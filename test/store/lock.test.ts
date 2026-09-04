@@ -159,6 +159,82 @@ describe('a holder that dies never wedges the store', () => {
     }
   })
 
+  it('reports a lock it could not create at all, rather than waiting on nothing', async () => {
+    const workspace = await aWorkspace()
+    try {
+      // A directory that does not exist is ENOENT, not EEXIST: nobody holds this lock and
+      // no amount of waiting will change that, so it is a refusal rather than a wait.
+      const nowhere = path.join(workspace.root, 'no', 'such', 'directory', '.lock')
+      const refused = await acquireLock(nowhere, { timeoutMs: 200 })
+      assert.equal(refused.ok, false)
+      assert.equal(refused.ok ? '' : refused.error.code, 'STORE_UNAVAILABLE')
+      assert.equal(refused.ok ? '' : refused.error.rule, 'S11')
+      assert.match(refused.ok ? '' : refused.error.message, /could not be created/)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('says only that it timed out when the lock file names no holder it can read', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      for (const body of ['not json at all', '{"pid":"one","host":"h","since":"s","nonce":"n"}', '{"pid":1,"host":"h"}']) {
+        await writeFile(file, body)
+        const refused = await acquireLock(file, { timeoutMs: 120, staleMs: 60_000 })
+        assert.equal(refused.ok, false, `${body} was treated as a holder`)
+        assert.equal(refused.ok ? '' : refused.error.code, 'LOCK_TIMEOUT')
+        assert.match(refused.ok ? '' : refused.error.message, /was not acquired within 120 ms$/)
+      }
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('tells a waiting caller who is holding it, once, after a second', async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const held = await acquireLock(file)
+      assert.ok(held.ok)
+
+      const notes: { pid: number | undefined; waited: number }[] = []
+      const second = await acquireLock(file, {
+        timeoutMs: 1_600,
+        onWaiting: (token, waited) => { notes.push({ pid: token?.pid, waited }) },
+      })
+      assert.equal(second.ok, false)
+      assert.equal(notes.length, 1, `the caller was told ${notes.length} times`)
+      assert.equal(notes[0]?.pid, process.pid, 'the note does not name the holder')
+      assert.ok((notes[0]?.waited ?? 0) >= 1_000, 'the note came before a second had passed')
+      await held.value.release()
+      t.diagnostic(`the waiting caller was notified once, after ${notes[0]?.waited} ms`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('releases once, and never unlinks a lock that changed hands', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const held = await acquireLock(file)
+      assert.ok(held.ok)
+      await held.value.release()
+      await held.value.release()
+
+      // Somebody else now holds it. A second release from the old handle must not remove it.
+      const next = await acquireLock(file)
+      assert.ok(next.ok)
+      await held.value.release()
+      assert.ok(await stat(file), 'the old handle unlinked the new holder\'s lock')
+      await next.value.release()
+      await assert.rejects(() => stat(file))
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
   it('names the holder when a caller asked for a bound and hit it', async () => {
     const workspace = await aWorkspace()
     try {
