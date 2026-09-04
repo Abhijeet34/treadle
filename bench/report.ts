@@ -13,6 +13,7 @@ import type { BenchConfig } from './config.ts'
 import type { Corpus } from './corpus.ts'
 import type { Floors } from './floors.ts'
 import type { GateReport } from './gate.ts'
+import type { LoadSample } from './load.ts'
 import type { Machine } from './machine.ts'
 import type { PackageFacts } from './package-facts.ts'
 import type { Accounting, TokenizerLoad } from './tokens.ts'
@@ -24,6 +25,7 @@ export type RunReport = {
   readonly finishedAt: string
   readonly durationMs: number
   readonly machine: Machine
+  readonly machineState: { readonly atStart: LoadSample; readonly atEnd: LoadSample }
   readonly config: BenchConfig
   readonly floors: Floors
   readonly corpora: readonly Corpus[]
@@ -53,7 +55,8 @@ function measurementRow(name: string, m: Measurement): string {
   const inp = m.inProcess === undefined ? 'NOT MEASURED' : ms(m.inProcess.p95.ms)
   const rss = m.peakRssKb === undefined ? 'NOT MEASURED' : `${(m.peakRssKb / 1024).toFixed(1)}`
   const failed = m.failures.length === 0 ? '' : ` **${m.failures.length} failed: ${m.failures[0]}**`
-  return `| ${name} | ${m.wall.n} | ${m.opsTotal} | ${statsCells(m.wall)} | ${net} | ${inp} | ${rss} |${failed}`
+  const load = `${m.load.before.load1} to ${m.load.after.load1}, ${m.load.before.nodeProcesses} node proc`
+  return `| ${name} | ${m.wall.n} | ${m.opsTotal} | ${statsCells(m.wall)} | ${net} | ${inp} | ${rss} | ${load} |${failed}`
 }
 
 function bytes(n: number | string): string {
@@ -77,12 +80,25 @@ export function toMarkdown(report: RunReport): string {
   push(`| Declared floor | ${report.machine.declaredNodeFloor}; this runtime ${report.machine.nodeMeetsFloor ? 'meets it' : '**is below it**, so every figure here was taken under a runtime the package refuses'} |`)
   push(`| Seed | ${report.config.seed} |`)
   push('')
+  push('This machine is shared with other work and was not idle for this run.')
+  push('Rather than wait for quiet, every row below carries the load either side of it, so a figure above its series can be judged against what the machine was doing.')
+  push('')
+  push('| Machine state | 1m load | 5m | 15m | free MiB | memory used | node processes |', '|---|---|---|---|---|---|---|')
+  for (const [when, sample] of [['at the start', report.machineState.atStart], ['at the end', report.machineState.atEnd]] as const) {
+    push(`| ${when} | ${sample.load1} | ${sample.load5} | ${sample.load15} | ${sample.freeMemMiB} | ${sample.usedMemPercent}% | ${sample.nodeProcesses} |`)
+  }
+  const peaks = report.latency.flatMap((s) => Object.values(s.operations).map((m) => m.load.peak1m))
+  if (peaks.length > 0) {
+    push('')
+    push(`Across the ${peaks.length} timed operations the 1-minute load ranged from ${Math.min(...peaks)} to ${Math.max(...peaks)}.`)
+  }
+  push('')
 
   push('## What the harness itself costs', '')
   push('Each row is a strict superset of the one above it, so a difference prices exactly one thing.')
   push('The spawn floor is subtracted from every net column below; the node floor is what the CI gate compares against.')
   push('')
-  push('| Floor | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB |', '|---|---|---|---|---|---|---|---|---|---|---|---|')
+  push('| Floor | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|')
   for (const row of report.floors.rows) push(measurementRow(row.label, row))
   push('')
   push(`Type stripping costs ${typeof report.floors.typeStrippingMs === 'number' ? `${ms(report.floors.typeStrippingMs)} ms` : report.floors.typeStrippingMs} and loading the store adapter costs ${typeof report.floors.storeLoadMs === 'number' ? `${ms(report.floors.storeLoadMs)} ms` : report.floors.storeLoadMs} on top of it, both taken from the ${report.floors.derivedFromStatistic}: they are fixed costs, and the cleanest launch of the fifty is the closest thing to an uncontaminated reading of one.`)
@@ -104,7 +120,7 @@ export function toMarkdown(report: RunReport): string {
   push('')
   for (const scale of report.latency) {
     push(`### ${scale.items} items, ${scale.shards} shards, largest shard ${scale.largestShardRecords} records`, '')
-    push('| Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB |', '|---|---|---|---|---|---|---|---|---|---|---|---|')
+    push('| Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     for (const [op, m] of Object.entries(scale.operations)) push(measurementRow(op, m))
     push('')
     push(`First index build with the index deleted: ${typeof scale.firstIndexBuildMs === 'number' ? `${scale.firstIndexBuildMs} ms` : scale.firstIndexBuildMs}. Re-index after a hand edit of the largest shard: ${typeof scale.reindexAfterHandEditMs === 'number' ? `${scale.reindexAfterHandEditMs} ms` : scale.reindexAfterHandEditMs}. Both in-process, one sample each.`)
@@ -142,9 +158,9 @@ export function toMarkdown(report: RunReport): string {
   push('')
 
   push('## The twelve comparison axes', '')
-  push('| Axis | Verdict | Observed | Reference | Target | ops | samples |', '|---|---|---|---|---|---|---|')
+  push('| Axis | Verdict | Observed | Reference | Target | ops | samples | peak load 1m |', '|---|---|---|---|---|---|---|---|')
   for (const a of report.axes) {
-    push(`| ${a.axis} ${a.name} | ${a.verdict} | ${a.observed} | ${a.reference} | ${a.target} | ${a.operations} | ${a.samples} |`)
+    push(`| ${a.axis} ${a.name} | ${a.verdict} | ${a.observed} | ${a.reference} | ${a.target} | ${a.operations} | ${a.samples} | ${a.load === undefined ? 'not sampled' : a.load.peak1m} |`)
   }
   push('')
   const blocked = report.axes.filter((a) => a.blockedOn !== undefined)

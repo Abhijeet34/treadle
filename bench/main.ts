@@ -20,6 +20,7 @@ import { loadConfig, samplesFor, type BenchConfig } from './config.ts'
 import { buildCorpus, type Corpus } from './corpus.ts'
 import { measureFloors } from './floors.ts'
 import { loadBudgets, programCost, runGate, ABSOLUTE_KEYS, AXIS_BUDGET_KEYS, type Budgets } from './gate.ts'
+import { peakLoad, sampleLoad } from './load.ts'
 import { describeMachine } from './machine.ts'
 import { packageFacts } from './package-facts.ts'
 import { toMarkdown, tokenizerFacts, type RunReport } from './report.ts'
@@ -112,10 +113,21 @@ async function main(): Promise<void> {
     ...(flags.samples === undefined ? {} : { samples: { default: flags.samples } }),
   }
   const startedAt = new Date()
+  const loadAtStart = sampleLoad()
   const runId = `${startedAt.toISOString().replace(/[:.]/g, '-')}`
   const started = performance.now()
 
   const say = (line: string): void => { process.stderr.write(`${line}\n`) }
+
+  // Every axis carries the load either side of it, for the same reason every measurement
+  // does: this machine is shared, and a figure without the machine's state beside it cannot
+  // be judged.
+  const withLoad = async (run: () => Promise<AxisResult>): Promise<AxisResult> => {
+    const before = sampleLoad()
+    const axis = await run()
+    const after = sampleLoad()
+    return { ...axis, load: { before, after, peak1m: peakLoad(before, after) } }
+  }
 
   const machine = describeMachine('24.15.0')
 
@@ -146,13 +158,13 @@ async function main(): Promise<void> {
 
   const a1Corpus = corpora.find((c) => c.spec.items === config.a5.corpusScale) ?? corpora[0] as Corpus
   say(`bench: A1, ${config.a1WriterCounts.join('/')} parallel writers`)
-  const a1 = await runA1(a1Corpus, config.a1WriterCounts, runToken(runId))
+  const a1 = await withLoad(() => runA1(a1Corpus, config.a1WriterCounts, runToken(runId)))
 
   say(`bench: A5, ${config.a5.randomEdits} random line edits plus the shaped cases`)
-  const a5 = await runA5(a1Corpus, config.corpusDir, config.a5.randomEdits, config.seed)
+  const a5 = await withLoad(() => runA5(a1Corpus, config.corpusDir, config.a5.randomEdits, config.seed))
 
   say('bench: A6, store resolution')
-  const a6 = await runA6(a1Corpus)
+  const a6 = await withLoad(() => runA6(a1Corpus))
 
   const loaded = loadTokenizers()
   const artefacts = await accountArtefacts(a1Corpus)
@@ -172,6 +184,7 @@ async function main(): Promise<void> {
     finishedAt: finished.toISOString(),
     durationMs: Math.round(performance.now() - started),
     machine,
+    machineState: { atStart: loadAtStart, atEnd: sampleLoad() },
     config,
     floors,
     corpora,

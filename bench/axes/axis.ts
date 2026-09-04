@@ -25,6 +25,8 @@ export type AxisResult = {
   readonly operations: number
   readonly samples: number
   readonly detail?: unknown
+  /** What else the machine was doing while this axis ran. */
+  readonly load?: { readonly before: unknown; readonly after: unknown; readonly peak1m: number }
   /** Named when the verdict is NOT MEASURED or PARTIAL: what has to land first. */
   readonly blockedOn?: string
 }

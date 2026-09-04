@@ -10,6 +10,8 @@
 
 import { spawnSync } from 'node:child_process'
 
+import { peakLoad, sampleLoad, type LoadSample } from './load.ts'
+
 export type Percentile = {
   readonly ms: number
   /** 1-based index into the sorted samples that this percentile selected. */
@@ -70,6 +72,8 @@ export type Measurement = {
   /** Store operations the children actually performed, summed. Zero is the tell. */
   readonly opsTotal: number
   readonly failures: readonly string[]
+  /** What else the machine was doing. Sampled either side of the whole measurement. */
+  readonly load: { readonly before: LoadSample; readonly after: LoadSample; readonly peak1m: number }
 }
 
 function percentile(sorted: readonly number[], p: number): Percentile {
@@ -158,6 +162,7 @@ export type MeasureOptions = LaunchOptions & {
 }
 
 export function measure(command: string, args: readonly string[], options: MeasureOptions): Measurement {
+  const loadBefore = sampleLoad()
   const samples: Sample[] = []
   const failures: string[] = []
   for (let i = 0; i <= options.samples; i += 1) {
@@ -181,6 +186,7 @@ export function measure(command: string, args: readonly string[], options: Measu
   const rss = retained.map((s) => s.report?.maxRssKb).filter((v): v is number => typeof v === 'number')
   const opsTotal = samples.reduce((sum, s) => sum + (s.report?.ops ?? 0), 0)
 
+  const loadAfter = sampleLoad()
   const shifted = options.floorMedianMs === undefined ? undefined : shift(wall, options.floorMedianMs)
   return {
     label: options.label,
@@ -193,5 +199,6 @@ export function measure(command: string, args: readonly string[], options: Measu
     ...(rss.length === 0 ? {} : { peakRssKb: Math.max(...rss) }),
     opsTotal,
     failures: failures.slice(0, 5),
+    load: { before: loadBefore, after: loadAfter, peak1m: peakLoad(loadBefore, loadAfter) },
   }
 }
