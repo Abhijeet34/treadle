@@ -24,6 +24,8 @@ type WriterOutcome = {
   readonly id: string
   readonly reported: 'ok' | 'refused' | 'crashed'
   readonly code?: string
+  readonly rule?: string
+  readonly message?: string
   readonly ms?: number
 }
 
@@ -91,7 +93,11 @@ export async function runA1(
     await store.close()
 
     const reportedOk = outcomes.filter((o) => o.reported === 'ok').length
-    const refusals = [...new Set(outcomes.filter((o) => o.reported !== 'ok').map((o) => o.code ?? o.reported))]
+    // The sentence, not only the code: a bare `VALIDATION` costs a round trip to find out
+    // which field the store refused, and the store already wrote that down.
+    const refusals = [...new Set(outcomes
+      .filter((o) => o.reported !== 'ok')
+      .map((o) => (o.message === undefined ? o.code ?? o.reported : `${o.code} ${o.rule}: ${o.message}`)))]
     const temps = existsSync(path.join(corpus.root, 'items'))
       ? readdirSync(path.join(corpus.root, 'items')).filter((f) => f.includes('.tmp.')).length
       : 0

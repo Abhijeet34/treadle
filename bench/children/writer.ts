@@ -38,5 +38,8 @@ await store.close()
 
 process.stdout.write(JSON.stringify(applied.ok
   ? { id, reported: 'ok', version: applied.value.writes[0]?.version, ms: Date.now() - started }
-  : { id, reported: 'refused', code: applied.error.code, rule: applied.error.rule, ms: Date.now() - started }) + '\n')
+  : {
+    id, reported: 'refused', code: applied.error.code, rule: applied.error.rule,
+    message: applied.error.message, ms: Date.now() - started,
+  }) + '\n')
 if (!applied.ok) process.exitCode = 1
