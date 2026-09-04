@@ -113,7 +113,7 @@ export function columnsOf(shape: ResultShape, key: string): readonly ColumnSpec[
   return property !== undefined && property.kind === 'block' ? property.columns : []
 }
 
-export function isBlock(value: Value): value is Block {
+export function isBlock(value: unknown): value is Block {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
