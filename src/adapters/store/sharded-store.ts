@@ -9,7 +9,8 @@
 // never overwrites a hand edit it did not see.
 
 import { createHash } from 'node:crypto'
-import { mkdir, open as openFile, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
 import {
@@ -190,6 +191,10 @@ export class ShardedStore implements Store {
     try {
       await this.#recoverJournals()
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
+      // Freshness first, inside the lock: the conflict message and the cross-shard id check
+      // both read the index, and a check that decides a refusal may not read a stale cache.
+      const fresh = await this.#refresh()
+      if (!fresh.ok) return fresh
       return await this.#applyUnderLock(transaction)
     } finally {
       await lock.value.release()
@@ -353,16 +358,18 @@ export class ShardedStore implements Store {
   }
 
   async #prefixUnchanged(full: string, previous: Fingerprint): Promise<boolean> {
-    const handle = await openFile(full, 'r')
+    if (previous.size === 0) return true
+    const hash = createHash('sha256')
+    let read = 0
     try {
-      const buffer = Buffer.alloc(previous.size)
-      const { bytesRead } = await handle.read(buffer, 0, previous.size, 0)
-      return bytesRead === previous.size && hashOf(buffer) === previous.hash
+      for await (const chunk of createReadStream(full, { start: 0, end: previous.size - 1 })) {
+        hash.update(chunk as Buffer)
+        read += (chunk as Buffer).byteLength
+      }
     } catch {
       return false
-    } finally {
-      await handle.close()
     }
+    return read === previous.size && hash.digest('hex') === previous.hash
   }
 
   /**
@@ -413,7 +420,7 @@ export class ShardedStore implements Store {
       applied.push({ id: write.item.id, version })
     }
 
-    const duplicate = this.#duplicateAcrossShards(transaction, shards)
+    const duplicate = this.#duplicateAcrossShards(transaction)
     if (duplicate !== undefined) return duplicate
 
     const files = [...shards].map(([file, parsed]) => ({
@@ -427,7 +434,7 @@ export class ShardedStore implements Store {
     await mkdir(path.dirname(journalPath), { recursive: true, mode: DIR_MODE })
     await writeFileAtomic(journalPath, JSON.stringify(journal))
 
-    await this.#applyJournal(journal)
+    await this.#applyJournal(journal, false)
     await rm(journalPath, { force: true })
 
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
@@ -481,20 +488,18 @@ export class ShardedStore implements Store {
   }
 
   /** An id may live in exactly one shard; a create into a second month is a named refusal. */
-  #duplicateAcrossShards(
-    transaction: StoreTransaction, shards: ReadonlyMap<string, ParsedFile>,
-  ): StoreResult<never> | undefined {
+  #duplicateAcrossShards(transaction: StoreTransaction): StoreResult<never> | undefined {
     for (const write of transaction.writes) {
       const home = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
       const row = this.#index.itemRow(write.item.id)
-      if (row !== undefined && row.file !== home && shards.has(home)) {
+      if (row !== undefined && row.file !== home) {
         return storeFail('CONFLICT', 'S3', `${write.item.id} is already a record in ${row.file}; a record never moves between shards`, [write.item.id])
       }
     }
     return undefined
   }
 
-  async #applyJournal(journal: Journal): Promise<void> {
+  async #applyJournal(journal: Journal, recovering: boolean): Promise<void> {
     for (const file of journal.files) {
       const full = path.join(this.#root, file.path)
       await mkdir(path.dirname(full), { recursive: true, mode: DIR_MODE })
@@ -503,9 +508,13 @@ export class ShardedStore implements Store {
     for (const log of journal.events) {
       const full = path.join(this.#root, log.path)
       await mkdir(path.dirname(full), { recursive: true, mode: DIR_MODE })
-      // Replay is idempotent by event id: only lines the file's tail does not already
-      // carry are appended, so re-applying a journal after a crash duplicates nothing.
-      const already = await eventIdsInTail(full, log.lines.length * MAX_EVENT_LINE_BYTES + 4096)
+      // Replay is idempotent by event id: on recovery only lines the file's tail does not
+      // already carry are appended, so re-applying a journal after a crash duplicates
+      // nothing. On the first pass every line is new, and reading the log back to prove it
+      // would make every write cost the size of the log.
+      const already = recovering
+        ? await eventIdsInTail(full, log.lines.length * MAX_EVENT_LINE_BYTES + 4096)
+        : new Set<string>()
       const missing = log.lines.filter((_, at) => !already.has(log.ids[at] as string))
       if (missing.length > 0) await appendAndSync(full, missing.join(''))
     }
@@ -525,7 +534,7 @@ export class ShardedStore implements Store {
       const full = path.join(dir, name)
       try {
         const journal = JSON.parse(await readFile(full, 'utf8')) as Journal
-        await this.#applyJournal(journal)
+        await this.#applyJournal(journal, true)
       } catch {
         // A journal we cannot read is a journal we cannot replay; the doctor reports it.
         continue

@@ -11,7 +11,7 @@
 // an append re-indexes the append rather than the file.
 
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync } from 'node:fs'
 import path from 'node:path'
 
 import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../application/ports/store.ts'
@@ -257,14 +257,6 @@ export class IndexCache {
     return rows.map((row) => (row.id === null
       ? { file: row.file, line: row.line, rule: row.rule, reason: row.reason }
       : { file: row.file, line: row.line, rule: row.rule, reason: row.reason, id: row.id }))
-  }
-
-  /** Deletes the database. The next call reopens an empty one and the store rebuilds it. */
-  reset(): void {
-    this.close()
-    for (const suffix of ['', '-wal', '-shm']) {
-      rmSync(`${this.#file}${suffix}`, { force: true })
-    }
   }
 
   close(): void {

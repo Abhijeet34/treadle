@@ -11,7 +11,7 @@
 // Finding F8 lands here too: a line is bounded before it is parsed, JSON nesting is
 // bounded before it is walked, and the file is read as a bounded stream rather than whole.
 
-import { readFile } from 'node:fs/promises'
+import { open } from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
 import { StringDecoder } from 'node:string_decoder'
 
@@ -192,8 +192,16 @@ export async function eventIdsInTail(path: string, window: number): Promise<Read
   const ids = new Set<string>()
   let text: string
   try {
-    const whole = await readFile(path, 'utf8')
-    text = whole.slice(Math.max(0, whole.length - window))
+    const handle = await open(path, 'r')
+    try {
+      const size = (await handle.stat()).size
+      const from = Math.max(0, size - window)
+      const buffer = Buffer.alloc(size - from)
+      await handle.read(buffer, 0, buffer.byteLength, from)
+      text = buffer.toString('utf8')
+    } finally {
+      await handle.close()
+    }
   } catch {
     return ids
   }
