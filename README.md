@@ -73,12 +73,18 @@ Each of these is specified and none is implemented yet.
 | Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
 | Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
 | Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
-| CLI, renderers, exit codes, help generation | Specified, not implemented |
-| Sprints, boards, ceremonies, metrics, impediments, doctor | Specified, not implemented |
+| Application services, the result object, the JSON Schemas | Implemented for the commands below |
+| Renderers: the compact agent line format, JSON, human | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `transition`, `next`, `explain`, `status`, `help`, `version` | Implemented |
+| Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
+| Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `doctor`, `config` | Specified, not implemented |
+| Sprints, boards, ceremonies, metrics, impediments, export, hooks, completions | Specified, not implemented |
 | Published package | Blocked on a name clearance that has not run |
 
-Nine of the thirteen findings in the project's threat model land in layers that do not exist yet.
-Four land here and are closed, each with a regression test that was shown to fail before it passed: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
+Eight of the thirteen findings in the project's threat model are closed, each with a regression test that was shown to fail before it passed.
+In the store: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
+In the output contract: a multi-line description forging lines in the agent stream, a column appended after a space-bearing one corrupting the row split, record content reaching a verbose log, and the data-versus-instruction boundary being legible to a parser but not to a model.
+The remaining five land in layers that do not exist yet.
 
 ## Documentation
 
