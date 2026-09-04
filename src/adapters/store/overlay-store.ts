@@ -101,8 +101,18 @@ export class OverlayStore implements Store {
       const conflict = compareAndSet(write.item.id, current, write.ifVersion)
       if (conflict !== undefined) return conflict
 
+      // The sharded store carries a stored record's unknown field keys forward; the
+      // overlay carries them from the item it is layering over, so a dry run diffs the
+      // same bytes the real write would produce. Unknown *sections* are the one thing it
+      // cannot carry, because `WorkItem` has a place for an unknown field and not for an
+      // unknown section; docs/architecture/adr/0006-the-store-seam.md names that gap.
+      const extra = new Map([...(current?.extra ?? []), ...(write.item.extra ?? [])])
       const version = (current?.version ?? 0) + 1
-      const round = roundTrip({ ...write.item, version })
+      const round = roundTrip({
+        ...write.item,
+        version,
+        ...(extra.size === 0 ? {} : { extra }),
+      })
       if (!round.ok) return round
       staged.set(write.item.id, round.value)
       applied.push({ id: write.item.id, version })
