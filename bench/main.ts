@@ -129,7 +129,7 @@ async function main(): Promise<void> {
 
   const a1Corpus = corpora.find((c) => c.spec.items === config.a5.corpusScale) ?? corpora[0] as Corpus
   say(`bench: A1, ${config.a1WriterCounts.join('/')} parallel writers`)
-  const a1 = await runA1(a1Corpus, config.a1WriterCounts)
+  const a1 = await runA1(a1Corpus, config.a1WriterCounts, runId.slice(11).replace(/-/g, ''))
 
   say(`bench: A5, ${config.a5.randomEdits} random line edits plus the shaped cases`)
   const a5 = await runA5(a1Corpus, config.corpusDir, config.a5.randomEdits, config.seed)

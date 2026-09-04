@@ -61,12 +61,19 @@ export type ParallelRound = {
   readonly findings: number
 }
 
-export async function runA1(corpus: Corpus, writerCounts: readonly number[]): Promise<AxisResult> {
+/**
+ * `runToken` keeps each run's ids distinct. A create asserts the item does not exist, so a
+ * second run against the same corpus would refuse every writer and report a durability with
+ * no denominator rather than a measurement.
+ */
+export async function runA1(
+  corpus: Corpus, writerCounts: readonly number[], runToken: string,
+): Promise<AxisResult> {
   const rounds: ParallelRound[] = []
   let operations = 0
 
   for (const n of writerCounts) {
-    const ids = Array.from({ length: n }, (_, i) => `a1-${n}-${String(i).padStart(4, '0')}`)
+    const ids = Array.from({ length: n }, (_, i) => `a1-${runToken}-${n}-${String(i).padStart(4, '0')}`)
     const started = performance.now()
     const outcomes = await Promise.all(ids.map((id) => runWriter(corpus.root, id, corpus.largestMonth)))
     const wallMs = performance.now() - started
@@ -105,6 +112,7 @@ export async function runA1(corpus: Corpus, writerCounts: readonly number[]): Pr
     })
   }
 
+  const unmeasurable = rounds.find((r) => typeof r.durability !== 'number')
   const allPerfect = rounds.every((r) => r.durability === 1)
   const worst = rounds.find((r) => r.durability !== 1)
   const crashed = rounds.reduce((sum, r) => sum + r.crashed, 0)
@@ -117,8 +125,10 @@ export async function runA1(corpus: Corpus, writerCounts: readonly number[]): Pr
     method: `N in {${writerCounts.join(', ')}} parallel creates from separate processes; persistence counted by reading the store`,
     reference: '100% at 5, 24, 60 on both builds (prior-art E1); 200 not run',
     target: '100% at every N, and zero silent mis-targets under the A6 scenarios',
-    verdict: allPerfect ? 'MET' : 'MISSED',
-    observed: allPerfect
+    verdict: unmeasurable !== undefined ? 'NOT MEASURED' : allPerfect ? 'MET' : 'MISSED',
+    observed: unmeasurable !== undefined
+      ? `${String(unmeasurable.durability)} at ${unmeasurable.writers} writers; ${unmeasurable.reportedRefused} were refused with ${unmeasurable.refusalCodes.join(', ') || 'no code'}`
+      : allPerfect
       ? `${rounds.map((r) => `${r.writers}: ${r.persisted}/${r.reportedOk}`).join(', ')}; every reported write is on disk, zero refusals, zero lock or temp files left. ${crashed === 0 ? 'Zero writers crashed' : `${crashed} of ${writerCounts.reduce((a, b) => a + b, 0)} writers crashed before reporting anything, which the ratio cannot see because a crash reports no success`}`
       : `${worst?.writers} writers: ${worst?.persisted} persisted of ${worst?.reportedOk} reported ok`,
     operations,

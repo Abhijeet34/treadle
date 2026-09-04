@@ -226,9 +226,15 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
 
   const a1 = report.axes.find((a) => a.axis === 'A1')
   const rounds = (a1?.detail as { rounds?: readonly { writers: number; durability: number | string }[] } | undefined)?.rounds
+  // A round with no successful writer has no denominator, and its ratio is the string that
+  // says so. Reading that as 0 would turn an unmeasurable round into a failing number, which
+  // is the one thing this rig exists not to do.
+  const unmeasured = rounds?.find((r) => typeof r.durability !== 'number')
   const worstDurability = rounds === undefined || rounds.length === 0
     ? 'NOT MEASURED: axis A1 reported no parallel rounds'
-    : Math.min(...rounds.map((r) => (typeof r.durability === 'number' ? r.durability : 0)))
+    : unmeasured !== undefined
+      ? String(unmeasured.durability)
+      : Math.min(...rounds.map((r) => r.durability as number))
   rows.push(axisBudget(budgets, 'a1Durability', 'A1 write durability, worst of the parallel rounds', worstDurability, 'ratio',
     typeof worstDurability === 'number' && worstDurability >= 1, rounds === undefined ? undefined : rounds.map((r) => `${r.writers}: ${r.durability}`).join(', ')))
 
