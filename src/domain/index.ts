@@ -48,6 +48,13 @@ export {
 } from './record.ts'
 
 export {
+  findUnsafeCharacter,
+  isSafeText,
+  type TextMode,
+  type UnsafeCharacter,
+} from './text.ts'
+
+export {
   COMMON_FIELDS,
   fieldsOf,
   isInstant,
