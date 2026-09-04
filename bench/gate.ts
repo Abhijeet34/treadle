@@ -2,8 +2,14 @@
 // DR8's regression gate.
 //
 // A CI runner is not this laptop, so no timing budget here is an absolute millisecond count.
-// Every timing row is checked as PROGRAM COST: the operation's p95 wall time minus the
-// runner's own `node -e` median, measured in the same job. That subtraction removes what the
+// Every timing row is checked as PROGRAM COST: the operation's MEDIAN wall time minus the
+// runner's own `node -e` median, measured in the same job.
+//
+// The median rather than the p95, because the p95 was measured and cannot carry a gate. Two
+// identical four-scale runs on this machine, 2026-09-05, moved their medians by at most 2.4%
+// across twenty operations and moved one p95 by 68.9%. A gate on the p95 would fire on the
+// scheduler. The p95 and p99 are still reported for every row, because what a slow
+// invocation costs an agent is worth knowing; they are just not what a build fails on. That subtraction removes what the
 // machine charges to start a process and leaves what our code charges to do the work, which
 // is the only part a regression can be attributed to. The committed limit is this machine's
 // measured program cost with the tolerance added, and `bench/budgets.json` records the run it
@@ -23,6 +29,8 @@ import type { RunReport } from './report.ts'
 
 export type Budgets = {
   readonly tolerancePercent: number
+  /** Where the tolerance came from. A percentage nobody measured is not a tolerance. */
+  readonly toleranceWhy: string
   readonly derivedFrom: {
     readonly runId: string
     readonly date: string
@@ -36,7 +44,7 @@ export type Budgets = {
     /** False until the limits have been re-derived on the machine the gate runs on. */
     readonly enforced: boolean
     readonly why?: string
-    /** `<op>@<scale>` to program cost at p95, in milliseconds. */
+    /** `<op>@<scale>` to program cost at the median, in milliseconds. */
     readonly limits: Readonly<Record<string, number>>
   }
   /** Axis outcomes that transfer across machines, so they have teeth on any runner. */
@@ -45,7 +53,7 @@ export type Budgets = {
 }
 
 export const AXIS_BUDGET_KEYS = [
-  'a1Durability', 'a5SilentDrops', 'a5WholeStoreRefusals', 'a5Crashes',
+  'a1Durability', 'a1Crashes', 'a5SilentDrops', 'a5WholeStoreRefusals', 'a5Crashes',
 ] as const
 export type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
 
@@ -80,6 +88,7 @@ export type GateRow = {
 
 export type GateReport = {
   readonly tolerancePercent: number
+  readonly toleranceWhy: string
   readonly derivedFrom: Budgets['derivedFrom']
   readonly rows: readonly GateRow[]
   readonly passed: number
@@ -93,9 +102,9 @@ export function loadBudgets(root: string): Budgets {
   return JSON.parse(readFileSync(path.join(root, 'bench', 'budgets.json'), 'utf8')) as Budgets
 }
 
-/** p95 wall time above the runner's own Node floor. Never below zero. */
-export function programCost(p95Ms: number, nodeFloorMs: number): number {
-  return Math.max(0, p95Ms - nodeFloorMs)
+/** Median wall time above the runner's own Node floor. Never below zero. */
+export function programCost(medianMs: number, nodeFloorMs: number): number {
+  return Math.max(0, medianMs - nodeFloorMs)
 }
 
 function compare(
@@ -178,12 +187,12 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
       const key = `${op}@${scale.items}`
       const limit = budgets.timing.limits[key]
       if (limit === undefined) {
-        rows.push({ budget: `${op} p95 at ${scale.items} items`, observed: programCost(measurement.wall.p95.ms, floor), limit: 'NOT MEASURED: no committed budget for this key', unit: 'ms', status: 'pending' })
+        rows.push({ budget: `${op} median at ${scale.items} items`, observed: programCost(measurement.wall.p50.ms, floor), limit: 'NOT MEASURED: no committed budget for this key', unit: 'ms', status: 'pending' })
         continue
       }
       rows.push(compare(
-        `${op} p95 at ${scale.items} items, above the node floor`,
-        measurement.failures.length > 0 ? `NOT MEASURED: ${measurement.failures[0]}` : programCost(measurement.wall.p95.ms, floor),
+        `${op} median at ${scale.items} items, above the node floor`,
+        measurement.failures.length > 0 ? `NOT MEASURED: ${measurement.failures[0]}` : programCost(measurement.wall.p50.ms, floor),
         Number((limit * slack).toFixed(1)),
         'ms',
         {
@@ -223,6 +232,11 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   rows.push(axisBudget(budgets, 'a1Durability', 'A1 write durability, worst of the parallel rounds', worstDurability, 'ratio',
     typeof worstDurability === 'number' && worstDurability >= 1, rounds === undefined ? undefined : rounds.map((r) => `${r.writers}: ${r.durability}`).join(', ')))
 
+  const a1Crashed = (a1?.detail as { crashed?: number } | undefined)?.crashed
+  rows.push(axisBudget(budgets, 'a1Crashes', 'A1 writers that crashed rather than reporting a refusal',
+    a1Crashed ?? 'NOT MEASURED: axis A1 reported no crash count', 'writers',
+    a1Crashed !== undefined && a1Crashed <= budgets.axes['a1Crashes'].limit))
+
   const counts = (report.axes.find((a) => a.axis === 'A5')?.detail as { counts?: Record<string, number> } | undefined)?.counts
   const a5 = (key: AxisBudgetKey, outcome: string, label: string): void => {
     const observed = counts === undefined ? 'NOT MEASURED: axis A5 reported no outcome counts' : (counts[outcome] ?? 0)
@@ -246,6 +260,7 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
 
   return {
     tolerancePercent: budgets.tolerancePercent,
+    toleranceWhy: budgets.toleranceWhy,
     derivedFrom: budgets.derivedFrom,
     rows,
     passed: rows.filter((r) => r.status === 'pass').length,

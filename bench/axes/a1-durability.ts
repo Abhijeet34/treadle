@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url'
 
 import { ShardedStore } from '../../src/adapters/store/index.ts'
 import type { Corpus } from '../corpus.ts'
+import { realStderr } from '../timing.ts'
 import type { AxisResult } from './axis.ts'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -36,7 +37,7 @@ function runWriter(root: string, id: string, month: string): Promise<WriterOutco
     child.on('close', (status) => {
       const line = out.trim().split('\n').filter((l) => l.startsWith('{')).pop()
       if (line === undefined) {
-        resolve({ id, reported: 'crashed', code: `exit ${status}: ${err.trim().slice(0, 200)}` })
+        resolve({ id, reported: 'crashed', code: `exit ${status}: ${realStderr(err)}` })
         return
       }
       resolve(JSON.parse(line) as WriterOutcome)
@@ -106,6 +107,7 @@ export async function runA1(corpus: Corpus, writerCounts: readonly number[]): Pr
 
   const allPerfect = rounds.every((r) => r.durability === 1)
   const worst = rounds.find((r) => r.durability !== 1)
+  const crashed = rounds.reduce((sum, r) => sum + r.crashed, 0)
 
   return {
     axis: 'A1',
@@ -117,11 +119,11 @@ export async function runA1(corpus: Corpus, writerCounts: readonly number[]): Pr
     target: '100% at every N, and zero silent mis-targets under the A6 scenarios',
     verdict: allPerfect ? 'MET' : 'MISSED',
     observed: allPerfect
-      ? `${rounds.map((r) => `${r.writers}: ${r.persisted}/${r.reportedOk}`).join(', ')}; every reported write is on disk, zero refusals, zero lock or temp files left`
+      ? `${rounds.map((r) => `${r.writers}: ${r.persisted}/${r.reportedOk}`).join(', ')}; every reported write is on disk, zero refusals, zero lock or temp files left. ${crashed === 0 ? 'Zero writers crashed' : `${crashed} of ${writerCounts.reduce((a, b) => a + b, 0)} writers crashed before reporting anything, which the ratio cannot see because a crash reports no success`}`
       : `${worst?.writers} writers: ${worst?.persisted} persisted of ${worst?.reportedOk} reported ok`,
     operations,
     samples: writerCounts.length,
-    detail: { rounds, misTargetScenarios: 'NOT MEASURED: the A6 scenarios resolve a store from a working directory, which is the command layer' },
+    detail: { rounds, crashed, misTargetScenarios: 'NOT MEASURED: the A6 scenarios resolve a store from a working directory, which is the command layer' },
     blockedOn: 'the mis-target half of this target is axis A6, which resolves a store from a working directory and needs the command layer',
   }
 }

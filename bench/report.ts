@@ -143,7 +143,9 @@ export function toMarkdown(report: RunReport): string {
   }
 
   push('## DR8 budget gate', '')
-  push(`Tolerance ${report.gate.tolerancePercent}% over the committed limit. Limits derived from run ${report.gate.derivedFrom.runId} on ${report.gate.derivedFrom.date} (${report.gate.derivedFrom.machine}, Node ${report.gate.derivedFrom.node}).`)
+  push(`Timing limits are program cost at the median: the operation's wall median minus the runner's own \`node -e\` median, measured in the same job.`)
+  push(`Tolerance ${report.gate.tolerancePercent}% over the committed limit, because ${report.gate.toleranceWhy}`)
+  push(`Limits derived from run ${report.gate.derivedFrom.runId} on ${report.gate.derivedFrom.date} (${report.gate.derivedFrom.machine}, Node ${report.gate.derivedFrom.node}).`)
   push(`${report.gate.rows.length} budgets: ${report.gate.passed} pass, ${report.gate.failed} fail, ${report.gate.openMisses} open miss, ${report.gate.pending} pending.`)
   push('An open miss is a budget the product has never met. It is reported with its number and does not fail a build for standing still; a regression against a budget that was met does.')
   push('')

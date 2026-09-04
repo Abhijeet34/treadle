@@ -29,6 +29,20 @@ export type Stats = {
   readonly maxMs: number
 }
 
+/**
+ * Node prints `ExperimentalWarning: SQLite ...` to stderr on every launch under this
+ * runtime, which is 150 characters ahead of whatever actually went wrong. Dropping the
+ * warning lines is what keeps a truncated capture from reporting the warning as the reason.
+ */
+export function realStderr(text: string, limit = 400): string {
+  return text
+    .split('\n')
+    .filter((line) => !/^\(node:\d+\)/.test(line) && !line.startsWith('(Use `node --trace-warnings'))
+    .join('\n')
+    .trim()
+    .slice(0, limit)
+}
+
 export type ChildReport = {
   readonly inProcessMs?: number
   readonly maxRssKb?: number
@@ -122,7 +136,7 @@ export function launchOnce(command: string, args: readonly string[], options: La
     return { wallMs, status: result.status, failure: result.error.message }
   }
   if (result.status !== 0) {
-    return { wallMs, status: result.status, failure: `exit ${result.status}: ${(result.stderr || '').trim().slice(0, 400)}` }
+    return { wallMs, status: result.status, failure: `exit ${result.status}: ${realStderr(result.stderr || '')}` }
   }
   const line = (result.stdout || '').trim().split('\n').filter((l) => l.startsWith('{')).pop()
   if (line === undefined) {

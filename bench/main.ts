@@ -72,20 +72,21 @@ function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budg
   const timing: Record<string, number> = {}
   for (const scale of report.latency) {
     for (const [op, m] of Object.entries(scale.operations)) {
-      timing[`${op}@${scale.items}`] = Number(programCost(m.wall.p95.ms, floor).toFixed(1))
+      timing[`${op}@${scale.items}`] = Number(programCost(m.wall.p50.ms, floor).toFixed(1))
     }
   }
   const coldStart = report.floors.rows.find((r) => r.label.startsWith('node + the store adapter'))
   return {
     tolerancePercent: previous.tolerancePercent,
+    toleranceWhy: previous.toleranceWhy,
     derivedFrom: {
       runId: report.runId,
       date: report.startedAt.slice(0, 10),
       machine: `${report.machine.cpuModel}, ${report.machine.cores} cores, ${report.machine.platform} ${report.machine.release}`,
       node: report.machine.node,
-      note: 'timing limits are program cost at p95: the operation wall p95 minus the runner\'s own node floor median, measured in the same job',
+      note: 'timing limits are program cost at the median: the operation wall median minus the runner\'s own node floor median, measured in the same job',
     },
-    coldStartMs: coldStart === undefined ? previous.coldStartMs : Number(programCost(coldStart.wall.p95.ms, floor).toFixed(1)),
+    coldStartMs: coldStart === undefined ? previous.coldStartMs : Number(programCost(coldStart.wall.p50.ms, floor).toFixed(1)),
     timing: { ...previous.timing, limits: timing },
     axes: Object.fromEntries(AXIS_BUDGET_KEYS.map((k) => [k, previous.axes[k]])) as Budgets['axes'],
     absolute: Object.fromEntries(ABSOLUTE_KEYS.map((k) => [k, previous.absolute[k]])) as Budgets['absolute'],

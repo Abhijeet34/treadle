@@ -21,6 +21,7 @@ import { fileURLToPath } from 'node:url'
 
 import { random } from '../../test/helpers/store-fixtures.ts'
 import type { Corpus } from '../corpus.ts'
+import { realStderr } from '../timing.ts'
 import type { AxisResult } from './axis.ts'
 
 const HERE = path.dirname(fileURLToPath(import.meta.url))
@@ -55,7 +56,7 @@ export type Case = {
 function audit(root: string): { readonly audit?: Audit; readonly crash?: string } {
   const result = spawnSync(process.execPath, [AUDIT, root], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, timeout: 120_000 })
   if (result.error !== undefined) return { crash: result.error.message }
-  if (result.status !== 0) return { crash: `exit ${result.status}: ${(result.stderr || '').trim().slice(0, 300)}` }
+  if (result.status !== 0) return { crash: `exit ${result.status}: ${realStderr(result.stderr || '')}` }
   const line = (result.stdout || '').trim().split('\n').filter((l) => l.startsWith('{')).pop()
   if (line === undefined) return { crash: `no report on stdout: ${(result.stdout || '').trim().slice(0, 200)}` }
   return { audit: JSON.parse(line) as Audit }
