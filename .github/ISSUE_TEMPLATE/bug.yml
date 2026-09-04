@@ -1,0 +1,47 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Bug report
+description: Something behaves differently from what the docs say.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Not a bug in behaviour but a security problem? Do not file it here.
+        Use the private route in [SECURITY.md](https://github.com/Abhijeet34/treadle/blob/main/SECURITY.md).
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: The release tag you ran, or the commit SHA if you built from source.
+      placeholder: v0.1.0, or 13f8747
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Operating system and Node version
+      description: Output of `node --version`, and which OS.
+      placeholder: macOS 15.6, Node v24.15.0
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: What you ran
+      description: The exact command, and the output. Paste it rather than describing it.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+      description: If the docs say something different from what you saw, quote the line.
+    validations:
+      required: true
+  - type: textarea
+    id: workspace
+    attributes:
+      label: The smallest workspace that reproduces it
+      description: Optional, and the single most useful thing you can attach.
+      render: markdown

@@ -4,6 +4,39 @@ This file is the project's committed home for project-intrinsic agent knowledge:
 
 - Add durable project-specific notes here as they are discovered through real work.
 
+## What this project is, and where its rules live
+
+treadle is an agile work-management CLI whose committed markdown files are the source of
+truth. The design was written before the code, so prefer reading a doc over inferring from
+the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams),
+`docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
+name), `docs/STABILITY.md` (what counts as a breaking change), `docs/PROVENANCE.md`
+(clean-room process). `README.md`'s Status table says what is implemented and what is only
+specified.
+
+## Build and test
+
+`npm run check` is the gate: `tsc --noEmit` then `node --test`. There is no build step in
+development. Node runs the TypeScript directly by stripping types, which is why
+`tsconfig.json` sets `erasableSyntaxOnly` and the code uses `const` objects and union types
+rather than enums, and why every relative import carries its `.ts` extension.
+
+`package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
+below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
+`npm install` here is expected and is not a defect to fix.
+
+## Rules that are tests rather than conventions
+
+Before hand-checking any of these, run the suite: it already checks them.
+
+- `src/domain` may import nothing but `src/domain`, and may not touch the filesystem, the
+  clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
+- Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
+  Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
+- Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
+- Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
+  `scripts/check-dco.sh` and commitlint over a pull request's commits.
+
 ## CI runner platforms
 
 If this project runs GitHub Actions, a pull request runs Linux runners only.

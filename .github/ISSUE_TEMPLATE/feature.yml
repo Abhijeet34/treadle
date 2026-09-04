@@ -1,0 +1,36 @@
+# SPDX-License-Identifier: Apache-2.0
+name: Feature request
+description: You want it to do something it does not do.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The design for this project was written before the code, so a request that names
+        the problem can often be answered from a decision that already exists.
+        Start with what you were trying to accomplish.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What were you trying to accomplish
+      description: The situation, not the solution. What did you have to do instead?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you would like it to do
+      description: A command shape, a flag, an output, or just a description.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What you considered and rejected
+      description: Optional. What did not work, and why.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope
+      options:
+        - label: I have read the Status table in the README and this is not already specified but unimplemented.
