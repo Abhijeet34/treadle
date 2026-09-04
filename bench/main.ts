@@ -117,9 +117,7 @@ async function main(): Promise<void> {
 
   const say = (line: string): void => { process.stderr.write(`${line}\n`) }
 
-  say(`bench ${runId}: floors, ${config.floorSamples} samples each`)
   const machine = describeMachine('24.15.0')
-  const floors = measureFloors(config.floorSamples)
 
   await mkdir(config.corpusDir, { recursive: true })
   const corpora: Corpus[] = []
@@ -133,6 +131,15 @@ async function main(): Promise<void> {
       lastMonth: config.lastMonth,
     }, flags.reuseCorpus))
   }
+
+  // Floors AFTER the corpora and immediately before the operations they are subtracted from,
+  // so both are measured in the same conditions. Generating the four corpora writes about
+  // 430 MB, and a floor taken on an idle machine before that write against operations timed
+  // while it is still draining puts the whole of the writeback into program cost: measured
+  // 2026-09-05, that ordering opened six small-scale timing rows by up to 58% while the 50k
+  // rows, which run once the flush has drained, sat on their nine-run medians.
+  say(`bench ${runId}: floors, ${config.floorSamples} samples each`)
+  const floors = measureFloors(config.floorSamples)
 
   say('bench: A4, latency at scale')
   const a4 = await runA4(corpora, (items) => samplesFor(config, items), floors.spawnMedianMs)
