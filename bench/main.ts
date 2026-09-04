@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 
 import { runA1 } from './axes/a1-durability.ts'
 import { runA4 } from './axes/a4-latency.ts'
+import { runA3 } from './axes/a3-output.ts'
 import { runA5 } from './axes/a5-robustness.ts'
 import { runA6, remainingAxes } from './axes/remaining.ts'
 import type { AxisResult } from './axes/axis.ts'
@@ -150,7 +151,10 @@ async function main(): Promise<void> {
   const artefacts = await accountArtefacts(a1Corpus)
   const accounting = artefacts.map((a) => account(a.label, a.text, loaded))
 
-  const axes: AxisResult[] = [a1, a4.axis, a5, a6, ...remainingAxes()]
+  say('bench: A3, output bytes and tokens over the golden command results')
+  const a3 = await runA3(loaded)
+
+  const axes: AxisResult[] = [a1, a3.axis, a4.axis, a5, a6, ...remainingAxes()]
     .sort((a, b) => Number(a.axis.slice(1)) - Number(b.axis.slice(1)))
 
   const committed = loadBudgets(ROOT)
@@ -168,6 +172,7 @@ async function main(): Promise<void> {
     packageFacts: packageFacts(ROOT),
     tokenizers: tokenizerFacts(loaded),
     accounting,
+    outputBudgets: a3.rows,
     axes,
   }
   // With --write-budgets the limits come from this run, so the gate is reported against the

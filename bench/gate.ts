@@ -252,17 +252,23 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   a5('a5WholeStoreRefusals', 'whole-store refusal', 'A5 whole-store refusals')
   a5('a5Crashes', 'crash', 'A5 crashes')
 
-  for (const axis of report.axes) {
-    if (axis.axis !== 'A3') continue
-    rows.push({
-      budget: 'output size per command, bytes and tokens',
-      observed: axis.observed,
-      limit: 'the per-command budgets of the interface specification section A.3',
-      unit: 'bytes',
+  // DR8's output row: bytes enforced, tokens advisory. Reported as the count over budget so
+  // the row carries a number rather than a sentence, and the per-artefact table carries the
+  // rest.
+  const over = report.outputBudgets.filter((r) => !r.withinBudget)
+  rows.push(report.outputBudgets.length === 0
+    ? {
+      budget: 'output size per command, bytes enforced and tokens advisory (interface A.3)',
+      observed: 'NOT MEASURED: the run produced no rendered command artefact',
+      limit: 'the per-command budgets of interface specification A.3',
+      unit: 'artefacts',
       status: 'pending',
-      note: axis.blockedOn,
-    })
-  }
+    }
+    : compare(
+      'output size per command, bytes enforced and tokens advisory (interface A.3)',
+      over.length, 0, 'artefacts over budget',
+      { note: `${report.outputBudgets.length} artefacts measured${over.length === 0 ? '' : `; over: ${over.map((r) => `${r.artefact} ${r.bytes}/${r.allowedBytes} B`).join(', ')}`}` },
+    ))
 
   return {
     tolerancePercent: budgets.tolerancePercent,

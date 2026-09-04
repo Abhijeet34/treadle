@@ -7,6 +7,7 @@
 // a stated absence rather than degrading to a zero.
 
 import type { AxisResult } from './axes/axis.ts'
+import type { OutputRow } from './axes/a3-output.ts'
 import type { ScaleRow } from './axes/a4-latency.ts'
 import type { BenchConfig } from './config.ts'
 import type { Corpus } from './corpus.ts'
@@ -30,6 +31,7 @@ export type RunReport = {
   readonly packageFacts: PackageFacts
   readonly tokenizers: readonly { readonly name: string; readonly package: string; readonly version: string | null; readonly loaded: boolean; readonly reason?: string }[]
   readonly accounting: readonly Accounting[]
+  readonly outputBudgets: readonly OutputRow[]
   readonly axes: readonly AxisResult[]
   readonly gate: GateReport
 }
@@ -116,6 +118,16 @@ export function toMarkdown(report: RunReport): string {
   push('| Artefact | Bytes | Lines | claude | o200k | cl100k | B/token claude | B/token o200k | B/token cl100k |', '|---|---|---|---|---|---|---|---|---|')
   for (const a of report.accounting) {
     push(`| ${a.label} | ${a.bytes} | ${a.lines} | ${a.tokens.claude} | ${a.tokens.o200k} | ${a.tokens.cl100k} | ${a.bytesPerToken.claude} | ${a.bytesPerToken.o200k} | ${a.bytesPerToken.cl100k} |`)
+  }
+  push('')
+
+  push('## Output budgets per command', '')
+  push('Bytes are the gate and tokens are advisory, per DR8. The budgets are the interface specification\'s section A.3, adjusted upward by four bytes for every occurrence of the binary name, because A.3 was stated against a three-character name.')
+  push('The reference column is quoted from the prior-art axes table and was never re-derived here.')
+  push('')
+  push('| Artefact | Bytes | Budget | Within | claude | o200k | cl100k | B/token claude | Reference | Against reference |', '|---|---|---|---|---|---|---|---|---|---|')
+  for (const r of report.outputBudgets) {
+    push(`| ${r.artefact} | ${r.bytes} | ${r.allowedBytes} | ${r.withinBudget ? 'yes' : '**no**'} | ${r.tokens.claude} | ${r.tokens.o200k} | ${r.tokens.cl100k} | ${r.bytesPerToken.claude} | ${r.referenceBytes} | ${r.againstReference} |`)
   }
   push('')
 

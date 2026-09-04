@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// The nine axes this rig cannot fill yet, each carrying the method it will be measured by so
+// The seven axes this rig cannot fill yet, each carrying the method it will be measured by so
 // the next task inherits a harness rather than a paragraph.
 //
 // Every one of them is NOT MEASURED with the reason stated. None is estimated, interpolated
@@ -17,7 +17,10 @@ import { resolveWorkspace } from '../../src/adapters/store/index.ts'
 import type { Corpus } from '../corpus.ts'
 import { notMeasured, type AxisResult } from './axis.ts'
 
-const COMMAND_LAYER = 'the command layer, which is being built in parallel; nothing under src/cli exists in this tree'
+// The command layer landed in #3 while this rig was being built, which is what let axis A3
+// move out of this file. What remains needs more than a rendered artefact: a scored question
+// set, a driven transition, an attempt per state pair, a metrics layer.
+const COMMAND_LAYER = 'the command surface exists since #3, but this axis needs a harness that drives it: nothing here scores it yet'
 
 /**
  * A6's cwd scenario at the seam that owns it. The store is resolved by walking up from a
@@ -49,7 +52,7 @@ export async function runA6(corpus: Corpus): Promise<AxisResult> {
     name: 'Mis-target rate',
     metric: 'commands that write to a store other than the one the human is looking at',
     corpus: 'the cwd scenario plus config-in-parent and env-override scenarios',
-    method: 'store resolution from the root, a subdirectory and an unrelated directory; the other two scenarios need a config file and an environment override, neither of which exists yet',
+    method: 'store resolution from the root, a subdirectory and an unrelated directory; the other two scenarios need a config file and an environment override',
     reference: '1 of 3 scenarios writes elsewhere silently (prior-art E2)',
     target: '0 of 3; every write prints the store identity',
     verdict: 'PARTIAL',
@@ -63,7 +66,7 @@ export async function runA6(corpus: Corpus): Promise<AxisResult> {
   }
 }
 
-/** The eight axes with nothing at the store seam to measure, each with its method kept. */
+/** The seven axes with nothing this rig can reach yet, each with its method kept. */
 export function remainingAxes(): readonly AxisResult[] {
   return [
     notMeasured({
@@ -73,17 +76,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'one command per question, scored full, partial or none',
       reference: '4 full, 6 partial, 15 none',
       target: '25 full',
-      reason: `there are no commands to score; blocked on ${COMMAND_LAYER}`,
-      blockedOn: COMMAND_LAYER,
-    }),
-    notMeasured({
-      axis: 'A3', name: 'Token cost',
-      metric: 'bytes of output for dashboard, list of 9, single item, ready list',
-      corpus: "the reference's 9-item fixture shape, recreated in our model",
-      method: 'byte count of stdout, plus the three tokenizers this rig loads, reported per tokenizer and never averaged',
-      reference: '1441, 1781, 322, 659 bytes (prior-art E10)',
-      target: 'at most the same bytes for the same information, every extra byte attributable to a field the reference lacks',
-      reason: `no command writes to stdout yet, so there is no artefact to count; the accounting instrument is built and demonstrated on store artefacts in this report. Blocked on ${COMMAND_LAYER}`,
+      reason: `the 25 questions have to be put to the command surface one at a time and scored full, partial or none; ${COMMAND_LAYER}`,
       blockedOn: COMMAND_LAYER,
     }),
     notMeasured({
@@ -93,7 +86,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'count items whose current state is explained by an event chain',
       reference: '0 of 50, the reference keeps no history',
       target: '50 of 50',
-      reason: `driving an item through a legal transition is the transition command, and reading the chain back is the explain command; blocked on ${COMMAND_LAYER}`,
+      reason: `this needs 50 items driven through 200 random legal transitions and each chain read back; ${COMMAND_LAYER}`,
       blockedOn: COMMAND_LAYER,
     }),
     notMeasured({
@@ -103,7 +96,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'attempt each pair and read the refusal',
       reference: '0 refused of 6 illegal pairs tried (prior-art E8)',
       target: 'every illegal pair refused with a guard id',
-      reason: `src/domain/state-machine.ts holds the rule table and test/domain/state-machine.test.ts exercises it, but the axis scores a command's refusal and its printed guard id; blocked on ${COMMAND_LAYER}`,
+      reason: `src/domain/state-machine.ts holds the rule table and test/domain/state-machine.test.ts exercises it, but the axis scores every ordered state pair through the command surface and reads the printed guard id; ${COMMAND_LAYER}`,
       blockedOn: COMMAND_LAYER,
     }),
     notMeasured({
@@ -123,7 +116,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'attempt each creation and read the refusal',
       reference: '0 of 11 refused, the reference has a single free-text kind',
       target: '11 of 11',
-      reason: `src/domain/fields.ts refuses these today and the domain suite covers them, but the axis scores what a creation command refuses at the surface; blocked on ${COMMAND_LAYER}`,
+      reason: `src/domain/fields.ts refuses these today and the domain suite covers them, but the axis scores one invalid creation per rule at the surface; ${COMMAND_LAYER}`,
       blockedOn: COMMAND_LAYER,
     }),
     notMeasured({
@@ -133,7 +126,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'run the full feature set with no harness present and count files written',
       reference: 'setup writes 4 files across 3 harnesses',
       target: '0 required; adapters optional and generated',
-      reason: 'there is no feature set to run and no adapter generator; the store writes only inside the workspace directory, which is a property this rig does not yet assert',
+      reason: 'this needs the full feature set run with no harness present and the files it wrote counted, and there is no adapter generator to score; the store writes only inside the workspace directory, which is a property this rig does not yet assert',
       blockedOn: COMMAND_LAYER,
     }),
     notMeasured({
@@ -143,7 +136,7 @@ export function remainingAxes(): readonly AxisResult[] {
       method: 'invoke each verb with a success and a failure input and validate both against the shipped schema',
       reference: 'mutations only; reads refuse the flag with exit 2; errors on stdout (prior-art E9)',
       target: 'every verb, both paths',
-      reason: `there are no verbs and schemas/ carries no schema; blocked on ${COMMAND_LAYER}`,
+      reason: `schemas/ carries eleven schemas since #3 and test/cli/schemas.test.ts validates against them, but the axis scores every verb on both its success and its failure path; ${COMMAND_LAYER}`,
       blockedOn: COMMAND_LAYER,
     }),
   ]
