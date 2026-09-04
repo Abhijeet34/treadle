@@ -111,6 +111,25 @@ describe('the class is enforced at the store boundary, in both directions', () =
     }
   })
 
+  it('refuses to write an extra field value carrying a pop directional isolate', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const item = anItem({ extra: new Map([['custom_field', 'evil\u2069text']]) })
+      const refused = await workspace.store.apply({ txn: 't1', writes: [{ item }], events: [] })
+      assert.equal(refused.ok, false)
+      assert.equal(refused.ok ? undefined : refused.error.code, 'VALIDATION')
+      assert.match(refused.ok ? '' : refused.error.message, /custom_field/)
+      assert.match(refused.ok ? '' : refused.error.message, /U\+2069 POP DIRECTIONAL ISOLATE/)
+
+      const shard = path.join(workspace.root, 'items/2026-09.md')
+      const items = await workspace.store.list()
+      assert.deepEqual(items.ok ? items.value.map((i) => i.id) : [], [])
+      await assert.rejects(readFile(shard, 'utf8'))
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
   it('refuses a section body carrying one', () => {
     const source = renderRecord({
       id: 'alpha-one', title: 'Alpha', fields: new Map([['state', 'draft']]),

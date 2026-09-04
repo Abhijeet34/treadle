@@ -5,7 +5,7 @@
 
 import { fail, ok, type Failure, type Result } from './errors.ts'
 import { validateFieldKeys } from './record.ts'
-import { isSafeText } from './text.ts'
+import { findUnsafeCharacter, isSafeText } from './text.ts'
 import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
@@ -158,7 +158,18 @@ const CHECKS: Readonly<Record<string, Check>> = {
     return value > options.now ? undefined : `hold_until ${value} is not in the future`
   },
   held_from: oneOf('held_from', ['draft', 'ready', 'in_progress', 'in_review']),
-  extra: (value) => (value instanceof Map ? undefined : 'extra must be a Map of unknown field keys to their verbatim values'),
+  extra: (value) => {
+    if (!(value instanceof Map)) return 'extra must be a Map of unknown field keys to their verbatim values'
+    for (const [key, entry] of value as ReadonlyMap<string, unknown>) {
+      if (typeof entry !== 'string' || !isSafeText(entry, 'line')) {
+        const unsafe = typeof entry === 'string' ? findUnsafeCharacter(entry, 'line') : undefined
+        return unsafe === undefined
+          ? `extra.${key} must be a single line with no control or bidi override characters`
+          : `extra.${key} carries ${unsafe.label} at character ${unsafe.at}, which is refused`
+      }
+    }
+    return undefined
+  },
 
   outcome: text('outcome', 1000),
   target_date: instant('target_date'),

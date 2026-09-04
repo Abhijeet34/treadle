@@ -133,6 +133,19 @@ export class ShardedStore implements Store {
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
     const file = path.join(this.#root, WORKSPACE_FILE)
+    let info: Awaited<ReturnType<typeof stat>>
+    try {
+      info = await stat(file)
+    } catch {
+      return storeFail('STORE_UNAVAILABLE', 'S1', `${file} is not there, so this directory is not a treadle workspace`, [this.#root])
+    }
+    if (info.size > MAX_FILE_BYTES) {
+      return storeFail(
+        'STORE_UNAVAILABLE', 'S4',
+        `${file} is ${info.size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
+        [this.#root],
+      )
+    }
     let text: string
     try {
       text = await readFile(file, 'utf8')

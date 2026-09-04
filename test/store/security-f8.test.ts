@@ -20,6 +20,7 @@ import {
   MAX_FILE_BYTES,
   MAX_RECORDS_PER_FILE,
   MAX_SECTION_BYTES,
+  openWorkspace,
   parseEventLine,
   parseFile,
   parseRecordSource,
@@ -49,6 +50,21 @@ describe('a file bigger than its ceiling is a named refusal, not an out-of-memor
       assert.ok(refusal, 'expected an S4 ceiling refusal')
       assert.equal(refusal.file, 'items/2026-10.md')
       assert.match(refusal.reason, new RegExp(`over the ${MAX_FILE_BYTES} byte ceiling`))
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it(`refuses to open a workspace whose workspace.md is over ${MAX_FILE_BYTES} bytes`, async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, 'workspace.md')
+      await truncate(file, MAX_FILE_BYTES + 1)
+
+      const opened = await openWorkspace(workspace.root)
+      assert.equal(opened.ok, false)
+      assert.equal(opened.ok ? '' : opened.error.rule, 'S4')
+      assert.match(opened.ok ? '' : opened.error.message, new RegExp(`over the ${MAX_FILE_BYTES} byte ceiling`))
     } finally {
       await workspace.dispose()
     }
