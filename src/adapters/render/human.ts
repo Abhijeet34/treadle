@@ -12,6 +12,23 @@ import { isBlock, type ColumnSpec, type ResultObject, type Value } from '../../a
 import type { Renderer, RenderOptions } from './index.ts'
 import { displayWidth, truncateToWidth } from './width.ts'
 
+/**
+ * Right-to-left content reorders the cells around it, so a correct table looks wrong. A
+ * field carrying any strong right-to-left or Arabic-number character is emitted inside a
+ * first-strong isolate, which confines the reordering to that field. Both isolate characters
+ * are zero width, so the column arithmetic is unchanged.
+ *
+ * Only the human rendering does this. `agent` is parsed rather than displayed, and an
+ * isolate spliced into a value there would be a byte the consumer did not store.
+ */
+const BIDI = /[\u0590-\u05ff\u0600-\u07bf\u0860-\u08ff\ufb1d-\ufdff\ufe70-\ufeff\u{10800}-\u{10fff}\u{1e800}-\u{1eeff}]/u
+const FIRST_STRONG_ISOLATE = '\u2068'
+const POP_DIRECTIONAL_ISOLATE = '\u2069'
+
+export function isolated(value: string): string {
+  return BIDI.test(value) ? `${FIRST_STRONG_ISOLATE}${value}${POP_DIRECTIONAL_ISOLATE}` : value
+}
+
 const DEFAULT_WIDTH = 80
 export const MIN_WIDTH = 40
 export const MAX_WIDTH = 200
@@ -36,7 +53,7 @@ function table(
   const order = [...fixed, ...free]
   const cell = (row: Readonly<Record<string, unknown>>, column: ColumnSpec): string => {
     const value = row[column.name]
-    return value === null || value === undefined || value === '' ? '-' : String(value)
+    return value === null || value === undefined || value === '' ? '-' : isolated(String(value))
   }
   const widths = order.map((column) =>
     Math.max(displayWidth(column.name), ...rows.map((row) => displayWidth(cell(row, column)))))
@@ -170,10 +187,10 @@ export const humanRenderer: Renderer = {
         const text = String(value)
         if (text.length === 0) continue
         lines.push(`  ${property.key}`)
-        lines.push(...wrap(text, width - 4, '    '))
+        lines.push(...wrap(isolated(text), width - 4, '    '))
         continue
       }
-      lines.push(`  ${property.key}  ${scalarText(value)}`)
+      lines.push(`  ${property.key}  ${isolated(scalarText(value))}`)
     }
     return `${fit(lines, width).join('\n')}\n`
   },

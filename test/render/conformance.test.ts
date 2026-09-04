@@ -10,7 +10,7 @@ import { describe, it, before } from 'node:test'
 
 import type { ResultObject } from '../../src/application/result.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
-import { humanRenderer } from '../../src/adapters/render/human.ts'
+import { humanRenderer, isolated } from '../../src/adapters/render/human.ts'
 import { jsonRenderer } from '../../src/adapters/render/json.ts'
 import { RENDERINGS, type Renderer } from '../../src/adapters/render/index.ts'
 import { displayWidth } from '../../src/adapters/render/width.ts'
@@ -157,3 +157,42 @@ function split(line: string, arity: number): readonly string[] {
   parts.push(rest)
   return parts
 }
+
+describe('right-to-left content is confined to its own field in the human rendering', () => {
+  const RTL = 'تسجيل الدخول'
+  const result: ResultObject = {
+    schema: 'backlog/1', ok: true, code: 'OK', command: 'backlog', workspace: 'w',
+    effect: 'read', txn: null, changed: null,
+    data: {
+      sort: 'priority,filed,id',
+      items: {
+        columns: [{ name: 'id' }, { name: 'state' }, { name: 'title', text: true }],
+        shown: 2, total: 2,
+        rows: [
+          { id: 'sso-saml', state: 'ready', title: RTL },
+          { id: 'dep-bump', state: 'draft', title: 'Move the toolchain' },
+        ],
+      },
+    },
+  }
+
+  // The isolates are written as escapes rather than as literal codepoints: an invisible
+  // character in source is unreadable, and the machine-wide provenance scan refuses one on
+  // sight rather than trying to tell a subject under test from a hidden marker.
+  it('wraps a field carrying strong right-to-left text in an isolate', () => {
+    const rendered = humanRenderer.render(result, { width: 80 })
+    assert.ok(rendered.includes(`\u2068${RTL}\u2069`), 'the field is not isolated')
+    assert.equal(rendered.includes('\u2068Move the toolchain'), false, 'a left-to-right field was isolated too')
+  })
+
+  it('leaves the column arithmetic alone, because both isolates are zero width', () => {
+    assert.equal(displayWidth(`\u2068${RTL}\u2069`), displayWidth(RTL))
+    assert.equal(isolated('plain ascii'), 'plain ascii')
+  })
+
+  it('splices nothing into the agent rendering, which is parsed rather than displayed', () => {
+    const rendered = agentRenderer.render(result)
+    assert.ok(rendered.includes(RTL))
+    assert.equal(rendered.includes('\u2068'), false, 'an isolate reached a value a consumer parses')
+  })
+})
