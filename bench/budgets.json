@@ -1,0 +1,22 @@
+{
+  "tolerancePercent": 25,
+  "derivedFrom": {
+    "runId": "NOT MEASURED: no run has produced these limits yet",
+    "date": "NOT MEASURED",
+    "machine": "NOT MEASURED",
+    "node": "NOT MEASURED",
+    "note": "run `npm run bench -- --write-budgets` to fill the timing limits from a measured run"
+  },
+  "coldStartMs": null,
+  "timing": {},
+  "absolute": {
+    "peakRssReadKb": { "limit": 102400, "enforced": true, "source": "DR8, 100 MiB for a read at 50k" },
+    "peakRssMutationKb": { "limit": 122880, "enforced": true, "source": "DR8, 120 MiB for a mutation at 50k" },
+    "firstIndexBuildMs": { "limit": 6000, "enforced": true, "source": "DR8, 6 s for 50k items and 500k events" },
+    "reindexAfterHandEditMs": { "limit": 50, "enforced": true, "source": "DR8, 50 ms after a hand edit of the largest shard" },
+    "indexToTextRatio": { "limit": 1.0, "enforced": true, "source": "DR8, index at most 1.0x the text size" },
+    "runtimeDependencies": { "limit": 0, "enforced": true, "source": "DR7, zero runtime dependencies" },
+    "installUnpackedBytes": { "limit": 1572864, "enforced": true, "source": "DR8, 1.5 MB unpacked" },
+    "bundleBytes": { "limit": 512000, "enforced": true, "source": "DR8, 500 KB bundle" }
+  }
+}
