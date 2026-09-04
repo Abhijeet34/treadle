@@ -1,0 +1,216 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "status.v1.json",
+  "title": "status/1",
+  "description": "Orient a caller in the workspace in one call.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "status/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "const": "status"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "points": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "states": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "state"
+            },
+            {
+              "name": "n"
+            }
+          ]
+        },
+        "findings": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "next": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "score"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            }
+          ]
+        },
+        "absent_features": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

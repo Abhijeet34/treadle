@@ -24,7 +24,7 @@ import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store, StoreError } from '../ports/store.ts'
 import { readWorkspace, type WorkspaceView } from './context.ts'
-import { diffOf, makeEvent, type Actor, type Mode } from './mutation.ts'
+import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
 /** Columns a list row may carry. `text` marks free text, which the renderer places last (F3). */
@@ -89,7 +89,7 @@ export const BACKLOG_SHAPE: ResultShape = {
   effect: 'read',
   summary: 'List the items that match a filter, in one stated order.',
   properties: [
-    { kind: 'list', key: 'filter' },
+    { kind: 'scalar', key: 'filter', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
     { kind: 'block', key: 'items', columns: ITEM_COLUMNS },
     { kind: 'scalar', key: 'points', type: 'integer' },
@@ -131,7 +131,6 @@ export type FileRequest = {
   readonly id?: ItemId
   readonly fields: Readonly<Record<string, string>>
   readonly actor: Actor
-  readonly mode: Mode
 }
 
 const INT_FIELDS = new Set(['priority', 'points', 'hours_estimate', 'timebox_hours'])
@@ -157,8 +156,9 @@ const REPORTED = [
 ] as const
 
 export async function fileItem(
-  store: Store, clock: Clock, ids: IdGenerator, request: FileRequest,
+  target: Target, clock: Clock, ids: IdGenerator, request: FileRequest,
 ): Promise<ResultObject> {
+  const { store, mode } = target
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('file', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
@@ -191,7 +191,7 @@ export async function fileItem(
     set: changes.map((change) => `${change.field} ${change.before} -> ${change.after}`),
   }
 
-  if (request.mode === 'preview') {
+  if (mode === 'preview') {
     return okResult(FILE_SHAPE, {
       workspace, txn: null, changed: 0,
       data: {
@@ -212,7 +212,7 @@ export async function fileItem(
   })
   if (!applied.ok) return storeRefusal('file', 'mutate', applied.error, workspace)
 
-  if (request.mode === 'dry-run') {
+  if (mode === 'dry-run') {
     return okResult(FILE_SHAPE, {
       workspace, txn: null, changed: 0,
       data: { ...data, dry_run: 1, would_exit: 0 },
@@ -347,14 +347,17 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 
   const data: Record<string, Value> = {}
   if (request.filters.length > 0) {
-    data['filter'] = request.filters.map((filter) => `${filter.field} ${filter.value}`)
+    data['filter'] = request.filters.map((filter) => `${filter.field} ${filter.value}`).join(' ')
   }
-  data['sort'] = 'priority, filed, id'
+  // A sort and an aggregate over nothing are noise; the `none` line is the answer there.
+  if (page.length > 0) data['sort'] = 'priority,filed,id'
   data['items'] = block
-  data['points'] = page.reduce((sum, item) => sum + (item.points ?? 0), 0)
-  data['done'] = page
-    .filter((item) => item.state === 'done')
-    .reduce((sum, item) => sum + (item.points ?? 0), 0)
+  if (page.length > 0) {
+    data['points'] = page.reduce((sum, item) => sum + (item.points ?? 0), 0)
+    data['done'] = page
+      .filter((item) => item.state === 'done')
+      .reduce((sum, item) => sum + (item.points ?? 0), 0)
+  }
 
   if (matched.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
@@ -406,7 +409,7 @@ function absence(
 export function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
   return [...known]
     .map((id) => ({ id, distance: editDistance(id, wanted) }))
-    .filter((candidate) => candidate.distance <= Math.max(2, Math.floor(wanted.length / 3)))
+    .filter((candidate) => candidate.distance <= Math.max(2, Math.ceil(wanted.length * 0.4)))
     .sort((a, b) => (a.distance === b.distance ? (a.id < b.id ? -1 : 1) : a.distance - b.distance))
     .slice(0, 3)
     .map((candidate) => candidate.id)
@@ -429,8 +432,8 @@ export function notFound(
   command: string, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
   return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect: 'read', rule: 'S1', entity: id,
-    cause: `${id} is in no record file of ${view.identity.path ?? view.identity.id}, which holds ${view.items.length} items`,
+    code: 'NOT_FOUND', command, workspace, effect: 'read', entity: id,
+    cause: `${id} is in no record here; this workspace holds ${view.items.length} items`,
     near: nearIds(view.byId.keys(), id),
     fix: ['treadle backlog'],
   })

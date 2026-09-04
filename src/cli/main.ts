@@ -15,18 +15,19 @@ import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
 import { explain, next, status } from '../application/services/insight.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import type { Actor, Mode } from '../application/services/mutation.ts'
+import type { Actor, Mode, Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
 import { randomIds } from '../adapters/ids.ts'
 import { LoggingStore } from '../adapters/logging-store.ts'
-import { OverlayStore, SCHEMA, openWorkspace } from '../adapters/store/index.ts'
+import { SCHEMA, openWorkspace } from '../adapters/store/index.ts'
 import { agentRenderer } from '../adapters/render/agent.ts'
 import { contractLines } from '../adapters/render/grammar.ts'
 import { humanRenderer } from '../adapters/render/human.ts'
 import { jsonRenderer } from '../adapters/render/json.ts'
 import { clampWidth } from '../adapters/render/human.ts'
 import { RENDERINGS, isRendering, type Rendering, type Renderer } from '../adapters/render/index.ts'
+import { targetFor } from '../adapters/target.ts'
 import { WORKSPACE_DIR, initWorkspace, resolveStore } from '../adapters/workspace.ts'
 import { Diagnostics, type Level } from './diagnostics.ts'
 import { EXIT_OF, exitFor } from './exit.ts'
@@ -221,12 +222,11 @@ export async function run(env: Environment): Promise<number> {
     }), flags)
   }
 
-  const base: Store = level >= 3 ? new LoggingStore(opened.value, diagnostics) : opened.value
-  const mode = modeOf(flags)
-  const store: Store = mode === 'dry-run' ? new OverlayStore(base) : base
+  const store: Store = level >= 3 ? new LoggingStore(opened.value, diagnostics) : opened.value
+  const target = targetFor(store, modeOf(flags))
 
   try {
-    const result = await dispatch(env, { command, operands, flags, filterOrder, store, mode })
+    const result = await dispatch(env, { command, operands, flags, filterOrder, store, target })
     return emit(env, result, flags)
   } finally {
     await opened.value.close()
@@ -239,11 +239,11 @@ type Dispatch = {
   readonly flags: Readonly<Record<string, unknown>>
   readonly filterOrder: readonly FilterFlag[]
   readonly store: Store
-  readonly mode: Mode
+  readonly target: Target
 }
 
 async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject> {
-  const { command, operands, flags, store, mode } = input
+  const { command, operands, flags, store, target } = input
   const actor = actorOf(env, flags)
 
   if (command === undefined || command === 'status') return status(store, systemClock)
@@ -289,31 +289,30 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     }
     if (title === undefined) return validation('file', 'file needs a title in quotes', ['treadle help file'])
     const chosen = flag(flags, 'id')
-    return fileItem(store, systemClock, randomIds, {
+    return fileItem(target, systemClock, randomIds, {
       type: type as WorkItemType, title, ...(chosen === undefined ? {} : { id: chosen }),
-      fields: setFieldsOf(flags), actor, mode,
+      fields: setFieldsOf(flags), actor,
     })
   }
 
   if (command === 'transition') {
-    const target = operands[1]
-    if (id === undefined || target === undefined) {
+    const targetState = operands[1]
+    if (id === undefined || targetState === undefined) {
       return validation('transition', 'transition needs an id and a target state', ['treadle help transition'])
     }
-    if (target !== 'resume' && !(WORK_ITEM_STATES as readonly string[]).includes(target)) {
-      return validation('transition', `${target} is not a state; the targets are ${WORK_ITEM_STATES.join(', ')} and resume`, ['treadle help transition'])
+    if (targetState !== 'resume' && !(WORK_ITEM_STATES as readonly string[]).includes(targetState)) {
+      return validation('transition', `${targetState} is not a state; the targets are ${WORK_ITEM_STATES.join(', ')} and resume`, ['treadle help transition'])
     }
     const reason = flag(flags, 'reason')
     const until = flag(flags, 'until')
     const overrides = flags['override']
-    return transition(store, systemClock, randomIds, {
+    return transition(target, systemClock, randomIds, {
       id,
-      target: target as WorkItemState | 'resume',
+      target: targetState as WorkItemState | 'resume',
       ...(reason === undefined ? {} : { reason }),
       ...(until === undefined ? {} : { until }),
       ...(Array.isArray(overrides) ? { overrides: overrides as readonly GuardId[] } : {}),
       actor,
-      mode,
     })
   }
 

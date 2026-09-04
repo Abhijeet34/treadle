@@ -21,7 +21,7 @@ import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
 import { readWorkspace, transitionContextFor } from './context.ts'
-import { diffOf, makeEvent, type Actor, type Mode } from './mutation.ts'
+import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -60,7 +60,6 @@ export type TransitionRequestInput = {
   readonly until?: string
   readonly overrides?: readonly GuardId[]
   readonly actor: Actor
-  readonly mode: Mode
 }
 
 function guardLine(guards: readonly GuardResult[]): string {
@@ -99,8 +98,9 @@ function nextItem(item: WorkItem, to: WorkItemState, request: TransitionRequestI
 }
 
 export async function transition(
-  store: Store, clock: Clock, ids: IdGenerator, request: TransitionRequestInput,
+  target: Target, clock: Clock, ids: IdGenerator, request: TransitionRequestInput,
 ): Promise<ResultObject> {
+  const { store, mode } = target
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('transition', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
@@ -109,7 +109,7 @@ export async function transition(
 
   const context = transitionContextFor(view.value, item)
 
-  if (request.mode === 'preview') {
+  if (mode === 'preview') {
     return okResult(TRANSITION_SHAPE, {
       workspace, txn: null, changed: 0,
       data: {
@@ -133,14 +133,14 @@ export async function transition(
   if (outcome.outcome === 'already') {
     const at = await entered(store, item)
     const data: Record<string, Value> = { already: item.id, state: outcome.state, v: String(item.version) }
-    if (at !== undefined) { data['since'] = at.at; data['event'] = at.event }
+    if (at !== undefined) data['since'] = at.at
     return okResult(TRANSITION_SHAPE, { workspace, txn: null, changed: 0, data })
   }
 
   if (outcome.outcome === 'refused') {
     const failed = outcome.guards.find((guard) => !guard.pass)
     const input = {
-      code: 'GUARD_REFUSED' as const,
+      code: (outcome.error.code === 'GUARD_REFUSED' ? 'GUARD_REFUSED' : 'VALIDATION') as 'GUARD_REFUSED' | 'VALIDATION',
       command: 'transition', workspace, effect: 'mutate' as const,
       rule: outcome.error.rule ?? 'T1',
       entity: `item ${item.id}`,
@@ -174,7 +174,7 @@ export async function transition(
     set: changes.map((change) => `${change.field} ${change.before} -> ${change.after}`),
     guards: guardLine(outcome.guards),
   }
-  if (request.mode === 'dry-run') {
+  if (mode === 'dry-run') {
     return okResult(TRANSITION_SHAPE, {
       workspace, txn: null, changed: 0,
       data: { dry_run: 1, would_exit: 0, ...data, events: '1 item.transition' },

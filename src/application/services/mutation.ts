@@ -9,10 +9,21 @@
 // one, and nothing in this file knows which store it holds.
 
 import type { WorkItem } from '../../domain/index.ts'
-import type { StoreEvent } from '../ports/store.ts'
+import type { Store, StoreEvent } from '../ports/store.ts'
 
 /** `apply` writes, `dry-run` evaluates every guard and writes nothing, `preview` evaluates nothing. */
 export type Mode = 'apply' | 'dry-run' | 'preview'
+
+/**
+ * A store and the mode it is in, paired. A mutating use case takes one of these rather than
+ * a store and a mode separately, because the two must agree: a `dry-run` whose store is the
+ * real one writes, and nothing at the call site would say so. `targetFor` in the adapters
+ * layer is the only thing that builds one, so the pairing is made once.
+ */
+export type Target = {
+  readonly store: Store
+  readonly mode: Mode
+}
 
 export type Actor = {
   readonly id: string

@@ -1,0 +1,208 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "backlog.v1.json",
+  "title": "backlog/1",
+  "description": "List the items that match a filter, in one stated order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "backlog/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "const": "backlog"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            }
+          ]
+        },
+        "points": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "done": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "narrowest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

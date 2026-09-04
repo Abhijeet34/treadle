@@ -34,7 +34,8 @@ export type ColumnSpec = {
 export type PropertySpec =
   | { readonly kind: 'scalar'; readonly key: string; readonly type: 'string' | 'integer' | 'boolean' }
   | { readonly kind: 'list'; readonly key: string }
-  | { readonly kind: 'text'; readonly key: string }
+  /** `whole` never truncates: a refusal's sentence and a help page's prose are not excerpts. */
+  | { readonly kind: 'text'; readonly key: string; readonly whole?: true }
   | { readonly kind: 'block'; readonly key: string; readonly columns: readonly ColumnSpec[] }
 
 export type ResultShape = {
@@ -120,7 +121,7 @@ export const ERROR_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'rule', type: 'string' },
     { kind: 'scalar', key: 'guard', type: 'string' },
     { kind: 'scalar', key: 'entity', type: 'string' },
-    { kind: 'text', key: 'cause' },
+    { kind: 'text', key: 'cause', whole: true },
     { kind: 'list', key: 'near' },
     { kind: 'list', key: 'fix' },
   ],

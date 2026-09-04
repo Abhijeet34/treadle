@@ -48,10 +48,11 @@ function cutToCells(value: string, cells: number): string {
 
 function renderBlock(key: string, block: Block): readonly string[] {
   const columns = orderColumns(block.columns)
-  const lines = [
-    `~${key} ${block.shown} ${block.total}`,
-    `#${columns.map((column) => (column.text === true ? `"${column.name}` : column.name)).join(' ')}`,
-  ]
+  const lines = [`~${key} ${block.shown} ${block.total}`]
+  // A header declares the shape of the rows that follow it, and there are none to declare.
+  if (block.rows.length > 0) {
+    lines.push(`#${columns.map((column) => (column.text === true ? `"${column.name}` : column.name)).join(' ')}`)
+  }
   for (const row of block.rows) {
     const cells = columns.map((column) => {
       const cell = row[column.name]
@@ -121,7 +122,8 @@ export const agentRenderer: Renderer = {
         continue
       }
       if (property.kind === 'text') {
-        lines.push(...renderText(property.key, String(value), limit, options.page))
+        const cap = property.whole === true ? null : limit
+        lines.push(...renderText(property.key, String(value), cap, options.page))
         continue
       }
       const text = scalarText(value)

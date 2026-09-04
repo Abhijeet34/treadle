@@ -14,7 +14,7 @@ export const HELP_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'topic', type: 'string' },
     { kind: 'scalar', key: 'effect', type: 'string' },
     { kind: 'list', key: 'usage' },
-    { kind: 'text', key: 'about' },
+    { kind: 'text', key: 'about', whole: true },
     {
       kind: 'block',
       key: 'commands',
