@@ -84,6 +84,60 @@ describe('dependency direction', () => {
   }
 })
 
+/**
+ * Returns the first import cycle in an adjacency map, as a path that closes on itself.
+ * Split out from the module graph so the test below can prove it finds a cycle it is
+ * handed, rather than passing because the real graph happens to be a tree.
+ */
+function firstCycle(edges: ReadonlyMap<string, readonly string[]>): readonly string[] | undefined {
+  const settled = new Set<string>()
+  const walk = (node: string, path: readonly string[]): readonly string[] | undefined => {
+    const at = path.indexOf(node)
+    if (at !== -1) return [...path.slice(at), node]
+    if (settled.has(node)) return undefined
+    for (const next of edges.get(node) ?? []) {
+      const found = walk(next, [...path, node])
+      if (found !== undefined) return found
+    }
+    settled.add(node)
+    return undefined
+  }
+  for (const node of edges.keys()) {
+    const found = walk(node, [])
+    if (found !== undefined) return found
+  }
+  return undefined
+}
+
+describe('the module graph under src/ is acyclic', () => {
+  const graph = new Map<string, readonly string[]>(
+    sources(SRC).map((file) => [
+      file,
+      specifiersOf(file)
+        .filter((spec) => spec.startsWith('.'))
+        .map((spec) => path.resolve(path.dirname(file), spec)),
+    ]),
+  )
+
+  it('finds a cycle it is handed, so a clean result means something', () => {
+    const seeded = new Map<string, readonly string[]>([['a', ['b']], ['b', ['c']], ['c', ['a']]])
+    assert.deepEqual(firstCycle(seeded), ['a', 'b', 'c', 'a'])
+    assert.equal(firstCycle(new Map([['a', ['b']], ['b', []]])), undefined)
+  })
+
+  it('has edges to judge', () => {
+    assert.ok([...graph.values()].flat().length >= 5)
+  })
+
+  it('has no import cycle', () => {
+    const cycle = firstCycle(graph)
+    assert.equal(
+      cycle === undefined ? undefined : cycle.map((f) => path.relative(ROOT, f)).join(' -> '),
+      undefined,
+    )
+  })
+})
+
 describe('src/domain is pure and I/O-free', () => {
   // Each pattern is a capability the domain must not have. The store, the clock and the
   // id generator arrive as arguments from the layers above; that is what the seams are for.

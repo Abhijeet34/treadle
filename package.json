@@ -44,7 +44,7 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
-    "commitlint": "commitlint --config scripts/commitlint.config.js"
+    "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",

@@ -33,7 +33,7 @@ npm ci
 
 ## Quick start
 
-There is no binary yet, so the quick start is the test suite.
+There is no binary yet, so the quick start is the test suite: 261 tests, no build step, about 0.4 seconds.
 
 ```bash
 npm test        # node --test over test/**/*.test.ts, no build step
@@ -70,7 +70,7 @@ Each of these is specified and none is implemented yet.
 
 | Area | State |
 |---|---|
-| Domain core: types, lifecycle, relations, hierarchy, gates | Implemented, 251 tests |
+| Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
 | Store, index, locking, transactions | Specified, not implemented |
 | CLI, renderers, exit codes, help generation | Specified, not implemented |
 | Sprints, boards, ceremonies, metrics, impediments, doctor | Specified, not implemented |
