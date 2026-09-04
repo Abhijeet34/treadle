@@ -104,19 +104,31 @@ export async function createWorkspace(
   root: string,
   workspace: { readonly id: string; readonly name: string; readonly at: string },
 ): Promise<StoreResult<undefined>> {
-  await mkdir(path.join(root, ITEMS_DIR), { recursive: true, mode: DIR_MODE })
-  await mkdir(path.join(root, EVENTS_DIR), { recursive: true, mode: DIR_MODE })
-  await writeFileAtomic(
-    path.join(root, WORKSPACE_FILE),
-    `${renderHeader(SCHEMA)}${renderRecord({
-      id: workspace.id,
-      title: workspace.name,
-      fields: new Map([['created_at', workspace.at]]),
-      sections: [],
-    })}`,
-  )
-  await writeFileAtomic(path.join(root, '.gitignore'), `${INDEX_DIR}/\n${LOCK_FILE}\n`)
-  await writeFileAtomic(path.join(root, '.gitattributes'), `${EVENTS_DIR}/*.jsonl merge=union\n`)
+  // The return type says this reports a failure, so it has to. A path already occupied by a
+  // file, a read-only parent and a full disk all arrive here as an errno, and `init`'s
+  // caller already has the branch that turns one into a refusal naming the path.
+  try {
+    await mkdir(path.join(root, ITEMS_DIR), { recursive: true, mode: DIR_MODE })
+    await mkdir(path.join(root, EVENTS_DIR), { recursive: true, mode: DIR_MODE })
+    await writeFileAtomic(
+      path.join(root, WORKSPACE_FILE),
+      `${renderHeader(SCHEMA)}${renderRecord({
+        id: workspace.id,
+        title: workspace.name,
+        fields: new Map([['created_at', workspace.at]]),
+        sections: [],
+      })}`,
+    )
+    await writeFileAtomic(path.join(root, '.gitignore'), `${INDEX_DIR}/\n${LOCK_FILE}\n`)
+    await writeFileAtomic(path.join(root, '.gitattributes'), `${EVENTS_DIR}/*.jsonl merge=union\n`)
+  } catch (error) {
+    const errno = error as NodeJS.ErrnoException
+    return storeFail(
+      'STORE_UNAVAILABLE', 'S13',
+      `the workspace at ${root} could not be created: ${errno.syscall ?? 'a write'} failed with ${errno.code ?? 'an error'}`,
+      [root],
+    )
+  }
   return storeOk(undefined)
 }
 
@@ -210,6 +222,18 @@ export class ShardedStore implements Store {
       const fresh = await this.#refresh()
       if (!fresh.ok) return fresh
       return await this.#applyUnderLock(transaction)
+    } catch (error) {
+      // The signature says every failure leaves as a result, so an errno the filesystem
+      // raised has to as well: a read-only shard directory or a full disk is the store being
+      // unavailable, not an exception for the caller to guess at. The journal the write left
+      // behind is what the next apply replays, so nothing is lost by refusing here.
+      const errno = error as NodeJS.ErrnoException
+      if (typeof errno.code !== 'string' || typeof errno.syscall !== 'string') throw error
+      return storeFail(
+        'STORE_UNAVAILABLE', 'S13',
+        `the transaction ${transaction.txn} could not be written: ${errno.syscall} failed with ${errno.code}${errno.path === undefined ? '' : ` on ${errno.path}`}`,
+        [transaction.txn],
+      )
     } finally {
       await lock.value.release()
     }

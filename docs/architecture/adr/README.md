@@ -36,6 +36,7 @@ The set is closed.
 | `S10` | A compare-and-set found a different stored version |
 | `S11` | The lock was not acquired within the caller's bound |
 | `S12` | The stored hierarchy closes a cycle |
+| `S13` | A store file could not be created, read or written, and the filesystem said why |
 
 `H16` is the one finding id borrowed from the design's doctor namespace rather than this one, because DR3 rule 6 already named it: a file that arrived with CRLF line endings.
 

@@ -150,10 +150,12 @@ function versionResult(env: Environment): ResultObject {
 }
 
 /**
- * The command boundary. R2 asks for a structured error on every failure path, and an
- * exception is one: a thrown `Error` that escaped here printed a Node stack trace on stderr
- * with no envelope, which is a second output grammar for a caller to parse and the one thing
- * the contract says never happens.
+ * The one boundary every command crosses, and the only place an exception may be turned into
+ * an exit status. R2 asks for a structured error on every failure path, and an exception is
+ * one: a thrown `Error` that escaped here printed a Node stack trace on stderr with no
+ * envelope, which is a second output grammar for a caller to parse and the one thing the
+ * contract says never happens. A stack trace on stderr also names absolute paths and internal
+ * frames, which is finding F10's class.
  */
 export async function run(env: Environment): Promise<number> {
   try {
