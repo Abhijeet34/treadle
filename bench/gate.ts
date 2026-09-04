@@ -32,10 +32,22 @@ export type Budgets = {
   }
   /** Cold start: the store-loading floor's own cost above `node -e`, in milliseconds. */
   readonly coldStartMs: number | null
-  /** `<op>@<scale>` to program cost at p95, in milliseconds. */
-  readonly timing: Readonly<Record<string, number>>
+  readonly timing: {
+    /** False until the limits have been re-derived on the machine the gate runs on. */
+    readonly enforced: boolean
+    readonly why?: string
+    /** `<op>@<scale>` to program cost at p95, in milliseconds. */
+    readonly limits: Readonly<Record<string, number>>
+  }
+  /** Axis outcomes that transfer across machines, so they have teeth on any runner. */
+  readonly axes: Readonly<Record<AxisBudgetKey, AbsoluteBudget>>
   readonly absolute: Readonly<Record<AbsoluteKey, AbsoluteBudget>>
 }
+
+export const AXIS_BUDGET_KEYS = [
+  'a1Durability', 'a5SilentDrops', 'a5WholeStoreRefusals', 'a5Crashes',
+] as const
+export type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
 
 export const ABSOLUTE_KEYS = [
   'peakRssReadKb', 'peakRssMutationKb', 'firstIndexBuildMs', 'reindexAfterHandEditMs',
@@ -105,6 +117,27 @@ function compare(
   }
 }
 
+/** An axis outcome, where "at most the limit" is not the comparison for every row. */
+function axisBudget(
+  budgets: Budgets, key: AxisBudgetKey, label: string, observed: number | string, unit: string,
+  ok: boolean, note?: string,
+): GateRow {
+  const budget = budgets.axes[key]
+  const detail = [note, budget.enforced ? undefined : `open finding, not build-blocking: ${budget.why ?? ''}`]
+    .filter((x) => x !== undefined && x !== '').join('; ')
+  if (typeof observed === 'string') {
+    return { budget: `${label} (${budget.source})`, observed, limit: budget.limit, unit, status: 'pending' }
+  }
+  return {
+    budget: `${label} (${budget.source})`,
+    observed,
+    limit: budget.limit,
+    unit,
+    status: ok ? 'pass' : budget.enforced ? 'fail' : 'open miss',
+    ...(detail === '' ? {} : { note: detail }),
+  }
+}
+
 function absolute(
   budgets: Budgets, key: AbsoluteKey, label: string, observed: number | string, unit: string, note?: string,
 ): GateRow {
@@ -143,7 +176,7 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   for (const scale of report.latency) {
     for (const [op, measurement] of Object.entries(scale.operations)) {
       const key = `${op}@${scale.items}`
-      const limit = budgets.timing[key]
+      const limit = budgets.timing.limits[key]
       if (limit === undefined) {
         rows.push({ budget: `${op} p95 at ${scale.items} items`, observed: programCost(measurement.wall.p95.ms, floor), limit: 'NOT MEASURED: no committed budget for this key', unit: 'ms', status: 'pending' })
         continue
@@ -153,7 +186,10 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
         measurement.failures.length > 0 ? `NOT MEASURED: ${measurement.failures[0]}` : programCost(measurement.wall.p95.ms, floor),
         Number((limit * slack).toFixed(1)),
         'ms',
-        { note: `n=${measurement.wall.n}, ${measurement.opsTotal} store operations` },
+        {
+          enforced: budgets.timing.enforced,
+          note: `n=${measurement.wall.n}, ${measurement.opsTotal} store operations${budgets.timing.enforced ? '' : `; not build-blocking: ${budgets.timing.why ?? ''}`}`,
+        },
       ))
     }
   }
@@ -178,6 +214,23 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   rows.push(absolute(budgets, 'installUnpackedBytes', 'install size, unpacked', report.packageFacts.unpackedBytes, 'bytes',
     'the `files` list has no dist/ yet, so this weighs the metadata only'))
   rows.push(absolute(budgets, 'bundleBytes', 'bundle', report.packageFacts.bundleBytes, 'bytes'))
+
+  const a1 = report.axes.find((a) => a.axis === 'A1')
+  const rounds = (a1?.detail as { rounds?: readonly { writers: number; durability: number | string }[] } | undefined)?.rounds
+  const worstDurability = rounds === undefined || rounds.length === 0
+    ? 'NOT MEASURED: axis A1 reported no parallel rounds'
+    : Math.min(...rounds.map((r) => (typeof r.durability === 'number' ? r.durability : 0)))
+  rows.push(axisBudget(budgets, 'a1Durability', 'A1 write durability, worst of the parallel rounds', worstDurability, 'ratio',
+    typeof worstDurability === 'number' && worstDurability >= 1, rounds === undefined ? undefined : rounds.map((r) => `${r.writers}: ${r.durability}`).join(', ')))
+
+  const counts = (report.axes.find((a) => a.axis === 'A5')?.detail as { counts?: Record<string, number> } | undefined)?.counts
+  const a5 = (key: AxisBudgetKey, outcome: string, label: string): void => {
+    const observed = counts === undefined ? 'NOT MEASURED: axis A5 reported no outcome counts' : (counts[outcome] ?? 0)
+    rows.push(axisBudget(budgets, key, label, observed, 'cases', typeof observed === 'number' && observed <= budgets.axes[key].limit))
+  }
+  a5('a5SilentDrops', 'silent drop', 'A5 silent drops')
+  a5('a5WholeStoreRefusals', 'whole-store refusal', 'A5 whole-store refusals')
+  a5('a5Crashes', 'crash', 'A5 crashes')
 
   for (const axis of report.axes) {
     if (axis.axis !== 'A3') continue

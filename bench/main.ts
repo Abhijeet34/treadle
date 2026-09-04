@@ -18,7 +18,7 @@ import type { AxisResult } from './axes/axis.ts'
 import { loadConfig, samplesFor, type BenchConfig } from './config.ts'
 import { buildCorpus, type Corpus } from './corpus.ts'
 import { measureFloors } from './floors.ts'
-import { loadBudgets, programCost, runGate, ABSOLUTE_KEYS, type Budgets } from './gate.ts'
+import { loadBudgets, programCost, runGate, ABSOLUTE_KEYS, AXIS_BUDGET_KEYS, type Budgets } from './gate.ts'
 import { describeMachine } from './machine.ts'
 import { packageFacts } from './package-facts.ts'
 import { toMarkdown, tokenizerFacts, type RunReport } from './report.ts'
@@ -32,6 +32,7 @@ type Flags = {
   readonly writeBudgets: boolean
   readonly gate: boolean
   readonly scales?: readonly number[]
+  readonly samples?: number
 }
 
 function parseFlags(argv: readonly string[]): Flags {
@@ -40,12 +41,14 @@ function parseFlags(argv: readonly string[]): Flags {
     return at < 0 ? undefined : argv[at + 1]
   }
   const scales = value('--scales')
+  const samples = value('--samples')
   return {
     out: value('--out') ?? path.join(ROOT, 'bench', 'results'),
     reuseCorpus: argv.includes('--reuse-corpus'),
     writeBudgets: argv.includes('--write-budgets'),
     gate: argv.includes('--gate'),
     ...(scales === undefined ? {} : { scales: scales.split(',').map(Number) }),
+    ...(samples === undefined ? {} : { samples: Number(samples) }),
   }
 }
 
@@ -83,7 +86,8 @@ function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budg
       note: 'timing limits are program cost at p95: the operation wall p95 minus the runner\'s own node floor median, measured in the same job',
     },
     coldStartMs: coldStart === undefined ? previous.coldStartMs : Number(programCost(coldStart.wall.p95.ms, floor).toFixed(1)),
-    timing,
+    timing: { ...previous.timing, limits: timing },
+    axes: Object.fromEntries(AXIS_BUDGET_KEYS.map((k) => [k, previous.axes[k]])) as Budgets['axes'],
     absolute: Object.fromEntries(ABSOLUTE_KEYS.map((k) => [k, previous.absolute[k]])) as Budgets['absolute'],
   }
 }
@@ -91,7 +95,11 @@ function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budg
 async function main(): Promise<void> {
   const flags = parseFlags(process.argv.slice(2))
   const base = loadConfig(ROOT)
-  const config: BenchConfig = flags.scales === undefined ? base : { ...base, scales: flags.scales }
+  const config: BenchConfig = {
+    ...base,
+    ...(flags.scales === undefined ? {} : { scales: flags.scales }),
+    ...(flags.samples === undefined ? {} : { samples: { default: flags.samples } }),
+  }
   const startedAt = new Date()
   const runId = `${startedAt.toISOString().replace(/[:.]/g, '-')}`
   const started = performance.now()
