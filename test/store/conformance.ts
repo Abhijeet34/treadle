@@ -196,6 +196,20 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('refuses an item the field dictionary refuses, before it reaches a file', async () => {
+      await withStore(async (store) => {
+        const refused = await store.apply({
+          txn: 't1',
+          writes: [{ item: anItem({ priority: 9 }) }],
+          events: [],
+        })
+        assert.equal(refused.ok, false)
+        assert.equal(refused.ok ? '' : refused.error.code, 'VALIDATION')
+        const found = await store.get('item-one')
+        assert.equal(found.ok && found.value, undefined)
+      })
+    })
+
     it('carries an unknown field key through a mutation', async () => {
       await withStore(async (store) => {
         const extra = new Map([['a_field_from_2027', 'kept']])

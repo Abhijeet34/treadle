@@ -46,7 +46,7 @@ import {
 } from './grammar.ts'
 import { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
-import { MAX_EVENT_LINE_BYTES } from './limits.ts'
+import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions } from './lock.ts'
 
 /** The one compiled-in schema number. DR3: `migrate` is the only path that changes a file's. */
@@ -274,6 +274,15 @@ export class ShardedStore implements Store {
   async #indexRecordFile(
     file: string, full: string, size: number, mtime: number,
   ): Promise<StoreResult<undefined>> {
+    // The ceiling is checked against the size the stat already gave us, before the file is
+    // read: a limit that only fires after the read has happened is not a limit (F8).
+    if (size > MAX_FILE_BYTES) {
+      this.#index.replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+        file, line: 1, rule: 'S4',
+        reason: `${file} is ${size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
+      }])
+      return storeOk(undefined)
+    }
     const text = await readFile(full, 'utf8')
     const parsed = parseFile(text, file)
     if (!parsed.ok) {
@@ -315,6 +324,13 @@ export class ShardedStore implements Store {
   async #indexEventFile(
     file: string, full: string, size: number, mtime: number, previous: Fingerprint | undefined,
   ): Promise<StoreResult<undefined>> {
+    if (size > MAX_EVENT_FILE_BYTES) {
+      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+        file, line: 1, rule: 'S6',
+        reason: `${file} is ${size} bytes, over the ${MAX_EVENT_FILE_BYTES} byte ceiling for an event file; it is not served`,
+      }], false)
+      return storeOk(undefined)
+    }
     const grew = previous !== undefined && size > previous.size
     const appendOnly = grew && await this.#prefixUnchanged(full, previous)
 

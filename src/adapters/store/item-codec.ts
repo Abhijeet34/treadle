@@ -149,6 +149,14 @@ function fieldText(key: string, value: unknown): string {
  * writing a newer file loses nothing it did not understand (DR3).
  */
 export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Encoded> {
+  // Validate before rendering, not after. A record that fails the field dictionary would
+  // render happily and then be quarantined on the next read, which is a write the store
+  // reported as a success and cannot serve.
+  const valid = validateWorkItem(item, { now: STRUCTURAL_NOW })
+  if (!valid.ok) {
+    return storeFail('VALIDATION', valid.error.rule ?? 'V4', `${item.id}: ${valid.error.message}`, [item.id])
+  }
+
   const fields = new Map<string, string>()
   for (const key of FIELD_ORDER) {
     const value = item[key as keyof WorkItem]
