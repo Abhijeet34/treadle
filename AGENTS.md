@@ -12,7 +12,9 @@ the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams)
 `docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
 name), `docs/STABILITY.md` (what counts as a breaking change), `docs/PROVENANCE.md`
 (clean-room process). `README.md`'s Status table says what is implemented and what is only
-specified.
+specified. `docs/architecture/adr/` holds one record per built decision, with the store's
+closed set of `S` rule ids in its `README.md`; each record ends with what it departs from in
+the design that preceded it.
 
 ## Build and test
 
@@ -23,7 +25,14 @@ rather than enums, and why every relative import carries its `.ts` extension.
 
 `package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
 below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
-`npm install` here is expected and is not a defect to fix.
+`npm install` here is expected and is not a defect to fix. `node:sqlite` also works unflagged
+below the floor and prints one `ExperimentalWarning` per process; that line in test output is
+expected too.
+
+Most of the suite's wall time is one file. `test/store/lock.test.ts` spawns 37 real child
+processes through `test/store/fixtures/writer.ts`, because DR4's guarantee is about separate
+processes and an in-process race would prove nothing. Run it with a generous
+`--test-timeout`; the rest of the suite is under a second.
 
 ## Rules that are tests rather than conventions
 

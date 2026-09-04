@@ -5,6 +5,7 @@
 
 import { fail, ok, type Failure, type Result } from './errors.ts'
 import { validateFieldKeys } from './record.ts'
+import { findUnsafeCharacter, isSafeText } from './text.ts'
 import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
@@ -61,21 +62,18 @@ export function isKnownField(name: string): boolean {
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
 
-// DR3 rule 7, as written. A single-line value carries no tab, newline, C0 or C1 control,
-// and no explicit bidi override. Finding F5 widens this list to the isolates and the
-// implicit marks; that fix lands with the store layer, which owns R7.
-const SINGLE_LINE_FORBIDDEN = /[\u0000-\u001F\u007F-\u009F\u202A-\u202E]/
-// A text field may carry newline and tab, and nothing else from the control ranges (2.14).
-const TEXT_FORBIDDEN = /[\u0000-\u0008\u000B-\u001F\u007F-\u009F\u202A-\u202E]/
+// DR3 rule 7, widened to the whole class by finding F5. text.ts owns the class so the
+// store boundary and this validator cannot drift; a single-line value additionally carries
+// no newline and no tab, which `line` mode is.
 
 function isSingleLine(value: string, max: number): boolean {
   return value.length > 0 && value.length <= max
-    && !SINGLE_LINE_FORBIDDEN.test(value)
+    && isSafeText(value, 'line')
     && value.trim() === value
 }
 
 function isText(value: string, max: number): boolean {
-  return value.length > 0 && value.length <= max && !TEXT_FORBIDDEN.test(value)
+  return value.length > 0 && value.length <= max && isSafeText(value, 'text')
 }
 
 function isBoundedInt(value: unknown, min: number, max: number): boolean {
@@ -160,7 +158,18 @@ const CHECKS: Readonly<Record<string, Check>> = {
     return value > options.now ? undefined : `hold_until ${value} is not in the future`
   },
   held_from: oneOf('held_from', ['draft', 'ready', 'in_progress', 'in_review']),
-  extra: (value) => (value instanceof Map ? undefined : 'extra must be a Map of unknown field keys to their verbatim values'),
+  extra: (value) => {
+    if (!(value instanceof Map)) return 'extra must be a Map of unknown field keys to their verbatim values'
+    for (const [key, entry] of value as ReadonlyMap<string, unknown>) {
+      if (typeof entry !== 'string' || !isSafeText(entry, 'line')) {
+        const unsafe = typeof entry === 'string' ? findUnsafeCharacter(entry, 'line') : undefined
+        return unsafe === undefined
+          ? `extra.${key} must be a single line with no control or bidi override characters`
+          : `extra.${key} carries ${unsafe.label} at character ${unsafe.at}, which is refused`
+      }
+    }
+    return undefined
+  },
 
   outcome: text('outcome', 1000),
   target_date: instant('target_date'),
