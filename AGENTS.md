@@ -29,7 +29,7 @@ below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning fr
 below the floor and prints one `ExperimentalWarning` per process; that line in test output is
 expected too.
 
-Most of the suite's wall time is one file. `test/store/lock.test.ts` spawns 36 real child
+Most of the suite's wall time is one file. `test/store/lock.test.ts` spawns 37 real child
 processes through `test/store/fixtures/writer.ts`, because DR4's guarantee is about separate
 processes and an in-process race would prove nothing. Run it with a generous
 `--test-timeout`; the rest of the suite is under a second.
