@@ -126,7 +126,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   it('explains a rank absence too, naming the position the id actually reached', async () => {
     const result = await next(demo.store, CLOCK, { limit: 2, explainAbsence: 'avatar-crop' })
     assert.equal(result.data['absent'], 'avatar-crop')
-    assert.match(String(result.data['clause']), /^rank want top 2 got \d+$/)
+    assert.match(String(result.data['clause']), /^rank want 1\.\.2 got \d+$/)
   })
 })
 

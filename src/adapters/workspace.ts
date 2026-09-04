@@ -7,7 +7,7 @@
 // for `.work/workspace.md` at each ancestor as well as `workspace.md` at the ancestor
 // itself, and the nested one wins at the same level because it is the one `init` writes.
 
-import { mkdir, readdir, stat } from 'node:fs/promises'
+import { readdir, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 import { initResult } from '../application/services/workspace.ts'
@@ -118,8 +118,4 @@ async function nonEmpty(at: string): Promise<boolean> {
   } catch {
     return false
   }
-}
-
-export async function ensureDirectory(at: string): Promise<void> {
-  await mkdir(at, { recursive: true })
 }

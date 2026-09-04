@@ -73,7 +73,7 @@ export const COMMANDS: readonly Command[] = [
   },
   {
     name: 'transition', shape: TRANSITION_SHAPE, effect: 'mutate', record: 'record',
-    omits: false, pageable: false, confirm: 'moderate', standalone: false,
+    omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
     usage: [
       'treadle transition <id> <target> [--reason <text>] [--until <instant>]',
@@ -150,7 +150,9 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     case '--verbose': return 'S'
     case '--color': return 'A'
     case '--width': return 'A'
-    case '--no-input': return 'S'
+    // Only a command that can prompt has anything to suppress. `init` is the one with a
+    // confirmation class today; interface B.5's severe class lands with `undo`.
+    case '--no-input': return command.confirm === 'none' ? 'A' : 'S'
     case '--workspace': return command.standalone ? 'N' : 'S'
     case '--dry-run': return command.effect === 'mutate' ? 'S' : 'A'
     case '--preview': return command.effect === 'mutate' ? 'S' : 'A'

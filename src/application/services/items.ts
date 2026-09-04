@@ -7,7 +7,6 @@ import {
   type AcceptanceCriterion,
   type ItemId,
   type WorkItem,
-  type WorkItemState,
   type WorkItemType,
 } from '../../domain/index.ts'
 import {
@@ -22,7 +21,7 @@ import {
 } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
-import type { Store, StoreError } from '../ports/store.ts'
+import type { Store } from '../ports/store.ts'
 import { readWorkspace, type WorkspaceView } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
@@ -451,5 +450,3 @@ export function notFound(
     fix: ['treadle backlog'],
   })
 }
-
-export type { StoreError, WorkItemState }

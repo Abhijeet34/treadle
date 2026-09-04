@@ -155,6 +155,18 @@
             "string",
             "null"
           ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }

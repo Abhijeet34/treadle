@@ -226,7 +226,9 @@ export async function run(env: Environment): Promise<number> {
   const target = targetFor(store, modeOf(flags))
 
   try {
+    const started = performance.now()
     const result = await dispatch(env, { command, operands, flags, filterOrder, store, target })
+    diagnostics.timing(command ?? 'status', Math.round(performance.now() - started))
     return emit(env, result, flags)
   } finally {
     await opened.value.close()
@@ -264,8 +266,10 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === 'next') {
     const forActor = flag(flags, 'for')
     const absence = flag(flags, 'explain-absence')
+    const cursor = flag(flags, 'cursor')
     return next(store, systemClock, {
       limit: positiveInt(flag(flags, 'limit'), 3),
+      ...(cursor === undefined ? {} : { cursor }),
       ...(forActor === undefined ? {} : { forActor }),
       ...(absence === undefined ? {} : { explainAbsence: absence }),
     })

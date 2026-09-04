@@ -57,6 +57,8 @@ export const NEXT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'absent', type: 'string' },
     { kind: 'scalar', key: 'clause', type: 'string' },
     { kind: 'scalar', key: 'store', type: 'string' },
+    { kind: 'scalar', key: 'more', type: 'integer' },
+    { kind: 'scalar', key: 'page', type: 'string' },
   ],
 }
 
@@ -143,6 +145,7 @@ export function rank(
 
 export type NextRequest = {
   readonly limit: number
+  readonly cursor?: ItemId
   readonly forActor?: string
   readonly explainAbsence?: ItemId
 }
@@ -153,7 +156,9 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   const workspace = view.value.identity.id
   const weights = DEFAULT_WEIGHTS
   const ranked = rank(view.value, clock.now(), weights, request.forActor)
-  const page = ranked.slice(0, request.limit)
+  const at = request.cursor === undefined ? 0 : ranked.findIndex((scored) => scored.item.id === request.cursor)
+  const from = at < 0 ? 0 : at
+  const page = ranked.slice(from, from + request.limit)
 
   const block: Block = {
     columns: columnsOf(NEXT_SHAPE, 'next'),
@@ -176,6 +181,12 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   if (ranked.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
   }
+  const remaining = ranked.length - (from + page.length)
+  if (remaining > 0) {
+    data['more'] = remaining
+    const following = ranked[from + page.length]
+    if (following !== undefined) data['page'] = `treadle next --cursor ${following.item.id}`
+  }
   if (request.explainAbsence !== undefined) {
     const id = request.explainAbsence
     const item = view.value.byId.get(id)
@@ -186,7 +197,7 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
     } else if (item.state !== 'ready') {
       data['clause'] = `state want ready got ${item.state}`
     } else if (!page.some((scored) => scored.item.id === id)) {
-      data['clause'] = `rank want top ${request.limit} got ${ranked.findIndex((s) => s.item.id === id) + 1}`
+      data['clause'] = `rank want ${from + 1}..${from + request.limit} got ${ranked.findIndex((s) => s.item.id === id) + 1}`
     } else {
       data['clause'] = 'none; it is in the list'
     }

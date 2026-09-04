@@ -152,6 +152,32 @@ describe('streams and renderings, end to end', () => {
     assert.match(run.err, /^fix treadle init$/m)
   })
 
+  it('under --quiet keeps the records and drops everything around them', async () => {
+    const loud = await runCli(['backlog', '--limit', '3'], { cwd })
+    const quiet = await runCli(['backlog', '--limit', '3', '--quiet'], { cwd })
+    assert.equal(quiet.code, loud.code)
+    assert.equal(quiet.out.startsWith('~items 3 24\n#id'), true, quiet.out)
+    assert.equal(quiet.out.includes('sort priority'), false, 'a header line survived --quiet')
+    assert.equal(quiet.out.split('\n').length < loud.out.split('\n').length, true)
+  })
+
+  it('under --quiet a mutation says nothing and the exit status is the signal', async () => {
+    const run = await runCli(['transition', 'auth-refresh', 'in_review', '--quiet'], { cwd })
+    assert.equal(run.code, 0)
+    assert.equal(run.out, '')
+    assert.equal(run.err, '')
+  })
+
+  it('pages a ranked list with --cursor, which is what makes --limit honest there', async () => {
+    const first = await runCli(['next', '--limit', '2'], { cwd })
+    assert.match(first.out, /^page treadle next --cursor (\S+)$/m)
+    const cursor = /^page treadle next --cursor (\S+)$/m.exec(first.out)?.[1] as string
+    const second = await runCli(['next', '--limit', '2', '--cursor', cursor], { cwd })
+    assert.match(second.out, new RegExp(`^${cursor} `, 'm'))
+    const firstRow = first.out.split('\n')[4] as string
+    assert.equal(second.out.includes(firstRow), false, `the second page repeats the first row: ${firstRow}`)
+  })
+
   it('refuses below the hard runtime floor before it reads anything', async () => {
     const run = await runCli(['backlog'], { cwd, nodeVersion: '22.14.0' })
     assert.equal(run.code, 6)

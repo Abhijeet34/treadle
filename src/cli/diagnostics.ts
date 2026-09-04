@@ -52,5 +52,3 @@ export class Diagnostics {
     this.#options.write(`vvv store ${operation} ${parts.join(' ')}`)
   }
 }
-
-export const SILENT = new Diagnostics({ level: 0, logValues: false, write: () => {} })
