@@ -73,7 +73,9 @@ function renderText(
 ): readonly string[] {
   if (value.length === 0) return []
   if (limit === null) {
-    return value.includes('\n') ? [...textBlock(key, value)] : [`"${key} ${value}`]
+    if (value.includes('\n')) return [...textBlock(key, value)]
+    guardSingleLine(key, value)
+    return [`"${key} ${value}`]
   }
   const firstLine = value.split('\n')[0] as string
   const cut = cutToCells(firstLine, limit)

@@ -195,4 +195,15 @@ describe('right-to-left content is confined to its own field in the human render
     assert.ok(rendered.includes(RTL))
     assert.equal(rendered.includes('\u2068'), false, 'an isolate reached a value a consumer parses')
   })
+
+  it('isolates cause, entity and near the same way on the error path', () => {
+    const errorResult: ResultObject = {
+      schema: 'error/1', ok: false, code: 'GUARD_REFUSED', command: 'transition', workspace: 'w',
+      effect: 'read', txn: null, changed: null,
+      data: { cause: `the gate fails: ${RTL}`, entity: RTL, near: [RTL], fix: ['treadle explain history'] },
+    }
+    const rendered = humanRenderer.render(errorResult, { width: 80 })
+    assert.ok(rendered.includes(`\u2068${RTL}\u2069`), 'the error-path field is not isolated')
+    assert.equal(rendered.includes('\u2068treadle explain history'), false, 'a fix line was isolated too')
+  })
 })

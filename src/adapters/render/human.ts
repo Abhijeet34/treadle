@@ -132,12 +132,12 @@ function errorLines(result: ResultObject, width: number): readonly string[] {
   const fixes = (result.data['fix'] as readonly string[] | undefined) ?? []
   const near = (result.data['near'] as readonly string[] | undefined) ?? []
   const lines: string[] = []
-  lines.push(...wrap(typeof cause === 'string' ? cause : result.code, width, ''))
+  lines.push(...wrap(isolated(typeof cause === 'string' ? cause : result.code), width, ''))
   lines.push('')
   if (guard !== undefined) lines.push(`  guard  ${String(guard)}`)
-  if (entity !== undefined) lines.push(`  entity ${String(entity)}`)
+  if (entity !== undefined) lines.push(`  entity ${isolated(String(entity))}`)
   if (result.data['rule'] !== undefined) lines.push(`  rule   ${String(result.data['rule'])}`)
-  if (near.length > 0) lines.push(`  near   ${near.join(', ')}`)
+  if (near.length > 0) lines.push(`  near   ${near.map((value) => isolated(value)).join(', ')}`)
   if (fixes.length > 0) {
     lines.push('')
     lines.push('Do one of these')
