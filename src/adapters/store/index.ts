@@ -8,6 +8,7 @@ export {
   TEMP_SWEEP_MS,
   appendAndSync,
   isTempName,
+  openExclusive,
   sweepTempFiles,
   tempNameFor,
   writeFileAtomic,

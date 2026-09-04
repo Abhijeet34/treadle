@@ -14,10 +14,11 @@
 // dead; treating it as death is how a store reclaims a lock somebody is holding.
 
 import { hostname } from 'node:os'
-import { open, readFile, stat, unlink, utimes } from 'node:fs/promises'
+import { readFile, stat, unlink, utimes } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
+import { openExclusive } from './atomic.ts'
 
 export const HEARTBEAT_MS = 200
 export const STALE_MS = 5_000
@@ -91,7 +92,7 @@ export async function acquireLock(
     const body = JSON.stringify(token)
 
     try {
-      const handle = await open(path, 'wx', 0o600)
+      const handle = await openExclusive(path, 0o600)
       try {
         await handle.writeFile(body, 'utf8')
         await handle.sync()

@@ -13,6 +13,7 @@
 
 import { randomBytes } from 'node:crypto'
 import { open, readdir, rename, stat, unlink } from 'node:fs/promises'
+import type { FileHandle } from 'node:fs/promises'
 import path from 'node:path'
 
 /** Project data, not secret (F9's own reading): the exclusive create is the control. */
@@ -36,6 +37,15 @@ export function tempNameFor(target: string): string {
 }
 
 /**
+ * The F9 control itself, in one place because both the temp file and the lock depend on it.
+ * `wx` is `O_CREAT | O_EXCL`, which fails on anything already at the path including a
+ * dangling symlink, so a pre-placed name is an EEXIST error and never a redirected write.
+ */
+export function openExclusive(target: string, mode: number): Promise<FileHandle> {
+  return open(target, 'wx', mode)
+}
+
+/**
  * Writes by exclusive-create, fsync and rename. The temp file is created 0o600 so its
  * contents are never briefly world-readable, and takes the target's own mode if the target
  * exists, so a workspace that tightened its permissions keeps them.
@@ -43,7 +53,7 @@ export function tempNameFor(target: string): string {
 export async function writeFileAtomic(target: string, contents: string): Promise<void> {
   const temp = tempNameFor(target)
   const mode = await modeOf(target)
-  const handle = await open(temp, 'wx', 0o600)
+  const handle = await openExclusive(temp, 0o600)
   try {
     await handle.writeFile(contents, 'utf8')
     await handle.sync()
