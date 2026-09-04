@@ -42,6 +42,7 @@ One source therefore backs the schema a consumer validates against, the order th
 `OK` 0, `INTERNAL` 1, `VALIDATION` 2, `GUARD_REFUSED` 3, `CONFLICT` 4, `NOT_FOUND` 5, `STORE_UNAVAILABLE` 6.
 A guard refusal is distinguishable from a validation error, which is the question DR5's U3 asked.
 The two hook codes DR5 names are not in the set: no hook exists to produce one, and a code nothing can produce is a contract with no implementation behind it.
+One status is not a function of any result object: `130`, `EXIT_INTERRUPTED`, when SIGINT arrives while a call is in flight. `bin/treadle.js` sets it and lets the call finish rather than killing it half applied, so a transaction either commits or is abandoned whole; the entry point keeps that status rather than overwriting it with the command's own exit code.
 
 **`--out human|agent|json` selects the rendering; absent, `human` if and only if stdout is a terminal, else `agent`.**
 That is the whole rule (R10).

@@ -6,9 +6,10 @@ A backlog that lives in a database is a backlog you cannot branch, diff, or revi
 A backlog that lives in a hand-written markdown list is one the tool cannot enforce anything about.
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
-**This repository currently ships the domain core and the store layer.**
-There is no command to run yet.
-What exists is the part every later layer is built on: the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, the definition-of-ready and definition-of-done evaluator, and underneath them the on-disk store: month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
+**This repository ships the domain core, the store layer, and a command surface enough to dogfood the tool on its own backlog.**
+The domain core has the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
+Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
+`bin/treadle.js` runs `init`, `file`, `show`, `backlog`, `transition`, `next`, `explain`, `status`, `help` and `version` over that store, through application services, rendered as one result object in three forms.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -33,7 +34,13 @@ npm ci
 
 ## Quick start
 
-There is no binary yet, so the quick start is the test suite: 421 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
+```bash
+node bin/treadle.js init
+node bin/treadle.js file story "Field edits"
+node bin/treadle.js status
+```
+
+The test suite is 603 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
 
 ```bash
 npm test        # node --test over test/**/*.test.ts, no build step
@@ -56,13 +63,13 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 // a refusal names the guard it broke, so a caller looks the rule up instead of reading prose
 ```
 
-## What it will do
+## What it does
 
-Each of these is specified and none is implemented yet.
+See [Status](#status) for the line between implemented and specified-only.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never enter a sprint.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly.
-- **Sprints and boards, both first class.** A team can run sprints and still enforce column limits.
+- **Sprints and boards, both first class.** Specified, not yet implemented: a team will be able to run sprints and still enforce column limits.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history.
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
