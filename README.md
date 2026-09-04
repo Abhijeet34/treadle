@@ -86,6 +86,23 @@ In the store: incomplete rejection of bidi and invisible characters, prototype p
 In the output contract: a multi-line description forging lines in the agent stream, a column appended after a space-bearing one corrupting the row split, record content reaching a verbose log, and the data-versus-instruction boundary being legible to a parser but not to a model.
 The remaining five land in layers that do not exist yet.
 
+## treadle's own backlog
+
+`.work/` is a treadle workspace holding this project's remaining work, filed with the tool
+itself. It is the proof that the tool can manage its own backlog, and it is readable and
+reviewable as markdown without running anything:
+
+```
+treadle status                                  # where the project stands
+treadle next                                    # what to pick up, and why that order
+treadle explain history                         # why one item is still in draft
+treadle backlog --state ready --explain-absence history
+```
+
+Eight of the sixteen items are still in `draft` because they are stories with no acceptance
+criteria and the ready gate refuses them, which is the tool working rather than a gap in the
+list. `treadle explain <id>` names the rule.
+
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - the layers, the dependency direction, and the six seams.
