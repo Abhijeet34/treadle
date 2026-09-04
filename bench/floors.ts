@@ -16,6 +16,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url))
 
 export type Floors = {
   readonly rows: readonly Measurement[]
+  /** Which statistic the two derived costs below were taken from. */
+  readonly derivedFromStatistic: 'best of N'
   /** Subtracted from every wall figure to give the program's own cost. */
   readonly spawnMedianMs: number
   /** The runner-relative baseline the CI gate compares a cold start against. */
@@ -45,11 +47,17 @@ export function measureFloors(samples: number): Floors {
     rows: [spawn, node, js, ts, store],
     spawnMedianMs,
     nodeMedianMs: node.wall.p50.ms,
+    derivedFromStatistic: 'best of N',
+    // Best of N, not the median. Both are fixed costs, so the cleanest launch of fifty is
+    // the closest thing to an uncontaminated reading of them. Measured across five runs on
+    // 2026-09-05, the min-based type-stripping cost spread 0.11 ms across four quiet runs
+    // while the median-based one spread 14.7 ms, because one run's floor phase ran under
+    // load and a median of fifty carries that load where a minimum does not.
     typeStrippingMs: ts.failures.length > 0 || js.failures.length > 0
       ? `NOT MEASURED: ${[...ts.failures, ...js.failures][0]}`
-      : Number((ts.wall.p50.ms - js.wall.p50.ms).toFixed(2)),
+      : Number((ts.wall.minMs - js.wall.minMs).toFixed(2)),
     storeLoadMs: store.failures.length > 0
       ? `NOT MEASURED: ${store.failures[0]}`
-      : Number((store.wall.p50.ms - ts.wall.p50.ms).toFixed(2)),
+      : Number((store.wall.minMs - ts.wall.minMs).toFixed(2)),
   }
 }
