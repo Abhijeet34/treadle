@@ -8,6 +8,11 @@
 // as one, and an edit the store simply absorbed is counted separately so the denominator
 // stays honest: a run of 200 edits that all landed in prose would prove nothing, and the
 // per-outcome counts are what shows whether the corpus of damage bit.
+//
+// One outcome exists to stop this axis over-reporting: an edit that destroys a record's own
+// heading has removed the record, and a store that says nothing about a record a person
+// deleted is behaving correctly. That case is counted apart from a silent drop and the
+// difference between the two is a heading line the file still carries.
 
 import { cp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
@@ -23,6 +28,7 @@ const AUDIT = path.join(HERE, '..', 'children', 'audit.ts')
 
 export type Outcome =
   | 'absorbed'
+  | 'edit removed the record'
   | 'refusal names the record'
   | 'refusal names the file only'
   | 'silent drop'
@@ -55,7 +61,19 @@ function audit(root: string): { readonly audit?: Audit; readonly crash?: string 
   return { audit: JSON.parse(line) as Audit }
 }
 
-function classify(baseline: ReadonlySet<string>, result: { audit?: Audit; crash?: string }, file: string): Omit<Case, 'label' | 'file' | 'line' | 'edit'> {
+/**
+ * A record whose heading the edit itself destroyed is not a silent drop: there is no longer
+ * anything in the file for the store to name. A record whose heading a person would still
+ * read as one, that the store serves and reports nothing about, is. The test is a heading
+ * line for that id, which is what separates the two and keeps this axis from over-reporting.
+ */
+function headingSurvives(text: string, id: string): boolean {
+  return new RegExp(`^#{1,6} ${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}:`, 'm').test(text)
+}
+
+function classify(
+  baseline: ReadonlySet<string>, result: { audit?: Audit; crash?: string }, file: string, mutated: string,
+): Omit<Case, 'label' | 'file' | 'line' | 'edit'> {
   if (result.crash !== undefined) {
     return { outcome: 'crash', missing: -1, findings: -1, detail: result.crash }
   }
@@ -69,7 +87,11 @@ function classify(baseline: ReadonlySet<string>, result: { audit?: Audit; crash?
     return { outcome: 'absorbed', missing: 0, findings: found.findings.length }
   }
   const named = new Set(found.findings.filter((f) => f.id !== undefined).map((f) => f.id as string))
-  const unnamed = missing.filter((id) => !named.has(id))
+  const erased = missing.filter((id) => !named.has(id) && !headingSurvives(mutated, id))
+  if (erased.length === missing.length) {
+    return { outcome: 'edit removed the record', missing: missing.length, findings: found.findings.length, detail: `the edit destroyed the heading of ${erased.join(', ').slice(0, 120)}` }
+  }
+  const unnamed = missing.filter((id) => !named.has(id) && headingSurvives(mutated, id))
   if (unnamed.length === 0) {
     return { outcome: 'refusal names the record', missing: missing.length, findings: found.findings.length }
   }
@@ -84,7 +106,7 @@ function classify(baseline: ReadonlySet<string>, result: { audit?: Audit; crash?
       detail: found.findings.find((f) => f.file === file && f.id === undefined)?.reason.slice(0, 200),
     }
   }
-  return { outcome: 'silent drop', missing: missing.length, findings: found.findings.length, detail: `${unnamed.length} of ${missing.length} lost records are named by no finding, first: ${unnamed[0]}` }
+  return { outcome: 'silent drop', missing: missing.length, findings: found.findings.length, detail: `${unnamed.length} of ${missing.length} lost records still carry a heading in the file and are named by no finding, first: ${unnamed[0]}` }
 }
 
 type Edit = { readonly kind: string; readonly apply: (lines: string[], at: number, next: () => number) => void }
@@ -132,7 +154,8 @@ export async function runA5(corpus: Corpus, workDir: string, editCount: number, 
     await rm(scratch, { recursive: true, force: true })
     await cp(pristine, scratch, { recursive: true })
     const where = await mutate(scratch)
-    cases.push({ label, ...where, ...classify(baseline, audit(scratch), where.file) })
+    const mutated = await readFile(path.join(scratch, where.file), 'utf8')
+    cases.push({ label, ...where, ...classify(baseline, audit(scratch), where.file, mutated) })
   }
 
   for (let i = 0; i < editCount; i += 1) {
@@ -176,6 +199,7 @@ export async function runA5(corpus: Corpus, workDir: string, editCount: number, 
       counts: Object.fromEntries(counts),
       shaped: cases.filter((c) => c.label !== 'random line edit'),
       offenders: cases.filter((c) => c.outcome === 'silent drop' || c.outcome === 'whole-store refusal' || c.outcome === 'crash').slice(0, 20),
+      editRemovedExamples: cases.filter((c) => c.outcome === 'edit removed the record').slice(0, 3),
       fileOnlyExamples: cases.filter((c) => c.outcome === 'refusal names the file only').slice(0, 5),
     },
   }

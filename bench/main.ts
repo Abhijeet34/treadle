@@ -64,7 +64,7 @@ async function accountArtefacts(corpus: Corpus): Promise<readonly { label: strin
   ]
 }
 
-function deriveBudgets(report: RunReport, previous: Budgets): Budgets {
+function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budgets {
   const floor = report.floors.nodeMedianMs
   const timing: Record<string, number> = {}
   for (const scale of report.latency) {
@@ -135,7 +135,7 @@ async function main(): Promise<void> {
   const axes: AxisResult[] = [a1, a4.axis, a5, a6, ...remainingAxes()]
     .sort((a, b) => Number(a.axis.slice(1)) - Number(b.axis.slice(1)))
 
-  const budgets = loadBudgets(ROOT)
+  const committed = loadBudgets(ROOT)
   const finished = new Date()
   const skeleton = {
     runId,
@@ -152,6 +152,11 @@ async function main(): Promise<void> {
     accounting,
     axes,
   }
+  // With --write-budgets the limits come from this run, so the gate is reported against the
+  // budgets it just established rather than against the stale ones it is replacing. Every
+  // timing row then reads as a pass by construction, which is what establishing a baseline
+  // is; the derivedFrom block in budgets.json says which run it was.
+  const budgets = flags.writeBudgets ? deriveBudgets(skeleton, committed) : committed
   const report: RunReport = { ...skeleton, gate: runGate(skeleton, budgets) }
 
   await mkdir(flags.out, { recursive: true })
@@ -160,8 +165,7 @@ async function main(): Promise<void> {
   say(`bench: wrote ${path.join(flags.out, 'bench.json')} and bench.md`)
 
   if (flags.writeBudgets) {
-    const derived = deriveBudgets(report, budgets)
-    await writeFile(path.join(ROOT, 'bench', 'budgets.json'), `${JSON.stringify(derived, null, 2)}\n`)
+    await writeFile(path.join(ROOT, 'bench', 'budgets.json'), `${JSON.stringify(budgets, null, 2)}\n`)
     say('bench: rewrote bench/budgets.json from this run')
   }
 
