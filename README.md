@@ -33,7 +33,7 @@ npm ci
 
 ## Quick start
 
-There is no binary yet, so the quick start is the test suite: 419 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
+There is no binary yet, so the quick start is the test suite: 421 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
 
 ```bash
 npm test        # node --test over test/**/*.test.ts, no build step
