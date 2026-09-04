@@ -6,9 +6,9 @@ A backlog that lives in a database is a backlog you cannot branch, diff, or revi
 A backlog that lives in a hand-written markdown list is one the tool cannot enforce anything about.
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
-**This repository currently ships the domain core and nothing else.**
+**This repository currently ships the domain core and the store layer.**
 There is no command to run yet.
-What exists is the part every later layer is built on: the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
+What exists is the part every later layer is built on: the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, the definition-of-ready and definition-of-done evaluator, and underneath them the on-disk store: month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -33,7 +33,7 @@ npm ci
 
 ## Quick start
 
-There is no binary yet, so the quick start is the test suite: 261 tests, no build step, about 0.4 seconds.
+There is no binary yet, so the quick start is the test suite: 408 tests, no build step, about 8 seconds, most of it the concurrency suite's 36 child processes.
 
 ```bash
 npm test        # node --test over test/**/*.test.ts, no build step
@@ -71,18 +71,20 @@ Each of these is specified and none is implemented yet.
 | Area | State |
 |---|---|
 | Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
-| Store, index, locking, transactions | Specified, not implemented |
+| Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
+| Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
 | CLI, renderers, exit codes, help generation | Specified, not implemented |
 | Sprints, boards, ceremonies, metrics, impediments, doctor | Specified, not implemented |
 | Published package | Blocked on a name clearance that has not run |
 
-Eleven of the thirteen findings in the project's threat model land in layers that do not exist yet.
-Two land here and are closed, each with a regression test that was shown to fail before it passed: prototype pollution through the record field-key grammar, and unbounded traversal of a hand-edited hierarchy cycle.
+Nine of the thirteen findings in the project's threat model land in layers that do not exist yet.
+Four land here and are closed, each with a regression test that was shown to fail before it passed: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
 
 ## Documentation
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - the layers, the dependency direction, and the six seams.
 - [docs/DOMAIN.md](docs/DOMAIN.md) - the domain core's public surface and the rule ids its errors name.
+- [docs/architecture/adr/](docs/architecture/adr/README.md) - one record per decision, with what it departs from and why.
 - [docs/STABILITY.md](docs/STABILITY.md) - what counts as a breaking change, and the pre-1.0 policy.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).

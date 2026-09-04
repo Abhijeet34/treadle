@@ -197,3 +197,12 @@ Write-time cycle detection cannot see an edge that a hand edit or a git merge pu
 That is threat-model finding F8.
 
 Both were shown to fail before they passed: with the deny-list deleted, three of the nine F6 tests go red; with the visited set and the ceiling deleted, the hierarchy suite does not terminate and is killed at 45 seconds.
+
+## Text safety
+
+`findUnsafeCharacter(value, mode)` and `isSafeText(value, mode)` are the one home of the character class a stored value may not carry: Unicode `Cc`, `Cf`, `Cs`, `Zl` and `Zp`, with `line` refusing newline and tab as well and `text` allowing both.
+U+200D ZERO WIDTH JOINER is permitted between two `Extended_Pictographic` characters, so a family emoji in a title survives and a joiner anywhere else does not.
+A refusal names the character, as `U+2069 POP DIRECTIONAL ISOLATE`, because by definition a person cannot see it in the file.
+
+The class lives here rather than in the store, even though the store is the boundary that applies it, because `validateWorkItem` applies it too and two copies would drift.
+That is threat-model finding F5, and [architecture/adr/0003-record-format-and-migration.md](architecture/adr/0003-record-format-and-migration.md) carries the reasoning for the class over the seven code points the audit named.
