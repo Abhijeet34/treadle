@@ -18,7 +18,7 @@ domain      entities, the lifecycle, relations, hierarchy, gates. Pure.
 A file may import from its own layer and from every layer above it in that diagram going down, and never the other way.
 `src/domain` may import nothing but `src/domain`.
 
-This is a test, not a convention: `test/architecture/layering.test.ts` reads every import in `src/`, resolves the relative ones, and fails on an edge that points the wrong way.
+This is a test, not a convention: `test/architecture/layering.test.ts` reads every import in `src/`, resolves the relative ones, and fails on an edge that points the wrong way or that closes an import cycle anywhere in the graph.
 It also fails on a `node:` import or a bare package specifier anywhere under `src/domain`, and on any use of `new Date`, `Date.now`, `Math.random`, `process.`, `globalThis`, `performance.` or `console.` there.
 The domain layer takes instants, ids and derived facts as arguments, which is what makes it fast to test and portable across storage backends.
 
