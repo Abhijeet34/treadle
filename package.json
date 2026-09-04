@@ -1,0 +1,55 @@
+{
+  "name": "treadle",
+  "version": "0.1.0",
+  "description": "Agile work management for a team and its agents, over files you commit to git.",
+  "license": "Apache-2.0",
+  "author": "Abhijeet Halder",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24.15.0"
+  },
+  "files": [
+    "dist/",
+    "schemas/",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "keywords": [
+    "agile",
+    "scrum",
+    "kanban",
+    "backlog",
+    "issue-tracker",
+    "project-management",
+    "work-management",
+    "sprint",
+    "cli",
+    "local-first",
+    "git-native",
+    "plaintext",
+    "agent-tools",
+    "developer-tools"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Abhijeet34/treadle.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Abhijeet34/treadle/issues"
+  },
+  "homepage": "https://github.com/Abhijeet34/treadle#readme",
+  "scripts": {
+    "test": "node --test 'test/**/*.test.ts'",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test",
+    "commitlint": "commitlint --config scripts/commitlint.config.js"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.0.0",
+    "@types/node": "^24.7.0",
+    "typescript": "^5.9.3"
+  }
+}
