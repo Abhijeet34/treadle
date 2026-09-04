@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "description": "Agile work management for a team and its agents, over files you commit to git.",
   "license": "Apache-2.0",
+  "bin": {
+    "treadle": "bin/treadle.js"
+  },
   "author": "Abhijeet Halder",
   "private": true,
   "type": "module",
@@ -10,7 +13,8 @@
     "node": ">=24.15.0"
   },
   "files": [
-    "dist/",
+    "bin/",
+    "src/",
     "schemas/",
     "LICENSE",
     "NOTICE",
@@ -44,7 +48,8 @@
     "test": "node --test \"test/**/*.test.ts\"",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
-    "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD"
+    "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD",
+    "schemas": "node scripts/generate-schemas.ts"
   },
   "devDependencies": {
     "@commitlint/cli": "^20.1.0",

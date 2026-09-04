@@ -1,0 +1,174 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "next.v1.json",
+  "title": "next/1",
+  "description": "Rank what to pick up, and print the components and weights that produced the order.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "next/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "const": "next"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "weights": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "score"
+            },
+            {
+              "name": "parts"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            }
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

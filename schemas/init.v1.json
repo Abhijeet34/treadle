@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "init.v1.json",
+  "title": "init/1",
+  "description": "Create a workspace here, and say what it created and what it did not.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "init/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "const": "init"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "mutate"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "already": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schema": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "files": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "name"
+            },
+            {
+              "name": "note",
+              "trust": "data"
+            }
+          ]
+        },
+        "not_created": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dry_run": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "preview": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "would_exit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

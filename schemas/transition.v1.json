@@ -1,0 +1,161 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "transition.v1.json",
+  "title": "transition/1",
+  "description": "Move one item to a target state, with every guard on that edge evaluated.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "transition/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "const": "transition"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "mutate"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dry_run": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "preview": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "would_exit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "already": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "v": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "set": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "guards": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "will_evaluate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "will_write": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "events": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "event": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}

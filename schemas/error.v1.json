@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "error.v1.json",
+  "title": "error/1",
+  "description": "The one refusal object every command produces on every failure path.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "error/1"
+    },
+    "ok": {
+      "const": false
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL"
+      ]
+    },
+    "command": {
+      "type": "string"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "enum": [
+        "read",
+        "mutate"
+      ]
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "rule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "guard": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "entity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cause": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "near": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fix": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
