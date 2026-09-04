@@ -16,8 +16,16 @@ import { RENDERINGS, type Renderer } from '../../src/adapters/render/index.ts'
 import { displayWidth } from '../../src/adapters/render/width.ts'
 import { goldenResults } from '../helpers/cli-fixtures.ts'
 import { RecordingRenderer } from './recorder.ts'
+import { keyValueRenderer } from './third-party.ts'
 
 const RENDERERS: readonly Renderer[] = [agentRenderer, jsonRenderer, humanRenderer]
+
+/**
+ * The seam's own contract, held over the three that ship and the one that does not. A seam
+ * whose second implementation is written by the same hand against the same internals proves
+ * nothing about a third party, so `keyValueRenderer` imports two types and no code at all.
+ */
+const EVERY_RENDERER: readonly Renderer[] = [...RENDERERS, keyValueRenderer]
 
 /** Content lines carry a value verbatim, so a trailing space in a stored value survives. */
 function toolComposed(lines: readonly string[]): readonly string[] {
@@ -39,25 +47,31 @@ describe('the renderer seam', () => {
     golden = await goldenResults()
   })
 
-  it('names one renderer per rendering, and a fourth that only records', () => {
+  it('names one renderer per rendering, and two more that ship nowhere', () => {
     assert.deepEqual(RENDERERS.map((renderer) => renderer.name).sort(), [...RENDERINGS].sort())
+    assert.equal(EVERY_RENDERER.length, RENDERINGS.length + 1)
+    assert.equal((RENDERINGS as readonly string[]).includes(keyValueRenderer.name), false,
+      'the fourth renderer must not be a shipped rendering')
   })
 
-  it('renders every golden object through every renderer', () => {
+  it('renders every golden object through every renderer, the fourth included', (t) => {
     assert.ok(golden.size >= 12, `only ${golden.size} golden objects`)
+    let rendered = 0
     for (const [name, result] of golden) {
-      for (const renderer of RENDERERS) {
+      for (const renderer of EVERY_RENDERER) {
         const bytes = renderer.render(result)
+        rendered += 1
         assert.ok(bytes.length > 0, `${renderer.name} rendered ${name} as nothing`)
         assert.ok(bytes.endsWith('\n'), `${renderer.name} on ${name} has no trailing newline`)
         assert.equal(bytes.endsWith('\n\n'), false, `${renderer.name} on ${name} ends with a blank line`)
       }
     }
+    t.diagnostic(`${golden.size} golden objects x ${EVERY_RENDERER.length} renderers = ${rendered} renderings, 0 failures`)
   })
 
   it('is deterministic: the same object renders to the same bytes twice', () => {
     for (const [name, result] of golden) {
-      for (const renderer of RENDERERS) {
+      for (const renderer of EVERY_RENDERER) {
         assert.equal(renderer.render(result), renderer.render(structuredClone(result)),
           `${renderer.name} on ${name} depends on something other than the object`)
       }
@@ -66,14 +80,19 @@ describe('the renderer seam', () => {
 
   it('reads nothing from the process: cwd, env and TTY do not change the bytes', () => {
     const before = new Map<string, string>()
-    for (const [name, result] of golden) before.set(name, agentRenderer.render(result))
+    for (const [name, result] of golden) {
+      for (const renderer of EVERY_RENDERER) before.set(`${renderer.name}/${name}`, renderer.render(result))
+    }
     const cwd = process.cwd()
     process.env['TREADLE_OUT'] = 'human'
     process.env['NO_COLOR'] = '1'
     process.chdir('/')
     try {
       for (const [name, result] of golden) {
-        assert.equal(agentRenderer.render(result), before.get(name), `${name} moved with the environment`)
+        for (const renderer of EVERY_RENDERER) {
+          assert.equal(renderer.render(result), before.get(`${renderer.name}/${name}`),
+            `${renderer.name} on ${name} moved with the environment`)
+        }
       }
     } finally {
       process.chdir(cwd)
