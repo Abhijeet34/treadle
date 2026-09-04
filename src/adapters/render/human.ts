@@ -66,6 +66,31 @@ function table(
   return lines
 }
 
+/**
+ * The one global rule (B.4): no emitted line exceeds W display cells. A line that would is
+ * broken at the last segment boundary that fits and continued with a two-space indent.
+ * Applied once over everything the renderer composed, rather than at each site that builds
+ * a line, because a rule applied per site is a rule with an exception waiting in it.
+ */
+function fitLine(line: string, width: number): readonly string[] {
+  if (displayWidth(line) <= width) return [line]
+  const lead = line.length - line.trimStart().length
+  const indent = ' '.repeat(lead + 2)
+  const out: string[] = []
+  let current = ' '.repeat(lead)
+  for (const word of line.trimStart().split(' ')) {
+    const candidate = current.trimEnd().length === 0 ? `${current}${word}` : `${current} ${word}`
+    if (displayWidth(candidate) > width && current.trim().length > 0) {
+      out.push(current)
+      current = `${indent}${word}`
+    } else {
+      current = candidate
+    }
+  }
+  out.push(current)
+  return out
+}
+
 function wrap(text: string, width: number, indent: string): readonly string[] {
   const out: string[] = []
   for (const paragraph of text.split('\n')) {
@@ -114,7 +139,7 @@ export const humanRenderer: Renderer = {
     if (shape === undefined) throw new Error(`no shape is registered for ${result.schema}`)
     const width = clampWidth(options.width)
     const ascii = options.ascii === true
-    if (!result.ok) return `${errorLines(result, width).join('\n')}\n`
+    if (!result.ok) return `${fit(errorLines(result, width), width).join('\n')}\n`
 
     const quiet = options.quiet === true
     const lines: string[] = []
@@ -150,6 +175,10 @@ export const humanRenderer: Renderer = {
       }
       lines.push(`  ${property.key}  ${scalarText(value)}`)
     }
-    return `${lines.join('\n')}\n`
+    return `${fit(lines, width).join('\n')}\n`
   },
+}
+
+function fit(lines: readonly string[], width: number): readonly string[] {
+  return lines.flatMap((line) => fitLine(line, width))
 }

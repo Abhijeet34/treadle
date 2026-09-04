@@ -334,6 +334,19 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
     })
   }
 
+  // F3: the row grammar splits on the first arity-1 spaces, so exactly one column may carry
+  // a value with a space in it. Two of them is a set no ordering can rescue, and a row that
+  // parses into the wrong fields with no error is worse than a refusal.
+  const free = request.columns.filter((name) =>
+    ITEM_COLUMNS.some((column) => column.name === name && column.text === true))
+  if (free.length > 1) {
+    return errorResult({
+      code: 'VALIDATION', command: 'backlog', workspace, effect: 'read', rule: 'C3',
+      cause: `${free.join(' and ')} both carry free text, and a row can carry one such column; every field after the first would be read wrong`,
+      fix: [`treadle backlog --fields ${request.columns.filter((name) => name !== free[0]).join(',')}`],
+    })
+  }
+
   const matched = view.value.items.filter((item) => matches(item, request.filters)).sort(backlogOrder)
   const start = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
   const from = start < 0 ? 0 : start

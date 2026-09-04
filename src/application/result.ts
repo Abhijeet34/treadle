@@ -44,6 +44,12 @@ export type ResultShape = {
   readonly effect: Effect
   /** The one sentence the inventory, the help page and the schema description all use. */
   readonly summary: string
+  /**
+   * One shape that any command's result may carry. Only the error object is one, and it is
+   * why its schema pins neither the command name nor the effect: DR5's error is the result
+   * object with `ok: false`, rendered by the same renderer, whichever verb produced it.
+   */
+  readonly anyCommand?: true
   readonly properties: readonly PropertySpec[]
 }
 
@@ -116,6 +122,7 @@ export const ERROR_SHAPE: ResultShape = {
   command: 'error',
   version: 1,
   effect: 'read',
+  anyCommand: true,
   summary: 'The one refusal object every command produces on every failure path.',
   properties: [
     { kind: 'scalar', key: 'rule', type: 'string' },

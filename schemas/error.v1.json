@@ -21,7 +21,7 @@
       "const": "error/1"
     },
     "ok": {
-      "type": "boolean"
+      "const": false
     },
     "code": {
       "enum": [
@@ -35,13 +35,16 @@
       ]
     },
     "command": {
-      "const": "error"
+      "type": "string"
     },
     "workspace": {
       "type": "string"
     },
     "effect": {
-      "const": "read"
+      "enum": [
+        "read",
+        "mutate"
+      ]
     },
     "txn": {
       "type": [
