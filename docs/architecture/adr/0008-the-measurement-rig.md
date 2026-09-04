@@ -13,8 +13,9 @@ DR8 turns that into a list of budgets and says CI enforces them.
 Nothing in the tree measured anything before this record.
 DR1, DR2 and DR4's figures were taken on throwaway spikes in a scratch directory that no longer exists, against corpora nobody can regenerate, so the landed store had never been compared with the design that specified it.
 
-The rig has to survive one more constraint: the command layer does not exist.
-Eight of the twelve axes score what a command prints, and a rig that quietly reported zero for those would launder an absence into a result.
+The rig has to survive two more constraints.
+The command layer landed in #3 partway through, so the rig had to be built against a surface that did not exist and then take it up when it arrived; axis A3 is the one that moved.
+And the machine is shared with sibling workers and is never idle, so a figure taken here carries load that no amount of retrying removes.
 
 ## Decision
 
@@ -40,6 +41,22 @@ The spawn floor is subtracted to give the program's own cost; the `node -e` floo
 
 Percentiles are nearest-rank and print the rank they resolved to, so a p99 that is really the maximum of twenty samples says so.
 
+### The load is recorded rather than waited out
+
+This machine is shared. Sampled during this work the 1-minute load average was 23 to 42 on 8 cores, with a dozen other `node` processes and about 70% of memory in use, and it peaked at 99.03 while 289 parallel writers ran.
+
+Waiting for quiet was tried across several runs and abandoned: it is not a method, and the load did not clear.
+So `bench/load.ts` samples the run-queue averages, free memory and the machine's `node` process count either side of every measurement and every axis, and the report prints them beside the figure.
+A reader who sees a number above its series can check what the machine was doing for it.
+
+`pgrep` rather than `ps`, which the sandbox refuses, and its lines are counted rather than asking for `-c`, which is a Linux flag macOS pgrep does not carry.
+
+### The floors are measured after the corpora
+
+The floor is subtracted from every operation to leave the program's own cost, which only holds if both are measured in the same conditions.
+Generating the four corpora writes about 430 MB.
+Floors taken on an idle machine before that write, against operations timed while it was still draining, put the whole of the writeback into program cost: that ordering opened six small-scale timing rows by up to 58% while the 50k rows, which run once the flush has drained, sat on their series.
+
 ### The gate reads the median, and the tolerance was measured
 
 Every timing budget is program cost: the operation's wall median minus the runner's own `node -e` median, taken in the same job.
@@ -48,7 +65,8 @@ That subtraction removes what a machine charges to start a process and leaves wh
 The median rather than the p95, because the p95 was measured and cannot carry a gate.
 Two identical four-scale runs on this machine on 2026-09-05 moved the median of twenty operations by at most 2.4% and moved one p95 by 68.9%.
 A gate on the p95 fires on the scheduler.
-The tolerance is 25%, which clears the worst drift observed anywhere in those two runs, the store-load floor's 15.3%, by 1.6x, and the operation drift by 10x.
+The tolerance is 35%, which clears the worst drift observed across the quiet runs, 19.9% on `list` at 1,000 items, by 1.76x.
+It is not enough at a load of 99, and that is the gate reporting the machine rather than the code, which is why the timing rows are not armed.
 
 ### A number nobody measured is not a number
 
@@ -105,21 +123,24 @@ Every reference figure in the axes table is quoted from the prior-art report and
 **Positive**
 
 - The landed store now has measured numbers against the design that specified it, and five DR8 budgets are recorded as missed rather than assumed met.
+- Axis A3 is measured in-repo, tokens included. `test/cli/budget.test.ts` gates the bytes and records that its token figures were taken outside the tree, because a tokenizer is a package and the product ships none; this rig carries all three as development dependencies.
 - Two defects surfaced that no test reaches: a record heading renamed out of the grammar is dropped from every query with no finding, and a few of 200 parallel writers die with an uncaught `database is locked`.
-- A run is reproducible: same seed, same corpora, and the two runs of 2026-09-05 agree at the median to within 2.4%.
+- A run is reproducible from its seed, and across ten runs `transition` at 50k spread 4.4% and `get` 6.9% at the median, loaded runs included.
 
 **Negative**
 
 - A full four-scale run costs about five and a half minutes and about 430 MB of corpora under `TREADLE_BENCH_DIR`. A pull request pays the two small scales.
 - The timing limits are calibrated to one machine and are not yet armed anywhere else.
 - Axis A1's 200-writer round alone takes about 70 seconds, because 200 cold Node processes serialise through one store lock.
+- The figures are bounded by confounds this rig cannot remove: a shared machine, a runtime below the product's floor, and no bundle. `docs/BENCHMARKS.md` lists all seven.
 
 ## Departures from the design record
 
 - **The gate reads the median, not the p95.** DR8 says "runs each command 20 times as a cold process, and fails on any p95 over budget". The p95 moved 68.9% between two identical runs here, so that gate would be a coin toss. The p95 is still measured and printed.
 - **Timing limits are relative on every row, not only on cold start.** DR8 makes cold start relative to the runner and leaves the per-command rows absolute. A runner cannot carry an absolute row either.
 - **A budget the product has never met is an open miss rather than a failure.** DR8 has one status. Six budgets are missed today by code that landed before this rig existed, and failing every build for them would train people to ignore the job. They print with their numbers and the report leads with them.
-- **These are store operations, not commands.** DR8's rows name `show`, `list`, `create` and `transition`. Nothing under `src/cli` exists, so the rows measure `get`, `list`, `apply` at the store seam and say so in every table. The children in `bench/children/` are what commands replace.
+- **The timed rows are store operations, not commands.** DR8's rows name `show`, `list`, `create` and `transition`. The timed children call `get`, `list` and `apply` at the store seam and say so in every table; the command surface that landed in #3 is not yet what they invoke. Axis A3 is the exception and does render real command artefacts.
+- **Every figure carries the machine's load.** DR8 assumes a benchmark runner it controls. This one runs on a shared machine, so the load is part of the record.
 - **The corpora carry 24 month shards at every scale, matching DR2's, but not DR2's byte-for-byte records.** Our largest shard at 50k holds 2,176 records in 1.09 MB against the design's 2,084 in 1.69 MB, so a direct millisecond comparison with DR2 carries that difference.
 
 ## What would reopen this
@@ -127,3 +148,4 @@ Every reference figure in the axes table is quoted from the prior-art report and
 - The command layer landing, which turns eight `NOT MEASURED` axes into rows and moves these children behind real verbs.
 - A build step, which would make the figures comparable with DR1's bundle and would give the bundle-size budget something to weigh.
 - A CI runner baseline, which is what arms `timing.enforced`.
+- A dedicated machine, which would make the load columns uninteresting and the tolerance tighter.

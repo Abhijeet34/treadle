@@ -37,7 +37,9 @@ iterating. `bench/README.md` has the flags, `bench/bench.config.json` the parame
 `docs/BENCHMARKS.md` the last measured run and ADR-0008 the method. Two things about it are
 worth knowing before reading a figure: a value that could not be taken is the string
 `NOT MEASURED: <reason>` and never a zero, and the gate reads the median rather than the p95
-because the p95 moved 68.9% between two identical runs on one machine.
+because the p95 moved 68.9% between two identical runs on one machine. This machine is shared
+and never idle, so every figure carries the load either side of it; judge a number against its
+load column and against the ten-run series in the report, not on its own.
 
 The suite is about 20 seconds and the two files that spawn processes are the slowest:
 `test/store/lock.test.ts` at about 8 seconds, spawning 37 of them through

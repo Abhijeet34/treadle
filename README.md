@@ -79,7 +79,7 @@ See [Status](#status) for the line between implemented and specified-only.
 |---|---|
 | Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
 | Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
-| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; four of the twelve comparison axes measured |
+| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; five of the twelve comparison axes measured, one half measured |
 | Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
@@ -100,7 +100,7 @@ The remaining five land in layers that do not exist yet.
 itself. It is the proof that the tool can manage its own backlog, and it is readable and
 reviewable as markdown without running anything:
 
-```
+```text
 treadle status                                  # where the project stands
 treadle next                                    # what to pick up, and why that order
 treadle explain history                         # why one item is still in draft
