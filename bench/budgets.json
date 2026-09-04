@@ -1,6 +1,6 @@
 {
-  "tolerancePercent": 25,
-  "toleranceWhy": "four four-scale runs on 2026-09-05 put the worst median drift of any operation at 13.9% (list at 1,000 items, 126.0 ms to 143.5 ms) and the worst drift of any floor at 15.3% (the store-load floor); 25% clears both by about 1.6x. The p95 moved 68.9% between two of those runs, which is why the gate reads the median and reports the p95 without gating on it.",
+  "tolerancePercent": 35,
+  "toleranceWhy": "six four-scale runs on 2026-09-05 put the worst run-to-run drift of any operation's program cost at 19.9% across the three runs where the machine was quiet (list at 1,000 items, 87.5 / 87.4 / 104.7 ms); 35% clears that by 1.76x. The in-process median was measured as an alternative and drifts 17.8% on the same case, so the statistic is not what the variance comes from. A run taken under load drifts further and shows up as an open miss, which is the correct outcome for a gate nobody has armed yet. The p95 moved 68.9% between two runs, which is why the gate reads the median and reports the p95 without gating on it.",
   "derivedFrom": {
     "runId": "2026-09-04T21-58-48-465Z",
     "date": "2026-09-04",
@@ -11,7 +11,7 @@
   "coldStartMs": 72.5,
   "timing": {
     "enforced": false,
-    "why": "the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change; arm this by re-deriving on the runner with --write-budgets",
+    "why": "the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured.",
     "limits": {
       "identity@100": 73.9,
       "get@100": 73.1,
