@@ -49,7 +49,7 @@ export const FILE_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'type', type: 'string' },
     { kind: 'scalar', key: 'state', type: 'string' },
-    { kind: 'text', key: 'title' },
+    { kind: 'text', key: 'title', whole: true },
     { kind: 'list', key: 'set' },
     { kind: 'scalar', key: 'event', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
@@ -77,7 +77,7 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'parent', type: 'string' },
     { kind: 'scalar', key: 'ac', type: 'string' },
     { kind: 'text', key: 'assignee' },
-    { kind: 'text', key: 'title' },
+    { kind: 'text', key: 'title', whole: true },
     { kind: 'text', key: 'desc' },
   ],
 }

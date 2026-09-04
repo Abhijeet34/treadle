@@ -106,7 +106,7 @@ treadle explain history                         # why one item is still in draft
 treadle backlog --state ready --explain-absence history
 ```
 
-Eight of the sixteen items are still in `draft` because they are stories with no acceptance
+Eight of the fifteen items are still in `draft` because they are stories with no acceptance
 criteria and the ready gate refuses them, which is the tool working rather than a gap in the
 list. `treadle explain <id>` names the rule.
 

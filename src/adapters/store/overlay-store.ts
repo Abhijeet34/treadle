@@ -10,6 +10,7 @@
 
 import type { WorkItem } from '../../domain/index.ts'
 import {
+  duplicateRefusal,
   storeFail,
   storeOk,
   type Applied,
@@ -94,8 +95,15 @@ export class OverlayStore implements Store {
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     const staged = new Map<string, WorkItem>()
     const applied: AppliedWrite[] = []
+    // A dry run refuses what the real write would refuse, which is why this reads the base
+    // store's findings rather than assuming a clean store (ADR-0006).
+    const findings = await this.findings()
+    if (!findings.ok) return findings
 
     for (const write of transaction.writes) {
+      const clash = duplicateRefusal(write.item.id, findings.value)
+      if (clash !== undefined) return clash
+
       const current = staged.get(write.item.id) ?? await this.get(write.item.id)
         .then((r) => (r.ok ? r.value : undefined))
       const conflict = compareAndSet(write.item.id, current, write.ifVersion)

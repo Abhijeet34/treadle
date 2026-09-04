@@ -82,9 +82,14 @@ export class IndexCache {
     }
     mkdirSync(path.dirname(this.#file), { recursive: true, mode: DIR_MODE })
     const db = new DatabaseSync(this.#file)
+    // The busy timeout is armed before anything that can meet another process's lock, and
+    // the journal-mode switch is the first such statement: it takes an exclusive lock on a
+    // database that is not yet in WAL, which is every database on the run that creates it.
+    // Armed second, that switch had nothing to wait with and raised SQLITE_BUSY the moment
+    // two commands opened a fresh index together.
+    db.exec('pragma busy_timeout = 5000')
     db.exec('pragma journal_mode = wal')
     db.exec('pragma synchronous = normal')
-    db.exec('pragma busy_timeout = 5000')
     db.exec(SCHEMA)
     this.#db = db
     return db

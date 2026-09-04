@@ -32,6 +32,7 @@ import { WORKSPACE_DIR, initWorkspace, resolveStore } from '../adapters/workspac
 import { Diagnostics, type Level } from './diagnostics.ts'
 import { EXIT_OF, exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
+import { commandNamed } from './inventory.ts'
 import { FILTER_FLAGS, parse, type FilterFlag } from './parse.ts'
 import { checkRuntime } from './runtime.ts'
 
@@ -148,7 +149,38 @@ function versionResult(env: Environment): ResultObject {
   })
 }
 
+/**
+ * The command boundary. R2 asks for a structured error on every failure path, and an
+ * exception is one: a thrown `Error` that escaped here printed a Node stack trace on stderr
+ * with no envelope, which is a second output grammar for a caller to parse and the one thing
+ * the contract says never happens.
+ */
 export async function run(env: Environment): Promise<number> {
+  try {
+    return await execute(env)
+  } catch (error) {
+    const parsed = parse(env.argv)
+    const flags = parsed.ok ? parsed.value.flags : {}
+    const command = parsed.ok ? parsed.value.command : undefined
+    return emit(env, internal(command, error), flags)
+  }
+}
+
+/** The refusal an escaped exception becomes. It names what failed, never how it was thrown. */
+function internal(command: string | undefined, error: unknown): ResultObject {
+  const named = command ?? 'treadle'
+  const thrown = error instanceof Error ? error : undefined
+  return errorResult({
+    code: 'INTERNAL',
+    command: named,
+    workspace: '-',
+    effect: commandNamed(named)?.effect ?? 'read',
+    cause: `${named} did not complete: ${thrown === undefined ? String(error) : `${thrown.name}: ${thrown.message}`}`,
+    fix: ['treadle version'],
+  })
+}
+
+async function execute(env: Environment): Promise<number> {
   const runtime = checkRuntime(env.nodeVersion)
   if (!runtime.ok) {
     env.streams.err(`err STORE_UNAVAILABLE -\ncause ${runtime.cause}\n`)

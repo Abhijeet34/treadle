@@ -190,7 +190,9 @@ export const humanRenderer: Renderer = {
         lines.push(...wrap(isolated(text), width - 4, '    '))
         continue
       }
-      lines.push(`  ${property.key}  ${isolated(scalarText(value))}`)
+      const text = scalarText(value)
+      if (text.length === 0) continue
+      lines.push(`  ${property.key}  ${isolated(text)}`)
     }
     return `${fit(lines, width).join('\n')}\n`
   },

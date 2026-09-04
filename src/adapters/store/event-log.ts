@@ -33,7 +33,7 @@ import {
 /** DR3's fixed key order. A rendered line is byte-identical whoever writes it. */
 const EVENT_KEYS = [
   'id', 'at', 'actor', 'actor_kind', 'entity_kind', 'entity', 'op',
-  'before', 'after', 'guards', 'cmd', 'txn',
+  'before', 'after', 'guards', 'reason', 'cmd', 'txn',
 ] as const
 
 const REQUIRED = ['id', 'at', 'actor', 'actor_kind', 'entity_kind', 'entity', 'op', 'txn'] as const

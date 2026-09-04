@@ -68,6 +68,8 @@ export type StoreEvent = {
   readonly before?: unknown
   readonly after?: unknown
   readonly guards?: unknown
+  /** Why the move was made, on the edges T4 requires one and on every override. */
+  readonly reason?: string
   readonly cmd?: string
   readonly txn: string
 }
@@ -119,6 +121,24 @@ export type Finding = {
   readonly rule: string
   readonly reason: string
   readonly id?: string
+}
+
+/**
+ * S3 on the write path, shared by both implementations. A duplicated id names no single
+ * record, so a write is refused rather than resolved by document order: picking the first
+ * copy silently is the reference implementation's own recorded risk, and it is worse on a
+ * write than on a read because the caller never learns which copy moved.
+ */
+export function duplicateRefusal(
+  id: ItemId, findings: readonly Finding[],
+): StoreResult<never> | undefined {
+  const clash = findings.find((finding) => finding.rule === 'S3' && finding.id === id)
+  if (clash === undefined) return undefined
+  return storeFail(
+    'CONFLICT', 'S3',
+    `${id} names more than one record here, so a write cannot say which one it means: ${clash.reason}`,
+    [id],
+  )
 }
 
 export type StoreIdentity = {

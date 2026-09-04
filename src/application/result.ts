@@ -34,7 +34,11 @@ export type ColumnSpec = {
 export type PropertySpec =
   | { readonly kind: 'scalar'; readonly key: string; readonly type: 'string' | 'integer' | 'boolean' }
   | { readonly kind: 'list'; readonly key: string }
-  /** `whole` never truncates: a refusal's sentence and a help page's prose are not excerpts. */
+  /**
+   * `whole` never truncates: a refusal's sentence and a help page's prose are not excerpts,
+   * and neither is a field the store already bounds. A.4 names `title` for that second
+   * reason, because the field dictionary caps it at 200 characters.
+   */
   | { readonly kind: 'text'; readonly key: string; readonly whole?: true }
   | { readonly kind: 'block'; readonly key: string; readonly columns: readonly ColumnSpec[] }
 
