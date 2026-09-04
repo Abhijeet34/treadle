@@ -4,6 +4,7 @@
 // ones: an in-process promise race would prove nothing about a lock file.
 //
 // Usage: writer.ts write <root> <id> | writer.ts hold <root> <ms> | writer.ts grab <root>
+//        | writer.ts churn <root> <id>
 
 import { setTimeout as delay } from 'node:timers/promises'
 
@@ -69,5 +70,29 @@ async function grab(): Promise<void> {
   await delay(60_000)
 }
 
-const modes: Record<string, () => Promise<void>> = { write, hold, grab }
+/**
+ * Writes in a loop and never stops, so the parent can SIGKILL it at an unpredictable point
+ * inside a transaction. It prints one line before the first write so the parent knows the
+ * store is warm and the kill lands mid-run rather than before anything happened.
+ */
+async function churn(): Promise<void> {
+  const store = new ShardedStore(root as string)
+  process.stdout.write('churning\n')
+  for (let attempt = 1; ; attempt += 1) {
+    const found = await store.get(argument as string)
+    if (!found.ok || found.value === undefined) return
+    await store.apply({
+      txn: `txn-${process.pid}-${attempt}`,
+      writes: [{ item: { ...found.value, priority: ((found.value.priority ?? 1) % 5) + 1 }, ifVersion: found.value.version }],
+      events: [{
+        id: `ev-${process.pid}-${attempt}`,
+        at: '2026-09-01T10:00:00Z',
+        actor: 'churn', actor_kind: 'process', entity_kind: 'work_item',
+        entity: argument as string, op: 'update', txn: `txn-${process.pid}-${attempt}`,
+      }],
+    })
+  }
+}
+
+const modes: Record<string, () => Promise<void>> = { write, hold, grab, churn }
 await (modes[mode as string] ?? (async () => { process.exitCode = 2 }))()

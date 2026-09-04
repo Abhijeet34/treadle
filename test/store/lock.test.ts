@@ -9,14 +9,14 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { readFile, readdir, stat, utimes, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { describe, it } from 'node:test'
 
-import { acquireLock, processIsGone } from '../../src/adapters/store/index.ts'
+import { acquireLock, parseFile, processIsGone } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 const run = promisify(execFile)
@@ -34,7 +34,7 @@ async function writer(root: string, id: string): Promise<Reported> {
 }
 
 describe(`${WRITERS} separate processes writing one record`, () => {
-  it('persists every write it reported, and leaves no lock behind', async () => {
+  it('persists every write it reported, and leaves no lock behind', async (t) => {
     const workspace = await aWorkspace()
     try {
       await workspace.store.apply({ txn: 't0', writes: [{ item: anItem({ priority: 1 }) }], events: [] })
@@ -56,6 +56,23 @@ describe(`${WRITERS} separate processes writing one record`, () => {
       assert.equal(events.ok && events.value.length, WRITERS)
 
       await assert.rejects(() => stat(path.join(workspace.root, '.lock')))
+
+      // Zero lost updates is the version count above. Zero corruption is this: the shards
+      // are read from disk rather than through the index, because a cache that agrees with
+      // itself proves nothing about the files a team commits.
+      const items = path.join(workspace.root, 'items')
+      let quarantined = 0
+      let records = 0
+      for (const name of (await readdir(items)).filter((n) => n.endsWith('.md'))) {
+        const parsed = parseFile(await readFile(path.join(items, name), 'utf8'), `items/${name}`)
+        assert.ok(parsed.ok, `items/${name} does not parse after ${WRITERS} concurrent writers`)
+        quarantined += parsed.value.quarantined.length
+        records += parsed.value.records.length
+      }
+      assert.equal(quarantined, 0, 'a concurrent write quarantined a record')
+      assert.equal(records, 1, `${records} records where one was written`)
+      const attempts = reported.reduce((sum, r) => sum + (r.attempts ?? 0), 0)
+      t.diagnostic(`${WRITERS} parallel processes: 0 lost updates, 0 corrupt shards, 0 quarantined, ${attempts} compare-and-set attempts to land ${WRITERS} writes`)
     } finally {
       await workspace.dispose()
     }
