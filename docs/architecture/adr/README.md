@@ -3,6 +3,7 @@
 One record per decision that a later change has to argue with rather than merely notice.
 The numbers match the design records they implement, so ADR-0002 is DR2's storage layout and ADR-0006 is DR6's store seam; the gaps are records that belong to layers not built yet.
 ADR-0009 is the exception: the design phase wrote no record for release and CI, and the threat model's F13 fix asks for one, so it carries the next free number rather than a design record's.
+ADR-0012 is the other kind of exception: it records a piece of DR6 that was refused rather than built, so it carries the next free number and leaves ADR-0006 to the seam that shipped.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -17,6 +18,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0009](0009-release-and-supply-chain.md) | One esbuild bundle as the published product, a signed annotated tag as the release authorisation, and the supply-chain controls around both |
 | [ADR-0010](0010-terminal-outcomes-dates-and-reviewability.md) | A resolution and an attempt outcome instead of four new states, one due date with three reads that act on it, and two reviewability controls |
 | [ADR-0011](0011-evidence-and-the-severity-audit.md) | Severity on every read surface and in the ranking, severity and priority changes audited, and a bounded evidence pointer the done gate requires |
+| [ADR-0012](0012-the-extension-surface-that-does-not-ship.md) | DR6's hook contract is refused rather than gated, and the generated adapter it designed has no surface to secure |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.

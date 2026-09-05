@@ -101,16 +101,18 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `config` | Specified, not implemented |
 | `doctor`: four findings over records and the event log; the rest wait on entities that do not exist yet | Partly implemented |
-| Sprints, boards, ceremonies, metrics, impediments, export, hooks, completions | Specified, not implemented |
+| Sprints, boards, ceremonies, metrics, impediments, export, completions | Specified, not implemented |
+| Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 186,164 bytes |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
-Nine of the thirteen findings in the project's threat model are closed, each with a regression test that was shown to fail before it passed.
+Twelve of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
 In the store: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
 In the output contract: a multi-line description forging lines in the agent stream, a column appended after a space-bearing one corrupting the row split, record content reaching a verbose log, and the data-versus-instruction boundary being legible to a parser but not to a model.
 In the supply chain: the three unstated controls, which are now `ignore-scripts=true` in a committed `.npmrc`, a committed lockfile that every workflow installs with `npm ci`, and an SBOM with build provenance on the release path.
-The remaining four land in layers that do not exist yet.
+Three closed by having their surface removed rather than guarded: the hook contract that would have executed a program named in a cloned repository, the path rule that came with it, and the adapter generator that does not exist, all argued in [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md).
+The one that remains is CSV formula injection, which lands with export.
 
 ## treadle's own backlog
 

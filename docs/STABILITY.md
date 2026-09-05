@@ -46,7 +46,7 @@ Not breaking:
 
 - Adding a new error code for a condition that previously exited 1 as an internal error.
 
-The mapping is: `0` success including an idempotent no-op, `2` invalid input, `3` a guard or a hook refused, `4` a stale-version conflict, `5` not found, `6` the store is unavailable, `1` anything else, `130` interrupted.
+The mapping is: `0` success including an idempotent no-op, `2` invalid input, `3` a guard refused, `4` a stale-version conflict, `5` not found, `6` the store is unavailable, `1` anything else, `130` interrupted.
 
 ### The output schema
 

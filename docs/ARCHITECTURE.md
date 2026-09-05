@@ -36,7 +36,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
-| Event sink | Receives the committed events of one transaction | The monthly event log | Hook dispatch, and a capturing sink for assertions |
+| Event sink | Receives the committed events of one transaction | The monthly event log | A capturing sink, which every event assertion in the suite runs against |
 | Policy | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, validated on load |
 
 The Store seam exists, with both implementations under one conformance suite; [architecture/adr/0006-the-store-seam.md](architecture/adr/0006-the-store-seam.md) is the record.
@@ -63,7 +63,10 @@ Each names where it departs from the design that preceded it.
 
 ## Extension
 
-Hooks are external executables that can veto a proposed mutation and never edit it.
-A pre-mutation hook sees a proposal and can only allow or refuse; the guards, the validation, the compare-and-set and the lock all run in the tool regardless of what any hook does.
-There is no hook phase inside the lock, so a hook cannot wedge the store.
-In-process plugins are excluded: a plugin that can call into the store bypasses the invariants a hook cannot.
+There is none, and that is a decision rather than a gap.
+
+DR6 designed a hook as an external executable named in a committed `workspace.md` and run on every mutation, which is code execution driven by the content of a repository you cloned.
+[architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses that contract for v1, keeps the event-sink seam, and states what would reopen it.
+`test/security/f1-f7-no-execution.test.ts` holds the refusal: nothing under `src/` may import a module that starts a process, evaluate a string, or read a setting named `hooks`.
+
+In-process plugins were already excluded for a separate reason: a plugin that can call into the store bypasses the invariants a hook could not.
