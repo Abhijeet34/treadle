@@ -14,6 +14,7 @@ import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
 import {
+  cycleAbove,
   findParentCycle,
   type WorkItem,
 } from '../../domain/index.ts'
@@ -142,6 +143,10 @@ export class ShardedStore implements Store {
   readonly #index: IndexCache
   readonly #options: ShardedStoreOptions
   #cycleFindings: readonly Finding[] = []
+  /** Ids whose parent edge the current refresh moved, which is what it has to re-walk. */
+  #movedParents: Set<string> = new Set()
+  /** Whether the current refresh moved any item row at all, edge or not. */
+  #rowsChanged = false
   /**
    * Shards the refresh inside `apply` re-parsed, for the write that follows it under the
    * same lock. Only the write path fills it, because a read that retained a 1 MB parse for
@@ -301,7 +306,10 @@ export class ShardedStore implements Store {
   async #refresh(keepParses = false): Promise<StoreResult<undefined>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
+    const moved = new Set<string>()
     this.#parsedUnderLock.clear()
+    this.#movedParents = moved
+    this.#rowsChanged = false
 
     for (const file of await this.#storeFiles()) {
       const full = path.join(this.#root, file)
@@ -329,8 +337,7 @@ export class ShardedStore implements Store {
 
   /** The S12 finding a cycle raises, from the verdict this refresh is entitled to reuse. */
   #hierarchyFindings(): readonly Finding[] {
-    const stored = this.#index.hierarchyVerdict()
-    const cycle = stored === undefined ? this.#recheckHierarchy() : JSON.parse(stored) as readonly string[] | null
+    const cycle = this.#hierarchyCycle()
     if (cycle === null || cycle === undefined) return []
     return [{
       file: WORKSPACE_FILE, line: 1, rule: 'S12',
@@ -345,7 +352,7 @@ export class ShardedStore implements Store {
     // The ceiling is checked against the size the stat already gave us, before the file is
     // read: a limit that only fires after the read has happened is not a limit (F8).
     if (size > MAX_FILE_BYTES) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+      this.#replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
         file, line: 1, rule: 'S4',
         reason: `${file} is ${size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
       }])
@@ -354,14 +361,14 @@ export class ShardedStore implements Store {
     const text = await readFile(full, 'utf8')
     const parsed = parseFile(text, file)
     if (!parsed.ok) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: parsed.error.rule, reason: parsed.error.message },
       ])
       return storeOk(undefined)
     }
     const schema = this.#schemaRefusal(parsed.value, file)
     if (schema !== undefined) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: schema.rule, reason: schema.message },
       ])
       return storeOk(undefined)
@@ -385,9 +392,18 @@ export class ShardedStore implements Store {
     if (parsed.value.crlf) {
       findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
     }
-    this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
+    this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
     if (keepParse) this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
     return storeOk(undefined)
+  }
+
+  /** Re-indexes one record file and keeps the parent edges it moved, for the cycle check. */
+  #replaceRecordFile(
+    file: string, fingerprint: Fingerprint, items: readonly IndexedItem[], findings: readonly Finding[],
+  ): void {
+    const outcome = this.#index.replaceRecordFile(file, fingerprint, items, findings)
+    if (outcome.changed) this.#rowsChanged = true
+    for (const id of outcome.movedParents) this.#movedParents.add(id)
   }
 
   async #indexEventFile(
@@ -451,6 +467,34 @@ export class ShardedStore implements Store {
     const cycle = findParentCycle(this.#index.parentEdges()) ?? null
     this.#index.setHierarchyVerdict(JSON.stringify(cycle))
     return cycle
+  }
+
+  /**
+   * The verdict this refresh is entitled to, at the cost the refresh's own findings earn.
+   *
+   * A refresh that moved no parent edge reuses the stored verdict. One that moved some, over
+   * a store already known to be acyclic, walks up from those nodes alone: a cycle that was
+   * not there before has to pass through an edge that moved.
+   *
+   * A store already reported cyclic recomputes whole as soon as any row moves, edge or not.
+   * An edit clears a cycle as easily as it closes one, and dropping the edge that closed it
+   * moves no edge at all, so a rule that watched only for moved edges would report a cycle
+   * that a hand edit had already removed.
+   */
+  #hierarchyCycle(): readonly string[] | null {
+    const stored = this.#index.hierarchyVerdict()
+    if (stored === undefined) return this.#recheckHierarchy()
+    const known = JSON.parse(stored) as readonly string[] | null
+    if (known !== null) return this.#rowsChanged ? this.#recheckHierarchy() : known
+    if (this.#movedParents.size === 0) return known
+    for (const id of this.#movedParents) {
+      const cycle = cycleAbove(id, (at) => this.#index.parentOf(at))
+      if (cycle !== undefined) {
+        this.#index.setHierarchyVerdict(JSON.stringify(cycle))
+        return cycle
+      }
+    }
+    return null
   }
 
   // -- writing ---------------------------------------------------------------------------

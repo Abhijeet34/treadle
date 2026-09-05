@@ -18,6 +18,18 @@ import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../applicati
 import { DIR_MODE } from './atomic.ts'
 import { eventFrom, eventRest } from './event-log.ts'
 
+/**
+ * What one record file's re-index leaves the caller to act on: the cross-shard duplicates it
+ * refused, and the ids whose parent edge moved, which are the only nodes a cycle the store
+ * did not already know about can pass through.
+ */
+export type RecordFileOutcome = {
+  readonly clashes: readonly Finding[]
+  /** Any row inserted or deleted, which is what can clear a cycle as well as close one. */
+  readonly changed: boolean
+  readonly movedParents: readonly string[]
+}
+
 export type Fingerprint = {
   readonly size: number
   readonly mtime: number
@@ -192,25 +204,28 @@ export class IndexCache {
     fingerprint: Fingerprint,
     items: readonly IndexedItem[],
     findings: readonly Finding[],
-  ): readonly Finding[] {
+  ): RecordFileOutcome {
     const db = this.#open()
     const clashes: Finding[] = []
+    const moved: string[] = []
+    let changed = false
     db.exec('begin immediate')
     try {
-      const previous = new Map<string, { line: number; source: string }>()
-      for (const row of db.prepare('select id, line, source from items where file = ?').all(file) as unknown as readonly { id: string; line: number; source: string }[]) {
-        previous.set(row.id, { line: row.line, source: row.source })
+      const previous = new Map<string, { line: number; source: string; parent: string | null }>()
+      for (const row of db.prepare('select id, line, source, parent from items where file = ?').all(file) as unknown as readonly { id: string; line: number; source: string; parent: string | null }[]) {
+        previous.set(row.id, { line: row.line, source: row.source, parent: row.parent })
       }
       db.prepare('delete from events where file = ?').run(file)
       db.prepare('delete from findings where file = ?').run(file)
 
       const drop = db.prepare('delete from items where id = ? and file = ?')
       const wanted = new Set(items.map((item) => item.id))
-      let moved = false
       for (const id of previous.keys()) {
+        // A parent edge that disappeared cannot close a cycle, so a deletion is not a moved
+        // edge however many rows it takes out. It can clear one, which `changed` carries.
         if (wanted.has(id)) continue
         drop.run(id, file)
-        moved = true
+        changed = true
       }
 
       const insert = db.prepare(`insert into items
@@ -219,8 +234,9 @@ export class IndexCache {
       for (const item of items) {
         const was = previous.get(item.id)
         if (was !== undefined && was.line === item.line && was.source === item.source) continue
+        if (item.parent !== null && (was === undefined || was.parent !== item.parent)) moved.push(item.id)
         if (was !== undefined) drop.run(item.id, file)
-        moved = true
+        changed = true
         try {
           insert.run(item.id, item.file, item.line, item.type, item.state, item.parent,
             item.sprint, item.points, item.priority, item.version, item.assignee,
@@ -239,15 +255,12 @@ export class IndexCache {
       }
       this.#insertFindings([...findings, ...clashes])
       this.#setFingerprint(file, fingerprint)
-      // A file whose mtime moved but whose records did not leaves the verdict standing: it
-      // was derived from this same row set.
-      if (moved) this.#forgetHierarchyVerdict()
       db.exec('commit')
     } catch (error) {
       db.exec('rollback')
       throw error
     }
-    return clashes
+    return { clashes, changed, movedParents: moved }
   }
 
   replaceEventFile(
@@ -330,6 +343,14 @@ export class IndexCache {
     const edges = new Map<string, string>()
     for (const row of rows) edges.set(row.id, row.parent)
     return edges
+  }
+
+  /** One parent edge, for a walk that follows the ancestry of a node whose edge moved. */
+  parentOf(id: string): string | undefined {
+    const row = this.#open()
+      .prepare('select parent from items where id = ?')
+      .get(id) as unknown as { parent: string | null } | undefined
+    return row?.parent ?? undefined
   }
 
   /** The stored verdict as written, or undefined when an item row has moved since. */

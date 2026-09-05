@@ -114,6 +114,7 @@ export {
   ALLOWED_PARENT_PAIRS,
   MAX_HIERARCHY_DEPTH,
   childrenOf,
+  cycleAbove,
   findHierarchyCycle,
   findParentCycle,
   hierarchyFrom,

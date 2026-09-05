@@ -111,6 +111,32 @@ export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | u
   return findParentCycle(graph.parentOf)
 }
 
+/**
+ * The cycle through one node's ancestry, for a caller that knows which edges moved and holds
+ * a graph too large to draw whole. Removing an edge cannot close a cycle and neither can
+ * leaving one alone, so a graph that was acyclic before a set of edges moved is cyclic only
+ * through one of the nodes those edges left, and the walk above each is all that has to run.
+ *
+ * The parent is fetched rather than looked up in a map, so the caller can answer from an
+ * index one row at a time. The visited set and not a depth ceiling is what ends the walk: a
+ * ceiling would stop short of a cycle that closes below it and report the graph clean.
+ */
+export function cycleAbove(
+  start: ItemId, parentOf: (id: ItemId) => ItemId | undefined,
+): readonly ItemId[] | undefined {
+  const path: ItemId[] = [start]
+  const seenAt = new Map<ItemId, number>([[start, 0]])
+  let node = parentOf(start)
+  while (node !== undefined) {
+    const at = seenAt.get(node)
+    if (at !== undefined) return [...path.slice(at), node]
+    seenAt.set(node, path.length)
+    path.push(node)
+    node = parentOf(node)
+  }
+  return undefined
+}
+
 function ancestors(graph: HierarchyGraph, from: ItemId): Result<readonly ItemId[]> {
   const chain: ItemId[] = []
   const seen = new Set<ItemId>([from])

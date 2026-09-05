@@ -168,8 +168,10 @@ describe('the sharded store on disk', () => {
     // The verdict is cached in the index between commands, so what has to be proved is that
     // the cache is bound to the rows and not to the process: a second store on the same root
     // must see a cycle a hand edit added, and stop reporting one a hand edit removed.
+    // The two records sit in different shards, so the edit re-indexes one file and the walk
+    // above the edge it moved has to follow into the other file's rows to close the cycle.
     const workspace = await aWorkspace()
-    const shard = path.join(workspace.root, 'items/2026-09.md')
+    const shard = path.join(workspace.root, 'items/2026-10.md')
     const s12 = async (store: ShardedStore): Promise<string | undefined> => {
       const found = await store.findings()
       assert.ok(found.ok)
@@ -180,7 +182,7 @@ describe('the sharded store on disk', () => {
         txn: 't1',
         writes: [
           { item: anItem({ id: 'item-one', parent_id: 'item-two' }) },
-          { item: anItem({ id: 'item-two' }) },
+          { item: anItem({ id: 'item-two', filed_at: '2026-10-15T10:00:00Z' }) },
         ],
         events: [],
       })
