@@ -130,7 +130,11 @@ Before hand-checking any of these, run the suite: it already checks them.
   (`test/architecture/supply-chain.test.ts`). That file is threat-model finding F13's
   enforcement; `npm run licences` is the other half and refuses a licence off the allowlist.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
-  `scripts/check-dco.sh` and commitlint over a pull request's commits.
+  `scripts/check-dco.sh` and commitlint over a pull request's commits. The trailer's name must
+  match the author's name; the address may differ only for a GitHub App author, which is why a
+  Dependabot bump passes while a trailer naming anyone else does not.
+  `test/architecture/dco.test.ts` drives that script over real commits in a throwaway repository,
+  so change the rule there and not by loosening the comparison.
 - `schemas/*.json` are generated from the `ResultShape` each service declares. Change a
   shape, run `npm run schemas`, and commit both; the suite fails otherwise.
 - No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
