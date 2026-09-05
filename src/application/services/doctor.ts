@@ -122,7 +122,7 @@ export function auditItem(
 
   for (const event of events) {
     if (event.entity !== item.id) continue
-    if (event.at < item.filed_at) {
+    if (Date.parse(event.at) < Date.parse(item.filed_at)) {
       findings.push({
         rule: 'H23',
         id: item.id,

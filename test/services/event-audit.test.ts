@@ -74,6 +74,13 @@ describe('what each read says about a hand-written event line', () => {
     assert.match(doctor.out, new RegExp(`^H23 first-story past1 event past1 is dated 2020-01-01T00:00:00Z, before the item was filed at ${filedAt}`, 'm'))
   })
 
+  it('does not raise H23 for an event in the same second as filed_at that carries a fractional part', async () => {
+    const sameSecond = filedAt.replace('Z', '.500000000Z')
+    await appendFile(path.join(root, LOG), line({ id: 'samesec1', at: sameSecond, op: 'item.set', after: { points: '5' } }))
+    const doctor = await cli(['doctor'])
+    assert.doesNotMatch(doctor.out, /^H23 first-story samesec1 /m)
+  })
+
   it('refuses every read over an instant that names no real date, at exit 7 with the line', async () => {
     await appendFile(path.join(root, LOG), line({ id: 'cal1', at: '2026-13-45T25:61:61Z', op: 'item.set' }))
     const history = await cli(['history', 'first-story'])
