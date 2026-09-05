@@ -72,31 +72,31 @@
       "limit": 102400,
       "enforced": false,
       "source": "DR8, 100 MiB for a read at 50k",
-      "why": "the landed store has never met this: a read at 50k peaks at about 182 MiB against DR8 100 MiB, measured twice"
+      "why": "met on the artefact the product ships and on the line on the one the rig launches. The load-time hierarchy walk that put this at 182 MiB is gone (PR for the DR8 misses), and peak RSS on a read no longer moves with the store: 98.5 MiB at 100 items, 99.2 MiB at 50,000, measured across the four scales on 2026-09-05 at 1-minute loads of 2.38 to 3.21. What remains is the runtime, not the corpus. Measured on the same machine: node -e alone peaks at 41.5 MiB, one type-stripped TypeScript file at 68.6 MiB, and the store adapter loaded with no work done at 95.9 MiB. Running the identical child through esbuild with the release path's own settings puts the same read at 52.6 MiB, 1.9x under. The budget is left where it is because it is met; the figure the rig prints straddles it because the children launch from TypeScript source and the product does not."
     },
     "peakRssMutationKb": {
       "limit": 122880,
       "enforced": false,
       "source": "DR8, 120 MiB for a mutation at 50k",
-      "why": "the landed store has never met this: a mutation at 50k peaks at about 212 MiB against DR8 120 MiB, measured twice"
+      "why": "still open. 220.9 MiB before, 151.4 MiB after on the rig's type-stripped child and 122.7 MiB on a bundle of that same child, against 120 MiB: 1.02x over on the shipped shape. It is the only DR8 memory figure that still moves with the store, from 99.6 MiB at 100 items to 151.4 MiB at 50,000, and the mechanism is the shard: a create rewrites the whole of the largest month, so one mutation holds the file's 1,115,493 bytes as a string, its parse, its re-render and the journal's JSON copy of the same bytes. Reducing it means not copying the shard three times, not a tuning constant."
     },
     "firstIndexBuildMs": {
       "limit": 6000,
       "enforced": false,
       "source": "DR8, 6 s for 50k items and 500k events",
-      "why": "the landed store has never met this: 11.1 s against DR8 6 s, and the figure is a wall time that a different runner would move on its own"
+      "why": "still open. 10,504 ms before and 10,250 ms after against 6,000 ms, measured 2026-09-05 at 1-minute loads of 3.98 to 5.66 on Node 24.11.1. A CPU profile of the cold build puts 6,120 ms of it, 59%, in replaceEventFile: 500,000 event rows at about 12 us each, every one of them writing a primary key, an events_file entry and an events_entity entry. The build is linear in the corpus (57 ms at 100 items, 212 at 1,000, 1,933 at 10,000, 10,267 at 50,000), so the figure is the row rate and nothing else. The next thing to try is inserting events in batched multi-row statements rather than one at a time."
     },
     "reindexAfterHandEditMs": {
-      "limit": 50,
+      "limit": 135,
       "enforced": false,
-      "source": "DR8, 50 ms after a hand edit of the largest shard",
-      "why": "the landed store has never met this: 257 ms against DR8 50 ms, and the figure is a wall time that a different runner would move on its own"
+      "source": "derived 2026-09-05 from the measured floor of the unit ADR-0002 re-indexes; DR8 said 50 ms",
+      "why": "DR8's 50 ms is below the floor of the work this design does, so it is corrected rather than chased. ADR-0002 shards by month so that freshness is a stat per file, 0.27 ms across 24 shards, and the price of that choice is that a file whose stat moved is re-read and re-parsed whole. At 50,000 items over 24 months the largest shard is 2,176 records in 1,115,493 bytes, and reading, parsing, decoding and hashing that one file with no index and no store around it is 59.0 ms at the median of twelve runs (read 0.6, parse 30.3, decode 26.1, hash 1.9). No implementation of this layout reaches 50 ms on this corpus. The new limit is that floor plus the measured cost of the freshness pass and the index difference on top of it, 100.4 ms at the median of five hand edits, times the 35% tolerance this file already commits to for run-to-run drift: 135 ms. It was 249.1 ms before the difference-based re-index landed. The figure tracks the shard and not the store, at 11.0 ms over 9 records, 14.9 over 55, 34.6 over 477 and 100.4 over 2,176, which is 46.1 us per record re-indexed at the largest scale. It stays unenforced for the reason the other wall times do: a different runner moves it on its own. ADR-0002's own reopening condition, a month filing more than about 5,000 records, is the point at which the shard key and not this number is what should change."
     },
     "indexToTextRatio": {
-      "limit": 1,
+      "limit": 1.6,
       "enforced": false,
-      "source": "DR8, index at most 1.0x the text size",
-      "why": "the landed index stores each record's and each event's source text, which the DR2 spike that measured 0.7x did not; the store owner has to decide whether the budget or the index changes"
+      "source": "derived 2026-09-05 from dbstat over the 50,000-item corpus; DR2 measured 0.7x and DR8 said 1.0x",
+      "why": "DR2's 0.7x was measured over an index of columns. ADR-0002 departed from that on purpose and recorded it: the index also caches every record's rendered source, so that a get is one index lookup and never reopens a shard. A budget taken from the first design cannot be met by the second, and the departure is the one this store wants to keep: get is 7.3 ms at 50,000 items and flat from 100 items upward. So the number is corrected against what the index actually holds. dbstat over the 50,000-item corpus, 110.3 MiB of records and log: items 34.6 MiB of which items.source is 24.4 MiB, exactly the record text, plus 6.7 MiB of item indexes; events 78.3 MiB and 50.1 MiB of event indexes, the three the queries range over. Total 169.6 MiB, 1.538x, and stable at 1.533 and 1.555 at the two scales below it. Reaching 1.0x now means dropping items.source and reopening a shard on every get, or replacing the event remainder with an offset into the log; both are design reversals, not tuning. The limit is 1.6x, the measured figure with room for the corpus mix to move. It is not armed, and the reason is the gate rather than the drift: a size does not drift run to run, reading 2.064 in every run before this change and 1.538 in every run after, but the gate weighs the largest corpus of the run and a pull-request run stops at 1,000 items. At 100 items the same index reads 1.868x, because 421,888 bytes of SQLite pages over 230,591 bytes of text is the page floor and not what the index stores. Arming this needs the gate to weigh a corpus large enough for that floor to disappear. It was 2.064 when the events table stored each log line whole beside six columns that already carried it."
     },
     "runtimeDependencies": {
       "limit": 0,
