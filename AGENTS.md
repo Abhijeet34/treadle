@@ -43,7 +43,11 @@ thing that applies them: never configure one by hand on the forge, because a han
 ruleset beside the file is the drift the files exist to prevent. The script applies every
 setting it can and names the ones it could not, together, at the end. Not every rule GitHub
 documents is available here, and `docs/RELEASING.md` carries which and the measurement behind
-it, so read that before adding a rule to one of those files.
+it, so read that before adding a rule to one of those files. The one setting there that
+reads like a mistake is not one: `can_approve_pull_request_reviews` is `true` because
+GitHub couples creating and approving into a single switch and release-please needs the
+creating half, and "Why Actions may create pull requests" in that doc carries why a
+stored token is the worse answer.
 
 `package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
 below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
