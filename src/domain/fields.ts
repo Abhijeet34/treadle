@@ -9,19 +9,35 @@ import { findUnsafeCharacter, isSafeText } from './text.ts'
 import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
+  EVIDENCE_KINDS,
   FOUND_IN_STAGES,
   RESOLUTIONS,
   WORK_ITEM_STATES,
   WORK_ITEM_TYPES,
+  type EvidencePointer,
   type Instant,
   type WorkItem,
   type WorkItemType,
 } from './types.ts'
 
+/**
+ * The prose bounds, and the evidence list's. Each is argued in
+ * docs/architecture/adr/0009-evidence-and-the-severity-audit.md; the short form is that a
+ * value which lands whole in a committed shard is bounded by what a reviewer will read in a
+ * diff, not by what the parser can hold. The store's own S5 ceiling of 128 KiB per section
+ * is unchanged, so a record written before these bounds still reads.
+ */
+export const MAX_DESCRIPTION = 10_000
+/** The same bound `hold_reason` already carries, which is the dictionary's one reason field. */
+export const MAX_REASON = 500
+export const MAX_EVIDENCE_ENTRIES = 20
+export const MAX_EVIDENCE_REF = 200
+export const MAX_EVIDENCE_LABEL = 120
+
 export const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'description', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due', 'evidence',
   'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
 ] as const
 
@@ -89,6 +105,15 @@ export type ValidateOptions = {
   readonly now: Instant
   /** The workspace's estimation scale; defaults to the model's 1,2,3,5,8,13. */
   readonly pointScale?: readonly number[]
+  /**
+   * Set by the store, and by nothing else. `description` was 100,000 characters before it
+   * was narrowed to MAX_DESCRIPTION, so files exist that carry more; applying the write
+   * bound on load would quarantine those records and make them unreadable, which
+   * docs/STABILITY.md calls the one thing the file format never does. On this path the
+   * store's own S5 section ceiling is the bound and a stored value over MAX_DESCRIPTION is
+   * doctor finding H18 instead of a refusal.
+   */
+  readonly storedProse?: true
 }
 
 type Check = (value: unknown, item: WorkItem, options: ValidateOptions) => string | undefined
@@ -98,15 +123,29 @@ const oneOf = (name: string, allowed: readonly string[]): Check => (value) =>
     ? undefined
     : `${name} must be one of ${allowed.join(', ')}`
 
+/**
+ * A bound that refuses says which bound and by how much. A message that named only the
+ * limit left a caller guessing whether its 90,000-character description was over by ten
+ * characters or by nine times, and the write it refuses is the one place that number is
+ * known.
+ */
+export function overLength(name: string, max: number, observed: number): string {
+  return `${name} is ${observed} characters and the limit is ${max}, which is ${observed - max} over`
+}
+
 const line = (name: string, max: number): Check => (value) =>
   typeof value === 'string' && isSingleLine(value, max)
     ? undefined
-    : `${name} must be a single line of 1 to ${max} characters with no control or bidi override characters`
+    : typeof value === 'string' && value.length > max
+      ? overLength(name, max, value.length)
+      : `${name} must be a single line of 1 to ${max} characters with no control or bidi override characters`
 
 const text = (name: string, max: number): Check => (value) =>
   typeof value === 'string' && isText(value, max)
     ? undefined
-    : `${name} must be 1 to ${max} characters and may carry newlines and tabs but no other control characters`
+    : typeof value === 'string' && value.length > max
+      ? overLength(name, max, value.length)
+      : `${name} must be 1 to ${max} characters and may carry newlines and tabs but no other control characters`
 
 const int = (name: string, min: number, max: number): Check => (value) =>
   isBoundedInt(value, min, max) ? undefined : `${name} must be a whole number from ${min} to ${max}`
@@ -127,7 +166,8 @@ const CHECKS: Readonly<Record<string, Check>> = {
   filed_at: instant('filed_at'),
   version: (value) => (isBoundedInt(value, 1, Number.MAX_SAFE_INTEGER) ? undefined : 'version must be a whole number of 1 or more'),
 
-  description: text('description', 100_000),
+  description: (value, _item, options) =>
+    text('description', options.storedProse === true ? Number.MAX_SAFE_INTEGER : MAX_DESCRIPTION)(value, _item, options),
   priority: int('priority', 1, 5),
   points: (value, _item, options) => {
     const scale = options.pointScale ?? DEFAULT_POINT_SCALE
@@ -154,7 +194,36 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
 
   due: instant('due'),
-  hold_reason: line('hold_reason', 500),
+  evidence: (value) => {
+    if (!Array.isArray(value)) return 'evidence must be a list of pointers'
+    const entries = value as readonly unknown[]
+    if (entries.length > MAX_EVIDENCE_ENTRIES) {
+      return `evidence carries ${entries.length} entries and the limit is ${MAX_EVIDENCE_ENTRIES}`
+    }
+    for (const entry of entries) {
+      if (typeof entry !== 'object' || entry === null) return 'each evidence entry is a kind, a ref and an optional label'
+      const pointer = entry as Partial<EvidencePointer>
+      if (typeof pointer.kind !== 'string' || !(EVIDENCE_KINDS as readonly string[]).includes(pointer.kind)) {
+        return `an evidence kind must be one of ${EVIDENCE_KINDS.join(', ')}`
+      }
+      if (typeof pointer.ref !== 'string' || !isSingleLine(pointer.ref, MAX_EVIDENCE_REF)) {
+        return typeof pointer.ref === 'string' && pointer.ref.length > MAX_EVIDENCE_REF
+          ? overLength('an evidence ref', MAX_EVIDENCE_REF, pointer.ref.length)
+          : `an evidence ref must be a single line of 1 to ${MAX_EVIDENCE_REF} characters`
+      }
+      // A ref with a space is a sentence wearing a pointer's name, and the row grammar can
+      // carry one space-bearing column, which the label already is.
+      if (pointer.ref.includes(' ')) return `the evidence ref "${pointer.ref}" carries a space; a ref is a hash, a path, a run id or a URL`
+      if (pointer.label !== undefined && (typeof pointer.label !== 'string' || !isSingleLine(pointer.label, MAX_EVIDENCE_LABEL))) {
+        return typeof pointer.label === 'string' && pointer.label.length > MAX_EVIDENCE_LABEL
+          ? overLength('an evidence label', MAX_EVIDENCE_LABEL, pointer.label.length)
+          : `an evidence label must be a single line of 1 to ${MAX_EVIDENCE_LABEL} characters`
+      }
+    }
+    return undefined
+  },
+
+  hold_reason: line('hold_reason', MAX_REASON),
   hold_until: (value, _item, options) => {
     if (!isInstant(value)) return 'hold_until must be an RFC 3339 instant in UTC'
     return value > options.now ? undefined : `hold_until ${value} is not in the future`

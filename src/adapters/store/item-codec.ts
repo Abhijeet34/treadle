@@ -10,6 +10,8 @@ import {
   isKnownField,
   validateWorkItem,
   type AcceptanceCriterion,
+  type EvidenceKind,
+  type EvidencePointer,
   type WorkItem,
 } from '../../domain/index.ts'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
@@ -21,6 +23,13 @@ import { unwritableBodyLine, type ParsedRecord, type Section } from './grammar.t
  * expired hold on disk is a doctor finding, not a reason to stop serving the record.
  */
 const STRUCTURAL_NOW = '0001-01-01T00:00:00Z'
+
+/**
+ * Both directions of the round trip read and write what is already on disk, so the write
+ * bound on `description` does not apply here; the store's own S5 section ceiling does.
+ * See `ValidateOptions.storedProse`.
+ */
+const STORED = { now: STRUCTURAL_NOW, storedProse: true } as const
 
 /** The single-line fields, in the order 2.14 lists them. Unknown keys render after these. */
 const FIELD_ORDER = [
@@ -50,12 +59,18 @@ const SECTION_FIELD: readonly (readonly [string, string])[] = [
   ['Expected', 'expected'],
   ['Actual', 'actual'],
   ['Findings', 'findings'],
+  ['Evidence', 'evidence'],
 ]
 
 const SECTION_BY_NAME = new Map(SECTION_FIELD)
 
 const INT_FIELDS = ['version', 'priority', 'points', 'hours_estimate', 'timebox_hours'] as const
 const TICKED = /^- \[([ x])\] (.+)$/
+/**
+ * One evidence pointer per line. Bounded and linear like every other pattern here: the ref
+ * class excludes the space that separates it from the label, so nothing can backtrack.
+ */
+const EVIDENCE_LINE = /^- ([a-z]{2,10}) ([^ ]{1,200})(?: (.{1,120}))?$/
 
 function refuse<T>(rule: string, reason: string, id: string): StoreResult<T> {
   return storeFail('VALIDATION', rule, reason, [id])
@@ -80,6 +95,26 @@ function criteriaFrom(body: string, id: string): StoreResult<readonly Acceptance
 
 function criteriaTo(criteria: readonly AcceptanceCriterion[]): string {
   return criteria.map((c) => `- [${c.ticked ? 'x' : ' '}] ${c.text}`).join('\n')
+}
+
+function evidenceFrom(body: string, id: string): StoreResult<readonly EvidencePointer[]> {
+  const out: EvidencePointer[] = []
+  for (const line of body.split('\n')) {
+    if (line.length === 0) continue
+    const match = EVIDENCE_LINE.exec(line)
+    if (match === null) {
+      return refuse('S1', `${id}: evidence line "${line}" is not "- <kind> <ref>" with an optional label`, id)
+    }
+    const label = match[3]
+    out.push(label === undefined
+      ? { kind: match[1] as EvidenceKind, ref: match[2] as string }
+      : { kind: match[1] as EvidenceKind, ref: match[2] as string, label })
+  }
+  return storeOk(out)
+}
+
+function evidenceTo(entries: readonly EvidencePointer[]): string {
+  return entries.map((e) => `- ${e.kind} ${e.ref}${e.label === undefined ? '' : ` ${e.label}`}`).join('\n')
 }
 
 /**
@@ -133,12 +168,18 @@ export function decodeItem(record: ParsedRecord): StoreResult<WorkItem> {
       draft[field] = criteria.value
       continue
     }
+    if (field === 'evidence') {
+      const evidence = evidenceFrom(section.body, record.id)
+      if (!evidence.ok) return evidence
+      draft[field] = evidence.value
+      continue
+    }
     draft[field] = section.body
   }
 
   if (extra.size > 0) draft['extra'] = extra
 
-  const validated = validateWorkItem(draft as unknown as WorkItem, { now: STRUCTURAL_NOW })
+  const validated = validateWorkItem(draft as unknown as WorkItem, STORED)
   if (!validated.ok) {
     return storeFail('VALIDATION', validated.error.rule ?? 'V4', `${record.id}: ${validated.error.message}`, [record.id])
   }
@@ -166,7 +207,7 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
   // Validate before rendering, not after. A record that fails the field dictionary would
   // render happily and then be quarantined on the next read, which is a write the store
   // reported as a success and cannot serve.
-  const valid = validateWorkItem(item, { now: STRUCTURAL_NOW })
+  const valid = validateWorkItem(item, STORED)
   if (!valid.ok) {
     return storeFail('VALIDATION', valid.error.rule ?? 'V4', `${item.id}: ${valid.error.message}`, [item.id])
   }
@@ -193,7 +234,9 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
     if (value === undefined) continue
     const body = field === 'acceptance_criteria'
       ? criteriaTo(value as readonly AcceptanceCriterion[])
-      : (value as string)
+      : field === 'evidence'
+        ? evidenceTo(value as readonly EvidencePointer[])
+        : (value as string)
     const bad = unwritableBodyLine(body)
     if (bad !== undefined) {
       return refuse('S1', `${item.id}: ${field} has the line "${bad}", and a body line may not start with # at column 0`, item.id)

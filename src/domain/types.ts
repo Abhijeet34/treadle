@@ -60,6 +60,26 @@ export type BugSeverity = (typeof BUG_SEVERITIES)[number]
 export const FOUND_IN_STAGES = ['dev', 'review', 'test', 'production'] as const
 export type FoundInStage = (typeof FOUND_IN_STAGES)[number]
 
+/**
+ * What a piece of evidence is, closed so a list of pointers can be counted and filtered
+ * rather than read. The set is the seven artefact kinds this tool's callers actually
+ * produce; anything else is a `url` or a `file`, which is why both are in it.
+ */
+export const EVIDENCE_KINDS = ['commit', 'pr', 'run', 'test', 'file', 'url', 'report'] as const
+export type EvidenceKind = (typeof EVIDENCE_KINDS)[number]
+
+/**
+ * A pointer to evidence that lives somewhere a third party can open it, never the evidence
+ * itself. `ref` carries no space because it is a hash, a path, a run id or a URL, and a
+ * bounded `label` says which one of those it is; the prose that would explain it belongs in
+ * the artefact the ref names. ADR-0009 carries the argument for the bounds.
+ */
+export type EvidencePointer = {
+  readonly kind: EvidenceKind
+  readonly ref: string
+  readonly label?: string
+}
+
 /** The workspace may configure its own scale; this is the default (2.14). */
 export const DEFAULT_POINT_SCALE = [1, 2, 3, 5, 8, 13] as const
 
@@ -87,6 +107,8 @@ export type WorkItem = {
   readonly component?: string
   readonly labels?: readonly string[]
   readonly sprint_id?: string
+  /** Bounded pointers at artefacts a third party can open, appended and never edited. */
+  readonly evidence?: readonly EvidencePointer[]
 
   /** An optional date the work is wanted by. `overdue` is derived from it; see dates.ts. */
   readonly due?: Instant
