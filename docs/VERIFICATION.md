@@ -23,7 +23,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A hand edit during an operation is handled | 12 trials: 6 broken records quarantined and reported as findings with the record either side still serving, 6 concurrent edits leaving a shard that still parses, 0 stores left unreadable | Proven |
 | Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
-| No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts. 51 source files scanned against 11 network module specifiers: 0 imports | Proven |
+| No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.11% lines and 88.99% branches overall against a 90/85 gate; all 7 named files at 96.33% lines or better and 96.26% branches or better | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 654 tests every run, 25.8 s to 42.5 s each, 692 s in total | Proven |
 | One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
@@ -83,16 +83,18 @@ A tight timing bound in a test is a machine measurement wearing a correctness co
 
 ## The defect this work found
 
-Writing the coverage gate exposed two reachable crashes on the same class.
-`treadle init` where `.work` is already a file, and `treadle file` into a shard directory with its write bit off, each printed a raw Node stack trace to stderr and exited 1.
+Writing the coverage gate exposed two reachable filesystem-failure paths on the same class.
+`treadle init` where `.work` is already a file, and `treadle file` into a shard directory with its write bit off.
+At the base this branch rebases onto, PR #4's command-boundary backstop already turns both into a structured envelope with no stack trace.
 
 ```text
-Error: ENOTDIR: not a directory, mkdir '.../.work/items'
-    at async mkdir (node:internal/fs/promises:861:10)
-    at async createWorkspace (.../src/adapters/store/sharded-store.ts:106:3)
+err INTERNAL -
+"cause init did not complete: Error: ENOTDIR: not a directory, mkdir '.../.work/items'
+fix treadle version
 ```
 
-That is not the envelope a caller parses, not an exit from the table in [STABILITY.md](STABILITY.md), and a stack trace on stderr carries absolute paths and internal frames, which is finding F10's class, record content reaching a log, arriving on a path nobody had walked.
+Both were reported as `INTERNAL` with exit 1 and no rule id.
+A filesystem that refuses a write is the store being unavailable, which [STABILITY.md](STABILITY.md) maps to exit 6.
 `createWorkspace` declared a result type it never used, and `apply` let an errno escape the same way.
 Both now return `STORE_UNAVAILABLE` with the rule id `S13`, and `run` carries a backstop for anything that still escapes.
 

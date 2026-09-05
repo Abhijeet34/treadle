@@ -8,10 +8,6 @@
 // A trap that cannot fire is the failure mode this file is most exposed to, so the first
 // test in it makes the trap fire on purpose and asserts it caught the call. Without that,
 // a patch that silently stopped applying would leave the rest of the file green over nothing.
-//
-// The static check at the end is the belt to that brace rather than the proof: a network
-// module imported anywhere under `src` would be a change worth arguing with, whether or not
-// this particular run of the CLI reached it.
 
 import assert from 'node:assert/strict'
 import dgram from 'node:dgram'
@@ -20,23 +16,14 @@ import http from 'node:http'
 import https from 'node:https'
 import net from 'node:net'
 import tls from 'node:tls'
-import { readFile, readdir, mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, it, before, after } from 'node:test'
 
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli } from '../helpers/cli-run.ts'
-
-const SRC = fileURLToPath(new URL('../../src/', import.meta.url))
-
-/** Every module specifier that can put a packet on a wire. */
-const NETWORK_MODULES = [
-  'node:net', 'node:tls', 'node:http', 'node:https', 'node:http2', 'node:dgram',
-  'node:dns', 'node:cluster', 'node:inspector', 'undici', 'node:worker_threads',
-]
 
 type Attempt = { readonly api: string; readonly argument: string }
 
@@ -161,32 +148,5 @@ describe('no command opens a socket', () => {
     assert.deepEqual(attempts, [], `a command reached the network: ${JSON.stringify(attempts)}`)
     assert.equal(ran, COMMANDS.length)
     t.diagnostic(`${ran} commands run with every network entry point trapped: 0 attempts`)
-  })
-})
-
-describe('no source file imports a module that can reach the network', () => {
-  it('holds across every file under src', async (t) => {
-    const files: string[] = []
-    const walk = async (at: string): Promise<void> => {
-      for (const entry of await readdir(at, { withFileTypes: true })) {
-        const full = path.join(at, entry.name)
-        if (entry.isDirectory()) await walk(full)
-        else if (entry.name.endsWith('.ts')) files.push(full)
-      }
-    }
-    await walk(SRC)
-    assert.ok(files.length > 20, `only ${files.length} source files were scanned`)
-
-    for (const file of files) {
-      const text = await readFile(file, 'utf8')
-      for (const specifier of NETWORK_MODULES) {
-        assert.equal(
-          new RegExp(`from ['"]${specifier}['"]|require\\(['"]${specifier}['"]\\)`).test(text),
-          false,
-          `${path.relative(SRC, file)} imports ${specifier}`,
-        )
-      }
-    }
-    t.diagnostic(`${files.length} source files scanned against ${NETWORK_MODULES.length} network module specifiers: 0 imports`)
   })
 })

@@ -4,10 +4,10 @@
 //
 // Both cases below were reproduced against the real binary before this file existed. `init`
 // where `.work` is already a file, and `file` into a shard directory with its write bit off,
-// each printed a raw Node stack trace to stderr and exited 1: no envelope, no rule id, no
-// exit from the table, and absolute internal paths in the trace, which is finding F10's
-// class arriving on a path nobody had walked. The store now returns `S13` for an errno it
-// cannot write through, and `run` carries a backstop for anything that still escapes.
+// each gave `err INTERNAL` and exited 1, with no rule id: not a crash, but not an exit from
+// the table either. The store now returns `S13` and `STORE_UNAVAILABLE` for an errno it
+// cannot write through, so the exit is 6, and `run` carries a backstop for anything that
+// still escapes.
 
 import assert from 'node:assert/strict'
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
