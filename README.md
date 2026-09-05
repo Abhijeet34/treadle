@@ -45,9 +45,10 @@ node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
 
-The test suite has no build step, about 31 seconds on Node 24.11.1. Most of that
-is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed
-inputs per run.
+`npm run check` is the gate: types, then the suite, then the bundle.
+Development itself needs no build step: Node runs the TypeScript directly.
+The suite is about 31 seconds on Node 24.11.1, most of that 73 real child processes across
+the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 
 ```bash
 npm test         # node --test over test/**/*.test.ts, no build step
