@@ -99,8 +99,54 @@ describe('the published package is the bundle and nothing else', () => {
     assert.match(facts, new RegExp(`path\\.join\\(dist, '${file}'\\)`))
   })
 
-  it('the declared runtime floor is the real one', () => {
-    assert.equal(manifest.engines?.node, '>=24.15.0')
-    assert.equal(readFileSync(path.join(ROOT, '.nvmrc'), 'utf8').trim(), '24.15.0')
+  it('the declared runtime floor is the real one, in all three places that name it', () => {
+    const floor = '24.15.0'
+    assert.equal(manifest.engines?.node, `>=${floor}`)
+    assert.equal(readFileSync(path.join(ROOT, '.nvmrc'), 'utf8').trim(), floor)
+    // ci.yml cannot read .nvmrc into a matrix, so it names the floor literally. This is what
+    // stops that literal drifting: raising the floor without raising it there would leave CI
+    // testing a version the product no longer supports.
+    const ci = readFileSync(path.join(ROOT, '.github', 'workflows', 'ci.yml'), 'utf8')
+    assert.match(ci, new RegExp(`node: \\["${floor.replaceAll('.', '\\.')}", `),
+      `ci.yml's check matrix must have ${floor} as its first leg`)
+  })
+})
+
+describe('F13 control three: the release path attests what it publishes', () => {
+  const release = readFileSync(path.join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8')
+  // The comments in that file discuss the flags it deliberately does not pass, so the
+  // "carries no token, passes no --provenance" assertions read the instructions alone.
+  const instructions = release.split('\n').filter((line) => !/^\s*#/.test(line)).join('\n')
+
+  it('exports an SBOM and attests the tarball', () => {
+    assert.match(instructions, /dependency-graph\/sbom/)
+    assert.match(instructions, /actions\/attest-build-provenance@[0-9a-f]{40}/)
+  })
+
+  it('publishes over OIDC and carries no npm token', () => {
+    assert.match(instructions, /id-token: write/)
+    assert.doesNotMatch(instructions, /NODE_AUTH_TOKEN|NPM_TOKEN/)
+    // Trusted publishing generates provenance itself, and the flag turns a
+    // provenance-ineligible publish into a failed release.
+    assert.doesNotMatch(instructions, /--provenance/)
+  })
+
+  it('gates the publish behind a variable and a protected environment', () => {
+    assert.match(instructions, /vars\.NPM_PUBLISH_ENABLED == 'true'/)
+    assert.match(instructions, /environment: npm-publish/)
+  })
+
+  it('pins every third-party action to a full commit SHA', () => {
+    for (const workflow of ['ci.yml', 'cross-platform.yml', 'release.yml', 'bench.yml']) {
+      const text = readFileSync(path.join(ROOT, '.github', 'workflows', workflow), 'utf8')
+      for (const line of text.split('\n')) {
+        const used = /^\s*(?:-\s*)?uses:\s*(\S+)/.exec(line)
+        if (used === null) continue
+        const ref = used[1] ?? ''
+        // A local reusable workflow is a path in this repository, so it has no ref to pin.
+        if (ref.startsWith('./')) continue
+        assert.match(ref, /@[0-9a-f]{40}$/, `${workflow} uses ${ref}, which is not a commit SHA`)
+      }
+    }
   })
 })

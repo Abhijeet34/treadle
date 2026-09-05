@@ -1,7 +1,15 @@
 # SPDX-License-Identifier: Apache-2.0
-# macOS and Windows coverage. Not on pull_request: see the note in ci.yml for the cost.
-# No cancel-in-progress here, because a superseded scheduled run is the only record of
-# its own result.
+# The macOS and Windows coverage ci.yml deliberately does not carry. AGENTS.md, "CI runner
+# platforms": a pull request runs Linux only, because GitHub bills a macOS minute at about 10x
+# a Linux one and a Windows minute at about 1.67x against the same allowance.
+#
+# What only these runners can find, for this product: the store's advisory lock and its atomic
+# rename are `node:fs` primitives whose failure modes differ per platform, path handling is a
+# store concern on a tool whose whole state is files, and the terminal width and encoding the
+# human rendering measures against are not the same three things anywhere.
+#
+# No `concurrency` block at all: cancelling a scheduled or release run discards the only
+# record of its own result, and AGENTS.md forbids cancel-in-progress on either.
 
 name: Cross-platform
 
@@ -9,6 +17,9 @@ on:
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
+  # Called by release.yml on the signed tag, so no artifact is attached and nothing is
+  # published on evidence from one platform.
+  workflow_call:
 
 permissions:
   contents: read
@@ -17,18 +28,59 @@ jobs:
   test:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # A backstop the step timeout below should always reach first.
+    timeout-minutes: 25
     strategy:
+      # One red platform should not hide the state of the others.
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    defaults:
+      run:
+        # bash on all three, so one script body works everywhere; the Windows runner's
+        # default is pwsh.
+        shell: bash
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
+          # The floor, on every platform. ci.yml is where current Node is tested.
           node-version-file: .nvmrc
           cache: npm
+
       - run: npm ci
+
       - name: Typecheck
         run: npm run typecheck
+
       - name: Test
-        run: npm test
+        timeout-minutes: 15
+        run: npm test 2>&1 | tee "$RUNNER_TEMP/test.log"
+
+      - name: Build the bundle and weigh it against DR1
+        run: npm run build
+
+      # A green tick does not carry how many tests ran, and on Windows that is exactly the
+      # thing that can go wrong: npm hands a script to cmd.exe, cmd keeps the quotes around
+      # `"test/**/*.test.ts"`, `node --test` matches no file and exits 0 over an empty set.
+      # Measured on a sibling repository with the identical command shape, where one platform
+      # reported green having run nothing. A run that cannot say how many tests it ran fails.
+      - name: Say how many tests this platform ran
+        if: always()
+        run: |
+          set -uo pipefail
+          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || true)
+          if [ -z "${ran:-}" ]; then
+            echo "::error::${{ matrix.os }}: the suite reported no test count, so nothing here is evidence" >&2
+            echo "${{ matrix.os }} - NO VERDICT: the suite never reported a test count" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # A floor far below the suite's real size, so it catches a run that matched no
+          # files or a small fraction of them and never fails on a test being deleted.
+          if [ "$ran" -lt 500 ]; then
+            echo "::error::${{ matrix.os }} ran only $ran tests; the suite is over 650" >&2
+            echo "${{ matrix.os }} - ran $ran tests, which is short" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "${{ matrix.os }} - ran $ran tests" >> "$GITHUB_STEP_SUMMARY"

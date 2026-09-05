@@ -1,0 +1,26 @@
+{
+  "name": "release tags",
+  "target": "tag",
+  "enforcement": "active",
+  "bypass_actors": [],
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/tags/v*"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    { "type": "update" },
+    { "type": "deletion" },
+    { "type": "required_signatures" },
+    {
+      "type": "tag_name_pattern",
+      "parameters": {
+        "name": "v<semver>",
+        "operator": "regex",
+        "negate": false,
+        "pattern": "^v(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)$"
+      }
+    }
+  ]
+}

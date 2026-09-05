@@ -1,8 +1,19 @@
 # SPDX-License-Identifier: Apache-2.0
-# A pull request runs Linux runners only. GitHub bills a macOS minute at about 10x a Linux
-# one and a Windows minute at about 1.67x, against the same allowance, so a three-platform
-# matrix here would spend most of the budget proving what the cheapest runner already
-# proved. Cross-platform coverage runs on a schedule and on dispatch; see cross-platform.yml.
+# Every job a merge depends on lives in this one file, because the `checks` aggregate at the
+# bottom can only `needs:` jobs in its own workflow, and .github/rulesets/main.json requires
+# exactly that one context. Jobs here can be added or renamed without touching the ruleset.
+#
+# A pull request runs Linux runners only. GitHub bills a macOS minute at about 10x a Linux one
+# and a Windows minute at about 1.67x, against the same allowance, so a three-platform matrix
+# here would spend most of the budget proving what the cheapest runner already proved.
+# cross-platform.yml carries macOS and Windows, weekly and on the release path. The one
+# exception is the release pull request, at the bottom of this file, and it exists because
+# merging that pull request is what makes a release possible.
+#
+# Third-party actions are pinned to a full commit SHA with the version in a trailing comment,
+# never to a tag: a tag can be repointed at new code by whoever owns the action.
+# .github/settings/actions-permissions.json sets `sha_pinning_required` so an unpinned action
+# cannot come back, and .github/dependabot.yml is what moves the pins.
 
 name: CI
 
@@ -10,39 +21,163 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  # A superseded pull request run is noise. A superseded push run on main is the only record
+  # that the merged commit was ever green.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # Two legs, and the floor is the load-bearing one. `engines.node` says >=24.15.0 because
+  # node:sqlite reaches Stability 1.2 there (DR1), and .nvmrc pins the same number, so the
+  # first leg is the product's own floor. The second is current Node on the cheapest runner:
+  # nothing else tests the open upper half of that range, and a Node release nobody asked for
+  # should redden a pull request here rather than a release later.
   check:
-    name: Typecheck and test
-    runs-on: ubuntu-latest
+    name: check / node ${{ matrix.node }}
+    runs-on: ubuntu-24.04
+    # A backstop, never the mechanism. A job that outlives this reports `cancelled`, which
+    # carries no verdict; the steps below bound themselves first.
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 24.15.0 is .nvmrc and package.json's engines floor. supply-chain.test.ts asserts
+        # that all three still name it, so this literal cannot drift on its own.
+        node: ["24.15.0", "26"]
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version-file: .nvmrc
+          node-version: ${{ matrix.node }}
           cache: npm
+
+      # `npm ci` rather than `npm install`, under the repository's own .npmrc, which sets
+      # ignore-scripts=true. That is two of threat-model finding F13's three controls, and the
+      # build step below is what proves the second one costs nothing: esbuild resolves its
+      # platform binary through an optional dependency, so a bundle appearing here is the
+      # evidence that no lifecycle script was needed to produce it.
       - run: npm ci
+
       - name: Typecheck
         run: npm run typecheck
+
+      # The suite spawns 37 processes for the store's advisory lock and more for the index
+      # contention case, so it is the slowest thing here at about 20 seconds locally.
       - name: Test
+        timeout-minutes: 10
         run: npm test
 
-  commits:
-    name: Conventional commits and DCO
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+      - name: Build the bundle and weigh it against DR1
+        run: npm run build
+
+      - name: Licences
+        run: npm run licences
+
+  # Not folded into `check`: it reaches the registry, so it fails for reasons that have
+  # nothing to do with the change under review, and a reader should be able to tell those two
+  # apart from the job list alone.
+  audit:
+    name: audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # At `low`, because zero runtime dependencies and seven development ones is not a tree
+      # with a backlog to grandfather. There is nothing to raise the floor for.
+      - name: npm audit
+        run: npm audit --audit-level=low
+
+  codeql:
+    name: codeql
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # build-mode: none, because there is nothing to observe being compiled. Node strips the
+      # types at run time and the esbuild bundle is a concatenation of the same files CodeQL
+      # already reads, so a tracing build would give it the source twice.
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: /language:javascript-typescript
+
+  # The workflows are the least tested code in the repository: nothing runs them until they
+  # run for real, and the release path runs for real once. actionlint reads them statically
+  # and runs shellcheck over every `run:` body, which is the only review the shell in this
+  # directory gets.
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      ACTIONLINT_VERSION: "1.7.12"
+      ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Downloaded and checksummed rather than run through a third-party action: this job's
+      # whole subject is that a workflow should not run code nobody pinned.
+      - name: Install actionlint
+        run: |
+          set -euo pipefail
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL "$url" -o actionlint.tar.gz
+          echo "${ACTIONLINT_SHA256}  actionlint.tar.gz" | sha256sum --check --strict
+          tar -xzf actionlint.tar.gz actionlint
+          sudo install -m 0755 actionlint /usr/local/bin/actionlint
+          rm -f actionlint actionlint.tar.gz
+
+      - name: Lint the workflows
+        run: actionlint -color
+
+  # GitHub's own action, available here because the repository is public: it reads the pull
+  # request's dependency diff, so it has nothing to say on a push.
+  dependency-review:
+    name: dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # Nothing to grandfather, so there is no reason to start above the floor.
+          fail-on-severity: low
+          # A development dependency here is not "not shipped" in the sense that matters:
+          # esbuild produces the bytes that ship, so its integrity is the product's.
+          fail-on-scopes: runtime, development
+          comment-summary-in-pr: on-failure
+
+  commits:
+    name: conventional commits and DCO
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -59,3 +194,41 @@ jobs:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE" "$HEAD"
+
+  # The one pull request that runs macOS and Windows, and the reason the rule above is "a
+  # pull request runs Linux runners only" rather than "no pull request runs anything else".
+  # Merging this pull request is what makes main's head releasable, and a release is cut from
+  # main's head, so this is the last moment three platforms can be checked before the tag.
+  #
+  # The same-repository clause is not decoration: without it a fork could open a pull request
+  # from a branch it names release-please--anything and spend the macOS and Windows matrix.
+  cross-platform:
+    name: cross-platform
+    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/cross-platform.yml
+
+  # The single required context. Everything above reaches the branch ruleset through this job
+  # and nowhere else, so `if: always()` is load-bearing: without it a failed dependency would
+  # leave this job skipped, and a skipped required check is not a failing one.
+  checks:
+    name: checks
+    if: always()
+    needs: [check, audit, codeql, actionlint, dependency-review, commits, cross-platform]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Every job that ran must have succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          set -euo pipefail
+          echo "results: $RESULTS"
+          # 'skipped' is accepted only because three jobs above skip themselves by event or by
+          # branch: dependency-review and commits off a pull request, cross-platform off the
+          # release pull request. No job here `needs:` another, so nothing else produces it.
+          for result in $RESULTS; do
+            case "$result" in
+              success|skipped) ;;
+              *) echo "::error::a required job reported '$result'" >&2; exit 1 ;;
+            esac
+          done

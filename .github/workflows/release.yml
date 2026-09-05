@@ -1,0 +1,269 @@
+# SPDX-License-Identifier: Apache-2.0
+# Two triggers, two halves, and the line between them is a person.
+#
+# On a push to main, release-please keeps the release pull request up to date: the version,
+# the changelog and nothing else. It never tags and never creates a release, which is the one
+# place this workflow departs from the sibling repository it is modelled on.
+#
+# The other half runs on a tag. treadle's release tags are annotated and signed
+# (.github/rulesets/tags.json requires both), and release-please cannot produce one: it
+# creates a GitHub Release and lets GitHub create the tag for it, which is lightweight and
+# unsigned. Measured on the sibling repository, whose four release tags all report
+# `"type": "commit"` from `git/refs/tags`. So the tag is created by a person at a terminal
+# where signing is configured, and pushing it is the act that authorises the release.
+#
+# What that buys, beyond the signature: nothing here can release anything by itself. The
+# publication gate the identity screen holds is not a flag someone might forget to unset, it
+# is the absence of a signed tag. docs/RELEASING.md carries the procedure and docs/ROLLBACK.md
+# what to do when a release was wrong.
+#
+# No `concurrency` block. Cancelling a publish mid-flight causes real damage, and GitHub keeps
+# only one pending run per group even when nothing is cancelled in flight, so a third push can
+# evict the one carrying a release.
+
+name: Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # Opening and updating the release pull request happens on every push to main,
+  # unconditionally: a gate in front of it would stop the pull request from ever appearing,
+  # which is a worse failure than any it could prevent. `skip-github-release` is what keeps it
+  # from tagging, and there is no second job that lifts it.
+  release-pr:
+    name: release-pr
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          # "if set to true, then do not try to tag releases" - the action's own description
+          # of this input, at the SHA pinned above.
+          skip-github-release: true
+
+  # Three platforms on the tagged tree, before anything is attached to a release and long
+  # before anything is published. The release pull request already ran this matrix through
+  # ci.yml, on the tree that became main's head; this run is on the tag itself, which is the
+  # tree the tarball is packed from.
+  cross-platform:
+    name: cross-platform
+    if: startsWith(github.ref, 'refs/tags/v')
+    uses: ./.github/workflows/cross-platform.yml
+
+  artifacts:
+    name: artifacts
+    needs: cross-platform
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      # actions/attest-build-provenance signs through GitHub's OIDC identity. No key and no
+      # secret: the identity is the workflow, the repository and the commit.
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The preflight resolves the tag object, verifies its signature and asks whether the
+          # commit is on main. A ref-only fetch brings none of those.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build the bundle
+        run: npm run build
+
+      # Refuses a tag that is lightweight, unsigned, misnamed, off main, or naming a version
+      # the tree does not declare, and writes the release notes for the version it accepted.
+      # scripts/release-preflight.ts carries the clauses and test/release/preflight.test.ts
+      # demonstrates each one refusing.
+      - name: Release preflight
+        run: node scripts/release-preflight.ts --tag "$TAG" --branch origin/main --notes-out "$RUNNER_TEMP/notes.md"
+
+      - name: Pack the tarball
+        id: pack
+        run: |
+          set -euo pipefail
+          # --ignore-scripts is redundant under this repository's .npmrc and is written anyway:
+          # the one command that turns this tree into bytes other people run should say what it
+          # does not execute, rather than depend on a file being read.
+          # The filename carries the package name and version; reading it back rather than
+          # composing it keeps the product name out of this file.
+          filename=$(npm pack --json --ignore-scripts | node -e '
+            let s = "";
+            process.stdin.on("data", (d) => (s += d)).on("end", () => console.log(JSON.parse(s)[0].filename));
+          ')
+          echo "tarball=$filename" >> "$GITHUB_OUTPUT"
+
+      # GitHub's dependency-graph export, not `npm sbom`: it describes the manifests from the
+      # same data the dependency review reads, needs no dependency installed, and cannot
+      # disagree with the alerts on the repository.
+      - name: Export the SBOM
+        run: gh api "repos/${GITHUB_REPOSITORY}/dependency-graph/sbom" > sbom.spdx.json
+
+      # Checksums over both, so someone who has downloaded the assets can check them without
+      # a network round trip to the attestation service.
+      - name: Checksum the assets
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: sha256sum "$TARBALL" sbom.spdx.json | tee SHA256SUMS
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: ${{ steps.pack.outputs.tarball }}
+
+      # The release is created here rather than by release-please, because the tag already
+      # exists and carries the signature that authorised all of this.
+      - name: Create the release and attach everything
+        env:
+          TARBALL: ${{ steps.pack.outputs.tarball }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag \
+            "$TARBALL" sbom.spdx.json SHA256SUMS
+
+  # Off until someone deliberately turns it on, and then still not until someone approves the
+  # run. Three interlocks, each of which stops publication on its own:
+  #
+  #   1. `private: true` in package.json, which npm itself refuses to publish. The name has
+  #      not been through its clearance screen, and this is what makes that a fact rather than
+  #      an intention. The preflight names it so a refusal reads as the gate holding.
+  #   2. NPM_PUBLISH_ENABLED, a repository variable rather than a secret or a default. Unset,
+  #      a release ends at the GitHub release and its three assets, and this job is visibly
+  #      skipped rather than silently absent.
+  #   3. The `npm-publish` environment, which is configured to require a reviewer. The job
+  #      stops and waits for a person before it can reach the registry.
+  #
+  # It holds no repository write token, and no npm token at all. The OIDC identity that mints
+  # the npm credential lives here alone, and everything it publishes was produced, checksummed
+  # and attested by the job above.
+  publish:
+    name: publish
+    needs: artifacts
+    if: startsWith(github.ref, 'refs/tags/v') && vars.NPM_PUBLISH_ENABLED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          registry-url: https://registry.npmjs.org
+
+      # npm's trusted-publishing documentation: "Trusted publishing requires npm CLI version
+      # 11.5.1 or later". An older npm fails with ENEEDAUTH, which reads like a misconfigured
+      # trusted publisher rather than an old client.
+      - name: Check npm can do trusted publishing
+        run: |
+          set -euo pipefail
+          npm --version
+          node -e '
+            const [a, b, c] = process.argv[1].split(".").map(Number);
+            const ok = a > 11 || (a === 11 && (b > 5 || (b === 5 && c >= 1)));
+            if (!ok) throw new Error("npm 11.5.1+ is required for trusted publishing");
+          ' "$(npm --version)"
+
+      # The same clauses as the artifacts job, plus the ones that only matter when a tarball
+      # is about to leave the machine. This is where `private: true` refuses.
+      - name: Release preflight
+        run: |
+          npm ci
+          npm run build
+          node scripts/release-preflight.ts --tag "$TAG" --branch origin/main --publishing
+
+      # Downloading the release asset rather than rebuilding: what npm receives is then
+      # byte-for-byte the artifact that was attested and checksummed above.
+      - name: Fetch the attested tarball
+        run: |
+          set -euo pipefail
+          gh release download "$TAG" --pattern '*.tgz' --pattern 'SHA256SUMS'
+          grep '\.tgz$' SHA256SUMS | sha256sum --check --strict
+
+      # No --provenance flag. npm's documentation: with trusted publishing "npm automatically
+      # generates and publishes provenance attestations ... you don't need to add the
+      # --provenance flag", and the flag turns a provenance-ineligible publish into a failed
+      # release rather than an unattested one.
+      - name: Publish
+        run: npm publish ./*.tgz --access public
+
+  # The first thing that has ever installed treadle the way a user installs it. It runs in a
+  # container rather than on the runner, because the runner has this repository checked out
+  # and a `treadle` on PATH from it would answer instead of the published one.
+  smoke:
+    name: smoke
+    needs: publish
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    container: node:24.15.0-trixie
+    steps:
+      # The registry serves a new version from a CDN, so the publish returning is not the
+      # package being installable yet. Six tries a minute apart rather than one and a guess.
+      - name: Install the published package from the registry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          for attempt in 1 2 3 4 5 6; do
+            if npm install --global --ignore-scripts "treadle@${version}"; then
+              echo "installed treadle@${version} on attempt ${attempt}"
+              break
+            fi
+            if [ "$attempt" = 6 ]; then
+              echo "::error::treadle@${version} was published but is not installable" >&2
+              exit 1
+            fi
+            sleep 60
+          done
+
+      # The happy path, driven the way the README drives it, against a workspace this job
+      # creates in a directory that has never held one.
+      - name: Run the happy path
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/smoke && cd /tmp/smoke
+          treadle version
+          treadle init --yes
+          treadle file story "A smoke test filed this"
+          treadle backlog
+          treadle status
+          # The envelope is the contract, so the check is on what it printed, not on exit 0
+          # alone: a command that fails prints `err <CODE>` and exits non-zero, and a command
+          # that succeeds prints `ok <command>`.
+          treadle status | head -1 | grep -q '^ok '
+          echo "the published package installs and answers"
