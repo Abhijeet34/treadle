@@ -49,7 +49,8 @@ about processes, and a crash on malformed input is only observable from outside 
 that crashes.
 
 The six behaviour axes go the other way and drive `src/cli/main.ts`'s own `run` in process,
-with argv, the working directory, the environment and both streams passed in: 612 spawns
-would have bought about 70 seconds of Node startup and changed nothing they measure. Each one
-runs a single read through the shipped `bin/treadle.js` as a real child and compares the
-bytes, so that trade is checked rather than assumed.
+with argv, the working directory, the environment and both streams passed in: 612 spawns at
+the store-loaded floor the run measures is one to two minutes of Node startup, and startup
+cannot change what they measure. Each one runs a single read through the shipped
+`bin/treadle.js` as a real child and compares the bytes, so that trade is checked rather than
+assumed.

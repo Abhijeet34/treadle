@@ -208,7 +208,7 @@ A7, A8 and A10 are deterministic pass-or-fail properties that transfer between m
 ## How the surface axes are driven
 
 The driver is `src/cli/main.ts`'s own `run`, the function `bin/treadle.js` shims, with argv, the working directory, the environment and both streams passed in as arguments.
-No process is spawned per invocation, because 612 spawns would have cost about 70 seconds of Node startup to measure behaviour that startup cannot change.
+No process is spawned per invocation, because 612 spawns at the appended run's store-loaded floor of 188 ms is close to two minutes of Node startup, spent measuring behaviour that startup cannot change.
 
 That is a claim, so it is checked rather than asserted.
 Each of the six axes runs one of its own reads through the shipped `bin/treadle.js` in a real child process and compares the bytes: **5 of 5 cross-checks matched exactly**, on exit status, stdout and stderr, from 200 to 734 bytes each.
