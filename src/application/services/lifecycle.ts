@@ -25,7 +25,7 @@ import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
 import { readWorkspace, transitionContextFor } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
-import { notFound } from './items.ts'
+import { echoed, notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const TRANSITION_SHAPE: ResultShape = {
@@ -207,7 +207,7 @@ export async function transition(
     item: item.id,
     state: `${outcome.from} -> ${outcome.to}`,
     v: `${item.version} -> ${written?.version ?? item.version + 1}`,
-    set: changes.map((change) => `${change.field} ${change.before} -> ${change.after}`),
+    set: changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`),
     guards: guardLine(outcome.guards),
   }
   if (mode === 'dry-run') {

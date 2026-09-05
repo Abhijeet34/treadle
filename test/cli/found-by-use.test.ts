@@ -5,8 +5,9 @@
 // rule that broke rather than as a diff.
 
 import assert from 'node:assert/strict'
-import { readFile, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { DatabaseSync } from 'node:sqlite'
 import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
@@ -429,5 +430,104 @@ describe('an aggregate says what it aggregates, and a heading with no value prin
 
     const listed = await cli(['backlog', '--out', 'human'])
     assert.match(listed.out, /^backlog {2}\S+$/m, 'a command that opened a workspace still names it')
+  })
+})
+
+describe('the defects the second adversarial pass found by using the tool', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  describe('a value that spans lines is projected on the set line, never spliced into it', () => {
+    it('reports a multi-line description as its size and exits 0, because the write landed', async () => {
+      const written = await cli(['set', 'auth-refresh', 'description=line one\nline two'])
+      assert.equal(written.code, 0, written.err)
+      assert.match(written.out, /^set description .* -> 17 chars$/m)
+      const shown = await cli(['show', 'auth-refresh', '--field', 'desc'])
+      assert.match(shown.out, /^\|desc 2 \d+$/m)
+    })
+  })
+
+  describe('the store never writes a record it would not serve back', () => {
+    it('refuses a criterion carrying a newline at exit 2, and every read after it still answers', async () => {
+      const refused = await cli(['set', 'auth-refresh', 'acceptance_criteria=one\ntwo'])
+      assert.equal(refused.code, 2, refused.out)
+      assert.match(refused.err, /^rule V4$/m)
+      assert.match(refused.err, /single line of text/)
+      const shown = await cli(['show', 'auth-refresh'])
+      assert.equal(shown.code, 0, shown.err)
+    })
+  })
+
+  describe('a cursor that names nothing is a refusal, not the first page again', () => {
+    for (const [argv, entity] of [
+      [['history', 'auth-refresh', '--cursor', 'nosuch'], 'auth-refresh'],
+      [['backlog', '--cursor', 'nosuch'], 'nosuch'],
+      [['next', '--cursor', 'nosuch'], 'nosuch'],
+    ] as const) {
+      it(`${argv[0]} exits 2 naming the cursor`, async () => {
+        const run = await cli(argv)
+        assert.equal(run.code, 2, run.out)
+        assert.match(run.err, /^rule C1$/m)
+        assert.match(run.err, new RegExp(`^entity ${entity}$`, 'm'))
+        assert.match(run.err, /^"cause --cursor nosuch names nothing in this list/m)
+      })
+    }
+  })
+
+  describe('the index is a cache, so a damaged one is rebuilt and never a stack trace', () => {
+    const index = () => path.join(demo.root, '.index', 'index.sqlite')
+    // The fixture's own connection is closed first: a real run is one process, and a second
+    // connection holding the file open across the damage is the fixture's shape, not the tool's.
+    before(async () => { await demo.store.close() })
+
+    it('rebuilds over garbage bytes at the index path', async () => {
+      assert.equal((await cli(['status'])).code, 0)
+      await writeFile(index(), Buffer.from('not a database, not even close'))
+      const run = await cli(['status'])
+      assert.equal(run.code, 0, run.err)
+      assert.match(run.out, /^items \d+$/m)
+    })
+
+    it('recomputes over a meta row that is not JSON', async () => {
+      assert.equal((await cli(['status'])).code, 0)
+      const db = new DatabaseSync(index())
+      db.prepare("insert or replace into meta (key, value) values ('hierarchy_cycle', 'not json')").run()
+      db.close()
+      const run = await cli(['status'])
+      assert.equal(run.code, 0, run.err)
+    })
+
+    it('refuses with S13 naming the path when a directory sits where the index goes', async () => {
+      await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
+      await mkdir(index(), { recursive: true })
+      const run = await cli(['status'])
+      assert.equal(run.code, 6, run.out)
+      assert.match(run.err, /^rule S13$/m)
+      assert.match(run.err, /could not be opened or rebuilt/)
+      await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
+      assert.equal((await cli(['status'])).code, 0)
+    })
+  })
+
+  describe('a nearer workspace the walk cannot read is a refusal, not a step past it', () => {
+    it('exits 6 with S13 naming the unreadable directory, rather than answering from the parent', { skip: process.getuid?.() === 0 }, async () => {
+      const inner = path.join(demo.root, 'inner')
+      const nested = path.join(inner, '.work')
+      await mkdir(nested, { recursive: true })
+      await chmod(nested, 0o000)
+      try {
+        const run = await runCli(['status'], { cwd: inner })
+        assert.equal(run.code, 6, run.out)
+        assert.match(run.err, /^rule S13$/m)
+        assert.match(run.err, /could not be read: stat failed with EACCES/)
+      } finally {
+        await chmod(nested, 0o755)
+        await rm(inner, { recursive: true, force: true })
+      }
+    })
   })
 })

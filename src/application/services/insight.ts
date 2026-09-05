@@ -32,7 +32,7 @@ import {
 } from './context.ts'
 import { auditItem } from './doctor.ts'
 import { notFound } from './items.ts'
-import { storeRefusal } from './refusal.ts'
+import { storeRefusal, unknownCursor } from './refusal.ts'
 
 export type Weights = {
   readonly pri: number
@@ -197,8 +197,8 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   const workspace = view.value.identity.id
   const weights = DEFAULT_WEIGHTS
   const ranked = rank(view.value, clock.now(), weights, request.forActor)
-  const at = request.cursor === undefined ? 0 : ranked.findIndex((scored) => scored.item.id === request.cursor)
-  const from = at < 0 ? 0 : at
+  const from = request.cursor === undefined ? 0 : ranked.findIndex((scored) => scored.item.id === request.cursor)
+  if (from < 0) return unknownCursor('next', workspace, request.cursor as string, request.cursor as string, 'treadle next')
   const page = ranked.slice(from, from + request.limit)
 
   const block: Block = {
@@ -258,10 +258,16 @@ type Entry = {
  * T4 made it record. The actor is the answer to "who changed this" for the change a reader
  * of `explain` is already asking about; `history` is the same fact for every other change.
  */
-function enteredAt(events: readonly StoreEvent[]): Entry | undefined {
+function enteredAt(events: readonly StoreEvent[], state: string): Entry | undefined {
   for (let i = events.length - 1; i >= 0; i -= 1) {
     const event = events[i]
-    if (event !== undefined && (event.op === 'item.transition' || event.op === 'item.file')) {
+    if (event === undefined || (event.op !== 'item.transition' && event.op !== 'item.file')) continue
+    // The log is a committed file. An event whose `after.state` is not the state the record
+    // holds did not put the item where it is, however recent it claims to be; a log written
+    // before the file event carried its fields has no `after.state`, and is trusted as before.
+    const after = event.after as { state?: unknown } | undefined
+    const said = after?.state
+    if (said === undefined || said === state) {
       return typeof event.reason === 'string'
         ? { at: event.at, event: event.id, by: event.actor, reason: event.reason }
         : { at: event.at, event: event.id, by: event.actor }
@@ -309,7 +315,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   // used to be read twice for the two.
   const events = await store.events({ entity: id })
   const log = events.ok ? events.value : []
-  const at = enteredAt(log)
+  const at = enteredAt(log, item.state)
   const data: Record<string, Value> = {
     item: item.id,
     type: item.type,

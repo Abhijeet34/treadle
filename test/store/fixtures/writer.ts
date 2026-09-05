@@ -72,8 +72,10 @@ async function grab(): Promise<void> {
 
 /**
  * Writes in a loop and never stops, so the parent can SIGKILL it at an unpredictable point
- * inside a transaction. It prints one line before the first write so the parent knows the
- * store is warm and the kill lands mid-run rather than before anything happened.
+ * inside a transaction, or SIGSTOP it there and let another writer reclaim the lock. It
+ * prints one line before the first write so the parent knows the store is warm and the
+ * signal lands mid-run, and one line per outcome so the parent can tell a refused write
+ * from a landed one.
  */
 async function churn(): Promise<void> {
   const store = new ShardedStore(root as string)
@@ -81,7 +83,7 @@ async function churn(): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
     const found = await store.get(argument as string)
     if (!found.ok || found.value === undefined) return
-    await store.apply({
+    const applied = await store.apply({
       txn: `txn-${process.pid}-${attempt}`,
       writes: [{ item: { ...found.value, priority: ((found.value.priority ?? 1) % 5) + 1 }, ifVersion: found.value.version }],
       events: [{
@@ -91,6 +93,7 @@ async function churn(): Promise<void> {
         entity: argument as string, op: 'update', txn: `txn-${process.pid}-${attempt}`,
       }],
     })
+    process.stdout.write(`${JSON.stringify(applied.ok ? { ok: true, version: applied.value.writes[0]?.version } : { ok: false, code: applied.error.code, rule: applied.error.rule })}\n`)
   }
 }
 

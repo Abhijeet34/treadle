@@ -37,7 +37,7 @@ import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
 import { notFound } from './items.ts'
 import { AUDITED_FIELDS } from './mutation.ts'
-import { storeRefusal } from './refusal.ts'
+import { storeRefusal, unknownCursor } from './refusal.ts'
 
 export const HISTORY_SHAPE: ResultShape = {
   command: 'history',
@@ -217,8 +217,8 @@ export async function history(
   // is almost always about the most recent change, so the newest is the first row.
   const ordered = [...events.value].reverse()
 
-  const at = request.cursor === undefined ? 0 : ordered.findIndex((event) => event.id === request.cursor)
-  const from = at < 0 ? 0 : at
+  const from = request.cursor === undefined ? 0 : ordered.findIndex((event) => event.id === request.cursor)
+  if (from < 0) return unknownCursor('history', workspace, id, request.cursor as string, `treadle history ${id}`)
   const page = ordered.slice(from, from + request.limit)
 
   const block: Block = {

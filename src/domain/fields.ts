@@ -339,8 +339,10 @@ const CHECKS: Readonly<Record<string, Check>> = {
     for (const entry of value as readonly unknown[]) {
       if (typeof entry !== 'object' || entry === null) return 'each acceptance criterion is a text and a tick'
       const criterion = entry as { text?: unknown; ticked?: unknown }
-      if (typeof criterion.text !== 'string' || !isText(criterion.text, 500)) {
-        return 'each acceptance criterion needs text of 1 to 500 characters'
+      // One line each: a criterion renders as `- [ ] text` on a line of its own, and a
+      // newline inside it wrote a body line the reader refused on every read after.
+      if (typeof criterion.text !== 'string' || !isText(criterion.text, 500) || !isSafeText(criterion.text, 'line')) {
+        return 'each acceptance criterion needs a single line of text of 1 to 500 characters'
       }
       if (typeof criterion.ticked !== 'boolean') return 'each acceptance criterion needs a boolean tick'
     }

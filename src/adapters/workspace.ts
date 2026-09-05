@@ -20,12 +20,31 @@ import { SCHEMA, ShardedStore, WORKSPACE_FILE, createWorkspace, openWorkspace } 
 /** The directory `init` writes, and the one the walk looks for at every ancestor. */
 export const WORKSPACE_DIR = '.work'
 
+/** A directory the walk could not look into, which is a refusal rather than a step past it. */
+export class WorkspaceUnreadable extends Error {
+  readonly at: string
+  readonly code: string
+
+  constructor(at: string, code: string) {
+    super(`the workspace at ${at} could not be read: stat failed with ${code}`)
+    this.at = at
+    this.code = code
+  }
+}
+
+/**
+ * Absence is the two errnos that mean "nothing here": no entry, or a file where a directory
+ * was expected. Anything else is a workspace the walk found and cannot read. It used to
+ * step past one and answer from a workspace further up, which is a different project.
+ */
 async function isWorkspace(at: string): Promise<boolean> {
   try {
     await stat(path.join(at, WORKSPACE_FILE))
     return true
-  } catch {
-    return false
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code ?? 'an error'
+    if (code === 'ENOENT' || code === 'ENOTDIR') return false
+    throw new WorkspaceUnreadable(at, code)
   }
 }
 
@@ -66,7 +85,17 @@ export async function initWorkspace(
   const name = request.name ?? path.basename(path.dirname(root))
   const id = workspaceIdFor(name)
 
-  if (await isWorkspace(root)) {
+  let existing: boolean
+  try {
+    existing = await isWorkspace(root)
+  } catch (error) {
+    if (!(error instanceof WorkspaceUnreadable)) throw error
+    return errorResult({
+      code: 'STORE_UNAVAILABLE', command: 'init', workspace: '-', effect: 'mutate', rule: 'S13',
+      cause: error.message,
+    })
+  }
+  if (existing) {
     const opened = await openWorkspace(root)
     const known = opened.ok ? (await opened.value.identity()) : undefined
     if (opened.ok) await opened.value.close()

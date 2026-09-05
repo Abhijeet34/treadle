@@ -9,7 +9,7 @@
 // never overwrites a hand edit it did not see.
 
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, readdir, rm, stat } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, readlink, rm, stat } from 'node:fs/promises'
 import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
@@ -46,10 +46,10 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts'
+import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
-import { acquireLock, type AcquireOptions } from './lock.ts'
+import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 
 /** The one compiled-in schema number. DR3: `migrate` is the only path that changes a file's. */
 export const SCHEMA = 1
@@ -60,6 +60,15 @@ const EVENTS_DIR = 'events'
 const INDEX_DIR = '.index'
 const JOURNAL_DIR = path.join(INDEX_DIR, 'txn')
 const LOCK_FILE = '.lock'
+
+/**
+ * Every path the store creates or follows below its root, checked with `lstat` before any
+ * of them is read or written. A workspace is a committed directory and git materialises a
+ * symbolic link on checkout, so a clone can carry `items -> ../../somewhere`; following it
+ * would put every write outside the directory `init` promised to stay inside. The root
+ * itself is on the list because the walk that found it went through `stat`.
+ */
+const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, INDEX_DIR, JOURNAL_DIR] as const
 
 export type ShardedStoreOptions = {
   readonly lockTimeoutMs?: number
@@ -157,6 +166,8 @@ export class ShardedStore implements Store {
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
+    const layout = await this.#checkLayout()
+    if (layout !== undefined) return layout
     const file = path.join(this.#root, WORKSPACE_FILE)
     let info: Awaited<ReturnType<typeof stat>>
     try {
@@ -221,20 +232,26 @@ export class ShardedStore implements Store {
   }
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
+    // Warm the index before the lock is taken. The refresh under the lock is then the delta
+    // since this instant rather than a cold rebuild, which at 1.1 million events is two
+    // minutes of synchronous work during which no heartbeat fires and the lock is forfeit.
+    const warm = await this.#refresh()
+    if (!warm.ok) return warm
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
       ...(this.#options.lockTimeoutMs === undefined ? {} : { timeoutMs: this.#options.lockTimeoutMs }),
       ...(this.#options.onWaiting === undefined ? {} : { onWaiting: this.#options.onWaiting }),
     })
     if (!lock.ok) return lock
     try {
-      await this.#recoverJournals()
+      await this.#recoverJournals(lock.value)
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
       // Freshness first, inside the lock: the conflict message and the cross-shard id check
       // both read the index, and a check that decides a refusal may not read a stale cache.
       const fresh = await this.#refresh(true)
       if (!fresh.ok) return fresh
-      return await this.#applyUnderLock(transaction)
+      return await this.#applyUnderLock(transaction, lock.value)
     } catch (error) {
+      if (error instanceof LockLost) return error.refusal
       // The signature says every failure leaves as a result, so an errno the filesystem
       // raised has to as well: a read-only shard directory or a full disk is the store being
       // unavailable, not an exception for the caller to guess at. The journal the write left
@@ -300,6 +317,21 @@ export class ShardedStore implements Store {
    * costs the append rather than the file.
    */
   async #refresh(keepParses = false): Promise<StoreResult<undefined>> {
+    const layout = await this.#checkLayout()
+    if (layout !== undefined) return layout
+    try {
+      return await this.#refreshIndex(keepParses)
+    } catch (error) {
+      if (!(error instanceof IndexUnavailable)) throw error
+      return storeFail(
+        'STORE_UNAVAILABLE', 'S13',
+        `the index at ${error.path} could not be opened or rebuilt: ${error.message}; delete ${INDEX_DIR} and retry`,
+        [this.#root],
+      )
+    }
+  }
+
+  async #refreshIndex(keepParses: boolean): Promise<StoreResult<undefined>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
     this.#parsedUnderLock.clear()
@@ -308,10 +340,11 @@ export class ShardedStore implements Store {
       const full = path.join(this.#root, file)
       let info
       try {
-        info = await stat(full)
+        info = await lstat(full)
       } catch {
         continue
       }
+      if (info.isSymbolicLink()) return this.#symlinkRefusal(file)
       seen.add(file)
       const previous = known.get(file)
       if (previous !== undefined && previous.size === info.size && previous.mtime === info.mtimeMs) continue
@@ -326,6 +359,35 @@ export class ShardedStore implements Store {
 
     this.#cycleFindings = this.#hierarchyFindings()
     return storeOk(undefined)
+  }
+
+  /**
+   * The symbolic-link rule (S15), applied to the layout before anything under the root is
+   * opened. A link is refused rather than reported as a finding because a finding lives in
+   * the index, and a linked `.index` is one of the paths this refuses.
+   */
+  async #checkLayout(): Promise<StoreResult<never> | undefined> {
+    for (const relative of LAYOUT) {
+      let info
+      try {
+        info = await lstat(path.join(this.#root, relative))
+      } catch {
+        continue
+      }
+      if (info.isSymbolicLink()) return this.#symlinkRefusal(relative)
+    }
+    return undefined
+  }
+
+  async #symlinkRefusal(relative: string): Promise<StoreResult<never>> {
+    const full = path.join(this.#root, relative)
+    const target = await readlink(full).catch(() => '?')
+    const what = relative === '.' ? `the workspace directory ${this.#root}` : relative
+    return storeFail(
+      'INTEGRITY', 'S15',
+      `${what} is a symbolic link to ${target}, which the store never follows; replace the link with the directory or file itself, or name the target with --workspace`,
+      [relative],
+    )
   }
 
   /** The S12 finding a cycle raises, from the verdict this refresh is entitled to reuse. */
@@ -400,7 +462,7 @@ export class ShardedStore implements Store {
     file: string, full: string, size: number, mtime: number, previous: Fingerprint | undefined,
   ): Promise<StoreResult<undefined>> {
     if (size > MAX_EVENT_FILE_BYTES) {
-      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [{
         file, line: 1, rule: 'S6',
         reason: `${file} is ${size} bytes, over the ${MAX_EVENT_FILE_BYTES} byte ceiling for an event file; it is not served`,
       }], false)
@@ -413,7 +475,7 @@ export class ShardedStore implements Store {
     const fromLine = appendOnly ? (previous as Fingerprint).lines : 0
     const read = await scanEventFile(full, file, from, fromLine)
     if (!read.ok) {
-      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [
+      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [
         { file, line: 1, rule: read.error.rule, reason: read.error.message },
       ], false)
       return storeOk(undefined)
@@ -421,8 +483,8 @@ export class ShardedStore implements Store {
     const whole = await readFile(full)
     this.#index.replaceEventFile(
       file,
-      { size, mtime, hash: hashOf(whole), lines: fromLine + read.value.events.length + read.value.findings.length },
-      read.value.events, read.value.findings, appendOnly,
+      { size, mtime, hash: hashOf(whole), lines: read.value.lines },
+      read.value.events, read.value.at, read.value.findings, appendOnly,
     )
     return storeOk(undefined)
   }
@@ -502,7 +564,7 @@ export class ShardedStore implements Store {
 
   // -- writing ---------------------------------------------------------------------------
 
-  async #applyUnderLock(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
+  async #applyUnderLock(transaction: StoreTransaction, lock: LockHandle): Promise<StoreResult<Applied>> {
     const shards = new Map<string, ParsedFile>()
     const applied: AppliedWrite[] = []
     const findings = this.#index.findings()
@@ -522,8 +584,21 @@ export class ShardedStore implements Store {
       const version = (stored === undefined ? 0 : Number(stored.fields.get('version') ?? 0)) + 1
       const encoded = encodeItem({ ...write.item, version }, stored)
       if (!encoded.ok) return encoded
+      const source = renderRecord(encoded.value)
+      // The record as it will be read, parsed once before it is written. The dictionary
+      // refuses what it knows about, and this holds the property where the bytes are: the
+      // store never writes a record it would not serve back. A criterion carrying a newline
+      // once passed the dictionary, rendered as a body line no reader accepts, was reported
+      // as a success and then refused every read after it.
+      const unserved = (why: string): StoreResult<never> => storeFail(
+        'VALIDATION', 'V4', `${write.item.id}: the record as written would not be served back: ${why}`, [write.item.id],
+      )
+      const back = parseRecordSource(source, 0)
+      if (!back.ok) return unserved(back.reason)
+      const served = decodeItem(back.record)
+      if (!served.ok) return unserved(served.error.message)
 
-      shards.set(file, withRecord(shard, { ...encoded.value, source: renderRecord(encoded.value), line: 0 }))
+      shards.set(file, withRecord(shard, { ...encoded.value, source, line: 0 }))
       applied.push({ id: write.item.id, version })
     }
 
@@ -536,9 +611,12 @@ export class ShardedStore implements Store {
     const journal: Journal = { txn: transaction.txn, files, events: eventFiles }
     const journalPath = path.join(this.#root, JOURNAL_DIR, `${transaction.txn}.json`)
     await mkdir(path.dirname(journalPath), { recursive: true, mode: DIR_MODE })
-    await writeFileAtomic(journalPath, JSON.stringify(journal))
+    await writeFileAtomic(journalPath, JSON.stringify(journal), () => this.#assertHeld(lock, transaction.txn, false))
 
-    await this.#applyJournal(journal, false)
+    // From here the journal is the transaction: a lock lost past this point leaves it for
+    // the next holder to apply, which is the same path a crash takes, so the write lands
+    // exactly once either way.
+    await this.#applyJournal(journal, false, lock, transaction.txn)
     await rm(journalPath, { force: true })
 
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
@@ -646,15 +724,32 @@ export class ShardedStore implements Store {
     return storeOk(chunk === undefined ? undefined : chunk.record)
   }
 
-  async #applyJournal(journal: Journal, recovering: boolean): Promise<void> {
+  /**
+   * The lock is asked before every byte a transaction commits. A holder that stalled past
+   * the stale window, or whose token another writer replaced, refuses here instead of
+   * writing over the reclaimer's work; ADR-0004 carries the measurement.
+   */
+  async #assertHeld(lock: LockHandle, txn: string, journaled: boolean): Promise<void> {
+    if (await lock.held()) return
+    throw new LockLost(storeFail(
+      'LOCK_LOST', 'S16',
+      journaled
+        ? `the lock was lost while transaction ${txn} was being applied: this process stalled past the heartbeat window and another writer reclaimed it; the journaled transaction is applied by the next writer, so check the record before retrying`
+        : `the lock was lost before transaction ${txn} was written: this process stalled past the heartbeat window and another writer reclaimed it; nothing was written, so retry`,
+      [txn],
+    ))
+  }
+
+  async #applyJournal(journal: Journal, recovering: boolean, lock: LockHandle, txn: string): Promise<void> {
     for (const file of journal.files) {
       const full = path.join(this.#root, file.path)
       await mkdir(path.dirname(full), { recursive: true, mode: DIR_MODE })
-      await writeFileAtomic(full, file.content)
+      await writeFileAtomic(full, file.content, () => this.#assertHeld(lock, txn, !recovering))
     }
     for (const log of journal.events) {
       const full = path.join(this.#root, log.path)
       await mkdir(path.dirname(full), { recursive: true, mode: DIR_MODE })
+      await this.#assertHeld(lock, txn, !recovering)
       // Replay is idempotent by event id: on recovery only lines the file's tail does not
       // already carry are appended, so re-applying a journal after a crash duplicates
       // nothing. On the first pass every line is new, and reading the log back to prove it
@@ -668,7 +763,7 @@ export class ShardedStore implements Store {
   }
 
   /** A lock holder that finds a journal re-applies it before doing its own work (DR4). */
-  async #recoverJournals(): Promise<void> {
+  async #recoverJournals(lock: LockHandle): Promise<void> {
     const dir = path.join(this.#root, JOURNAL_DIR)
     let names: string[]
     try {
@@ -679,15 +774,26 @@ export class ShardedStore implements Store {
     for (const name of names.sort()) {
       if (!name.endsWith('.json')) continue
       const full = path.join(dir, name)
+      let journal: Journal
       try {
-        const journal = JSON.parse(await readFile(full, 'utf8')) as Journal
-        await this.#applyJournal(journal, true)
+        journal = JSON.parse(await readFile(full, 'utf8')) as Journal
       } catch {
         // A journal we cannot read is a journal we cannot replay; the doctor reports it.
         continue
       }
+      await this.#applyJournal(journal, true, lock, journal.txn)
       await rm(full, { force: true })
     }
+  }
+}
+
+/** Carries a lock-loss refusal out of the write path as a result rather than a stack trace. */
+class LockLost extends Error {
+  readonly refusal: StoreResult<never>
+
+  constructor(refusal: StoreResult<never>) {
+    super(refusal.ok ? 'lock lost' : refusal.error.message)
+    this.refusal = refusal
   }
 }
 

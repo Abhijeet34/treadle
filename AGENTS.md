@@ -234,6 +234,28 @@ Before hand-checking any of these, run the suite: it already checks them.
   deliberate layout change is `TREADLE_SNAPSHOT=update node --test test/render/human-layout.test.ts`
   and then reviewing the diff.
 
+## Three properties the second adversarial pass added, and where each lives
+
+No path at or below the workspace root is followed as a symbolic link: the store `lstat`s its
+layout and every shard and event file before reading or writing, and a link is refusal `S15`.
+A workspace is a committed directory and git materialises a link on checkout, so this is the
+containment claim `init` prints, held against a clone. `test/store/symlink.test.ts` is the
+property; ADR-0002 carries the decision.
+
+A lock holder that stalls past the 5 second heartbeat window has lost its lock, whether or not
+a waiter took it, and the store asks the handle at the commit point of every file it writes.
+A paused writer (`Ctrl-Z`, `SIGSTOP`, a laptop lid) resuming into its critical section was
+measured overwriting the reclaimer's write. The refusal is `LOCK_LOST`/`S16`;
+`test/store/lock.test.ts` reproduces the pause with a real process, and `apply` warms the
+index before taking the lock so a cold rebuild is never the stall.
+
+The event log holds the record files' property: a line the store holds and does not serve is
+a finding at its line, never a silent drop. A repeated event id is `S14`, an instant that
+names no real date is `S1`, and `doctor` reports a state the record holds against the last
+event that recorded it (`H20`) and an event dated before its item was filed (`H23`). An event
+naming an item the store does not hold is not a finding, because a record removed by hand is
+a legitimate edit and the event reaches no read surface.
+
 ## Where a record's identity and its boundary are decided
 
 One place each, and both are in `src/adapters/store/grammar.ts`.

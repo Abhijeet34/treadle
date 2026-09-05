@@ -49,8 +49,14 @@ export function openExclusive(target: string, mode: number): Promise<FileHandle>
  * Writes by exclusive-create, fsync and rename. The temp file is created 0o600 so its
  * contents are never briefly world-readable, and takes the target's own mode if the target
  * exists, so a workspace that tightened its permissions keeps them.
+ *
+ * `beforeCommit` runs after the fsync and before the rename, which is the commit. The
+ * store asks the lock there: the fsync is milliseconds and the rename microseconds, so a
+ * check ahead of the whole write left a window a paused holder was measured landing in.
  */
-export async function writeFileAtomic(target: string, contents: string): Promise<void> {
+export async function writeFileAtomic(
+  target: string, contents: string, beforeCommit?: () => Promise<void>,
+): Promise<void> {
   const temp = tempNameFor(target)
   const mode = await modeOf(target)
   const handle = await openExclusive(temp, 0o600)
@@ -62,6 +68,7 @@ export async function writeFileAtomic(target: string, contents: string): Promise
     await handle.close()
   }
   try {
+    if (beforeCommit !== undefined) await beforeCommit()
     await rename(temp, target)
   } catch (error) {
     await unlink(temp).catch(() => undefined)

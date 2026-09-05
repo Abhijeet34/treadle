@@ -12,6 +12,15 @@
 // debugger answers `kill(pid, 0)` forever, while its heartbeat timer, which runs on the
 // event loop, stops with it. `EPERM` from `kill` means alive and outside our reach, never
 // dead; treating it as death is how a store reclaims a lock somebody is holding.
+//
+// A reclaim has a second half. The paused holder resumes one day, and from its own point of
+// view it still holds the lock: it wrote a shard from a parse it took before the pause and
+// overwrote the reclaimer's write, measured as one lost update in 117 (`Ctrl-Z` for six
+// seconds is enough). So the handle knows when it has been reclaimed, from either side: a
+// gap between two heartbeats longer than the stale window means a waiter was entitled to
+// take it, whether or not one did, and a token on disk that is not ours means one did. A
+// write asks `held()` before every byte it commits, and a lost lock is a refusal rather
+// than a write.
 
 import { hostname } from 'node:os'
 import { readFile, stat, unlink, utimes } from 'node:fs/promises'
@@ -36,6 +45,11 @@ export type LockToken = {
 
 export type LockHandle = {
   readonly token: LockToken
+  /**
+   * Whether this process still holds the lock. False once a heartbeat gap exceeded the
+   * stale window, or once the file carries another holder's token; both are final.
+   */
+  held(): Promise<boolean>
   release(): Promise<void>
 }
 
@@ -99,7 +113,7 @@ export async function acquireLock(
       } finally {
         await handle.close()
       }
-      return storeOk(held(path, token, body, heartbeatMs))
+      return storeOk(held(path, token, body, heartbeatMs, staleMs))
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
         return storeFail('STORE_UNAVAILABLE', 'S11', `the lock ${path} could not be created: ${(error as Error).message}`, [path])
@@ -152,8 +166,23 @@ async function reclaimIfAbandoned(path: string, staleMs: number): Promise<void> 
   await unlink(path).catch(() => undefined)
 }
 
-function held(path: string, token: LockToken, body: string, heartbeatMs: number): LockHandle {
+function held(
+  path: string, token: LockToken, body: string, heartbeatMs: number, staleMs: number,
+): LockHandle {
+  let lastBeat = Date.now()
+  let lost = false
+
+  // A stall is judged against the same window a waiter judges it against, from this side:
+  // if this process could not beat for `staleMs`, a waiter was entitled to reclaim, and
+  // touching the file now would only make the reclaimer's token look fresh.
+  const stalled = (): boolean => {
+    if (!lost && Date.now() - lastBeat > staleMs) lost = true
+    return lost
+  }
+
   const beat = setInterval(() => {
+    if (stalled()) { clearInterval(beat); return }
+    lastBeat = Date.now()
     const now = new Date()
     void utimes(path, now, now).catch(() => undefined)
   }, heartbeatMs)
@@ -162,6 +191,12 @@ function held(path: string, token: LockToken, body: string, heartbeatMs: number)
   let released = false
   return {
     token,
+    async held(): Promise<boolean> {
+      if (released || stalled()) return false
+      const current = await readFile(path, 'utf8').catch(() => undefined)
+      if (current !== body) lost = true
+      return !lost
+    },
     async release(): Promise<void> {
       if (released) return
       released = true

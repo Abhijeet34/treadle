@@ -11,7 +11,7 @@
 // an append re-indexes the append rather than the file.
 
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../application/ports/store.ts'
@@ -121,6 +121,25 @@ export type HierarchyDirty = {
   readonly full: boolean
 }
 
+/**
+ * The index could not be opened, and deleting it did not help. The store turns this into a
+ * refusal naming the path; a stack trace here read as "file is not a database" with the
+ * remedy `treadle version`.
+ */
+export class IndexUnavailable extends Error {
+  readonly path: string
+
+  constructor(path: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.path = path
+  }
+}
+
+/** The database and the two files WAL mode keeps beside it. */
+function indexFiles(file: string): readonly string[] {
+  return [file, `${file}-wal`, `${file}-shm`]
+}
+
 /** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
 const WAL_DEADLINE_MS = 2_000
 
@@ -173,6 +192,25 @@ export class IndexCache {
       this.#db = undefined
     }
     mkdirSync(path.dirname(this.#file), { recursive: true, mode: DIR_MODE })
+    // A cache that will not open is deleted and rebuilt, which is the same answer as a
+    // cache that is absent: nothing in it is authoritative. Only a second failure, such as
+    // a directory sitting at the path or a parent that refuses writes, is a refusal.
+    try {
+      this.#db = this.#openFresh()
+    } catch (first) {
+      for (const stale of indexFiles(this.#file)) {
+        try { rmSync(stale, { force: true }) } catch { /* a directory at the path; the retry says so */ }
+      }
+      try {
+        this.#db = this.#openFresh()
+      } catch (second) {
+        throw new IndexUnavailable(this.#file, second ?? first)
+      }
+    }
+    return this.#db
+  }
+
+  #openFresh(): DatabaseSync {
     const db = new DatabaseSync(this.#file)
     // The busy timeout is armed before anything that can meet another process's lock, and
     // the journal-mode switch is the first such statement: it takes an exclusive lock on a
@@ -192,7 +230,6 @@ export class IndexCache {
     } else {
       db.exec(SCHEMA)
     }
-    this.#db = db
     return db
   }
 
@@ -297,24 +334,43 @@ export class IndexCache {
     db.prepare('insert or replace into meta (key, value) values (?, ?)').run(HIERARCHY_DIRTY_KEY, dirty)
   }
 
+  /**
+   * `lines` is parallel to `events`: the line each was read from, which is what a finding
+   * on one of them names.
+   */
   replaceEventFile(
     file: string,
     fingerprint: Fingerprint,
     events: readonly StoreEvent[],
+    lines: readonly number[],
     findings: readonly Finding[],
     append: boolean,
   ): void {
     const db = this.#open()
+    const clashes: Finding[] = []
     db.exec('begin immediate')
     try {
       if (!append) this.#dropRows(file)
-      const insert = db.prepare(`insert or ignore into events
+      const insert = db.prepare(`insert into events
         (id, at, entity, op, actor, txn, file, rest) values (?, ?, ?, ?, ?, ?, ?, ?)`)
-      for (const event of events) {
-        insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
-          eventRest(event))
-      }
-      this.#insertFindings(findings)
+      const holder = db.prepare('select file from events where id = ?')
+      events.forEach((event, i) => {
+        try {
+          insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
+            eventRest(event))
+        } catch {
+          // The id is this table's primary key and its one owner across files. An `insert
+          // or ignore` here kept whichever copy was indexed first and dropped the other
+          // without a word: a second file carrying an existing id replaced the real event
+          // in every read while `doctor` reported the store clean.
+          const first = (holder.get(event.id) as unknown as { file: string } | undefined)?.file ?? file
+          clashes.push({
+            file, line: lines[i] as number, rule: 'S14',
+            reason: `event ${event.id} at ${file} line ${lines[i]} repeats an id ${first} already carries; this copy is not served`,
+          })
+        }
+      })
+      this.#insertFindings([...findings, ...clashes])
       this.#setFingerprint(file, fingerprint)
       db.exec('commit')
     } catch (error) {
@@ -387,21 +443,33 @@ export class IndexCache {
     return row?.parent ?? undefined
   }
 
-  /** The stored verdict as written, or undefined when no verdict has ever been computed. */
-  hierarchyVerdict(): string | undefined {
+  /**
+   * A meta row as JSON, or undefined when it is absent or not JSON. A row that does not
+   * parse is treated as never written, so a damaged cache costs a recompute and not a
+   * stack trace; the same rule the whole index lives by.
+   */
+  #metaJson(key: string): unknown {
     const row = this.#open()
       .prepare('select value from meta where key = ?')
-      .get(HIERARCHY_KEY) as unknown as { value: string } | undefined
-    return row?.value
+      .get(key) as unknown as { value: string } | undefined
+    if (row === undefined) return undefined
+    try {
+      return JSON.parse(row.value)
+    } catch {
+      return undefined
+    }
+  }
+
+  /** The stored verdict as written, or undefined when no verdict has ever been computed. */
+  hierarchyVerdict(): string | undefined {
+    const parsed = this.#metaJson(HIERARCHY_KEY)
+    return parsed === undefined ? undefined : JSON.stringify(parsed)
   }
 
   /** What has moved since that verdict was written, or undefined when nothing has. */
   hierarchyDirty(): HierarchyDirty | undefined {
-    const row = this.#open()
-      .prepare('select value from meta where key = ?')
-      .get(HIERARCHY_DIRTY_KEY) as unknown as { value: string } | undefined
-    if (row === undefined) return undefined
-    const parsed = JSON.parse(row.value) as { rows?: boolean; moved?: readonly string[]; full?: boolean }
+    const parsed = this.#metaJson(HIERARCHY_DIRTY_KEY) as { rows?: boolean; moved?: readonly string[]; full?: boolean } | undefined
+    if (parsed === undefined || typeof parsed !== 'object' || parsed === null) return undefined
     return { rows: parsed.rows ?? false, moved: parsed.moved ?? [], full: parsed.full ?? false }
   }
 

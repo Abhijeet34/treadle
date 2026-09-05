@@ -44,6 +44,9 @@ The set is closed.
 | `S11` | The lock was not acquired within the caller's bound |
 | `S12` | The stored hierarchy closes a cycle |
 | `S13` | A store file could not be created, read or written, and the filesystem said why |
+| `S14` | Two events in the store share an id |
+| `S15` | A path inside the store is a symbolic link, which the store never follows |
+| `S16` | The lock was lost while held: the holder stalled past the heartbeat window and another writer reclaimed it |
 
 ## The doctor's finding ids
 
@@ -52,8 +55,9 @@ a doctor finding is a report rather than a refusal: the record still serves and 
 They are raised in three places, because each id needs a different thing beside the record.
 `H16` comes from the store on load, which is the only layer that sees the file's bytes.
 `H17` comes from `status`, which has the clock.
-The last four come from `doctor` and from `explain`, the only reads that have the event log and
-the done gate. ADR-0010 argues `H17` and ADR-0011 the last four.
+The rest come from `doctor` and from `explain`, the only reads that have the event log and
+the done gate. ADR-0010 argues `H17` and ADR-0011 `H18` to `H21`; `H23` is the log's own
+half of `H20`, added when a hand-written event line was found answering `explain`.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -61,8 +65,9 @@ the done gate. ADR-0010 argues `H17` and ADR-0011 the last four.
 | `H17` | `status` | An overdue item is assigned to nobody |
 | `H18` | `doctor`, `explain` | A stored description is over the write bound, which the load path does not apply |
 | `H19` | `doctor`, `explain` | A severity or a priority was marked by the item's own assignee |
-| `H20` | `doctor`, `explain` | A record's severity or priority disagrees with the last event that recorded it, so it was changed outside the tool |
+| `H20` | `doctor`, `explain` | A record's state, severity or priority disagrees with the last event that recorded it, so one of the two was changed outside the tool |
 | `H21` | `doctor`, `explain` | A done item whose type has a review step points at no evidence |
+| `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
 
 ## The CLI's rule ids
 
