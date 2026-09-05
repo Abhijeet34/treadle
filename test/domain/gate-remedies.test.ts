@@ -180,15 +180,17 @@ describe('every remedy a gate can emit names a command that exists', () => {
 
   // Imported here rather than at the top of the file, so a tree with no field editor at all
   // fails this one assertion by name instead of failing to load and reporting nothing.
-  it('names, in every set remedy, a field that set will accept', async () => {
+  it('names, in every assignment it writes, a field that set will accept', async () => {
     const { SETTABLE_FIELDS } = await import('../../src/application/services/editing.ts')
-    const sets = remedies.filter((entry) => entry.remedy.startsWith('treadle set '))
-    assert.ok(sets.length >= 6, `only ${sets.length} remedies invoke set`)
+    const sets = remedies.filter((entry) => entry.remedy.includes('='))
+    assert.ok(sets.length >= 6, `only ${sets.length} remedies carry an assignment`)
     for (const { rule, remedy } of sets) {
-      const assignments = remedy.split(' ').slice(3).map((token) => token.split('=')[0] as string)
-      assert.ok(assignments.length > 0, `${rule} invokes set with no assignment: ${remedy}`)
-      for (const field of assignments) {
-        if (field.length === 0) continue
+      // A quoted value can carry a space and an `=`, so the quoted spans go first and the
+      // assignments are read off what is left.
+      const bare = remedy.replaceAll(/"[^"]*"/g, '<quoted>')
+      const fields = [...bare.matchAll(/(?:^|\s)([a-z_]+)=/g)].map((match) => match[1] as string)
+      assert.ok(fields.length > 0, `${rule} carries an = and no assignment: ${remedy}`)
+      for (const field of fields) {
         assert.ok(
           (SETTABLE_FIELDS as readonly string[]).includes(field),
           `${rule} tells a caller to set ${field}, which set refuses: ${remedy}`,

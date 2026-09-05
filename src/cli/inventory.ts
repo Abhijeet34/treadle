@@ -10,6 +10,7 @@
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
+import { SET_SHAPE } from '../application/services/editing.ts'
 import { HISTORY_SHAPE } from '../application/services/history.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from '../application/services/insight.ts'
 import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
@@ -91,6 +92,16 @@ export const COMMANDS: readonly Command[] = [
       ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
       ['treadle transition sso-saml in_progress --preview', 'which store and which guards, evaluating none of them'],
+    ],
+  },
+  {
+    name: 'set', shape: SET_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle set <id> <field>=<value> [<field>=<value> ...]'],
+    examples: [
+      ['treadle set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
+      ['treadle set checkout-500 fix_confirmed=true reviewer=kim', 'the two fields the done gate reads, in one write'],
     ],
   },
   {

@@ -13,6 +13,7 @@ import { WORK_ITEM_STATES, WORK_ITEM_TYPES, type GuardId } from '../domain/index
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
+import { setFields } from '../application/services/editing.ts'
 import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
@@ -364,6 +365,11 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       type: type as WorkItemType, title, ...(chosen === undefined ? {} : { id: chosen }),
       fields: setFieldsOf(flags), actor,
     })
+  }
+
+  if (command === 'set') {
+    if (id === undefined) return validation('set', 'set needs the id of one item', ['treadle backlog'])
+    return setFields(target, systemClock, randomIds, { id, assignments: operands.slice(1), actor })
   }
 
   if (command === 'mark') {

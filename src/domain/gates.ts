@@ -6,7 +6,7 @@
 // a second code path, so what the gate prints is exactly what guards G1 and G6 decide.
 
 import { fail, ok, type Result } from './errors.ts'
-import { fieldsOf, isKnownField, requiredAtCreation } from './fields.ts'
+import { fieldsOf, isKnownField, requiredAtCreation, writeCommand, writerOf } from './fields.ts'
 import { isTerminal, type ItemId, type WorkItem, type WorkItemState, type WorkItemType } from './types.ts'
 
 export type GateCheck =
@@ -93,12 +93,19 @@ export const DEFAULT_DONE_GATE: Gate = {
   ],
 }
 
-type Outcome = { readonly pass: true } | { readonly pass: false; readonly reason: string; readonly remedy: string }
+type Outcome =
+  | { readonly pass: true }
+  | { readonly pass: false; readonly reason: string; readonly remedy?: string }
 
 const PASS: Outcome = { pass: true }
 
-function no(reason: string, remedy: string): Outcome {
-  return { pass: false, reason, remedy }
+/**
+ * A failed rule. The remedy is optional and is left off rather than filled with prose: a
+ * caller reads it as a command line to run, so a sentence there is a promise nothing keeps.
+ * test/domain/gate-remedies.test.ts is what holds every remedy that is emitted to that.
+ */
+function no(reason: string, remedy?: string): Outcome {
+  return remedy === undefined ? { pass: false, reason } : { pass: false, reason, remedy }
 }
 
 function fieldOf(item: WorkItem, name: string): unknown {
@@ -111,46 +118,56 @@ function run(check: GateCheck, context: GateContext): Outcome {
     case 'field_present': {
       const value = fieldOf(item, check.field)
       return value === undefined || value === ''
-        ? no(`${check.field} is not set`, `set ${check.field} on ${item.id}`)
+        ? no(`${check.field} is not set`, writeCommand(check.field, item.id, '<value>'))
         : PASS
     }
     case 'field_is_true':
       return fieldOf(item, check.field) === true
         ? PASS
-        : no(`${check.field} is not true`, `set ${check.field} to true on ${item.id}`)
+        : no(`${check.field} is not true`, writeCommand(check.field, item.id, 'true'))
     case 'field_non_empty_list': {
       const value = fieldOf(item, check.field)
       return Array.isArray(value) && value.length > 0
         ? PASS
-        : no(`${check.field} is empty`, `add at least one entry to ${check.field} on ${item.id}`)
+        : no(`${check.field} is empty`, writeCommand(check.field, item.id, '"<entry>|<entry>"'))
     }
     case 'list_all_ticked': {
       const value = fieldOf(item, check.field)
       if (!Array.isArray(value) || value.length === 0) {
-        return no(`${check.field} is empty`, `add at least one entry to ${check.field} on ${item.id}`)
+        return no(`${check.field} is empty`, writeCommand(check.field, item.id, '"<entry>|<entry>"'))
       }
       const open = (value as readonly { ticked?: boolean }[]).filter((e) => e.ticked !== true).length
       return open === 0
         ? PASS
-        : no(`${open} of ${value.length} entries in ${check.field} are not ticked`, `tick the remaining ${open} entries on ${item.id}`)
+        : no(
+          `${open} of ${value.length} entries in ${check.field} are not ticked`,
+          writeCommand(check.field, item.id, '"[x] <entry>|[x] <entry>"'),
+        )
     }
     case 'type_required_fields': {
       const missing = requiredAtCreation(item.type).filter((f) => fieldOf(item, f) === undefined)
-      return missing.length === 0
-        ? PASS
-        : no(`the ${item.type} is missing ${missing.join(', ')}`, `set ${missing.join(' and ')} on ${item.id}`)
+      if (missing.length === 0) return PASS
+      const reason = `the ${item.type} is missing ${missing.join(', ')}`
+      // The missing fields are not all one command's: a bug with no `severity` is `mark`'s
+      // and a bug with no `repro_steps` is `set`'s. One remedy is one command line, so a
+      // mixed set names the first field's own command and the reason names all of them; the
+      // rule fails again on what is left, which is `set`'s and groups into one line.
+      const first = missing[0] as string
+      return missing.every((f) => writerOf(f).kind === 'set')
+        ? no(reason, `treadle set ${item.id} ${missing.map((f) => `${f}=<value>`).join(' ')}`)
+        : no(reason, writeCommand(first, item.id, '<value>'))
     }
     case 'estimate_set':
       return typeof item.points === 'number'
         ? PASS
-        : no('points are not set', `run an estimate on ${item.id}`)
+        : no('points are not set', writeCommand('points', item.id, '<n>'))
     case 'no_active_blocker':
       return context.blockers.length === 0
         ? PASS
-        : no(`blocked by ${context.blockers.join(', ')}`, `finish or cancel ${context.blockers.join(' and ')}`)
+        : no(`blocked by ${context.blockers.join(', ')}`, `treadle transition ${context.blockers[0]} done`)
     case 'parent_present':
       return item.parent_id === undefined
-        ? no('the item has no parent', `set a parent on ${item.id}`)
+        ? no('the item has no parent', writeCommand('parent_id', item.id, '<id>'))
         : PASS
     case 'child_present': {
       const wanted = check.childType
@@ -159,24 +176,29 @@ function run(check: GateCheck, context: GateContext): Outcome {
         ? PASS
         : no(
           `the item has no ${wanted ?? 'child'} child`,
-          `file a ${wanted ?? 'child'} with ${item.id} as its parent`,
+          `treadle file ${wanted ?? '<type>'} "<title>" --set parent_id=${item.id}`,
         )
     }
     case 'no_open_child': {
       const open = context.children.filter((c) => !isTerminal(c.state)).map((c) => c.id)
       return open.length === 0
         ? PASS
-        : no(`${open.join(', ')} are still open`, `finish or cancel ${open.join(' and ')}`)
+        : no(`${open.join(', ')} are still open`, `treadle transition ${open[0]} done`)
     }
+    // The one check with no remedy, because no command raises or resolves an impediment: the
+    // entity is not in this build and `openImpediments` is a hard-coded 0, so this branch is
+    // unreachable. test/domain/gate-remedies.test.ts declares that, and wiring the entity up
+    // means giving this a command there too.
     case 'no_open_impediment':
       return context.openImpediments === 0
         ? PASS
-        : no(`${context.openImpediments} impediments are still open`, `resolve them before closing ${item.id}`)
+        : no(`${context.openImpediments} impediments are still open`)
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
-      if (item.reviewer === undefined) return no('no reviewer is recorded', `record a reviewer on ${item.id}`)
+      const reviewer = writeCommand('reviewer', item.id, '<name>')
+      if (item.reviewer === undefined) return no('no reviewer is recorded', reviewer)
       return item.reviewer === item.assignee
-        ? no(`the reviewer ${item.reviewer} is also the assignee`, `record a reviewer other than ${item.assignee}`)
+        ? no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
         : PASS
     }
     // Scoped by the review step rather than by three per-type rules, the same way DOD3 is:

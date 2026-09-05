@@ -73,7 +73,12 @@ class Reader {
     }
   }
 
+  /**
+   * An empty scalar is an absent line, not a `<key> ` with nothing after the space: A2 rule 1
+   * forbids the trailing whitespace and the renderer drops the line, so the reader does too.
+   */
   scalar(key: string, expected: string): void {
+    if (expected.length === 0) return
     assert.equal(this.take(`scalar ${key}`), `${key} ${expected}`)
   }
 
