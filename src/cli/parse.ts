@@ -56,10 +56,13 @@ const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     sprint: { type: 'string' },
     assignee: { type: 'string' },
     priority: { type: 'string' },
+    resolution: { type: 'string' },
   },
   transition: {
     reason: { type: 'string' },
     until: { type: 'string' },
+    resolution: { type: 'string' },
+    outcome: { type: 'string' },
     override: { type: 'string', multiple: true },
   },
   next: { for: { type: 'string' } },
@@ -70,7 +73,7 @@ const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
 }
 
 /** Filter flags, in the order they were written, so a tie names the first one (A.4). */
-export const FILTER_FLAGS = ['state', 'type', 'sprint', 'assignee', 'priority'] as const
+export const FILTER_FLAGS = ['state', 'type', 'sprint', 'assignee', 'priority', 'resolution'] as const
 export type FilterFlag = (typeof FILTER_FLAGS)[number]
 
 export type Parsed = {

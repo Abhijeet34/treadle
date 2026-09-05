@@ -168,7 +168,10 @@ describe('the sharded store on disk', () => {
     const workspace = await aWorkspace()
     try {
       assert.equal(await readFile(path.join(workspace.root, '.gitignore'), 'utf8'), '.index/\n.lock\n')
-      assert.equal(await readFile(path.join(workspace.root, '.gitattributes'), 'utf8'), 'events/*.jsonl merge=union\n')
+      assert.equal(
+        await readFile(path.join(workspace.root, '.gitattributes'), 'utf8'),
+        'events/*.jsonl merge=union linguist-generated=true\n',
+      )
       assert.equal((await stat(path.join(workspace.root, 'workspace.md'))).mode & 0o777, 0o644)
     } finally {
       await workspace.dispose()

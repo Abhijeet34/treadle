@@ -97,17 +97,30 @@ describe('a rendered record is a fixed point of parse and render', () => {
 })
 
 describe('a work item survives encode, render, parse and decode unchanged', () => {
-  it(`holds over ${ITEMS} generated items`, () => {
+  it(`holds over ${ITEMS} generated items`, (t) => {
+    let survived = 0
+    let refused = 0
     for (let seed = 1; seed <= ITEMS; seed += 1) {
       const item = new Gen(seed + 200_000).workItem()
       const encoded = encodeItem(item)
-      assert.ok(encoded.ok, `seed ${seed}: ${encoded.ok ? '' : encoded.error.message}`)
+      // The generator can produce a section body whose line starts with `#` at column 0,
+      // which DR3 rule 4 refuses by name on the write path. That is the encoder working,
+      // not the property failing, so it is counted and the rule id is asserted; the
+      // alternative is a property that silently passes because no seed happened to hit it.
+      if (!encoded.ok) {
+        assert.equal(encoded.error.rule, 'S1', `seed ${seed}: ${encoded.error.message}`)
+        refused += 1
+        continue
+      }
       const parsed = parseRecordSource(renderRecord(encoded.value), 1)
       assert.ok(parsed.ok, `seed ${seed}: ${parsed.ok ? '' : parsed.reason}`)
       const decoded = decodeItem(parsed.record)
       assert.ok(decoded.ok, `seed ${seed}: ${decoded.ok ? '' : decoded.error.message}`)
       assert.deepStrictEqual({ ...decoded.value }, { ...item }, `seed ${seed} did not survive the round trip`)
+      survived += 1
     }
+    t.diagnostic(`${ITEMS} items: ${survived} survived unchanged, ${refused} refused at encode`)
+    assert.ok(survived > ITEMS * 0.9, `only ${survived} of ${ITEMS} items reached the round trip`)
   })
 })
 

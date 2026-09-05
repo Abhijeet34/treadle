@@ -11,9 +11,11 @@ import {
   evaluateTransition,
   isTerminal,
   validateWorkItem,
+  type AttemptOutcome,
   type GuardId,
   type GuardResult,
   type ItemId,
+  type Resolution,
   type WorkItem,
   type WorkItemState,
 } from '../../domain/index.ts'
@@ -52,7 +54,7 @@ export const TRANSITION_SHAPE: ResultShape = {
 }
 
 /** Fields a transition may move, in the order they report. */
-const MOVED = ['state', 'hold_reason', 'hold_until', 'held_from'] as const
+const MOVED = ['state', 'hold_reason', 'hold_until', 'held_from', 'resolution'] as const
 
 export type TransitionRequestInput = {
   readonly id: ItemId
@@ -60,6 +62,10 @@ export type TransitionRequestInput = {
   readonly reason?: string
   readonly until?: string
   readonly overrides?: readonly GuardId[]
+  /** `cancel` only: the closed-set reason the item stopped, which the record keeps. */
+  readonly resolution?: Resolution
+  /** `release` only: how the attempt ended, which the event keeps and the record does not. */
+  readonly outcome?: AttemptOutcome
   readonly actor: Actor
 }
 
@@ -95,6 +101,11 @@ function nextItem(item: WorkItem, to: WorkItemState, request: TransitionRequestI
     delete draft['hold_reason']
     delete draft['hold_until']
   }
+  // `revive` is the only edge out of cancelled, and it clears the resolution rather than
+  // leaving a record that says both "draft" and "why it stopped". Jira does the same on
+  // reopen, and the field dictionary refuses the pair anyway.
+  if (to === 'cancelled') draft['resolution'] = request.resolution
+  else if (item.state === 'cancelled') delete draft['resolution']
   return draft as unknown as WorkItem
 }
 
@@ -129,6 +140,8 @@ export async function transition(
     target: request.target,
     ...(request.reason === undefined ? {} : { reason: request.reason }),
     ...(request.overrides === undefined ? {} : { overrides: request.overrides }),
+    ...(request.resolution === undefined ? {} : { resolution: request.resolution }),
+    ...(request.outcome === undefined ? {} : { outcome: request.outcome }),
   })
 
   if (outcome.outcome === 'already') {
@@ -180,6 +193,9 @@ export async function transition(
       // that kept it was `hold`, which happens to have a field for it. The event log is
       // where the other five belong: it is the only record of why the move was made.
       ...(request.reason === undefined ? {} : { reason: request.reason }),
+      // The attempt outcome is a fact about the attempt, not about the item, so the log is
+      // where it belongs: the item is back in the queue and its record says only that.
+      ...(request.outcome === undefined ? {} : { outcome: request.outcome }),
     })],
   })
   if (!applied.ok) return storeRefusal('transition', 'mutate', applied.error, workspace)

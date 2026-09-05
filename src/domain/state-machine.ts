@@ -9,9 +9,13 @@
 import { fail, type DomainError } from './errors.ts'
 import type { GateVerdict } from './gates.ts'
 import {
+  ATTEMPT_OUTCOMES,
+  RESOLUTIONS,
   WORK_ITEM_STATES,
+  type AttemptOutcome,
   type GuardId,
   type ItemId,
+  type Resolution,
   type TransitionName,
   type WorkItem,
   type WorkItemState,
@@ -45,8 +49,26 @@ export const TRANSITION_TABLE: readonly TransitionSpec[] = [
   ...[...HOLDABLE, 'on_hold' as const].map((from): TransitionSpec => (
     { name: 'cancel', from, to: 'cancelled', guards: ['G7'], requiresReason: true }
   )),
+  // An attempt that ended without the work being done has no legal exit that says so: a
+  // hold leaves `next`, which ranks `ready` only, and a cancel leaves the board. The item
+  // goes back to the queue and the log carries who tried and why it did not take.
+  { name: 'release', from: 'in_progress', to: 'ready', guards: [], requiresReason: true },
   { name: 'revive', from: 'cancelled', to: 'draft', guards: [], requiresReason: true },
 ]
+
+/**
+ * The two closed-set values a transition carries, and the one edge each belongs to. Both
+ * are on the same rule (`T6`) because they are the same rule: an edge that records a
+ * machine-readable outcome refuses to be taken without one, and refuses one it does not own.
+ */
+const CLOSED_VALUE: Readonly<Record<string, {
+  readonly on: TransitionName
+  readonly allowed: readonly string[]
+  readonly what: string
+}>> = {
+  resolution: { on: 'cancel', allowed: RESOLUTIONS, what: 'why the item stopped' },
+  outcome: { on: 'release', allowed: ATTEMPT_OUTCOMES, what: 'how the attempt ended' },
+}
 
 /** G2, G3 and G7 yield to an explicit override with a reason (2.2). The rest never do. */
 export const OVERRIDABLE_GUARDS: readonly GuardId[] = ['G2', 'G3', 'G7']
@@ -84,6 +106,10 @@ export type TransitionRequest = {
   readonly target: WorkItemState | 'resume'
   readonly reason?: string
   readonly overrides?: readonly GuardId[]
+  /** Required by `cancel` and refused elsewhere; stored on the record. */
+  readonly resolution?: Resolution
+  /** Required by `release` and refused elsewhere; carried in the event, never on the record. */
+  readonly outcome?: AttemptOutcome
 }
 
 export type TransitionOutcome =
@@ -225,6 +251,20 @@ export function evaluateTransition(
     }
     if (!OVERRIDABLE_GUARDS.includes(guard)) {
       return refuse(fail('VALIDATION', 'T5', `${guard} cannot be overridden; fix the item instead`, [item.id]).error)
+    }
+  }
+
+  for (const [name, rule] of Object.entries(CLOSED_VALUE)) {
+    const given = request[name as 'resolution' | 'outcome']
+    if (spec.name !== rule.on) {
+      if (given === undefined) continue
+      return refuse(fail('VALIDATION', 'T6', `only the ${rule.on} transition records ${name}, and this is ${spec.name}`, [item.id]).error)
+    }
+    if (given === undefined) {
+      return refuse(fail('VALIDATION', 'T6', `the ${rule.on} transition records ${name}, ${rule.what}, and none was given; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
+    }
+    if (!rule.allowed.includes(given)) {
+      return refuse(fail('VALIDATION', 'T6', `${given} is not a ${name}; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
     }
   }
 

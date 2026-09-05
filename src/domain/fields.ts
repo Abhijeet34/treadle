@@ -10,6 +10,7 @@ import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
+  RESOLUTIONS,
   WORK_ITEM_STATES,
   WORK_ITEM_TYPES,
   type Instant,
@@ -20,12 +21,12 @@ import {
 export const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'description', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
-  'hold_reason', 'hold_until', 'held_from', 'extra',
+  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
 ] as const
 
 const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
-  epic: ['outcome', 'target_date'],
+  epic: ['outcome'],
   story: ['acceptance_criteria'],
   task: [],
   bug: ['severity', 'repro_steps', 'expected', 'actual', 'found_in', 'fix_confirmed'],
@@ -152,12 +153,14 @@ const CHECKS: Readonly<Record<string, Check>> = {
     return new Set(labels).size === labels.length ? undefined : 'labels must be unique within one item'
   },
 
+  due: instant('due'),
   hold_reason: line('hold_reason', 500),
   hold_until: (value, _item, options) => {
     if (!isInstant(value)) return 'hold_until must be an RFC 3339 instant in UTC'
     return value > options.now ? undefined : `hold_until ${value} is not in the future`
   },
   held_from: oneOf('held_from', ['draft', 'ready', 'in_progress', 'in_review']),
+  resolution: oneOf('resolution', RESOLUTIONS),
   extra: (value) => {
     if (!(value instanceof Map)) return 'extra must be a Map of unknown field keys to their verbatim values'
     for (const [key, entry] of value as ReadonlyMap<string, unknown>) {
@@ -172,7 +175,6 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
 
   outcome: text('outcome', 1000),
-  target_date: instant('target_date'),
   acceptance_criteria: (value) => {
     if (!Array.isArray(value)) return 'acceptance_criteria must be a list'
     for (const entry of value as readonly unknown[]) {
@@ -252,6 +254,14 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
         return invalid('V4', `${name} is set on an item whose state is ${item.state}, not on_hold`, item)
       }
     }
+  }
+
+  // A resolution says why a stopped item stopped, so it is meaningless anywhere but the
+  // stopped state. It is not required here: a record an older tool wrote carries none, and
+  // refusing to serve it would make a field addition a store outage. `T6` is what requires
+  // one, on the one edge that produces it.
+  if (item.state !== 'cancelled' && item.resolution !== undefined) {
+    return invalid('V4', `resolution is set on an item whose state is ${item.state}, not cancelled`, item)
   }
 
   if (item.extra !== undefined) {

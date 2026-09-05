@@ -16,28 +16,40 @@ export {
 } from './errors.ts'
 
 export {
+  ATTEMPT_OUTCOMES,
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
   GUARD_IDS,
   RELATION_KINDS,
+  RESOLUTIONS,
   TERMINAL_STATES,
   TRANSITIONS,
   WORK_ITEM_STATES,
   WORK_ITEM_TYPES,
   isTerminal,
   type AcceptanceCriterion,
+  type AttemptOutcome,
   type BugSeverity,
   type FoundInStage,
   type GuardId,
   type Instant,
   type ItemId,
   type RelationKind,
+  type Resolution,
   type TransitionName,
   type WorkItem,
   type WorkItemState,
   type WorkItemType,
 } from './types.ts'
+
+export {
+  MAX_OVERDUE_DAYS,
+  daysOverdue,
+  healthFindings,
+  isOverdue,
+  type HealthFinding,
+} from './dates.ts'
 
 export {
   FIELD_KEY_PATTERN,

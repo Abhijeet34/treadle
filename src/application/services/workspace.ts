@@ -35,7 +35,7 @@ export const CREATED_FILES: readonly (readonly [string, string])[] = [
   ['items/', 'one record file per month; this is what you commit and review'],
   ['events/', 'the append-only event log, one file per month'],
   ['.gitignore', 'ignores .index/ and .lock, which are derived and safe to delete'],
-  ['.gitattributes', 'merges the event log by union so two branches appending do not conflict'],
+  ['.gitattributes', 'merges the event log by union, and marks it generated so a review reads the records'],
 ]
 
 export const NEXT_STEPS: readonly string[] = [
