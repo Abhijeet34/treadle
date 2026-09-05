@@ -189,7 +189,10 @@ describe('the escaper survives a mutation fuzzer', () => {
       assert.equal(block.length - 1, value.split('\n').length, `the block count is wrong: ${base64(value)}`)
       const header = /^\|k (\d+) (\d+)$/.exec(block[0] as string)
       assert.ok(header !== null, `a block header that does not parse: ${base64(value)}`)
-      assert.equal(Number(header[2]), Buffer.byteLength(value, 'utf8'))
+      // Both counts, because the header is the whole of what a consumer reads: a wrong line
+      // count ends the block early and the next content line is read as a record.
+      assert.equal(Number(header[1]), block.length - 1, `the block line count is wrong: ${base64(value)}`)
+      assert.equal(Number(header[2]), Buffer.byteLength(value, 'utf8'), `the block byte count is wrong: ${base64(value)}`)
       for (const line of block.slice(1)) {
         assert.ok(line === '"' || line.startsWith('" '), `an unmarked content line: ${base64(value)}`)
       }
