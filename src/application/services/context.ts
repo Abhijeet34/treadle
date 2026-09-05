@@ -26,7 +26,7 @@ import {
   type WorkItemState,
   type WorkItemType,
 } from '../../domain/index.ts'
-import type { Store, StoreIdentity, StoreResult } from '../ports/store.ts'
+import type { Finding, Store, StoreIdentity, StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input. Workspace
@@ -41,7 +41,16 @@ export function hasReviewStep(type: WorkItemType): boolean {
 export type WorkspaceView = {
   readonly identity: StoreIdentity
   readonly items: readonly WorkItem[]
+  /**
+   * A lookup index over `items`, and only that. It used to be the third place a record's
+   * identity was decided, because a `Map` keeps the last entry for a repeated key while the
+   * store's two owners both refuse one; the map is safe now because neither owner can hand
+   * `list` a repeated id. What a lookup cannot answer is why an id is absent, which is what
+   * `unserved` is for: absent and ambiguous are different refusals.
+   */
   readonly byId: ReadonlyMap<ItemId, WorkItem>
+  /** Ids the store holds records for and refuses to serve, with the finding that says why. */
+  readonly unserved: ReadonlyMap<ItemId, Finding>
   readonly hierarchy: HierarchyGraph
   readonly relations: RelationGraph
 }
@@ -51,12 +60,20 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   if (!identity.ok) return identity
   const items = await store.list()
   if (!items.ok) return items
+  const findings = await store.findings()
+  if (!findings.ok) return findings
+
+  const byId = new Map(items.value.map((item) => [item.id, item]))
+  const unserved = new Map(findings.value.flatMap(
+    (finding) => (finding.id === undefined || byId.has(finding.id) ? [] : [[finding.id, finding] as const]),
+  ))
   return {
     ok: true,
     value: {
       identity: identity.value,
       items: items.value,
-      byId: new Map(items.value.map((item) => [item.id, item])),
+      byId,
+      unserved,
       hierarchy: hierarchyFrom(items.value),
       relations: emptyRelationGraph(),
     },

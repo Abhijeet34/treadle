@@ -74,3 +74,52 @@ describe('a record whose id appears twice', () => {
     }
   })
 })
+
+describe('an id that names more than one record in one file', () => {
+  it('serves neither copy, rather than picking the first in document order', async () => {
+    const workspace = await aWorkspace()
+    try {
+      await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
+      await duplicate(workspace.root, 'items/2026-09.md', 'item-one', 'A first task, the copy')
+
+      const listed = await workspace.store.list()
+      assert.ok(listed.ok)
+      assert.equal(
+        listed.value.some((item) => item.id === 'item-one'), false,
+        'a duplicated id was resolved to one record by document order',
+      )
+      const found = await workspace.store.get('item-one')
+      assert.ok(found.ok)
+      assert.equal(found.value, undefined, 'get resolved a duplicated id to one record')
+
+      const findings = await workspace.store.findings()
+      assert.ok(findings.ok)
+      const s3 = findings.value.filter((f) => f.rule === 'S3' && f.id === 'item-one')
+      assert.equal(s3.length, 2, `both copies name themselves: ${JSON.stringify(findings.value)}`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+describe('a record the parser quarantined', () => {
+  it('refuses a write for its id rather than filing a second copy under it', async () => {
+    const workspace = await aWorkspace()
+    try {
+      await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
+      const shard = path.join(workspace.root, 'items/2026-09.md')
+      // A hand edit that breaks the record's grammar rather than its fields: the record is
+      // quarantined, so the write path's scan over record chunks finds nothing for the id.
+      await writeFile(shard, (await readFile(shard, 'utf8')).replace('type: task', 'type task no colon'))
+
+      const refused = await workspace.store.apply({ txn: 't2', writes: [{ item: anItem() }], events: [] })
+      assert.equal(refused.ok, false, 'a create landed a second record under an id the store already holds')
+      assert.match(refused.ok ? '' : refused.error.message, /item-one/)
+
+      const after = await readFile(shard, 'utf8')
+      assert.equal((after.match(/^# item-one:/gm) ?? []).length, 1, 'the store wrote the duplicate it refuses to read')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})

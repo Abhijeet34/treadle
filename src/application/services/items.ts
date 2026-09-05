@@ -440,9 +440,24 @@ function editDistance(a: string, b: string): number {
   return previous[b.length] as number
 }
 
+/**
+ * The one refusal for an id no command could resolve, and it distinguishes two answers a
+ * lookup alone collapses into one. An id the store holds a record for and refuses to serve
+ * is not missing, it is ambiguous or quarantined, and telling a caller it "is in no record
+ * here" while the file carries it twice is the silent first-match wearing a different hat.
+ */
 export function notFound(
   command: string, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
+  const unserved = view.unserved.get(id)
+  if (unserved !== undefined) {
+    return errorResult({
+      code: 'CONFLICT', command, workspace, effect: 'read', entity: id,
+      rule: unserved.rule,
+      cause: `${id} names a record this workspace does not serve: ${unserved.file} line ${unserved.line}: ${unserved.reason}`,
+      fix: ['treadle status'],
+    })
+  }
   return errorResult({
     code: 'NOT_FOUND', command, workspace, effect: 'read', entity: id,
     cause: `${id} is in no record here; this workspace holds ${view.items.length} items`,

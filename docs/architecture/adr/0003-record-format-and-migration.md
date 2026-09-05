@@ -40,14 +40,15 @@ The store layer, per DR2 to DR4.
 - [ ] The index rebuilds from a fingerprint
 ```
 
-Six rules carry the weight.
+Seven rules carry the weight.
 
-1. **A record starts at a line beginning `# ` at column 0.** That is the resynchronisation point. A `# ` line whose text is not `<slug>: <title>` ends the previous record and is quarantined by line number, and every other record in the file keeps serving.
+1. **A record starts at a line beginning `# ` at column 0, or at a line a hand edit reshaped into one.** That is the resynchronisation point. A `# ` line whose text is not `<slug>: <title>` ends the previous record and is quarantined by line number, and every other record in the file keeps serving. A line that carries `<slug>: <title>` after a run of at most three spaces and six hashes is a heading an edit damaged, and it resynchronises there too, so that demoting `# ` to `## `, indenting it or dropping its hash cannot make the record above absorb the record below. Two conditions keep prose out: the candidate must be followed by a record's mandatory field block, and inside a record's own field block a line is a candidate only once that record's four mandatory fields have been read, so `state: ready` is never mistaken for a boundary.
 2. **Every semantic value is a field, never a heading and never a position.** `state: ready` is the state. The file's order and its section names carry nothing the lifecycle reads, so a cosmetic rename cannot move an item.
 3. **A single-line value carries no character from the safe-text class**, and a section body carries none of it but newline and tab. The class is Unicode `Cc`, `Cf`, `Cs`, `Zl` and `Zp`; see below.
 4. **A body line may not begin with `#` at column 0.** The write path refuses one by name, because such a line would re-parse as a heading. On read the segment split quarantines it rather than silently re-homing it.
 5. **An absent optional field is an absent line**, never an empty value, so a diff never shows a field appearing with nothing in it.
 6. **Encoding is UTF-8 with LF.** A file read with CRLF parses with the CR stripped and is reported as finding `H16`; the next write to it normalises the whole file.
+7. **A name names one thing.** An id that appears on two records in one file names neither: both are quarantined as `S3`, so no reader and no write can resolve it by document order. A section name that appears twice in one record is quarantined as `S1` on the same reasoning, because `decodeItem` reads a section by name and would otherwise take the last one silently. The parser publishes one id-to-chunk map, and every reader and the write path resolve an id through it.
 
 Events are a different format on purpose: JSON Lines, keys in the fixed order `id, at, actor, actor_kind, entity_kind, entity, op, before, after, guards, cmd, txn`, no whitespace, `merge=union` in `.gitattributes`.
 An event is machine-written and never hand-edited, and the record grammar would cost lines that no reader of a log wants.
@@ -74,6 +75,7 @@ A line that matches neither form is not something a newer tool writes; it is cor
 - A file with a higher number is refused on read as `SCHEMA_NEWER` (`S8`) naming the file and both numbers, and every other file keeps serving. A merge that brought in one newer file disables one month, not the store.
 - A file with a lower number is readable, and a write to it is refused as `SCHEMA_OLDER` (`S9`) with `migrate` named in the message, because writing it would rewrite the whole file as a side effect of a one-record change.
 - Adding an optional field or a section name does not bump the number. Unknown-line preservation covers that in both directions.
+- Rules 1 and 7 did not bump the number either, and the reason is worth stating because a grammar change normally would. Neither rule changes how any file this tool wrote parses: the write path has never produced a duplicated id, a duplicated section name or a heading outside `# <slug>: <title>`. What they change is the reading of a file a hand edit damaged, which had no defined meaning before and now has a quarantine. Bumping the number would make every existing workspace read-only behind a `migrate` command that is not built, to no reader's benefit.
 
 `migrate` itself is not built on this branch; the refusal that makes it necessary is, and it names the command.
 
@@ -119,12 +121,15 @@ Rather than hope no merge is ever written, every object rebuilt from a line has 
 
 - A record is diff-legible, and a reviewer can tick an acceptance criterion in a pull request because it is a GitHub task list.
 - A corrupt record costs itself. The measured case: one heading renamed in a shard, every other record served, the bad one reported with its file and line.
+- Damage to a heading is loud rather than silent, which is the property the Context section claims. It cannot be prevented: within a multi-record file the boundary is a line, and a line is the thing a person reformats. The prevention that would work is one record per file, where the filesystem owns the boundary, and ADR-0002 priced and rejected it on freshness, at 296 ms across 50,000 per-item files against 0.27 ms across 24 shards. So detection it is, and the detector is redundancy the format already carries: a record's mandatory field block. A checksum would fire on every legitimate hand edit, a record count in the header would fire on every legitimate record a person adds by hand and would name the file rather than the record, and the index cannot be the detector because it is derived, gitignored and absent from a fresh clone.
 - An older tool reading a newer file loses nothing it did not understand.
 
 **Negative**
 
 - The grammar is this project's own, so a parser in another language needs this document.
 - A reviewer who writes `[X]` rather than `[x]` has ticked nothing, and the record is refused by name rather than silently mis-read.
+- A section body line reading `some-slug: some text` at column 0, directly above what looks like a record's mandatory field block, is read as a damaged heading and the record is quarantined. That shape is what a swallowed record looks like, so the false positive and the true positive are the same bytes; the refusal names the record and the line.
+- A command asked for an id the store holds twice now exits 4, a conflict naming the ambiguity, where it exited 5 and said the id was in no record here. Under `docs/STABILITY.md` that is a breaking move of a condition between exit codes; nothing is released yet, so it costs a release note rather than a bump.
 
 ## Departures from the design record
 
@@ -132,3 +137,7 @@ Rather than hope no merge is ever written, every object rebuilt from a line has 
 - **An unrecognised task-list marker is a named record refusal, not a doctor finding.** DR3 puts it in the doctor, which does not exist yet. Refusing by name keeps the "zero silent drops" property today, and the doctor can downgrade it to a finding when it lands.
 - **A malformed line inside a record is quarantined rather than preserved.** DR3 says unknown lines are preserved, which is right for the two forms a newer tool actually writes and wrong for a line that matches nothing in the grammar. Both forms are still preserved; the third is reported.
 - **The record grammar is about 260 lines, not the 150 DR3 estimated.** The difference is the ceilings, the safe-text checks and the quarantine paths, none of which the estimate included.
+- **Rule 1 resynchronises on a damaged heading, and rule 7 exists at all.** Both are corrections to this record, not to the design.
+  The first shipped version of rule 1 made `# ` at column 0 the only resynchronisation point, which meant the Context section above was false about the code beneath it: measured over a two-record file, six single-line edits to a heading, among them demoting it to `## `, dropping its space and dropping its hash, moved the record below into the record above with every command exiting zero, and the absorbing record's own `Description` silently became the absorbed record's prose.
+  The benchmark rig reproduced one of the six as a silent drop in 206 damaged stores on every run, which is why comparison axis A5 was scored `MISSED` against a target of zero silent drops.
+  Rule 7 is the same correction for identity: an id was resolved in three places that tie-broke differently, two taking the first record in document order and one the last, and they agreed only because every read went through the index, which nothing enforced.
