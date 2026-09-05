@@ -1,0 +1,44 @@
+# SPDX-License-Identifier: Apache-2.0
+# Actions are pinned to commit SHAs in every workflow, which is only safe because something
+# moves the pins. This is that something; the version behind a SHA is named in the pull
+# request title, and CI's own actionlint job reads the result.
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "ci"
+      include: scope
+    groups:
+      # One pull request through one CI run rather than six. These actions are all
+      # first-party and move together.
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: "07:00"
+      timezone: Etc/UTC
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
+      include: scope
+    groups:
+      # esbuild is separated from the rest of the toolchain because it is the one development
+      # dependency whose output ships: it produces the bytes in dist/treadle.js, so its
+      # integrity is the product's rather than the build's.
+      bundler:
+        patterns: ["esbuild"]
+      toolchain:
+        dependency-type: development
+        patterns: ["*"]

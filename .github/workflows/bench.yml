@@ -52,6 +52,12 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # The package rows DR8 budgets (install size, bundle size) are properties of the tarball
+      # the `files` allowlist produces, and that ships dist/treadle.js. Without this step every
+      # one of them reports NOT MEASURED rather than a number.
+      - name: Build the bundle
+        run: npm run build
+
       - name: Measure and gate
         env:
           TREADLE_BENCH_DIR: ${{ runner.temp }}/treadle-bench

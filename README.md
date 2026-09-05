@@ -24,6 +24,7 @@ The published package has zero runtime dependencies, and that is a budget rather
 
 Nothing is published yet.
 Publication is gated on a name clearance that has not run, so `package.json` carries `"private": true` and `npm publish` refuses.
+The release machinery is built and has never been fired; [docs/RELEASING.md](docs/RELEASING.md) says what opens it.
 Clone the repository to work on it.
 
 ```bash
@@ -31,6 +32,10 @@ git clone https://github.com/Abhijeet34/treadle.git
 cd treadle
 npm ci
 ```
+
+What a published install would carry is one file of executable code.
+`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 18 files, 58.5 kB packed and 242.8 kB unpacked.
+The bundle is 180,105 bytes against DR1's 500 KB budget, and the build fails rather than warns if it goes over.
 
 ## Quick start
 
@@ -40,13 +45,15 @@ node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
 
-The test suite has no build step, about 31 seconds on Node 24.11.1. Most of that
-is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed
-inputs per run.
+`npm run check` is the gate: types, then the suite, then the bundle.
+Development itself needs no build step: Node runs the TypeScript directly.
+The suite is about 31 seconds on Node 24.11.1, most of that 73 real child processes across
+the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 
 ```bash
 npm test         # node --test over test/**/*.test.ts, no build step
-npm run check    # tsc --noEmit under strict, then the tests
+npm run check    # tsc --noEmit under strict, the tests, then the bundle
+npm run build    # dist/treadle.js, weighed against the DR8 bundle budget
 npm run coverage # the suite under coverage, held to a per-file gate
 npm run flake    # 20 consecutive full runs, budget zero
 ```
@@ -94,12 +101,15 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `doctor`, `config` | Specified, not implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, hooks, completions | Specified, not implemented |
+| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 180,105 bytes |
+| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
-Eight of the thirteen findings in the project's threat model are closed, each with a regression test that was shown to fail before it passed.
+Nine of the thirteen findings in the project's threat model are closed, each with a regression test that was shown to fail before it passed.
 In the store: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
 In the output contract: a multi-line description forging lines in the agent stream, a column appended after a space-bearing one corrupting the row split, record content reaching a verbose log, and the data-versus-instruction boundary being legible to a parser but not to a model.
-The remaining five land in layers that do not exist yet.
+In the supply chain: the three unstated controls, which are now `ignore-scripts=true` in a committed `.npmrc`, a committed lockfile that every workflow installs with `npm ci`, and an SBOM with build provenance on the release path.
+The remaining four land in layers that do not exist yet.
 
 ## treadle's own backlog
 
@@ -125,6 +135,7 @@ list. `treadle explain <id>` names the rule.
 - [docs/architecture/adr/](docs/architecture/adr/README.md) - one record per decision, with what it departs from and why.
 - [docs/STABILITY.md](docs/STABILITY.md) - what counts as a breaking change, and the pre-1.0 policy.
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md) - the measured run: the twelve axes, the performance budget, and what is not measured yet.
+- [docs/RELEASING.md](docs/RELEASING.md) - how a release happens, why the tag is signed by a person, and how to roll one back.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
 - [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
