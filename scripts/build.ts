@@ -29,7 +29,7 @@ await build({
   target: 'node24.15',
   // Not minified, and not source-mapped. A stack trace in a bug report from a machine we
   // cannot reach is worth more than the bytes either would save, and the measured size below
-  // is 2.9x under the budget, so there is nothing to buy.
+  // is 2.8x under the budget, so there is nothing to buy.
   banner: { js: '#!/usr/bin/env node' },
   legalComments: 'inline',
 })

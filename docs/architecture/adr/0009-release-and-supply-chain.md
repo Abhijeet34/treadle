@@ -36,8 +36,8 @@ Development still has no build step, which is what `AGENTS.md` promised and what
 The 500 KB limit is not written in the build script.
 It is read from `bench/budgets.json`, so `npm run build` and `npm run bench:gate` weigh the bundle against the same number and cannot drift apart.
 
-Measured: 179,471 bytes, 2.9x under the budget.
-The tarball is 18 files, 58.2 kB packed and 241.6 kB unpacked, against DR8's 1.5 MB unpacked limit.
+Measured: 180,105 bytes, 2.8x under the budget.
+The tarball is 18 files, 58.5 kB packed and 242.8 kB unpacked, against DR8's 1.5 MB unpacked limit.
 
 ### A signed annotated tag is the release authorisation
 
@@ -76,13 +76,13 @@ esbuild was chosen partly because it resolves its platform binary through an opt
 | `prepack` to build the tarball | `ignore-scripts=true` is F13's first control, and it turns off the project's own lifecycle scripts too. The release workflow runs `npm run build` explicitly instead, which is visible in the log rather than implied |
 | `npm sbom` | GitHub's dependency-graph export describes the manifests from the same data the dependency review reads, needs nothing installed, and cannot disagree with the alerts on the repository |
 | Porting the sibling's `approve-release-checks` script, which releases the release pull request's parked CI | 165 lines plus a test, to make an unattended release unattended. treadle's release is human-initiated by design, so the person who signs the tag is already there to approve the checks |
-| Minifying or source-mapping the bundle | A stack trace from a machine nobody can reach is worth more than the bytes. The bundle is 2.9x under budget, so there is nothing to buy |
+| Minifying or source-mapping the bundle | A stack trace from a machine nobody can reach is worth more than the bytes. The bundle is 2.8x under budget, so there is nothing to buy |
 
 ## Consequences
 
 **Positive**
 
-- The DR8 bundle-size budget weighs a real number for the first time: 179,471 bytes against 512,000.
+- The DR8 bundle-size budget weighs a real number for the first time: 180,105 bytes against 512,000.
 - The rollback policy has been rehearsed rather than only written. `scripts/rollback-drill.sh` signs real tags in a throwaway clone and drives the preflight against each one; eight scenarios, all passing.
 - CI gained CodeQL, dependency review, `npm audit` at `low`, the licence gate and actionlint, behind a single required `checks` context that a skipped job cannot satisfy.
 - The `check` matrix runs the 24.15.0 floor and current Node. Nothing tested the open upper half of `engines.node` before.
