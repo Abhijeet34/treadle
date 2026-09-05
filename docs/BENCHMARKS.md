@@ -199,6 +199,8 @@ And the events table stored each log line whole beside six columns that already 
 
 ### Peak RSS on a read: closed, and the budget was never the store's to miss
 
+**Corrected below.** This section is kept as the record of what was measured in the appended run, and the operation it measures is `store.list` bounded at 50 rows, which no command performs. "The read every command performs is the wall that is still standing" carries the figure for the read the product actually makes, and the gate now weighs this budget over the worst of its set rather than over `list`.
+
 Peak RSS on a read at 50,000 items is 99.2 MiB against 100 MiB.
 That is a pass by 0.8%, which is too close to celebrate, so here is what the number is actually made of.
 
@@ -432,6 +434,171 @@ Demonstrated: with the budgets as committed it exits 0, and with the install-siz
 It does not fail on the per-operation timing limits.
 They were derived on this Apple M2 and have never been measured on a GitHub runner, so a red build there would be evidence about the runner.
 `bench/budgets.json` carries `timing.enforced: false` with that reason, the rows still print with their numbers, and arming them means re-deriving on the runner once the runner's own drift has been measured.
+
+## Where it stops scaling, and what gives way first
+
+Everything above stops at 50,000 items because that is what DR8 sized.
+This section pushes past it and names the wall.
+Every figure here was taken on the machine and runtime the table above names, on 2026-09-06, with sibling workers running throughout; the 1-minute load is given beside each group because none of it was taken idle.
+
+Three things could give way: the wall time of an answer, the memory one answer holds, and the shard layout's own ceilings.
+One of them had already given way below 50,000 and nothing said so.
+
+### `doctor` was quadratic, and at 50,000 items it returned nothing at all
+
+`doctor` handed every item the entire event log and `auditItem` filtered that log by entity three times per item, so the audit cost items x events.
+
+| Corpus | Before | After |
+|---|---|---|
+| 100 items, 1,000 events | 375 ms | 272 ms |
+| 1,000 items, 10,000 events | 1,338 ms | 342 ms |
+| 10,000 items, 100,000 events | 273,554 ms | 991 ms |
+| 50,000 items, 500,000 events | no answer inside 600,000 ms | 4,438 ms |
+
+Index warm in every run, wall time measured around the shipped `bin/treadle.js`, at 1-minute loads of 8.5 to 20.9.
+The finding list is byte-identical before and after at all three scales that produced one: 27, 238 and 2,473 findings.
+
+Nothing about this was visible from the axis table, because no axis calls `doctor`.
+It was found by running the command against the 50,000-item corpus and watching it not come back.
+The fix buckets the log by entity once, which makes it linear in both, and the regression test asserts passes over the log rather than a wall time: the old code walked the whole log 150 times over 50 items, the new one walks it once.
+
+A command that has no answer is a wall, and a command with no bound on its work has no way to say it reached one.
+
+### The read every command performs is the wall that is still standing
+
+`readWorkspace` in `src/application/services/context.ts` calls `store.list()` with no query, indexes the result by id and builds the hierarchy graph off it.
+Every command pays it, including `show`, which prints one record.
+
+Peak RSS and in-process time of that read against the bounded `list` the memory budget used to be weighed over, one cold process each, at 1-minute loads of 4.2 to 4.3:
+
+| Items | `list`, 50 rows | the read every command performs |
+|---|---|---|
+| 131 | 101,456 KiB, 7.6 ms | 101,744 KiB, 14.4 ms |
+| 1,320 | 100,448 KiB, 10.8 ms | 114,240 KiB, 46.1 ms |
+| 10,120 | 100,736 KiB, 9.2 ms | 199,200 KiB, 275.7 ms |
+| 50,021 | 102,400 KiB, 9.3 ms | 416,144 KiB, 1,239.1 ms |
+| 100,000 | 103,040 KiB, 43.2 ms | 601,872 KiB, 8,142.5 ms |
+
+Every row above 50,000 is one cold sample rather than a median, and the 100,000 row was taken at a 1-minute load of 28.1 against 4.2 for the rows above it, so read its wall time as an upper bound and its RSS as the figure it is.
+
+The instrument is `process.resourceUsage().maxRSS`, read in the process that did the work; libuv normalises the darwin `ru_maxrss` to KiB, and `/usr/bin/time -l` cannot report it in the sandbox these runs were driven from because `sysctl kern.clockrate` is denied there.
+About 99 MiB of every row is the runtime rather than the corpus, which the floors table prices: `node -e` alone peaks at 41.5 MiB and the store adapter loaded with no work done at 95.9 MiB.
+What the corpus adds is 6.28 KiB per item at 50,000, and it is still 5.0 KiB per item at 100,000.
+
+The same read at the command surface, one process per command, on the 50,021-item corpus at a 1-minute load of 4.2:
+
+| Command | Wall | Peak RSS | Bytes printed |
+|---|---|---|---|
+| `treadle show wi-000286` | 1,262.9 ms | 418,672 KiB | 532 |
+| `treadle backlog --limit 9` | 1,285.3 ms | 419,200 KiB | 862 |
+| `treadle next --limit 3` | 1,321.7 ms | 419,392 KiB | 458 |
+| `treadle status` | 1,313.3 ms | 419,632 KiB | 601 |
+| `treadle history wi-000286` | 1,247.2 ms | 419,584 KiB | 563 |
+| `treadle backlog --limit 60000` | 1,360.6 ms | 426,672 KiB | 3,653,036 |
+| `treadle file task "..."` | 1,308.4 ms | 430,256 KiB | 211 |
+| `treadle doctor` | 4,338.9 ms | 1,060,816 KiB | 1,677,306 |
+
+Printing 532 bytes costs 409 MiB and 1.26 s, and the figure does not move with what is asked for.
+`doctor` is 1.01 GiB because it holds the 500,000 events beside the 50,000 items.
+
+DR8's budgets are 100 MiB for a read at 50k and 120 MiB for a mutation.
+The rig reported the read row as a pass at 99.2 MiB in the run appended below, and that figure is a `store.list` bounded at 50 rows, which no command makes.
+The budgets are unchanged here; what changed is which operation they are weighed over, and the read row now reads 4.06x rather than 0.99x.
+A budget met by an operation the product never performs is not a budget.
+
+### The layout's own ceilings, and where the arithmetic puts them
+
+`src/adapters/store/limits.ts` caps one shard at 8 MiB and 20,000 records, and ADR-0002's own reopening condition is a month filing more than about 5,000 records.
+The corpus spreads its items over 24 months, and the largest month holds about 4.3% of them.
+
+| Items | Shards | Largest shard | Of the 8 MiB cap | Index / text |
+|---|---|---|---|---|
+| 50,000 | 24 | 2,176 records, 1,115,493 B | 13.3% | 1.538x |
+| 100,000 | 24 | 4,315 records, 2,214,665 B | 26.4% | 1.539x |
+
+The index ratio does not move with the corpus, and the shard is linear in it: 512.6 B per record at 50,000 and 513.3 at 100,000.
+At 513 B per record the 8 MiB byte cap is reached by a month holding about 16,350 records, which this distribution reaches at roughly 380,000 items, and the 20,000-record cap at roughly 460,000.
+ADR-0002's own reopening condition of 5,000 records in one month arrives first, at about 116,000 items.
+
+So the layout has room the memory does not.
+Read memory crosses DR8's 100 MiB budget between 131 items (101,744 KiB) and 1,320 (114,240 KiB), and most of that is the runtime rather than the corpus: the timed children launch from TypeScript source, and "Peak RSS on a read" above measured the same read at 52.6 MiB through the release path's bundle against 99.2 from source.
+Even from that floor, 6.28 KiB per item spends the remaining headroom by about 7,700 items.
+The wall this tool meets first is `readWorkspace`, and it is nowhere near the shard key.
+
+## Deep pagination, proved by counting
+
+`backlog`, `history` and `next` page by naming an id in a `page` line the caller follows.
+Whether that walk is exact is a counting question, so it was counted rather than inspected.
+The reader follows only the `page` line the tool prints, through the shipped `bin/treadle.js`, and compares the ids it collected against the tool's own `total` and against one unpaged read.
+
+| Walk | Pages | Rows returned | Distinct | Duplicates | Missed |
+|---|---|---|---|---|---|
+| `backlog --limit 500` over 50,021 items | 101 | 50,021 | 50,021 | 0 | 0 |
+| `history --limit 3` over 402 events | 134 | 402 | 402 | 0 | 0 |
+| `backlog --limit 100` over 10,031 items with a writer filing one item every 150 ms | 102 | 10,119 | 10,119 | 0 | not applicable |
+
+The set the 101 pages produced is equal to the set one unpaged read produces, in both directions: 0 ids in the pages and not in the whole, 0 in the whole and not in the pages.
+
+### What the walk actually guarantees
+
+It is exact over a workspace that does not change under it, and it is not a snapshot.
+Each page is a fresh whole read, sorted by `priority, filed_at, id`, sliced from the cursor id.
+So the guarantee is stated by what a concurrent writer can do to the sort key, and all three cases were driven deterministically with the write placed between two pages:
+
+- **An append is picked up.** A new item has no priority and today's `filed_at`, so it sorts to the end. 88 items landed during the 102-page walk above and all 88 were returned, with no duplicate.
+- **An item whose key moves from after the cursor to before it is skipped.** Nine items at `--limit 3`; between page 1 and page 2 a writer raised `itm-8` to priority 1. Pages 2 and 3 returned `itm-4`, `itm-5`, `itm-6`, `itm-7`, `itm-9`. `itm-8` was never returned: 8 of 9 items for a walk that read every page.
+- **An item whose key moves the other way is returned twice.** The same nine items; between page 1 and page 2 a writer dropped `itm-2`, already returned on page 1, to priority 5. Page 3 ended with `more 1`, and the item that page names is `itm-2`.
+
+That is a read-committed walk over a moving list, and it is what an offset-free cursor over a re-sorted set can offer without a snapshot.
+It is written down here because a caller cannot infer it from the output.
+
+### The case that was silently wrong
+
+A cursor the list no longer holds returned index -1, and all three commands clamped that to 0 and served the first page.
+Measured on the 10,000-item corpus before the fix: `treadle backlog --state ready --limit 3 --cursor wi-003956`, where that item is `done` and so outside the filtered list, printed byte for byte what `treadle backlog --state ready --limit 3` printed.
+A writer that transitions the cursor item out of the filter therefore turns a walk into a loop over the first pages, with nothing in the output to read it from.
+
+All three now refuse with `C1`, name the cursor, and give the command that starts the walk again.
+
+## Forward compatibility, measured
+
+`docs/STABILITY.md` makes one promise: unknown fields and unknown sections are preserved verbatim and travel with the record through every mutation, so an older tool writing a newer file loses nothing it did not understand.
+Five shapes of "written by a newer version" were driven against a build that has never seen them, each in its own workspace, through the shipped entry point.
+
+| What a newer version wrote | This build's answer |
+|---|---|
+| An unknown field key, `risk_tier: gold` | **Preserved.** It survives a `set`, is re-rendered after the known fields in dictionary order, and is counted by `extra` on `show` |
+| An unknown H2 section | **Preserved.** It survives a `set` and is re-attached after the sections this build knows |
+| An unknown event op, `item.escalate`, with an unknown key beside it | **Ignored, and preserved.** `history` prints the op verbatim and counts the unknown key as `+1`, `doctor` reports the store clean, and nothing rewrites the log |
+| An unknown item type, `type: gadget` | **Refused, workspace-wide.** Every read exits 7 naming `V4` and the record; `doctor` lists one finding per bad record. The refusal hides the other records in the same workspace, which is `readWorkspace`'s stated contract rather than an accident |
+| A file at a newer schema, `schema: 2` | **Refused.** `S8` names the file, `doctor` lists it, and every read and every write over that workspace exits 7. `workspace.md` at a newer schema refuses at `S1`/`S8` with exit 6 |
+| A gate rule a workspace configured | **Ignored in silence.** There is no surface to configure one: `evaluateGate` takes a `Gate` and no adapter reads one from the workspace, so a `## Gates` section added to `workspace.md` is neither read nor reported, and is preserved because nothing rewrites that file |
+
+The promise holds where it is made, and the two refusals are the design working: a new item type or a grammar change bumps the compiled-in schema number, and `docs/STABILITY.md` already classes that as breaking with a minor bump.
+
+Two things beside it read false and one of them is fixed here.
+
+The refusal on `show <id> --field risk_tier` said "carries no field named risk_tier" for a key the file did carry and that `show` was counting under `extra` in the same output.
+The value stays unprinted, for the reason the count exists, and the refusal now says which of the two answers it is.
+
+The other is reported rather than fixed, because the message belongs to the store.
+`S8` says "every other file keeps serving", which is true of the store and false at the command surface: with one shard at `schema: 2`, `show`, `backlog`, `set` and even a `file` into a different month all exit 7.
+A caller reads that clause and concludes some commands will work.
+
+## What a cold caller could not learn from the tool
+
+A caller that had never seen this tool or this workspace drove `file`, `advance`, `gate`, `complete` and `audit` using only `treadle help` and each step's own output.
+It completed the flow.
+`explain` is what carries it: it prints every failing gate rule with the exact command that clears it, and `transition`'s refusal points back at `explain`.
+
+Six places needed knowledge the tool did not give it.
+
+1. **`--cursor` was in no help output.** The tool prints `page treadle backlog --cursor <id>` itself, and `--cursor` was absent from the flag matrix, so `treadle help backlog` never named it and `treadle show <id> --cursor x` was accepted in silence where `--limit` is refused. `history`'s usage line carried it and `backlog`'s and `next`'s did not. Fixed: it scopes as `--limit` does and all three usage lines name it.
+2. **`set` printed `[object Object]`.** Writing acceptance criteria answered `set acceptance_criteria - -> [object Object],[object Object]`, and the event log recorded the length of that placeholder as the value that moved. Fixed: a criterion prints as `open` or `done` and an evidence pointer as its kind.
+3. **The actor is `unknown` and nothing says how to set it.** `init` printed `actor unknown`, every event's `by` column says `unknown`, and `explain` prints `"by unknown`. `TREADLE_ACTOR` and `TREADLE_ACTOR_KIND` are read in `src/cli/main.ts` and appear in no help output, no example and no README line. A cold caller writes an unattributed audit trail and is not told.
+4. **Command-specific flags are not in help.** `help <command>` lists the 17 global flags with a verdict each, and command flags appear only where a `usage` line happens to name one. `file` accepts `--id`, `--desc`, `--assignee`, `--label`, `--sprint` and `--parent`, and its usage line names none of them; `transition` accepts `--reason`, `--until`, `--resolution`, `--outcome` and `--override`; `backlog` accepts `--sprint` and `--priority`. The parser refuses an unknown flag by naming the option table, so a caller finds these by being refused rather than by asking.
+5. **`--contract`, `--no-color`, `--ascii` and `--log-values` are accepted and documented nowhere.** `treadle --contract` prints the line grammar, which is the one thing an agent most needs first, and no help output mentions it.
+6. **The word "gate" reaches no command.** The top-level table's 15 summaries never use it; the gate verdicts live in `explain`, whose summary is "Say why one item is where it is". A caller told to gate an item guesses, and learns from the first `GUARD_REFUSED`, whose `fix` line names `explain`.
 
 ## The run
 
