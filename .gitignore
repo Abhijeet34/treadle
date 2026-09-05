@@ -5,3 +5,6 @@ coverage/
 .DS_Store
 .fm-evidence/
 bench/results/
+*.tgz
+sbom.spdx.json
+SHA256SUMS
