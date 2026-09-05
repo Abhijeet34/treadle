@@ -97,9 +97,10 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `transition`, `next`, `explain`, `status`, `help`, `version` | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `transition`, `mark`, `evidence add`, `doctor`, `next`, `explain`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
-| Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `doctor`, `config` | Specified, not implemented |
+| Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `config` | Specified, not implemented |
+| `doctor`: four findings over records and the event log; the rest wait on entities that do not exist yet | Partly implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, hooks, completions | Specified, not implemented |
 | Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 186,164 bytes |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |

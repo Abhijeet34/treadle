@@ -141,6 +141,28 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, closed).pass, true)
   })
 
+  it('refuses a done that points at no evidence, and only where the type has a review step', () => {
+    const bare = gateContext(item('story', {
+      state: 'in_review', points: 5, reviewer: 'kim', assignee: 'dana',
+      acceptance_criteria: [{ text: 'refresh once', ticked: true }],
+    }), { reviewStep: true })
+    assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, bare)), ['DOD7'])
+    assert.ok(evaluateGate(DEFAULT_DONE_GATE, bare).rules
+      .find((r) => r.rule === 'DOD7')?.remedy?.startsWith('treadle evidence add'))
+
+    const pointed = gateContext(item('story', {
+      state: 'in_review', points: 5, reviewer: 'kim', assignee: 'dana',
+      acceptance_criteria: [{ text: 'refresh once', ticked: true }],
+      evidence: [{ kind: 'pr', ref: 'https://example.test/pr/42', label: 'the fix' }],
+    }), { reviewStep: true })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, pointed).pass, true)
+
+    // A chore has no review step, so the anti-attestation pair is inert for it, exactly as
+    // DOD3 already is.
+    const chore = gateContext(item('chore'), { reviewStep: false })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, chore).pass, true)
+  })
+
   it('fails an item with an open impediment', () => {
     const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task'), { openImpediments: 2 }))
     assert.deepEqual(failed(verdict), ['DOD2'])
@@ -151,12 +173,15 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, noReview).pass, true)
 
     const missing = gateContext(item('task', { assignee: 'dana' }), { reviewStep: true })
-    assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, missing)), ['DOD3'])
+    assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, missing)), ['DOD3', 'DOD7'])
 
     const self = gateContext(item('task', { assignee: 'dana', reviewer: 'dana' }), { reviewStep: true })
-    assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, self)), ['DOD3'])
+    assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, self)), ['DOD3', 'DOD7'])
 
-    const other = gateContext(item('task', { assignee: 'dana', reviewer: 'kim' }), { reviewStep: true })
+    const other = gateContext(
+      item('task', { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run', ref: '8813' }] }),
+      { reviewStep: true },
+    )
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, other).pass, true)
   })
 })

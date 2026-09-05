@@ -7,11 +7,14 @@
 // compare two runs byte for byte.
 
 import {
+  BUG_SEVERITIES,
   TRANSITION_TABLE,
   daysOverdue,
   healthFindings,
   isOverdue,
+  isTerminal,
   legalTargetsFrom,
+  type BugSeverity,
   type GuardId,
   type ItemId,
   type WorkItem,
@@ -27,6 +30,7 @@ import {
   readyVerdict,
   type WorkspaceView,
 } from './context.ts'
+import { auditItem } from './doctor.ts'
 import { notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -37,14 +41,25 @@ export type Weights = {
   readonly spr: number
   readonly asg: number
   readonly due: number
+  readonly sev: number
 }
 
 /**
  * Integer weights, so a score is an integer and two implementations cannot round apart.
  * `due` is four so a day past the date outranks four days of age and never a priority step:
  * a date the workspace agreed is evidence, and priority is still the thing a person set.
+ * `sev` is six for the same reason read the other way: an S1 scores 4 and a priority level
+ * is 10, so severity lifts a defect by at most 2.4 levels and priority stays the lever a
+ * person sets. The two components answer different questions and both are printed.
  */
-export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4 }
+export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4, sev: 6 }
+
+const SEVERITY_RANK: Readonly<Record<BugSeverity, number>> = { S1: 4, S2: 3, S3: 2, S4: 1 }
+
+/** 4 for an S1 down to 1 for an S4, and 0 for anything with no severity. */
+export function severityRank(item: WorkItem): number {
+  return item.severity === undefined ? 0 : SEVERITY_RANK[item.severity]
+}
 
 const MAX_AGE_DAYS = 30
 const DAY_MS = 86_400_000
@@ -96,6 +111,12 @@ export const EXPLAIN_SHAPE: ResultShape = {
       columns: [{ name: 'to' }, { name: 'guards' }],
     },
     { kind: 'scalar', key: 'blocks', type: 'string' },
+    { kind: 'scalar', key: 'sev', type: 'string' },
+    {
+      kind: 'block',
+      key: 'findings',
+      columns: [{ name: 'rule' }, { name: 'detail', text: true }],
+    },
   ],
 }
 
@@ -118,6 +139,7 @@ export const STATUS_SHAPE: ResultShape = {
       columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'title', text: true }],
     },
     { kind: 'scalar', key: 'absent_features', type: 'string' },
+    { kind: 'scalar', key: 'defects', type: 'string' },
   ],
 }
 
@@ -141,13 +163,14 @@ export function scoreOf(
   const sprint = item.sprint_id === undefined ? 0 : 1
   const match = forActor !== undefined && item.assignee === forActor ? 1 : 0
   const overdue = daysOverdue(item, now)
+  const severity = severityRank(item)
   const score = priority * weights.pri + age * weights.age + dependents * weights.dep
     + sprint * weights.spr + match * (forActor === undefined ? 0 : weights.asg)
-    + overdue * weights.due
+    + overdue * weights.due + severity * weights.sev
   return {
     item,
     score,
-    parts: `p${priority}/a${age}/d${dependents}/s${sprint}/m${match}/u${overdue}`,
+    parts: `p${priority}/a${age}/d${dependents}/s${sprint}/m${match}/u${overdue}/v${severity}`,
   }
 }
 
@@ -192,7 +215,7 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
 
   const asg = request.forActor === undefined ? 0 : weights.asg
   const data: Record<string, Value> = {
-    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg} due ${weights.due}`,
+    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg} due ${weights.due} sev ${weights.sev}`,
     next: block,
   }
   if (ranked.length === 0) {
@@ -292,6 +315,20 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['moves'] = moves
   const blocking = blockedByThis(view.value, id)
   data['blocks'] = blocking.length === 0 ? '-' : blocking.join(',')
+  if (item.severity !== undefined) data['sev'] = item.severity
+
+  // explain already reads this item's events for the instant it entered its state, so the
+  // audit over the same list is free here and is the per-item half of `doctor`.
+  const events = await store.events({ entity: id })
+  const audit = events.ok ? auditItem(item, events.value) : []
+  if (audit.length > 0) {
+    data['findings'] = {
+      columns: columnsOf(EXPLAIN_SHAPE, 'findings'),
+      shown: audit.length,
+      total: audit.length,
+      rows: audit.map((finding): Row => ({ rule: finding.rule, detail: finding.detail })),
+    }
+  }
   return okResult(EXPLAIN_SHAPE, { workspace, data })
 }
 
@@ -311,6 +348,14 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   const counts = new Map<string, number>()
   for (const item of view.value.items) counts.set(item.state, (counts.get(item.state) ?? 0) + 1)
   const states = [...counts.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))
+
+  // Severity reached no read surface at all, and the orientation call is the one a triaging
+  // caller makes first. Open bugs only: a closed defect's severity is history, not a queue.
+  const open = view.value.items.filter((item) => item.type === 'bug' && !isTerminal(item.state))
+  const census = BUG_SEVERITIES
+    .map((severity) => [severity, open.filter((item) => item.severity === severity).length] as const)
+    .filter(([, count]) => count > 0)
+  const defects = census.length === 0 ? undefined : census.map(([s, n]) => `${s} ${n}`).join(' ')
 
   const now = clock.now()
   const ranked = rank(view.value, now, DEFAULT_WEIGHTS, undefined).slice(0, 3)
@@ -352,6 +397,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
         })),
       },
       absent_features: 'sprint board impediment relation',
+      ...(defects === undefined ? {} : { defects }),
     },
   })
 }

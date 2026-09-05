@@ -45,6 +45,7 @@ The set is closed.
 | `T4` | A transition or an override that records a reason was given none |
 | `T5` | An override names a guard the edge does not evaluate, or one that cannot be overridden |
 | `T6` | An edge that records a closed-set value was given none, one outside the set, or one it does not own |
+| `T7` | A reason is longer than `MAX_REASON`, which is 500 characters |
 | `R1` | An item cannot relate to itself |
 | `R2` | The edge would close a cycle in a directional relation kind |
 | `R3` | The relation traversal hit its depth ceiling |
@@ -83,6 +84,28 @@ Two of the common fields are conditional rather than free.
 `validateWorkItem(item, { now, pointScale })` checks both, plus every field's own validation from the field dictionary.
 `now` is an argument because a hold expiry has to be in the future and this layer does not read a clock.
 `pointScale` is workspace configuration and defaults to `1, 2, 3, 5, 8, 13`.
+`storedProse` is set by the store and by nothing else: `description` was narrowed from 100,000 characters to `MAX_DESCRIPTION` after files existed, and applying a write bound on the load path would make a record an earlier version wrote unreadable, which [STABILITY.md](STABILITY.md) says the file format never does.
+On that path the store's S5 section ceiling is the bound and a stored value over `MAX_DESCRIPTION` is doctor finding `H18`.
+
+### The bounded fields, and where each number comes from
+
+| Constant | Value | Why that number |
+|---|---|---|
+| `MAX_DESCRIPTION` | 10,000 characters | Threat-model finding F10's reading of the dictionary; a 30-line description already produced a 41-line diff, and the shard is what a reviewer reads |
+| `MAX_REASON` | 500 characters | `hold_reason`'s own bound, so the two reasons in this tool are the same size |
+| `MAX_EVIDENCE_ENTRIES` | 20 | About 800 bytes on `show`, which is one `backlog` page, so a fully evidenced item still reads in one screen |
+| `MAX_EVIDENCE_REF` | 200 characters, no space | A hash, a path, a run id or a URL; a ref with a space is a sentence wearing a pointer's name |
+| `MAX_EVIDENCE_LABEL` | 120 characters | One line naming which of those the ref is, and never the place the explanation goes |
+
+A bound that refuses names the field, the observed length, the limit and the difference.
+Nothing here truncates.
+
+### Evidence
+
+`EVIDENCE_KINDS` is closed: `commit`, `pr`, `run`, `test`, `file`, `url`, `report`.
+An `EvidencePointer` is a `kind`, a `ref` and an optional `label`, and `evidence` is a list of them on every work item.
+It is a pointer at an artefact that lives elsewhere, never the artefact, because the store is committed to git and a screenshot in a shard is a binary in a text repository.
+[architecture/adr/0011-evidence-and-the-severity-audit.md](architecture/adr/0011-evidence-and-the-severity-audit.md) carries the argument.
 
 Readiness and doneness requirements are not here: they live in the gates, because the model's own design is that the gate is what makes a type's fields bite.
 
@@ -198,10 +221,14 @@ Default done gate:
 | `DOD4` | story | Every acceptance criterion is ticked |
 | `DOD5` | spike | The spike records its findings |
 | `DOD6` | bug | The fix is confirmed |
+| `DOD7` | all | The item points at evidence, when the type has a review step |
+
+`DOD7` is scoped by the review step rather than by three per-type rules, exactly as `DOD3` is, so the two answer to one setting.
+Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
-The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment` and `reviewer_distinct_from_assignee`.
+The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `reviewer_distinct_from_assignee` and `evidence_present`.
 A workspace gate composes those; there is no custom predicate, because a gate is loaded from a text file and a text file cannot carry one.
 
 ## Records, and the two security findings that land here

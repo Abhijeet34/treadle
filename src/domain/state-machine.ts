@@ -7,6 +7,7 @@
 // the outcome. docs/DOMAIN.md carries the rule table the errors name.
 
 import { fail, type DomainError } from './errors.ts'
+import { MAX_REASON, overLength } from './fields.ts'
 import type { GateVerdict } from './gates.ts'
 import {
   ATTEMPT_OUTCOMES,
@@ -273,6 +274,12 @@ export function evaluateTransition(
     return refuse(fail('VALIDATION', 'T4', spec.requiresReason
       ? `the ${spec.name} transition records a reason, and none was given`
       : `an override records a reason, and none was given`, [item.id]).error)
+  }
+  // T7. A reason lands whole in the event log, which was the second unbounded prose door:
+  // 10,000 characters were accepted and written to a committed file. The bound is
+  // `hold_reason`'s, which is the one reason the field dictionary already sized.
+  if (request.reason !== undefined && request.reason.length > MAX_REASON) {
+    return refuse(fail('VALIDATION', 'T7', overLength('a reason', MAX_REASON, request.reason.length), [item.id]).error)
   }
 
   const results = evaluated.map((guard): GuardResult => {

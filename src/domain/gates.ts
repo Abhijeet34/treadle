@@ -22,6 +22,7 @@ export type GateCheck =
   | { readonly kind: 'no_open_child' }
   | { readonly kind: 'no_open_impediment' }
   | { readonly kind: 'reviewer_distinct_from_assignee' }
+  | { readonly kind: 'evidence_present' }
 
 export type GateRule = {
   readonly id: string
@@ -88,6 +89,7 @@ export const DEFAULT_DONE_GATE: Gate = {
     { id: 'DOD4', scope: 'story', sentence: 'Every acceptance criterion is ticked.', check: { kind: 'list_all_ticked', field: 'acceptance_criteria' } },
     { id: 'DOD5', scope: 'spike', sentence: 'The spike records its findings.', check: { kind: 'field_present', field: 'findings' } },
     { id: 'DOD6', scope: 'bug', sentence: 'The fix is confirmed.', check: { kind: 'field_is_true', field: 'fix_confirmed' } },
+    { id: 'DOD7', scope: 'all', sentence: 'The item points at evidence, when the type has a review step.', check: { kind: 'evidence_present' } },
   ],
 }
 
@@ -176,6 +178,18 @@ function run(check: GateCheck, context: GateContext): Outcome {
       return item.reviewer === item.assignee
         ? no(`the reviewer ${item.reviewer} is also the assignee`, `record a reviewer other than ${item.assignee}`)
         : PASS
+    }
+    // Scoped by the review step rather than by three per-type rules, the same way DOD3 is:
+    // the two together are the anti-attestation pair, so they answer to one setting.
+    case 'evidence_present': {
+      if (!context.reviewStep) return PASS
+      const entries = item.evidence ?? []
+      return entries.length > 0
+        ? PASS
+        : no(
+          'the item points at no evidence',
+          `treadle evidence add ${item.id} <kind> <ref> [label]`,
+        )
     }
   }
 }

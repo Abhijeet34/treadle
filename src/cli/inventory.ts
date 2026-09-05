@@ -9,7 +9,9 @@
 
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
+import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from '../application/services/insight.ts'
+import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
 import { TRANSITION_SHAPE } from '../application/services/lifecycle.ts'
 import { INIT_SHAPE } from '../application/services/workspace.ts'
@@ -89,6 +91,33 @@ export const COMMANDS: readonly Command[] = [
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
       ['treadle transition sso-saml in_progress --preview', 'which store and which guards, evaluating none of them'],
     ],
+  },
+  {
+    name: 'mark', shape: MARK_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle mark <id> [--severity <S1-S4>] [--priority <1-5>] --reason <text>'],
+    examples: [
+      ['treadle mark checkout-500 --severity S1 --reason "it drops paid orders"', 'raise a defect, with the before and after in the log'],
+      ['treadle mark checkout-500 --priority 4 --reason "the workaround holds"', 'lower a priority; the event names who did it'],
+    ],
+  },
+  {
+    name: 'evidence', shape: EVIDENCE_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle evidence add <id> <kind> <ref> [label]'],
+    examples: [
+      ['treadle evidence add checkout-500 run 8813 "664 pass"', 'point at a run; the essay goes in the artefact, not here'],
+      ['treadle evidence add checkout-500 pr https://example.test/pr/42', 'a pointer needs no label'],
+    ],
+  },
+  {
+    name: 'doctor', shape: DOCTOR_SHAPE, effect: 'read', record: 'list',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle doctor'],
+    examples: [['treadle doctor', 'what the files say that no write path would have accepted']],
   },
   {
     name: 'next', shape: NEXT_SHAPE, effect: 'read', record: 'list',
