@@ -195,6 +195,33 @@ describe('the defects found by using the tool', () => {
   })
 })
 
+describe('set echoes a reported change the same way file does', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('reports a multi-line value as its size, exits 0, and the value still reads back whole', async () => {
+    const filed = await cli([
+      'file', 'bug', 'Card decline', '--id', 'card-decline',
+      '--set', 'severity=S2', '--set', 'found_in=production', '--set', 'repro_steps=pay with a declined card',
+    ])
+    assert.equal(filed.code, 0, filed.err)
+
+    const edited = await cli(['set', 'card-decline', 'description=one\ntwo'])
+    assert.equal(edited.code, 0, `${edited.out}${edited.err}`)
+    assert.match(edited.out, /^set description - -> 7 chars$/m)
+
+    const shown = await cli(['show', 'card-decline', '--field', 'desc'])
+    assert.equal(shown.code, 0, shown.err)
+    assert.match(shown.out, /^\|desc 2 7$/m)
+    assert.match(shown.out, /^" one$/m)
+    assert.match(shown.out, /^" two$/m)
+  })
+})
+
 describe('a gate that demands a field names a command that can set it', () => {
   let demo: Demo
 

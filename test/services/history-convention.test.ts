@@ -155,3 +155,57 @@ describe('the what column of history has one convention', () => {
     assert.ok(rendered.includes('evidence=run:8813'))
   })
 })
+
+describe('a stored value shaped like the length marker does not become one', () => {
+  let rig: Rig
+  let cell: string
+  const MARKER_ID = 'marker-collision'
+
+  before(async () => {
+    const parent = await mkdtemp(path.join(tmpdir(), 'treadle-what-marker-'))
+    const root = path.join(parent, 'platform', '.work')
+    const ids = sequentialIds()
+    const clock = fixedClock(NOW)
+    await initWorkspace(clock, ids, { at: root, name: 'what-marker', actor: ACTOR })
+
+    const opened = await openWorkspace(root)
+    if (!opened.ok) throw new Error(opened.error.message)
+    const store = opened.value
+    const apply = targetFor(store, 'apply')
+    const must = (result: { ok: boolean; data: Record<string, unknown> }, what: string) => {
+      if (!result.ok) throw new Error(`${what}: ${String(result.data['cause'])}`)
+    }
+
+    must(await fileItem(apply, clock, ids, {
+      type: 'bug', title: 'Marker collision', id: MARKER_ID,
+      fields: { severity: 'S2', found_in: 'production', repro_steps: 'reproduce the marker collision' },
+      actor: ACTOR,
+    }), 'file')
+    // `assignee` is `line(name, 200)`, which allows a space, so this is a stored value that
+    // happens to read exactly like the `<n> chars` marker `auditedSnapshot` writes for prose.
+    must(await setFields(apply, clock, ids, {
+      id: MARKER_ID, assignments: ['assignee=3 chars'], actor: ACTOR,
+    }), 'set')
+
+    const log = await history(store, MARKER_ID, { limit: 50 })
+    assert.equal(log.ok, true)
+    const block = log.data['events'] as { rows: readonly Record<string, string>[] }
+    const row = block.rows.find((entry) => entry['op'] === 'item.set')
+    cell = row?.['what'] as string
+
+    rig = {
+      store,
+      dispose: async () => {
+        await store.close()
+        await rm(parent, { recursive: true, force: true })
+      },
+    }
+  })
+
+  after(async () => { await rig.dispose() })
+
+  it('renders assignee=(unset)->(?), never assignee=(unset)->(text:3)', () => {
+    assert.match(cell, /assignee=\(unset\)->\(\?\)/)
+    assert.doesNotMatch(cell, /\(text:3\)/)
+  })
+})

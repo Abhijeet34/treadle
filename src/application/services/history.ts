@@ -36,6 +36,7 @@ import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, t
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
 import { notFound } from './items.ts'
+import { AUDITED_FIELDS } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const HISTORY_SHAPE: ResultShape = {
@@ -92,8 +93,8 @@ const VALUE_OF_OP: Readonly<Record<string, {
   'item.evidence.add': {
     field: 'evidence',
     of: (after) => {
-      const kind = side(after['kind'])
-      const ref = side(after['ref'])
+      const kind = side(after['kind'], 'kind')
+      const ref = side(after['ref'], 'ref')
       return ref === UNKNOWN ? kind : `${kind}:${ref}`
     },
   },
@@ -119,15 +120,24 @@ const UNKNOWN = '(?)'
 const PROSE = /^(\d+) chars$/
 
 /**
+ * Fields whose value is never the `<n> chars` length marker `auditedSnapshot` writes in place
+ * of prose, so `side` must never sniff one out of them. Every `AUDITED_FIELDS` entry is
+ * recorded verbatim by `auditedSnapshot` and can legitimately read like a count (an assignee
+ * literally named "3 chars"); `ref` is not a dictionary field at all and is never put through
+ * that length-marker conversion, so a pointer that happens to read "8 chars" is its own value.
+ */
+const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
+
+/**
  * One side of a move as it prints. `-` is the snapshot's own marker for a field that was not
  * set, and it printed as an empty string: `reviewer=->dev` reads as a typo rather than as a
  * field that had no previous value. Every marker is parenthesised, and a stored value that
  * opens with the same glyph is reported unknown rather than allowed to forge one.
  */
-function side(value: unknown): string {
+function side(value: unknown, field: string): string {
   if (value === '-') return UNSET
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_VALUE) return UNKNOWN
-  const prose = PROSE.exec(value)
+  const prose = NEVER_PROSE.has(field) ? null : PROSE.exec(value)
   if (prose !== null) return `(text:${prose[1] as string})`
   return /\s/.test(value) || value.startsWith('(') ? UNKNOWN : value
 }
@@ -141,8 +151,8 @@ function move(
   before: Record<string, unknown> | undefined,
   after: Record<string, unknown> | undefined,
 ): string {
-  const to = side(after?.[field])
-  return before === undefined ? `${field}=${to}` : `${field}=${side(before[field])}->${to}`
+  const to = side(after?.[field], field)
+  return before === undefined ? `${field}=${to}` : `${field}=${side(before[field], field)}->${to}`
 }
 
 /** The item fields one event moved, in the order the event recorded them. */

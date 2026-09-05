@@ -235,7 +235,7 @@ const REPORTED = [
 ] as const
 
 /** The longest a reported value prints before it is reported as its size instead. */
-const MAX_ECHO = 120
+export const MAX_ECHO = 120
 
 /**
  * One side of a reported change, as a line the grammar can carry. A prose field may hold
@@ -245,7 +245,7 @@ const MAX_ECHO = 120
  * that fits stays verbatim, because the point of the echo is that a caller can see what was
  * stored without a second command.
  */
-function echoed(value: string): string {
+export function echoed(value: string): string {
   return value.length <= MAX_ECHO && !/[\n\t]/.test(value) ? value : `${value.length} chars`
 }
 
