@@ -280,6 +280,12 @@ When a fact can be computed from a stored field and the clock, it is derived on 
 A field nothing reads is decoration, so a new one lands with the reads that act on it in the same change.
 `test/architecture/field-visibility.test.ts` is that rule as a test rather than a hope: every field the dictionary and every key `EVENT_KEYS` persists carries one line naming the result key that prints it, or a declared reason it stays hidden, and the file's header says what to write.
 Three fields reached a benchmark finding before it existed, each captured on every write and shown by nothing.
+A resolving key is not a read surface, which is the half that suite once missed: `acceptance_criteria` claimed `show:ac`, the tool printed `ac 0/1`, and no command anywhere would print the criteria.
+Its last suite now asserts that a stored value's own text reaches `show <id>` or `show <id> --field <name>`, with `CONTENT_HELD_BACK` naming the exceptions and their reasons, so a count, a length or a tally never closes a field again.
+Where a field's content does not fit `show`'s A.3 byte budget it goes behind `--field`, which is the shape `desc` already had; `test/cli/budget.test.ts` is the figure, and it has no headroom.
+
+The `what` column of `history` has one convention and a new op inherits it: every part is `name=value` or `name=from->to`, never a bare name, and a side the log did not record printably is one of the three markers `(unset)`, `(text:<n>)` and `(?)`.
+It is stated in the header of `src/application/services/history.ts`, beside the `VALUE_OF_OP` table an append-shaped op adds itself to, and `test/services/history-convention.test.ts` holds it over every op the build writes.
 
 ## The extension surface is closed, and closing it was the decision
 
