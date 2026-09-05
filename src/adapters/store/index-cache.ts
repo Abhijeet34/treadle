@@ -50,7 +50,14 @@ create table if not exists items (
   state text not null, parent text, sprint text, points integer, priority integer, version integer not null,
   assignee text, filed_at text not null, title text not null, source text not null);
 create index if not exists items_file on items(file);
-create index if not exists items_state on items(state, priority);
+-- Both orders listItems can ask for. Every query it builds ends in an order by filed_at, id
+-- with an optional limit, so an index that leads on the filter and continues in that order
+-- lets SQLite stop at the limit instead of sorting every matching row, each of which carries
+-- the record's whole source text. The index it replaces led on state and continued on
+-- priority, which no query here ever asks for.
+drop index if exists items_state;
+create index if not exists items_state_filed on items(state, filed_at, id);
+create index if not exists items_filed on items(filed_at, id);
 create table if not exists events (
   id text primary key, at text not null, entity text not null, op text not null,
   actor text not null, txn text not null, file text not null, source text not null);
@@ -145,7 +152,15 @@ export class IndexCache {
     }))
   }
 
-  /** Replaces one file's rows as a unit, so a half-indexed file is never queryable. */
+  /**
+   * Replaces one file's rows as a unit, so a half-indexed file is never queryable.
+   *
+   * The unit is applied as a difference rather than as a drop and a reload. Every other
+   * column is derived from `source`, so a row whose id, line and source are unchanged is the
+   * row the reload would have written, and re-writing it costs three index updates to reach
+   * the same state. Appending one record to a 2,176-record shard rewrites the whole file and
+   * so re-indexes it whole, and that is what a create pays for on the command after it.
+   */
   replaceRecordFile(
     file: string,
     fingerprint: Fingerprint,
@@ -156,11 +171,30 @@ export class IndexCache {
     const clashes: Finding[] = []
     db.exec('begin immediate')
     try {
-      this.#dropRows(file)
+      const previous = new Map<string, { line: number; source: string }>()
+      for (const row of db.prepare('select id, line, source from items where file = ?').all(file) as unknown as readonly { id: string; line: number; source: string }[]) {
+        previous.set(row.id, { line: row.line, source: row.source })
+      }
+      db.prepare('delete from events where file = ?').run(file)
+      db.prepare('delete from findings where file = ?').run(file)
+
+      const drop = db.prepare('delete from items where id = ? and file = ?')
+      const wanted = new Set(items.map((item) => item.id))
+      let moved = false
+      for (const id of previous.keys()) {
+        if (wanted.has(id)) continue
+        drop.run(id, file)
+        moved = true
+      }
+
       const insert = db.prepare(`insert into items
         (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, source)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       for (const item of items) {
+        const was = previous.get(item.id)
+        if (was !== undefined && was.line === item.line && was.source === item.source) continue
+        if (was !== undefined) drop.run(item.id, file)
+        moved = true
         try {
           insert.run(item.id, item.file, item.line, item.type, item.state, item.parent,
             item.sprint, item.points, item.priority, item.version, item.assignee,
@@ -179,7 +213,9 @@ export class IndexCache {
       }
       this.#insertFindings([...findings, ...clashes])
       this.#setFingerprint(file, fingerprint)
-      this.#forgetHierarchyVerdict()
+      // A file whose mtime moved but whose records did not leaves the verdict standing: it
+      // was derived from this same row set.
+      if (moved) this.#forgetHierarchyVerdict()
       db.exec('commit')
     } catch (error) {
       db.exec('rollback')
