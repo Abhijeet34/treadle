@@ -1,34 +1,34 @@
 # Benchmarks
 
 The acceptance bar for treadle is a measured margin over the reference on twelve axes, not an adjective.
-This file is the first run that produces those numbers.
-Four of the twelve axes are measured, one is half measured, and seven are not measured: six need a harness that drives the command surface and one needs a metrics layer that does not exist yet.
-Every unmeasured one says so in its own row with the reason, because a gap in a table reads as a pass to whoever skims it.
+Ten of the twelve are measured here.
+Two are not, and each says so in its own row with the reason rather than as a gap, because a gap in a table reads as a pass to whoever skims it.
 
-**One thing in this file has changed since it was written.**
-Every "there is no bundle" and "the bundle-size budget has nothing to weigh" below was true of the tree that produced these figures, and is no longer.
-[ADR-0009](architecture/adr/0009-release-and-supply-chain.md) added the build step: `dist/treadle.js` now has something to weigh against DR8's 512,000 limit, so the last pending budget in the appendix is a `PASS` on the next run rather than a `NOT MEASURED`.
-A current figure comes from the build itself, which prints the count and the margin and fails rather than warns if it goes over; on 2026-09-05 `npm run build` printed `bundle: 208691 bytes against 512000 (DR8, 500 KB bundle), 2.5x under`.
-The timing figures are untouched by that, because the timed children still launch from TypeScript source; that gap is the one the floors table prices, and closing it is what would make these numbers comparable with DR1's.
-The appendix is left exactly as the run produced it, because a measured record that is edited afterwards is not one.
+Six of the ten were filled in this run: A2, A6, A7, A8, A10 and A12.
+All six needed a harness that drives the command surface rather than one artefact rendered from it, and that harness is `bench/axes/surface.ts`.
+Four of the six meet their target, two miss it, and the two misses are reported with the mechanism behind each.
 
 Reproduce it with `npm run bench`.
-The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T01-11-11-759Z`, with its heading levels demoted one step and nothing else changed.
+The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T11-53-33-136Z`, with its heading levels demoted one step and nothing else changed.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
+
+**One set of figures below is older than the appendix and is marked where it appears.**
+The ten-run series in "Targets missed" was taken on 2026-09-04, before [#4](https://github.com/Abhijeet34/treadle/pull/4) and [#7](https://github.com/Abhijeet34/treadle/pull/7) landed, and none of it was re-taken.
+It is kept because it is the only evidence this repository has of how far a figure on this machine drifts between runs, and a single run cannot replace it.
+Everything else on this page was measured in the appended run.
 
 ## Read this before you read a number
 
-This machine is shared with other work and was not idle for any run.
-At the start of the appended run the 1-minute load average was 66.16 on 8 cores, with 15 other `node` processes and 66% of memory in use; across its twenty timed operations the 1-minute load ranged from 14.35 to 35.95, and it peaked at 86.26 while 289 parallel writers were running.
-Waiting for quiet was tried and abandoned: it is not a method, and the load did not clear.
+This machine is shared with other work and was not idle for this run.
+At the start of the appended run the 1-minute load average was 5.25 on 8 cores, with 53.2% of memory in use; across its twenty timed operations the 1-minute load ranged from 4.15 to 4.68, and it peaked at 55.11 while 289 parallel writers were running.
+Waiting for quiet was tried and abandoned on earlier runs: it is not a method, and the load did not clear.
 
 So the confound is recorded rather than dodged.
-Every row in the appendix carries the load either side of it, and every headline figure below is given as the median across ten four-scale runs with its full range, not as one run's number.
-Where the appended run sits above its series, the load column is where to look.
+Every row in the appendix carries the load either side of it.
+The appended run is the quietest four-scale run this rig has taken, which is why its timing rows sit below the ten-run series rather than above it, and the load column is where that is visible.
 
-Two limits on what the series can prove, both stated because they bound it.
-The load instrument was added late, so most of the ten runs contribute timings without a load sample: the series shows the spread, not the cause of each point.
-And the ten-run series was measured before #4 landed, while the appended run is the only four-scale run on the tree that carries it, so a series figure and an appendix figure are not measurements of the same store.
+The six axes filled in this run are counts rather than timings.
+A refusal either names a rule id or does not, and a record either landed in the intended store or did not, so the load column bounds how long those axes took and not what they measured.
 
 ## The machine
 
@@ -38,7 +38,7 @@ And the ten-run series was measured before #4 landed, while the appended run is 
 | Node | 24.11.1, below the 24.15.0 floor `package.json` declares |
 | SQLite in Node | 3.50.4 |
 | Seed | `20260905` |
-| Appended run | 442 s of wall time, four corpora, 550 timed cold processes, 289 parallel writers, 206 damaged stores, 12 rendered command artefacts |
+| Appended run | 368 s of wall time, four corpora, 550 timed cold processes, 289 parallel writers, 206 damaged stores, 12 rendered command artefacts, 612 commands driven at the surface |
 
 Node 24.11.1 is under the product's own floor, so every figure was taken on a runtime the shipped package refuses to run on.
 The store is the only layer with a measurable cost here, it runs unchanged on both, and a figure without its runtime named is not a figure.
@@ -50,14 +50,15 @@ Five nested floors, each a strict superset of the one above, so a difference pri
 | Floor | Best of 50 | Median |
 |---|---|---|
 | `/usr/bin/true` | 2.2 ms | 2.3 ms |
-| `node -e` | 37.5 ms | 38.5 ms |
-| `node` plus one JavaScript file | 40.3 ms | 41.1 ms |
-| `node` plus one TypeScript file | 73.2 ms | 74.3 ms |
-| `node` plus the store adapter loaded, no work | 117.1 ms | 118.7 ms |
+| `node -e` | 37.5 ms | 38.2 ms |
+| `node` plus one JavaScript file | 40.3 ms | 41.8 ms |
+| `node` plus one TypeScript file | 73.5 ms | 74.9 ms |
+| `node` plus the store adapter loaded, no work | 118.3 ms | 120.3 ms |
 
 Subtract 2.3 ms of spawn from any wall figure to get the program's own cost.
-Type stripping costs 32.9 ms and loading the store costs 44.0 ms on top of it, so 77 ms of every cold invocation is module loading that a bundle would mostly remove.
-DR1 measured its 45 ms budget on a 406 KB bundle and this tree has no build step, so these figures and DR1's are not the same measurement.
+Type stripping costs 33.3 ms and loading the store costs 44.8 ms on top of it, so 78 ms of every cold invocation is module loading that a bundle would mostly remove.
+The tree now builds one, weighed at 208,710 bytes in the package table of the appendix, and `npm run build` prints that count against DR8's 512,000 limit and fails rather than warns if it goes over.
+The timed children still launch from TypeScript source, so these figures and DR1's 45 ms budget on a 406 KB bundle are still not the same measurement.
 
 The floors are measured after the corpora are generated and immediately before the operations they are subtracted from, so both share their conditions.
 Measuring them first, on an idle machine, put 430 MB of corpus writeback into program cost and opened six small-scale rows by up to 58%.
@@ -66,33 +67,57 @@ Measuring them first, on an idle machine, put 430 MB of corpus writeback into pr
 
 | Target | Measured |
 |---|---|
-| A1, 100% of reported writes persisted at every N | 1.000 in every round of all fifteen runs; 200 of 200 at N=200 in the appended one |
-| A1, no writer crashed rather than refusing | 0, after #4; see below |
+| A1, 100% of reported writes persisted at every N | 1.000 in every round; 200 of 200 at N=200, at a 1-minute load of 55.11 |
+| A1, no writer crashed rather than refusing | 0 of 289, after #4 |
 | A1, no lock or temp file left behind | 0 after every round |
-| A3, output at most the reference's bytes | `status` 440 B against 1441, `backlog` 717 against 1781, `show` 273 against 322, `next` 350 against 659 |
+| A3, output at most the reference's bytes | `status` 463 B against 1441, `backlog` 717 against 1781, `show` 273 against 322, `next` 380 against 659 |
 | A3, every artefact inside its A.3 budget | 12 of 12 |
-| A6, the cwd scenario resolves to one store | 3 of 3 correct, 0 mis-targets |
-| A5, zero whole-store refusals | 0 of 206 damaged stores |
+| A5, zero silent drops | 0 of 206 damaged stores, since #7; see below |
+| A5, zero whole-store refusals | 0 of 206 |
 | A5, zero crashes on malformed input | 0 of 206 |
+| A6, zero mis-targets across all three scenarios | 0 of 10 writes with no explicit target, and 3 of 3 resolutions correct at the store seam |
+| A6, every write prints the store identity | 10 of 10 writes that landed; the path is a separate finding below |
+| A7, every item's state explained by its event chain | 50 of 50, over 250 events |
+| A8, every illegal pair refused with a rule id | 22 of 22, naming `T1` and `T3` |
+| A10, every invalid creation refused | 11 of 11, naming `C1`, `V4` and `V5`, with nothing created in any of the 11 |
 | DR7, zero runtime dependencies | 0 |
-| DR8, install size at most 1.5 MB unpacked | 351,419 bytes across 72 files |
+| DR8, install size at most 1.5 MB unpacked | 284,611 bytes across 21 files |
+| DR8, bundle at most 500 KB | 208,710 bytes |
 
 A3 is the widest margin in the table.
-The bare dashboard is 3.3x smaller than the reference's and the nine-item list 2.5x smaller, while carrying sprint identity, points, per-column WIP against limits, a ranked next-three and a blocked block that the reference has no concept of.
+The bare dashboard is 3.1x smaller than the reference's and the nine-item list 2.5x smaller, while carrying sprint identity, points, per-column WIP against limits, a ranked next-three and a blocked block that the reference has no concept of.
 `test/cli/budget.test.ts` gates those bytes; its own header records that the token figures were taken outside the tree because a tokenizer is a package and the product ships zero runtime dependencies.
-This rig carries all three tokenizers as development dependencies, so the token half is now measured in-repo: bytes per token range from 2.63 on `next` to 3.88 on `backlog`, a 1.48x spread that a byte budget alone hides.
+This rig carries all three tokenizers as development dependencies, so the token half is measured in-repo: bytes per token range from 2.44 on `next` to 3.88 on `backlog`, a 1.59x spread that a byte budget alone hides.
 
-Of 35 budgets in the appended run: 26 pass, 0 fail, 8 open miss, 1 pending.
+A6, A7, A8 and A10 are the four axes filled in this run that meet their target, and each beats the reference outright rather than narrowly.
+The reference wrote to the wrong store in one scenario of three, kept no history at all, refused none of six illegal transitions and refused none of eleven invalid creations.
+
+Of 35 budgets in the appended run: 28 pass, 0 fail, 7 open miss, 0 pending.
 
 ## Targets missed
 
-Figures are the median across ten runs, with the range, because one run's number on a loaded machine is not the claim.
+Three of these are measured once in the appended run, at the command surface, and are counts rather than timings.
+
+| Target | Reference | Measured | Miss |
+|---|---|---|---|
+| A2, every one of the 25 questions answerable with one command | 4 full, 6 partial, 15 none | 10 full, 7 partial, 8 none | 15 of 25 short of full |
+| A12, every verb with a machine-readable object on both paths | mutations only, reads refuse the flag, errors on stdout | 25 of 26 invocations hold the contract, across 13 verbs | one invocation |
+| A4, read and create below 150 ms at 50k, startup excluded | 89/90 ms at 100 items, 154/141 ms at 5k | read 154.0 ms, create 329.1 ms | 1.03x and 2.19x |
+
+A2's eight unanswerable questions are 7, 8, 9, 10, 15, 19, 20 and 21, and every one of them needs an entity or a metric this tree does not implement: a sprint, an impediment, a board column, a relation, or a flow metric.
+The per-question table is in the appendix under "A2, the 25 questions and how each was scored", with the command each question was put to and what a full answer would have to contain, so the scoring can be checked rather than trusted.
+Seven more score partial: the answer is there for one named item but not for the workspace, or the set is one filter away but the window or the edge that would complete it is not stored.
+Against the reference on the same list this is 2.5x as many questions answered whole, and 8 unanswerable against its 15.
+
+A12's one miss is a defect in this product and is described below.
+
+The remaining rows are the ten-run series, taken on 2026-09-04 on the tree before #4 and #7, and no figure in it was re-taken.
+It is the only evidence here of run-to-run drift, so it is kept and marked rather than replaced by one quiet run.
 
 | Target | Budget | Median of ten runs | Range | Over by |
 |---|---|---|---|---|
 | A4, create below 150 ms at 50k, startup excluded | 150 ms | 311.1 ms | 304.3 to 417.2 | 2.07x |
 | A4, read below 150 ms at 50k, startup excluded | 150 ms | 148.6 ms | 147.7 to 157.9 | at the target, not under it |
-| A5, zero silent drops | 0 | 1 of 206 | 1 in every run | one case |
 | DR8, peak RSS on a read at 50k | 100 MiB | 182.0 MiB | | 1.82x |
 | DR8, peak RSS on a mutation at 50k | 120 MiB | 216.6 MiB | | 1.81x |
 | DR8, first index build at 50k | 6,000 ms | 11,074 ms | 10,578 to 25,920 | 1.85x |
@@ -100,20 +125,19 @@ Figures are the median across ten runs, with the range, because one run's number
 | DR8, index size against the text it indexes | 1.0x | 2.06x | 2.06x in every run | 2.06x |
 
 Read at 50k is the one worth reading carefully.
-Its median sat between 147.7 and 150.1 ms in nine of the ten pre-#4 runs and reached 157.9 in the tenth.
+Its median sat between 147.7 and 150.1 ms in nine of the ten pre-#4 runs and reached 157.9 in the tenth, and the appended run's 154.0 ms p95 on the quietest machine this rig has seen sits in the same band.
 Read is at the target rather than under it, and a claim that it passes would rest on which run got quoted.
-The appended run's read median of 315.4 ms is not a read figure: it was taken at a 1-minute load of 25.25 and is the clearest single illustration in this document of why the load column exists.
 
 Create misses on every run and misses wide.
-The mechanism is in the corpus table: a create appends one record to the largest shard, which holds 2,176 records in 1.09 MB, and the whole shard is rewritten and re-indexed.
+The mechanism is in the corpus table: a create appends one record to the largest shard, which holds 2,176 records in 1.06 MiB, and the whole shard is rewritten and re-indexed.
 
 `list` and `transition` are not axis targets but bound the same work: `transition` is the most stable figure in the whole rig at 428.9 to 447.6 ms across ten runs, and `list` is 161.0 to 164.0 in eight runs and 209.0 and 491.7 in the two loaded ones.
 
-Five of these are DR8 budgets that the landed store has never met, and DR8's numbers came from throwaway spikes that no longer exist rather than from this code.
+Five of the DR8 rows are budgets the landed store has never met, and DR8's numbers came from throwaway spikes that no longer exist rather than from this code.
 They are recorded as open misses: printed with their number, not failing a build for standing still.
 A budget nobody has ever met is a finding, not a regression.
 
-## The two defects the rig found, and what happened to them
+## The three defects the rig found, and what happened to them
 
 **Closed: a parallel writer could die with an uncaught `database is locked`.**
 
@@ -129,37 +153,68 @@ Error: database is locked
 Before the fix the rate was load-dependent and ran 0, 3, 5, 5, 9, 14, 15, 21, 23 and 31 of 289 writers across ten runs; only one of those ten was clean, so a single clean run would have proved nothing.
 
 [#4](https://github.com/Abhijeet34/treadle/pull/4) closed it independently, arming the timeout before the switch and then retrying the lock promotion that SQLite refuses to wait on at all.
-Re-measured here against the tree that carries it: **0 crashes in 1,445 writers across five runs**, every round reporting 200 of 200 at N=200 with no refusals, at 1-minute loads from 3.13 to 116.12, which is heavier contention than any of the runs that produced the crash.
-The budget is now armed, so a return of it fails the build rather than printing as an open miss.
+Re-measured against the tree that carries it: **0 crashes in 1,445 writers across five runs**, every round reporting 200 of 200 at N=200 with no refusals, at 1-minute loads from 3.13 to 116.12, which is heavier contention than any of the runs that produced the crash.
+The appended run adds a sixth clean round set at a peak load of 55.11.
+The budget is armed, so a return of it fails the build rather than printing as an open miss.
 
-**Still open: a record heading renamed out of the grammar is dropped in silence.**
+**Closed: a record heading renamed out of the grammar was dropped in silence.**
 
-Rewriting `# wi-000026: ...` as `## wi-000026: ...` in a shard removes that record from every query and produces no finding.
-Reproduced by hand outside the harness: `items: 420 findings: 0` before the edit, `items: 419 findings: []` after.
-It is the reference's own headline failure, present in treadle, and it is the single silent drop in every run of the A5 corpus including the one appended here.
+This page previously reported it as open, and that report is now out of date rather than wrong: it was true of the tree that produced the earlier appendix.
+Rewriting `# wi-000026: ...` as `## wi-000026: ...` in a shard removed that record from every query and produced no finding, which is the reference's own headline failure present in treadle.
 
-The heading is still in the file, which is what separates it from an edit that deletes a record outright: the harness counts those apart, and correcting that distinction moved the measured count from 4 to 1.
+[#7](https://github.com/Abhijeet34/treadle/pull/7) closed it by resynchronising on a heading a hand edit reshaped, discriminated by a record's four mandatory field lines.
+Measured here: the shaped heading-rename case reports `refusal names the record` with one finding, and the whole 206-store A5 corpus reports **0 silent drops**, where every run before #7 reported exactly one.
+The budget is armed on the same reasoning #4's was, and `test/store/record-boundary.test.ts` holds the same property as a test, so the gate is the second line rather than the only one.
 
-Neither defect was fixed by this branch.
-A benchmark that quietly repairs what it measures is measuring something else, and the value of that rule is visible in the first one: the rig found it, another worker fixed it, and the rig then verified the fix without either side taking the other's word for it.
+A5 is still `PARTIAL` rather than `MET` for the other half of its target: 1 of 206 damaged stores produced a refusal that names the file rather than the record, when a single byte was changed on line 1 and the file stopped being a record file this tool wrote.
+That refusal is correct and loud; it is the granularity that misses.
+
+**Still open: a refusal the parser raises ignores `--out json`.**
+
+Axis A12 found this and reports it as a miss rather than fixing it.
+`src/cli/main.ts:205` renders a parse-level refusal with `emit(env, result, {})`, an empty flag set, so the rendering the caller asked for is dropped and the default one is used instead.
+
+```text
+$ treadle version --fields id --out json
+err VALIDATION -
+rule C1
+"cause --fields cannot apply to version, and ignoring it would answer a question you did not ask
+```
+
+Three parse-level refusals were probed and all three ignored the flag: a flag refused for a command, a flag refused for a different command, and an unknown command.
+Every refusal raised past the parser renders as asked, which is why 25 of the 26 invocations hold and the failure is narrow rather than general.
+It matters because the caller who most needs the machine-readable form is the one that got the invocation wrong.
+
+No defect was fixed by this branch.
+A benchmark that quietly repairs what it measures is measuring something else, and the value of that rule is visible in the first two: the rig found them, another worker fixed each, and the rig then verified both without either side taking the other's word for it.
 
 ## What is not measured, and what unblocks it
 
-The command surface landed in #3 while this rig was being built, which is what let A3 move into the measured set.
-Six axes still need a harness that drives that surface rather than one artefact rendered from it.
+Two axes, and neither is blocked on a harness any more.
 
-| Axis | What it needs |
+| Axis | Why it cannot be scored |
 |---|---|
-| A2 question coverage | the 25 questions put to the command surface one at a time and scored full, partial or none |
-| A7 audit answerability | 50 items driven through 200 random legal transitions, each chain read back |
-| A8 lifecycle enforcement | every ordered state pair attempted at the surface and the printed guard id read; `src/domain/state-machine.ts` holds the rule table today |
-| A10 type validation | one invalid creation per rule at the surface; `src/domain/fields.ts` refuses these today |
-| A11 harness neutrality | the full feature set run with no harness present and the files it wrote counted, plus an adapter generator to score |
-| A12 output contract | every verb on both its success and its failure path; `schemas/` carries eleven schemas since #3 |
+| A9 metric coverage | no metric is implemented in this tree; nothing under `src` computes velocity, cycle time or a burndown series, so there is nothing to score and a figure here would be a figure about a harness |
+| A11 harness neutrality | half its target has nothing to score: no adapter generator exists, because [ADR-0012](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses A.8 rule 3 for v1 |
 
-A9 metric coverage needs the metrics layer, which no landed commit begins.
-A6 is half measured: the cwd scenario is a store resolution and is measured, while the config-in-parent and environment-override scenarios and the printed store identity are command-layer behaviour.
-The DR8 bundle-size budget is `pending` for a different reason: there is no build step, so there is no bundle to weigh.
+A11's other half, counting the files the full feature set writes outside the workspace, is reachable through the same harness the six new axes use.
+It is not run here rather than reported half done, because A6 already measures the property that half exists to catch and a second partial row would add a number without adding a fact.
+
+The six axes filled in this run are measured but not gated.
+A7, A8 and A10 are deterministic pass-or-fail properties that transfer between machines, which is exactly what `bench:gate` exists for, so arming them is the obvious next step and needs a budget key each rather than more measurement.
+
+## How the surface axes are driven
+
+The driver is `src/cli/main.ts`'s own `run`, the function `bin/treadle.js` shims, with argv, the working directory, the environment and both streams passed in as arguments.
+No process is spawned per invocation, because 612 spawns would have cost about 70 seconds of Node startup to measure behaviour that startup cannot change.
+
+That is a claim, so it is checked rather than asserted.
+Each of the six axes runs one of its own reads through the shipped `bin/treadle.js` in a real child process and compares the bytes: **5 of 5 cross-checks matched exactly**, on exit status, stdout and stderr, from 200 to 734 bytes each.
+A6 is the sixth axis and needs no cross-check of its own, because every one of its rows is verified by reading both stores back rather than by reading what the command printed.
+
+Each axis builds its own workspace by running `init` and `file`, so nothing is written by a fixture that a command could not have written.
+Every axis reports the number of commands it drove: 37 for A2, 38 for A6, 303 for A7, 177 for A8, 25 for A10 and 32 for A12.
+A count of zero is the tell that an axis reported a verdict over nothing.
 
 ## How stable a figure here is
 
@@ -172,25 +227,30 @@ Ten four-scale runs, because a benchmark whose own repeatability is unknown cann
 - At 50k, where the work dominates, `transition` spread 4.4% and `get` 6.9% across all ten runs, including the loaded ones.
 
 The tolerance is 35%, which clears the measured 19.9% by 1.76x.
-It is not enough on a machine at a load of 99, and the appended run has two timing rows open because of it.
+The appended run still has two timing rows open, `create` and `transition` at 10,000 items, 7.6% and 8.9% over their limits on a machine at a load of 4.
 That is the gate reporting the machine rather than the code, which is exactly why the timing rows are not armed.
+
+The six surface axes have no such spread to report.
+Each ran in three recorded four-scale runs during this task and returned the same verdict and the same counts in all three, which is what a deterministic corpus and a fixed rule table buy.
 
 ## Confounds that could not be eliminated
 
 Stated plainly, because each one bounds what these numbers support.
 
-1. **The machine was shared throughout.** Sibling workers ran during every run, and the appended run started at a 1-minute load of 66.16 on 8 cores. Load is recorded for the later runs only; the earlier ones contribute timings without it.
-2. **The ten-run series predates #4.** It measures the store before the busy-timeout fix, while the appended run measures the store after it. Axis A1 was re-measured on the new tree; the A4 timings were not re-measured ten times, so a series figure and an appendix figure are not the same store.
+1. **The machine was shared throughout.** Sibling workers ran during every run, and the appended run started at a 1-minute load of 5.25 on 8 cores. Load is recorded for the later runs only; the earlier ones contribute timings without it.
+2. **The ten-run series predates #4 and #7.** It measures the store before the busy-timeout fix and before the heading resynchronisation, while the appended run measures the store after both. A series figure and an appendix figure are not measurements of the same store.
 3. **Node 24.11.1 is below the product's declared 24.15.0 floor.** The store runs unchanged on both, and no figure here was taken on the runtime the package will ship against.
-4. **There is no bundle.** Every figure runs from TypeScript source and carries 32.6 ms of type stripping plus 44.7 ms of module loading that DR1's 406 KB bundle would mostly remove. The bundle-size budget has nothing to weigh.
+4. **The timed children run from TypeScript source, not from the bundle the package ships.** Every timed figure carries 33.3 ms of type stripping plus 44.8 ms of module loading that the 208,710-byte bundle would mostly remove.
 5. **The timing limits are calibrated to this machine and are not armed anywhere.** They have never been measured on a CI runner.
-6. **The corpora are not DR2's corpora.** Ours holds 2,176 records in 1.09 MB in its largest shard against the design's 2,084 in 1.69 MB, so a millisecond-for-millisecond comparison with DR2 carries that difference.
+6. **The corpora are not DR2's corpora.** Ours holds 2,176 records in 1.06 MiB in its largest shard against the design's 2,084 in 1.69 MB, so a millisecond-for-millisecond comparison with DR2 carries that difference.
 7. **Every reference figure is quoted from the prior-art axes table and none was re-derived.** The reference implementation is not in this tree and was never run.
 8. **`purge` needs root and was not run**, so a cold process here is never a cold page cache.
+9. **A2's three scores are a judgement, made once, by one worker.** The predicate behind each verdict is in `bench/axes/a2-questions.ts` and every row is published with its command, so the judgement can be disputed row by row rather than only in aggregate.
+10. **A10's eleven rules are an enumeration this rig made.** The prior-art table names "11 rules" without numbering them, so five are taken from its own invalid-at-creation column and six from the field dictionary that column defers to; each row names the cell it came from.
 
 ## What the gate enforces
 
-`npm run bench:gate` fails on what transfers between machines: durability under parallel writers, whole-store refusals and crashes on malformed input, the runtime dependency count, the install size and the per-command output budgets.
+`npm run bench:gate` fails on what transfers between machines: durability under parallel writers, silent drops, whole-store refusals and crashes on malformed input, the runtime dependency count, the install size, the bundle size and the per-command output budgets.
 Demonstrated: with the budgets as committed it exits 0, and with the install-size limit tightened to 1,000 bytes it reports `FAIL: install size, unpacked = 19568 bytes, limit 1000` and exits 1.
 
 It does not fail on the per-operation timing limits.
@@ -199,9 +259,9 @@ They were derived on this Apple M2 and have never been measured on a GitHub runn
 
 ## The run
 
-## treadle benchmark run 2026-09-05T11-38-06-479Z
+## treadle benchmark run 2026-09-05T11-53-33-136Z
 
-Started 2026-09-05T11:38:06.479Z, finished 2026-09-05T11:43:33.713Z, 327.2 s of wall time.
+Started 2026-09-05T11:53:33.136Z, finished 2026-09-05T11:59:41.357Z, 368.2 s of wall time.
 Generated by `npm run bench`. Every figure below was measured in that run; nothing is carried over, interpolated or estimated.
 
 ### Machine and runtime
@@ -219,10 +279,10 @@ Rather than wait for quiet, every row below carries the load either side of it, 
 
 | Machine state | 1m load | 5m | 15m | free MiB | memory used | node processes |
 |---|---|---|---|---|---|---|
-| at the start | 13.29 | 13.81 | 7.9 | 7831 | 52.2% | 1 |
-| at the end | 11.18 | 16.39 | 10.92 | 8153 | 50.2% | 1 |
+| at the start | 5.25 | 15.07 | 12.6 | 7670 | 53.2% | 1 |
+| at the end | 10.36 | 19.53 | 15.79 | 7770 | 52.6% | 2 |
 
-Across the 20 timed operations the 1-minute load ranged from 3.93 to 6.72.
+Across the 20 timed operations the 1-minute load ranged from 4.15 to 4.68.
 
 ### What the harness itself costs
 
@@ -231,13 +291,13 @@ The spawn floor is subtracted from every net column below; the node floor is wha
 
 | Floor | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| spawn floor (/usr/bin/true) | 50 | 0 | 4.6 | 2.2 | 2.3 | 2.5 | 2.6 | 50/50 | n/a | NOT MEASURED | NOT MEASURED | 7.68 to 7.68, 1 node proc |
-| node floor (node -e) | 50 | 51 | 38.3 | 37.1 | 37.3 | 37.7 | 37.7 | 50/50 | 35.3 | NOT MEASURED | NOT MEASURED | 7.68 to 7.68, 1 node proc |
-| node + one JavaScript file | 50 | 51 | 40.8 | 39.7 | 40.1 | 40.4 | 40.5 | 50/50 | 38.1 | 0.0 | 44.8 | 7.68 to 7.68, 1 node proc |
-| node + one TypeScript file (type stripping) | 50 | 51 | 72.6 | 72.1 | 72.8 | 74.5 | 74.5 | 50/50 | 72.1 | 0.0 | 68.6 | 7.68 to 7.22, 2 node proc |
-| node + the store adapter loaded, no work done | 50 | 51 | 124.0 | 117.6 | 118.9 | 170.1 | 189.9 | 50/50 | 167.8 | 0.0 | 95.7 | 7.22 to 6.72, 1 node proc |
+| spawn floor (/usr/bin/true) | 50 | 0 | 3.0 | 2.2 | 2.3 | 2.5 | 2.6 | 50/50 | n/a | NOT MEASURED | NOT MEASURED | 4.52 to 4.52, 2 node proc |
+| node floor (node -e) | 50 | 51 | 38.4 | 37.5 | 38.2 | 39.4 | 41.5 | 50/50 | 37.0 | NOT MEASURED | NOT MEASURED | 4.52 to 4.56, 2 node proc |
+| node + one JavaScript file | 50 | 51 | 42.0 | 40.3 | 41.8 | 43.5 | 46.0 | 50/50 | 41.1 | 0.0 | 44.8 | 4.56 to 4.56, 2 node proc |
+| node + one TypeScript file (type stripping) | 50 | 51 | 79.3 | 73.5 | 74.9 | 78.6 | 80.4 | 50/50 | 76.3 | 0.0 | 68.6 | 4.56 to 4.44, 2 node proc |
+| node + the store adapter loaded, no work done | 50 | 51 | 133.1 | 118.3 | 120.3 | 125.0 | 126.7 | 50/50 | 122.7 | 0.0 | 96.6 | 4.44 to 4.56, 2 node proc |
 
-Type stripping costs 32.4 ms and loading the store adapter costs 45.5 ms on top of it, both taken from the best of N: they are fixed costs, and the cleanest launch of the fifty is the closest thing to an uncontaminated reading of one.
+Type stripping costs 33.3 ms and loading the store adapter costs 44.8 ms on top of it, both taken from the best of N: they are fixed costs, and the cleanest launch of the fifty is the closest thing to an uncontaminated reading of one.
 DR1 measured its budget on a 406 KB bundle. The tree now builds one, weighed in the package table above, but the timed children below still run from TypeScript source and carry both of those costs; bundling them is what would make these figures comparable with DR1's.
 
 ### Corpora
@@ -249,7 +309,7 @@ Written through the landed store, not synthesised as files. Item counts are read
 | 100 | 23 | 2024-12: 9 records, 4.2 KiB | 9 | 49.3 KiB | 175.9 KiB | 520.0 KiB | 0.4 s |
 | 1000 | 24 | 2025-04: 55 records, 27.5 KiB | 130 | 498.9 KiB | 1.7 MiB | 4.6 MiB | 0.6 s |
 | 10000 | 24 | 2025-08: 477 records, 238.7 KiB | 1450 | 4.9 MiB | 17.2 MiB | 45.4 MiB | 3.7 s |
-| 50000 | 24 | 2025-08: 2176 records, 1.1 MiB | 7295 | 24.4 MiB | 85.8 MiB | 227.6 MiB | 27.7 s |
+| 50000 | 24 | 2025-08: 2176 records, 1.1 MiB | 7295 | 24.4 MiB | 85.8 MiB | 227.6 MiB | 28.1 s |
 
 ### Latency, one cold process per sample
 
@@ -260,49 +320,49 @@ These are store operations rather than commands: the timed children call the sto
 
 | Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| identity | 30 | 31 | 118.1 | 116.8 | 134.3 | 193.3 | 202.8 | 30/30 | 190.9 | 6.3 | 97.3 | 6.72 to 6.27, 1 node proc |
-| get | 30 | 31 | 119.3 | 119.1 | 119.9 | 120.7 | 121.5 | 30/30 | 118.4 | 7.4 | 99.1 | 6.27 to 6.08, 1 node proc |
-| list | 30 | 31 | 120.7 | 120.1 | 120.9 | 123.6 | 123.9 | 30/30 | 121.3 | 8.4 | 98.8 | 6.08 to 5.76, 1 node proc |
-| create | 30 | 31 | 140.2 | 140.3 | 143.0 | 147.4 | 153.8 | 30/30 | 145.1 | 33.6 | 101.4 | 5.76 to 5.86, 1 node proc |
-| transition | 30 | 31 | 145.3 | 142.7 | 146.9 | 151.7 | 151.9 | 30/30 | 149.3 | 36.7 | 101.0 | 5.86 to 5.79, 1 node proc |
+| identity | 30 | 31 | 119.7 | 118.0 | 121.2 | 126.1 | 132.3 | 30/30 | 123.7 | 4.6 | 97.0 | 4.56 to 4.68, 2 node proc |
+| get | 30 | 31 | 121.1 | 120.2 | 121.4 | 127.7 | 130.4 | 30/30 | 125.4 | 8.3 | 99.0 | 4.68 to 4.38, 2 node proc |
+| list | 30 | 31 | 125.5 | 120.8 | 122.0 | 130.9 | 133.5 | 30/30 | 128.6 | 8.9 | 99.2 | 4.38 to 4.38, 2 node proc |
+| create | 30 | 31 | 144.5 | 141.4 | 143.8 | 149.2 | 151.8 | 30/30 | 146.9 | 33.6 | 100.9 | 4.38 to 4.59, 2 node proc |
+| transition | 30 | 31 | 146.2 | 144.3 | 148.1 | 152.3 | 154.6 | 30/30 | 150.0 | 36.7 | 101.3 | 4.59 to 4.38, 2 node proc |
 
-First index build with the index deleted: 56 ms. Re-index after a hand edit of the largest shard: 14.7 ms. Both in-process, one sample each.
+First index build with the index deleted: 55 ms. Re-index after a hand edit of the largest shard: 14.7 ms. Both in-process, one sample each.
 
 #### 1000 items, 24 shards, largest shard 55 records
 
 | Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| identity | 30 | 31 | 116.6 | 116.7 | 117.4 | 118.8 | 120.4 | 30/30 | 116.5 | 4.0 | 96.6 | 5.79 to 5.79, 1 node proc |
-| get | 30 | 31 | 123.2 | 122.7 | 123.4 | 124.9 | 125.7 | 30/30 | 122.6 | 11.3 | 101.0 | 5.79 to 5.56, 1 node proc |
-| list | 30 | 31 | 126.6 | 125.5 | 126.8 | 128.0 | 128.8 | 30/30 | 125.6 | 14.2 | 100.5 | 5.56 to 5.28, 1 node proc |
-| create | 30 | 31 | 143.9 | 151.8 | 155.2 | 159.9 | 161.0 | 30/30 | 157.6 | 43.6 | 104.0 | 5.28 to 5.17, 1 node proc |
-| transition | 30 | 31 | 161.4 | 156.8 | 160.2 | 164.3 | 167.5 | 30/30 | 162.0 | 49.8 | 105.1 | 5.17 to 4.92, 1 node proc |
+| identity | 30 | 31 | 118.4 | 117.2 | 118.3 | 124.7 | 125.4 | 30/30 | 122.4 | 4.7 | 97.3 | 4.38 to 4.35, 2 node proc |
+| get | 30 | 31 | 124.8 | 122.9 | 124.4 | 126.6 | 128.2 | 30/30 | 124.3 | 11.5 | 101.6 | 4.35 to 4.4, 2 node proc |
+| list | 30 | 31 | 127.6 | 126.3 | 127.3 | 133.0 | 138.7 | 30/30 | 130.7 | 17.2 | 101.9 | 4.4 to 4.45, 2 node proc |
+| create | 30 | 31 | 147.3 | 151.1 | 155.1 | 157.0 | 157.5 | 30/30 | 154.7 | 43.5 | 104.3 | 4.45 to 4.26, 2 node proc |
+| transition | 30 | 31 | 159.0 | 158.8 | 161.0 | 168.5 | 169.1 | 30/30 | 166.2 | 50.2 | 104.2 | 4.26 to 4.23, 2 node proc |
 
-First index build with the index deleted: 210 ms. Re-index after a hand edit of the largest shard: 22.2 ms. Both in-process, one sample each.
+First index build with the index deleted: 211 ms. Re-index after a hand edit of the largest shard: 22.3 ms. Both in-process, one sample each.
 
 #### 10000 items, 24 shards, largest shard 477 records
 
 | Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| identity | 30 | 31 | 116.9 | 116.8 | 117.4 | 118.7 | 119.1 | 30/30 | 116.4 | 4.0 | 96.5 | 4.92 to 4.69, 1 node proc |
-| get | 30 | 31 | 148.5 | 147.2 | 149.1 | 154.3 | 154.7 | 30/30 | 152.0 | 36.1 | 118.0 | 4.69 to 4.47, 1 node proc |
-| list | 30 | 31 | 153.5 | 152.7 | 154.2 | 155.0 | 156.2 | 30/30 | 152.7 | 41.6 | 119.1 | 4.47 to 4.27, 1 node proc |
-| create | 30 | 31 | 185.8 | 211.4 | 214.8 | 222.4 | 222.7 | 30/30 | 220.1 | 106.0 | 125.6 | 4.27 to 4.09, 1 node proc |
-| transition | 30 | 31 | 241.0 | 237.2 | 241.4 | 245.2 | 250.0 | 30/30 | 242.9 | 127.0 | 135.8 | 4.09 to 3.93, 1 node proc |
+| identity | 30 | 31 | 117.2 | 116.9 | 120.6 | 125.7 | 126.2 | 30/30 | 123.3 | 5.3 | 97.3 | 4.23 to 4.46, 2 node proc |
+| get | 30 | 31 | 154.0 | 149.7 | 154.0 | 157.3 | 158.2 | 30/30 | 155.0 | 38.0 | 118.9 | 4.46 to 4.46, 4 node proc |
+| list | 30 | 31 | 157.3 | 155.0 | 160.2 | 166.1 | 177.4 | 30/30 | 163.8 | 46.5 | 119.0 | 4.46 to 4.26, 4 node proc |
+| create | 30 | 31 | 192.5 | 223.2 | 288.0 | 322.2 | 365.4 | 30/30 | 319.9 | 171.7 | 125.1 | 4.26 to 4.31, 4 node proc |
+| transition | 30 | 31 | 309.8 | 294.2 | 329.9 | 402.3 | 453.3 | 30/30 | 400.0 | 231.3 | 136.8 | 4.31 to 4.42, 4 node proc |
 
-First index build with the index deleted: 1978 ms. Re-index after a hand edit of the largest shard: 71.1 ms. Both in-process, one sample each.
+First index build with the index deleted: 2454 ms. Re-index after a hand edit of the largest shard: 95.2 ms. Both in-process, one sample each.
 
 #### 50000 items, 24 shards, largest shard 2176 records
 
 | Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| identity | 20 | 21 | 117.3 | 117.1 | 117.7 | 118.7 | 119.0 | 20/20 | 116.3 | 4.0 | 96.8 | 3.93 to 3.93, 1 node proc |
-| get | 20 | 21 | 256.8 | 257.3 | 258.8 | 266.2 | 269.1 | 20/20 | 263.8 | 150.9 | 180.9 | 3.93 to 4.1, 1 node proc |
-| list | 20 | 21 | 273.4 | 270.4 | 272.1 | 273.5 | 275.4 | 20/20 | 271.1 | 157.5 | 181.2 | 4.1 to 4.25, 1 node proc |
-| create | 20 | 21 | 326.8 | 445.1 | 452.6 | 456.1 | 466.2 | 20/20 | 453.8 | 326.6 | 220.0 | 4.25 to 4.14, 1 node proc |
-| transition | 20 | 21 | 585.6 | 560.5 | 582.7 | 591.0 | 598.2 | 20/20 | 588.7 | 459.5 | 248.6 | 4.14 to 3.96, 1 node proc |
+| identity | 20 | 21 | 145.2 | 149.2 | 160.9 | 172.3 | 172.7 | 20/20 | 170.0 | 6.3 | 97.0 | 4.39 to 4.44, 4 node proc |
+| get | 20 | 21 | 363.2 | 257.5 | 259.2 | 274.4 | 301.2 | 20/20 | 272.1 | 154.0 | 183.4 | 4.44 to 4.16, 5 node proc |
+| list | 20 | 21 | 276.4 | 271.9 | 273.4 | 278.3 | 286.7 | 20/20 | 276.0 | 162.1 | 182.3 | 4.16 to 4.15, 2 node proc |
+| create | 20 | 21 | 327.4 | 446.4 | 453.3 | 462.0 | 469.5 | 20/20 | 459.6 | 329.1 | 219.6 | 4.15 to 4.15, 2 node proc |
+| transition | 20 | 21 | 573.0 | 558.3 | 584.5 | 595.7 | 632.1 | 20/20 | 593.3 | 464.5 | 260.7 | 4.15 to 4.04, 2 node proc |
 
-First index build with the index deleted: 10471 ms. Re-index after a hand edit of the largest shard: 259.5 ms. Both in-process, one sample each.
+First index build with the index deleted: 10402 ms. Re-index after a hand edit of the largest shard: 260.2 ms. Both in-process, one sample each.
 
 ### Byte and token accounting
 
@@ -326,7 +386,7 @@ The reference column is quoted from the prior-art axes table and was never re-de
 
 | Artefact | Bytes | Budget | Within | claude | o200k | cl100k | B/token claude | Reference | Against reference |
 |---|---|---|---|---|---|---|---|---|---|
-| status | 463 | 1074 | yes | 154 | 166 | 166 | 3.01 | 1441 | 463 B against 1441 B, 0.32x |
+| status | 463 | 1074 | yes | 156 | 167 | 167 | 2.97 | 1441 | 463 B against 1441 B, 0.32x |
 | backlog | 717 | 964 | yes | 185 | 185 | 185 | 3.88 | 1781 | 717 B against 1781 B, 0.40x |
 | backlog-empty | 120 | 140 | yes | 35 | 37 | 37 | 3.43 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | show | 273 | 310 | yes | 89 | 91 | 92 | 3.07 | 322 | 273 B against 322 B, 0.85x |
@@ -335,7 +395,7 @@ The reference column is quoted from the prior-art axes table and was never re-de
 | transition | 131 | 230 | yes | 44 | 44 | 44 | 2.98 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | transition-already | 100 | 110 | yes | 37 | 37 | 37 | 2.7 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | transition-dry-run | 163 | 250 | yes | 53 | 53 | 53 | 3.08 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
-| transition-preview | 233 | 254 | yes | 74 | 68 | 68 | 3.15 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
+| transition-preview | 233 | 254 | yes | 76 | 69 | 69 | 3.07 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | not-found | 156 | 164 | yes | 51 | 49 | 47 | 3.06 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | guard-refused | 237 | 278 | yes | 80 | 76 | 76 | 2.96 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 
@@ -354,18 +414,18 @@ The reference column is quoted from the prior-art axes table and was never re-de
 
 | Axis | Verdict | Observed | Reference | Target | ops | samples | peak load 1m |
 |---|---|---|---|---|---|---|---|
-| A1 Write durability | MET | 5: 5/5, 24: 24/24, 60: 60/60, 200: 200/200; every reported write is on disk, zero refusals, zero lock or temp files left. Zero writers crashed | 100% at 5, 24, 60 on both builds (prior-art E1); 200 not run | 100% at every N, and zero silent mis-targets under the A6 scenarios | 289 | 4 | 46.72 |
-| A2 Question coverage | MISSED | 10 full, 7 partial, 8 none, out of 25, against the reference's 4 full, 6 partial, 15 none; the 8 that score none are 7, 8, 9, 10, 15, 19, 20, 21, and every one of them needs an entity or a metric this tree does not implement | 4 full, 6 partial, 15 none | 25 full | 37 | 25 | 12.94 |
+| A1 Write durability | MET | 5: 5/5, 24: 24/24, 60: 60/60, 200: 200/200; every reported write is on disk, zero refusals, zero lock or temp files left. Zero writers crashed | 100% at 5, 24, 60 on both builds (prior-art E1); 200 not run | 100% at every N, and zero silent mis-targets under the A6 scenarios | 289 | 4 | 55.11 |
+| A2 Question coverage | MISSED | 10 full, 7 partial, 8 none, out of 25, against the reference's 4 full, 6 partial, 15 none; the 8 that score none are 7, 8, 9, 10, 15, 19, 20, 21, and every one of them needs an entity or a metric this tree does not implement | 4 full, 6 partial, 15 none | 25 full | 37 | 25 | 12.59 |
 | A3 Token cost | MET | status 463 B against 1441 B, backlog 717 B against 1781 B, show 273 B against 322 B, next 380 B against 659 B; all 12 artefacts inside their A.3 budget | 1441, 1781, 322, 659 bytes (prior-art E10) | at most the same bytes for the same information, every extra byte attributable to a field the reference lacks | 12 | 12 | not sampled |
-| A4 Latency at scale | MISSED | at 50000 items, startup excluded: read p95 150.9 ms, create p95 326.6 ms | 89/90 ms at 100, 154/141 ms at 5k, startup 83 ms (prior-art E11) | below 150 ms at 50k for read and create, startup excluded and reported separately | 570 | 550 | not sampled |
-| A5 Malformed-input robustness | PARTIAL | 206 damaged stores read: 2 edit removed the record, 90 refusal names the record, 113 absorbed, 1 refusal names the file only | heading rename: silent drop; bad metadata line: whole-store refusal; duplicate id: silent; self-edge: silent; cycle: accepted | zero silent drops, zero whole-store refusals, every refusal names the record | 206 | 206 | 46.72 |
-| A6 Mis-target rate | MET | 0 mis-targets in 10 writes with no explicit target, across all three scenarios; 1 explicit --workspace write landed where it was pointed; 3 of 3 seam resolutions correct; no command invented a store; every write that landed printed the workspace identity in its envelope, while the filesystem path is printed by status, doctor and --preview but not by an applied write | 1 of 3 scenarios writes elsewhere silently (prior-art E2) | 0 of 3; every write prints the store identity | 14 | 11 | 12.94 |
-| A7 Audit answerability | MET | 50 of 50 items explained: the named event is in the log, the replay of 250 events ends in the state shown, and every event carries an actor | 0 of 50, the reference keeps no history | 50 of 50 | 303 | 50 | 12.94 |
-| A8 Lifecycle enforcement | MET | 22 of 22 illegal pairs refused naming a rule id, 20 legal pairs behaved as the table says, 7 same-state requests returned the idempotent marker | 0 refused of 6 illegal pairs tried (prior-art E8) | every illegal pair refused with a guard id | 177 | 49 | 11.98 |
+| A4 Latency at scale | MISSED | at 50000 items, startup excluded: read p95 154.0 ms, create p95 329.1 ms | 89/90 ms at 100, 154/141 ms at 5k, startup 83 ms (prior-art E11) | below 150 ms at 50k for read and create, startup excluded and reported separately | 570 | 550 | not sampled |
+| A5 Malformed-input robustness | PARTIAL | 206 damaged stores read: 2 edit removed the record, 90 refusal names the record, 113 absorbed, 1 refusal names the file only | heading rename: silent drop; bad metadata line: whole-store refusal; duplicate id: silent; self-edge: silent; cycle: accepted | zero silent drops, zero whole-store refusals, every refusal names the record | 206 | 206 | 55.11 |
+| A6 Mis-target rate | MET | 0 mis-targets in 10 writes with no explicit target, across all three scenarios; 1 explicit --workspace write landed where it was pointed; 3 of 3 seam resolutions correct; no command invented a store; every write that landed printed the workspace identity in its envelope, while the filesystem path is printed by status, doctor and --preview but not by an applied write | 1 of 3 scenarios writes elsewhere silently (prior-art E2) | 0 of 3; every write prints the store identity | 38 | 11 | 12.59 |
+| A7 Audit answerability | MET | 50 of 50 items explained: the named event is in the log, the replay of 250 events ends in the state shown, and every event carries an actor | 0 of 50, the reference keeps no history | 50 of 50 | 303 | 50 | 11.98 |
+| A8 Lifecycle enforcement | MET | 22 of 22 illegal pairs refused naming a rule id, 20 legal pairs behaved as the table says, 7 same-state requests returned the idempotent marker | 0 refused of 6 illegal pairs tried (prior-art E8) | every illegal pair refused with a guard id | 177 | 49 | 11.18 |
 | A9 Metric coverage | NOT MEASURED | NOT MEASURED: no metric is implemented in this tree; nothing under src computes velocity, cycle time or a burndown series, so there is nothing to score and a figure here would be a figure about a harness | 0 of 14 | 14 of 14, each matching the spreadsheet | 0 | 0 | not sampled |
-| A10 Type validation | MET | 11 of 11 refused with a rule id and nothing created; rule ids C1, V4, V5 | 0 of 11 refused, the reference has a single free-text kind | 11 of 11 | 25 | 12 | 11.98 |
+| A10 Type validation | MET | 11 of 11 refused with a rule id and nothing created; rule ids C1, V4, V5 | 0 of 11 refused, the reference has a single free-text kind | 11 of 11 | 25 | 12 | 11.18 |
 | A11 Harness neutrality | NOT MEASURED | NOT MEASURED: the target has two halves and one of them has nothing to score: no adapter generator exists, because ADR-0012 refuses A.8 rule 3 for v1, so "adapters optional and generated" cannot be measured at all. The counting half is now reachable through the same harness the other axes use and is not run here rather than being reported half done | setup writes 4 files across 3 harnesses | 0 required; adapters optional and generated | 0 | 0 | not sampled |
-| A12 Output contract | MISSED | 25 of 26 invocations held the contract across 13 verbs; version failure did not, and 3 of 3 probed parse-level refusals ignored --out json because src/cli/main.ts raises them before the rendering is chosen | mutations only; reads refuse the flag with exit 2; errors on stdout (prior-art E9) | every verb, both paths | 32 | 26 | 11.98 |
+| A12 Output contract | MISSED | 25 of 26 invocations held the contract across 13 verbs; version failure did not, and 3 of 3 probed parse-level refusals ignored --out json because src/cli/main.ts raises them before the rendering is chosen | mutations only; reads refuse the flag with exit 2; errors on stdout (prior-art E9) | every verb, both paths | 32 | 26 | 11.18 |
 
 #### What each unfilled axis is waiting for
 
@@ -476,43 +536,43 @@ A row holds when the object is on the expected stream, the other stream is empty
 Timing limits are program cost at the median: the operation's wall median minus the runner's own `node -e` median, measured in the same job.
 Tolerance 35% over the committed limit, because six four-scale runs on 2026-09-05 put the worst run-to-run drift of any operation's program cost at 19.9% across the three runs where the machine was quiet (list at 1,000 items, 87.5 / 87.4 / 104.7 ms); 35% clears that by 1.76x. The in-process median was measured as an alternative and drifts 17.8% on the same case, so the statistic is not what the variance comes from. A run taken under load drifts further and shows up as an open miss, which is the correct outcome for a gate nobody has armed yet. The p95 moved 68.9% between two runs, which is why the gate reads the median and reports the p95 without gating on it.
 Limits derived from run 2026-09-04T23-39-28-387Z on 2026-09-04 (Apple M2, 8 cores, darwin 25.6.0, Node 24.11.1).
-35 budgets: 30 pass, 0 fail, 5 open miss, 0 pending.
+35 budgets: 28 pass, 0 fail, 7 open miss, 0 pending.
 An open miss is a budget the product has never met. It is reported with its number and does not fail a build for standing still; a regression against a budget that was met does.
 
 | Budget | Observed | Limit | Unit | Status | Note |
 |---|---|---|---|---|---|
-| cold start: the store layer loaded, above the runner's own node floor | 132.8 | 213 | ms | PASS | runner node floor measured in this job at 37.3 ms median |
-| identity median at 100 items, above the node floor | 96.9 | 240.8 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| get median at 100 items, above the node floor | 82.5 | 232.3 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| list median at 100 items, above the node floor | 83.6 | 268.8 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| create median at 100 items, above the node floor | 105.7 | 255.2 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| transition median at 100 items, above the node floor | 109.5 | 229.6 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| cold start: the store layer loaded, above the runner's own node floor | 86.8 | 213 | ms | PASS | runner node floor measured in this job at 38.2 ms median |
+| identity median at 100 items, above the node floor | 83 | 240.8 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| get median at 100 items, above the node floor | 83.2 | 232.3 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| list median at 100 items, above the node floor | 83.8 | 268.8 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| create median at 100 items, above the node floor | 105.6 | 255.2 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| transition median at 100 items, above the node floor | 109.9 | 229.6 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
 | identity median at 1000 items, above the node floor | 80.1 | 106.7 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| get median at 1000 items, above the node floor | 86.1 | 115.2 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| list median at 1000 items, above the node floor | 89.5 | 121 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| create median at 1000 items, above the node floor | 117.9 | 156.3 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| transition median at 1000 items, above the node floor | 122.9 | 162.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| identity median at 10000 items, above the node floor | 80.1 | 278.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| get median at 10000 items, above the node floor | 111.8 | 438.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| list median at 10000 items, above the node floor | 116.9 | 311.7 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| create median at 10000 items, above the node floor | 177.5 | 232.2 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| transition median at 10000 items, above the node floor | 204 | 267.8 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| identity median at 50000 items, above the node floor | 80.3 | 369.8 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| get median at 50000 items, above the node floor | 221.4 | 882.1 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| list median at 50000 items, above the node floor | 234.8 | 549.9 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| create median at 50000 items, above the node floor | 415.2 | 584.4 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| transition median at 50000 items, above the node floor | 545.4 | 723.3 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
-| peak RSS, read at the largest scale (DR8, 100 MiB for a read at 50k) | 185568 | 102400 | KiB | OPEN MISS | open finding, not build-blocking: the landed store has never met this: a read at 50k peaks at about 182 MiB against DR8 100 MiB, measured twice |
-| peak RSS, mutation at the largest scale (DR8, 120 MiB for a mutation at 50k) | 225232 | 122880 | KiB | OPEN MISS | open finding, not build-blocking: the landed store has never met this: a mutation at 50k peaks at about 212 MiB against DR8 120 MiB, measured twice |
-| first index build at the largest scale (DR8, 6 s for 50k items and 500k events) | 10471 | 6000 | ms | OPEN MISS | open finding, not build-blocking: the landed store has never met this: 11.1 s against DR8 6 s, and the figure is a wall time that a different runner would move on its own |
-| re-index after a hand edit of the largest shard (DR8, 50 ms after a hand edit of the largest shard) | 259.5 | 50 | ms | OPEN MISS | open finding, not build-blocking: the landed store has never met this: 257 ms against DR8 50 ms, and the figure is a wall time that a different runner would move on its own |
+| get median at 1000 items, above the node floor | 86.2 | 115.2 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| list median at 1000 items, above the node floor | 89.1 | 121 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| create median at 1000 items, above the node floor | 116.9 | 156.3 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| transition median at 1000 items, above the node floor | 122.8 | 162.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| identity median at 10000 items, above the node floor | 82.4 | 278.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| get median at 10000 items, above the node floor | 115.8 | 438.9 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| list median at 10000 items, above the node floor | 122 | 311.7 | ms | PASS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| create median at 10000 items, above the node floor | 249.8 | 232.2 | ms | OPEN MISS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| transition median at 10000 items, above the node floor | 291.7 | 267.8 | ms | OPEN MISS | n=30, 31 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| identity median at 50000 items, above the node floor | 122.7 | 369.8 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| get median at 50000 items, above the node floor | 221 | 882.1 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| list median at 50000 items, above the node floor | 235.2 | 549.9 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| create median at 50000 items, above the node floor | 415.1 | 584.4 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| transition median at 50000 items, above the node floor | 546.3 | 723.3 | ms | PASS | n=20, 21 store operations; not build-blocking: the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. |
+| peak RSS, read at the largest scale (DR8, 100 MiB for a read at 50k) | 186624 | 102400 | KiB | OPEN MISS | open finding, not build-blocking: the landed store has never met this: a read at 50k peaks at about 182 MiB against DR8 100 MiB, measured twice |
+| peak RSS, mutation at the largest scale (DR8, 120 MiB for a mutation at 50k) | 224880 | 122880 | KiB | OPEN MISS | open finding, not build-blocking: the landed store has never met this: a mutation at 50k peaks at about 212 MiB against DR8 120 MiB, measured twice |
+| first index build at the largest scale (DR8, 6 s for 50k items and 500k events) | 10402 | 6000 | ms | OPEN MISS | open finding, not build-blocking: the landed store has never met this: 11.1 s against DR8 6 s, and the figure is a wall time that a different runner would move on its own |
+| re-index after a hand edit of the largest shard (DR8, 50 ms after a hand edit of the largest shard) | 260.2 | 50 | ms | OPEN MISS | open finding, not build-blocking: the landed store has never met this: 257 ms against DR8 50 ms, and the figure is a wall time that a different runner would move on its own |
 | index size as a multiple of the text it indexes (DR8, index at most 1.0x the text size) | 2.06 | 1 | x | OPEN MISS | 238637056 bytes of index over 115635217 bytes of records and events; open finding, not build-blocking: the landed index stores each record's and each event's source text, which the DR2 spike that measured 0.7x did not; the store owner has to decide whether the budget or the index changes |
 | runtime dependencies (DR7, zero runtime dependencies) | 0 | 0 | packages | PASS |  |
 | install size, unpacked (DR8, 1.5 MB unpacked) | 284611 | 1572864 | bytes | PASS | the packed tarball: the bundle, the schemas and the three licence files |
 | bundle (DR8, 500 KB bundle) | 208710 | 512000 | bytes | PASS |  |
 | A1 write durability, worst of the parallel rounds (axis A1) | 1 | 1 | ratio | PASS | 5: 1, 24: 1, 60: 1, 200: 1 |
 | A1 writers that crashed rather than reporting a refusal (axis A1) | 0 | 0 | writers | PASS |  |
-| A5 silent drops (axis A5) | 0 | 0 | cases | PASS | open finding, not build-blocking: the store has never met this: a record heading renamed out of the grammar is dropped from every query with no finding |
+| A5 silent drops (axis A5) | 0 | 0 | cases | PASS |  |
 | A5 whole-store refusals (axis A5) | 0 | 0 | cases | PASS |  |
 | A5 crashes (axis A5) | 0 | 0 | cases | PASS |  |
 | output size per command, bytes enforced and tokens advisory (interface A.3) | 0 | 0 | artefacts over budget | PASS | 12 artefacts measured |
