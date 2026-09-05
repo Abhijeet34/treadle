@@ -170,12 +170,17 @@ export async function run(env: Environment): Promise<number> {
 function internal(command: string | undefined, error: unknown): ResultObject {
   const named = command ?? 'treadle'
   const thrown = error instanceof Error ? error : undefined
+  const said = thrown === undefined ? String(error) : `${thrown.name}: ${thrown.message}`
   return errorResult({
     code: 'INTERNAL',
     command: named,
     workspace: '-',
     effect: commandNamed(named)?.effect ?? 'read',
-    cause: `${named} did not complete: ${thrown === undefined ? String(error) : `${thrown.name}: ${thrown.message}`}`,
+    // A message from anywhere in the runtime is not held to the store's safe-text class, and
+    // a bare carriage return in one would make the renderer throw on the path that exists to
+    // stop a throw. Newlines survive, because the renderer puts a multi-line cause in a
+    // counted block; nothing else the grammar treats as a delimiter does.
+    cause: `${named} did not complete: ${said.replaceAll('\r\n', '\n').replaceAll('\r', ' ')}`,
     fix: ['treadle version'],
   })
 }
