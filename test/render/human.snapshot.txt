@@ -336,8 +336,8 @@ explain  acme-platform
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     record a reviewer on sso-saml
-  done  DOD4  fail     tick the remaining 2 entries on ss…
+  done  DOD3  fail     treadle set sso-saml reviewer=<nam…
+  done  DOD4  fail     treadle set sso-saml acceptance_cr…
   done  DOD7  fail     treadle evidence add sso-saml <kin…
 
 moves  5 of 5
@@ -365,8 +365,8 @@ explain  acme-platform
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     record a reviewer on sso-saml
-  done  DOD4  fail     tick the remaining 2 entries on sso-saml
+  done  DOD3  fail     treadle set sso-saml reviewer=<name>
+  done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
 moves  5 of 5
@@ -394,8 +394,8 @@ explain  acme-platform
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     record a reviewer on sso-saml
-  done  DOD4  fail     tick the remaining 2 entries on sso-saml
+  done  DOD3  fail     treadle set sso-saml reviewer=<name>
+  done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
 moves  5 of 5
@@ -461,13 +461,14 @@ help  acme-platform
     Agile work management for a team and its agents,
     over files you commit to git.
 
-commands  14 of 14
+commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
   show        read    no        Print the stored fields o…
   backlog     read    yes       List the items that match…
   transition  mutate  no        Move one item to a target…
+  set         mutate  no        Write one or more stored …
   mark        mutate  no        Set the severity or the p…
   evidence    mutate  no        Append one bounded pointe…
   doctor      read    no        Report what the stored fi…
@@ -504,13 +505,14 @@ help  acme-platform
     Agile work management for a team and its agents, over files you commit
     to git.
 
-commands  14 of 14
+commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one st…
   transition  mutate  no        Move one item to a target state, with every g…
+  set         mutate  no        Write one or more stored fields of an item th…
   mark        mutate  no        Set the severity or the priority of one item,…
   evidence    mutate  no        Append one bounded pointer at an artefact a t…
   doctor      read    no        Report what the stored files say that no writ…
@@ -543,13 +545,14 @@ help  acme-platform
   about
     Agile work management for a team and its agents, over files you commit to git.
 
-commands  14 of 14
+commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one stated order.
   transition  mutate  no        Move one item to a target state, with every guard on that edge evaluated.
+  set         mutate  no        Write one or more stored fields of an item that is already filed.
   mark        mutate  no        Set the severity or the priority of one item, with the reason and both values in the log.
   evidence    mutate  no        Append one bounded pointer at an artefact a third party can open.
   doctor      read    no        Report what the stored files say that no write path would have accepted.
@@ -1094,4 +1097,28 @@ next  3 of 3
 
   absent_features  sprint board impediment relation
   defects  S1 1 S2 1 S3 1
+
+### set @ 60
+set  acme-platform  1 changed  txn t0904
+  item  health-endpoint
+  v  1 -> 2
+  set  assignee - -> kim
+  set  component - -> platform
+  event  e0904
+
+### set @ 80
+set  acme-platform  1 changed  txn t0904
+  item  health-endpoint
+  v  1 -> 2
+  set  assignee - -> kim
+  set  component - -> platform
+  event  e0904
+
+### set @ 200
+set  acme-platform  1 changed  txn t0904
+  item  health-endpoint
+  v  1 -> 2
+  set  assignee - -> kim
+  set  component - -> platform
+  event  e0904
 
