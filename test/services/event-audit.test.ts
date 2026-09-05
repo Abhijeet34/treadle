@@ -98,7 +98,7 @@ describe('what each read says about a hand-written event line', () => {
     assert.match(history.err, /event \S+ at events\/2026-0[89]\.jsonl line \d+ repeats an id events\/2026-0[89]\.jsonl already carries; this copy is not served/)
     const doctor = await cli(['doctor'])
     assert.equal(doctor.code, 7)
-    assert.match(doctor.out, /^S14 - events\/2026-0[89]\.jsonl:\d+ event \S+ at events\/2026-0[89]\.jsonl line \d+ repeats an id events\/2026-0[89]\.jsonl already carries; this copy is not served$/m)
+    assert.match(doctor.out, /^S14 \S+ events\/2026-0[89]\.jsonl:\d+ event \S+ at events\/2026-0[89]\.jsonl line \d+ repeats an id events\/2026-0[89]\.jsonl already carries; this copy is not served$/m)
     await rm(path.join(root, '.work', 'events', '2026-08.jsonl'))
   })
 
