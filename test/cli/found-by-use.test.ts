@@ -531,3 +531,47 @@ describe('the defects the second adversarial pass found by using the tool', () =
     })
   })
 })
+
+describe('the defects a caller found on its first walk through the tool', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('reports a structured field it just wrote by what moved, not as [object Object]', async () => {
+    // `set csv-export acceptance_criteria="a|b"` printed
+    // `set acceptance_criteria - -> [object Object],[object Object]`, and the event log
+    // recorded the length of that placeholder as the value that moved.
+    const written = await cli(['set', 'csv-export', 'acceptance_criteria=a header row is present|the rows match the filter'])
+    assert.equal(written.code, 0, written.err)
+    assert.doesNotMatch(written.out, /\[object Object\]/)
+    assert.match(written.out, /^set acceptance_criteria \S+ -> open,open$/m)
+
+    const ticked = await cli(['set', 'csv-export', 'acceptance_criteria=[x] a header row is present|the rows match the filter'])
+    assert.equal(ticked.code, 0, ticked.err)
+    assert.match(ticked.out, /^set acceptance_criteria open,open -> done,open$/m)
+
+    const logged = await cli(['history', 'csv-export', '--limit', '2'])
+    assert.doesNotMatch(logged.out, /\[object Object\]/)
+  })
+
+  it('names --cursor in the help of every command that prints a --cursor line', async () => {
+    for (const command of ['backlog', 'next', 'history']) {
+      const help = await cli(['help', command])
+      assert.equal(help.code, 0, help.err)
+      assert.match(help.out, /^--cursor S /m, `treadle help ${command} does not name --cursor`)
+      assert.match(help.out, /--cursor </, `treadle help ${command} has no usage line for --cursor`)
+    }
+  })
+
+  it('refuses --cursor where it refuses --limit, rather than accepting it in silence', async () => {
+    // The parser accepted `--cursor` on every command because the flag was absent from the
+    // scope table, so a caller who passed it to the wrong command was told nothing.
+    const refused = await cli(['show', 'csv-export', '--cursor', 'anything'])
+    assert.equal(refused.code, 2)
+    assert.match(refused.err, /--cursor cannot apply to show/)
+    assert.match(refused.err, /^fix treadle help show$/m)
+  })
+})

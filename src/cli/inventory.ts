@@ -78,7 +78,7 @@ export const COMMANDS: readonly Command[] = [
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: true,
-    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>] [--fields <list>] [--limit <n>]'],
+    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>] [--fields <list>] [--limit <n>] [--cursor <id>]'],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
@@ -149,7 +149,7 @@ export const COMMANDS: readonly Command[] = [
     name: 'next', shape: NEXT_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle next [--limit <n>] [--for <actor>]'],
+    usage: ['treadle next [--limit <n>] [--cursor <id>] [--for <actor>]'],
     examples: [['treadle next', 'what to pick up, with the score components and the weights that ranked it']],
   },
   {
@@ -207,7 +207,7 @@ export type Verdict = 'S' | 'A' | 'N' | 'X'
 export const GLOBAL_FLAGS = [
   '--help', '--version', '--out', '--quiet', '--verbose', '--color', '--workspace',
   '--dry-run', '--preview', '--yes', '--no-input', '--actor', '--width', '--fields',
-  '--limit', '--explain-absence',
+  '--limit', '--cursor', '--explain-absence',
 ] as const
 export type GlobalFlag = (typeof GLOBAL_FLAGS)[number]
 
@@ -230,6 +230,10 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     case '--actor': return command.effect === 'mutate' ? 'S' : 'A'
     case '--fields': return command.columns ? 'S' : 'X'
     case '--limit': return command.pageable ? 'S' : 'X'
+    // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
+    // the tool prints itself in every `page` line, and `treadle version --cursor x` was
+    // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.
+    case '--cursor': return command.pageable ? 'S' : 'X'
     case '--explain-absence': return command.omits ? 'S' : 'X'
   }
 }
