@@ -72,7 +72,7 @@ export type EvidenceKind = (typeof EVIDENCE_KINDS)[number]
  * A pointer to evidence that lives somewhere a third party can open it, never the evidence
  * itself. `ref` carries no space because it is a hash, a path, a run id or a URL, and a
  * bounded `label` says which one of those it is; the prose that would explain it belongs in
- * the artefact the ref names. ADR-0009 carries the argument for the bounds.
+ * the artefact the ref names. ADR-0011 carries the argument for the bounds.
  */
 export type EvidencePointer = {
   readonly kind: EvidenceKind

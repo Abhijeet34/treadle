@@ -130,7 +130,7 @@ export async function markItem(
       [`treadle mark ${item.id} ${changes.map((c) => `--${c.field === 'severity' ? 'severity' : 'priority'} ${c.after}`).join(' ')} --reason "<why>"`])
   }
   if (request.reason.length > MAX_REASON) {
-    return refusal('mark', workspace, 'T6', item.id, overLength('a reason', MAX_REASON, request.reason.length),
+    return refusal('mark', workspace, 'T7', item.id, overLength('a reason', MAX_REASON, request.reason.length),
       ['treadle help mark'])
   }
 

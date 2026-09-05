@@ -22,7 +22,7 @@ import {
 
 /**
  * The prose bounds, and the evidence list's. Each is argued in
- * docs/architecture/adr/0009-evidence-and-the-severity-audit.md; the short form is that a
+ * docs/architecture/adr/0011-evidence-and-the-severity-audit.md; the short form is that a
  * value which lands whole in a committed shard is bounded by what a reviewer will read in a
  * diff, not by what the parser can hold. The store's own S5 ceiling of 128 KiB per section
  * is unchanged, so a record written before these bounds still reads.

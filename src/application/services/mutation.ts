@@ -66,16 +66,16 @@ export function makeEvent(input: EventInput): StoreEvent {
 }
 
 /**
- * The fields a mutation event records before and after. It is `file`'s reported set less
- * the four free-text ones: an event line is read by a machine and diffed by a person, and a
+ * The fields a mutation event records before and after. It is `file`'s `REPORTED` set less
+ * its six free-text fields: an event line is read by a machine and diffed by a person, and a
  * 5,000-character repro step in it duplicates the record it was copied from. Everything a
- * caller can be held to - the marker fields, the estimate, the ownership - is here, which
- * is what makes a hand edit of severity or priority detectable against the log.
+ * caller can be held to - the marker fields, the estimate, the ownership, the date - is
+ * here, which is what makes a hand edit of severity or priority detectable against the log.
  */
 export const AUDITED_FIELDS = [
   'type', 'state', 'filed_at', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
-  'target_date', 'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
+  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
 ] as const
 
 /** The change list as an event's `before` or `after` object, keyed by field. */

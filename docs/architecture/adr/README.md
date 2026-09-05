@@ -16,6 +16,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0008](0008-the-measurement-rig.md) | The measurement rig: corpora written through the store, cold-process timing, and a gate that reads the median |
 | [ADR-0009](0009-release-and-supply-chain.md) | One esbuild bundle as the published product, a signed annotated tag as the release authorisation, and the supply-chain controls around both |
 | [ADR-0010](0010-terminal-outcomes-dates-and-reviewability.md) | A resolution and an attempt outcome instead of four new states, one due date with three reads that act on it, and two reviewability controls |
+| [ADR-0011](0011-evidence-and-the-severity-audit.md) | Severity on every read surface and in the ranking, severity and priority changes audited, and a bounded evidence pointer the done gate requires |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -42,9 +43,24 @@ The set is closed.
 | `S12` | The stored hierarchy closes a cycle |
 | `S13` | A store file could not be created, read or written, and the filesystem said why |
 
-`H16` and `H17` are the two finding ids borrowed from the design's doctor namespace rather than this one.
-DR3 rule 6 already named `H16`, a file that arrived with CRLF line endings.
-`H17` is an overdue item assigned to nobody, which ADR-0010 puts on `status` until `doctor` lands.
+## The doctor's finding ids
+
+Every `H` id is borrowed from the design's doctor namespace rather than from the store's, and
+a doctor finding is a report rather than a refusal: the record still serves and a person decides.
+They are raised in three places, because each id needs a different thing beside the record.
+`H16` comes from the store on load, which is the only layer that sees the file's bytes.
+`H17` comes from `status`, which has the clock.
+The last four come from `doctor` and from `explain`, the only reads that have the event log and
+the done gate. ADR-0010 argues `H17` and ADR-0011 the last four.
+
+| Id | Raised by | Finding |
+|---|---|---|
+| `H16` | the store, on load | A file arrived with CRLF line endings, which DR3 rule 6 named |
+| `H17` | `status` | An overdue item is assigned to nobody |
+| `H18` | `doctor`, `explain` | A stored description is over the write bound, which the load path does not apply |
+| `H19` | `doctor`, `explain` | A severity or a priority was marked by the item's own assignee |
+| `H20` | `doctor`, `explain` | A record's severity or priority disagrees with the last event that recorded it, so it was changed outside the tool |
+| `H21` | `doctor`, `explain` | A done item whose type has a review step points at no evidence |
 
 ## The CLI's rule ids
 

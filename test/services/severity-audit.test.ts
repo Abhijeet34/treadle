@@ -96,7 +96,7 @@ describe('next weights severity, so an S1 and an S4 no longer rank identically',
 
   it('prints the severity weight beside the others, so the order is checkable (R11)', async () => {
     const ranked = await runCli(['next'], { cwd: demo.root })
-    assert.match(ranked.out, /^weights pri 10 age 1 dep 5 spr 8 asg 0 sev 6$/m)
+    assert.match(ranked.out, /^weights pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6$/m)
   })
 
   it('lets severity lift a defect at most 2.4 priority levels, never more', async () => {
@@ -165,7 +165,7 @@ describe('a change to severity or priority is an event with a before and an afte
   it('refuses a reason past the bound rather than writing it to the log', async () => {
     const long = await cli(['mark', 'sess-timeout', '--severity', 'S2', '--reason', 'r'.repeat(MAX_REASON + 1)])
     assert.equal(long.code, 2)
-    assert.match(long.err, /^rule T6$/m)
+    assert.match(long.err, /^rule T7$/m)
     assert.match(long.err, new RegExp(`a reason is ${MAX_REASON + 1} characters and the limit is ${MAX_REASON}`))
     await demo.dispose()
   })
@@ -330,7 +330,7 @@ describe('both prose doors are bounded, and neither bound truncates', () => {
   it('refuses a reason past the bound rather than storing it in the event', async () => {
     const long = await cli(['transition', 'csv-export', 'in_progress', '--reason', 'r'.repeat(10_000)])
     assert.equal(long.code, 2)
-    assert.match(long.err, /^rule T6$/m)
+    assert.match(long.err, /^rule T7$/m)
     assert.match(long.err, new RegExp(`a reason is 10000 characters and the limit is ${MAX_REASON}`))
   })
 })

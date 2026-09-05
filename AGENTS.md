@@ -115,6 +115,27 @@ A multi-line value never appears as a bare line: it arrives as `|<key> <lines> <
 followed by exactly that many content lines. Read the count, not the newlines. That is
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
+## Narrowing a bound after files exist
+
+A bound the tool did not always have cannot be applied where the value is read.
+`description` went from 100,000 characters to 10,000; applying that in `validateWorkItem`
+with no mode made a record an earlier version wrote unservable, `show` exiting 4 and
+`doctor` reporting `checked 0`. `docs/STABILITY.md` says reading always works, so the bound
+is a write-time rule: `ValidateOptions.storedProse` is set by the store's codec and by
+nothing else, the store's S5 section ceiling is the load bound, and a stored value over the
+write bound is doctor finding `H18`. Any future narrowing takes the same shape.
+
+`treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
+same audit for one item off the events it already reads. The four ids are in
+`docs/architecture/adr/README.md` and argued in ADR-0011; `status`'s `findings` count stays
+what it always was, the store's own load-time findings.
+
+`mark` is the only command that edits a field after filing, and it edits two: severity and
+priority. Both are audited, so a change carries an actor, a reason and a before value. If
+`set` lands, route those two fields through `mark`'s event rather than giving them a second
+write path, for the same reason `#resolve` is the one answer to "which record does this id
+name".
+
 ## Rules that are tests rather than conventions
 
 Before hand-checking any of these, run the suite: it already checks them.
