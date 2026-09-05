@@ -208,6 +208,12 @@ Before hand-checking any of these, run the suite: it already checks them.
   two tables in `test/security/no-egress.test.ts` and
   `test/security/f1-no-execution-at-runtime.test.ts`, which assert they exercise every
   command the inventory names.
+- No prose a dependency wrote reaches an output surface. `node:util`'s `parseArgs` was the
+  one source of it: its `cause` explained a `--` convention this tool does not document and
+  its three-line message rendered `cause` as a counted block rather than a marked scalar.
+  `src/cli/parse.ts` re-derives every flag fault from the option table `help <command>`
+  prints, and the suite in `test/cli/found-by-use.test.ts` asserts the parser's own byte
+  sequences are absent. A dependency that formats a message is a message to rewrite.
 - Every remedy a gate rule emits is a command line, and `test/domain/gate-remedies.test.ts`
   holds that: each `GateCheck` kind declares the command that performs its remedy, or a
   reason it has none. A remedy that reads as advice is the defect that left a bug filed
