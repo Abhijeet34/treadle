@@ -4,7 +4,7 @@
 // Two questions, because they have different answers. What ships: nothing but treadle's own
 // bundle, which is what the `files` allowlist and the zero-dependency budget produce, so no
 // third-party attribution attaches to the published tarball and NOTICE says so. What is
-// installed to build and test it: 85 packages at last count, none of which ship, every one of
+// installed to build and test it: 88 packages at last count, none of which ship, every one of
 // which still has to carry a licence this project may use.
 //
 // Run it to verify, `--write` to regenerate the notices file, `--list` to enumerate the whole
