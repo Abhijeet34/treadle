@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "backlog.v1.json",
-  "title": "backlog/1",
+  "$id": "backlog.v2.json",
+  "title": "backlog/2",
   "description": "List the items that match a filter, in one stated order.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "backlog/1"
+      "const": "backlog/2"
     },
     "ok": {
       "type": "boolean"
@@ -77,7 +77,7 @@
             "null"
           ]
         },
-        "done": {
+        "done_points": {
           "type": [
             "integer",
             "null"

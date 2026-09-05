@@ -5,6 +5,13 @@
 // only the global options, so a global flag's value is never mistaken for the command word;
 // the second is strict over the global set plus that command's own, so an unknown flag is a
 // named refusal rather than a silently ignored token.
+//
+// `parseArgs` throws prose of its own, and none of it is ever emitted. Its text explains a
+// `--` convention this tool does not document, it arrives with an unbalanced quote because
+// it quotes the offending token, and one of its three messages is three lines long, which a
+// one-line `cause` renders as a counted block. Every throw is therefore re-derived here from
+// the same option table `help <command>` prints, so a refusal about a flag reads like every
+// other refusal the tool writes.
 
 import { parseArgs, type ParseArgsConfig } from 'node:util'
 
@@ -120,15 +127,116 @@ function filterOrderOf(argv: readonly string[]): readonly FilterFlag[] {
   return out
 }
 
+/** A flag as written, resolved to the option name parseArgs would look up. */
+type FlagToken = {
+  /** The token as the caller wrote it, which is what a refusal names. */
+  readonly raw: string
+  readonly name: string
+  /** Written `--name=value`, so the value travels in the token itself. */
+  readonly inline: boolean
+  /** The next argv entry, which is where a non-inline value would have to come from. */
+  readonly next: string | undefined
+}
+
+/** Every flag on the line, in order, with a short letter resolved through the option table. */
+function flagTokens(argv: readonly string[], options: OptionConfig): readonly FlagToken[] {
+  const shorts = new Map<string, string>()
+  for (const [name, config] of Object.entries(options)) {
+    const short = (config as { short?: string }).short
+    if (short !== undefined) shorts.set(short, name)
+  }
+  const out: FlagToken[] = []
+  for (const [index, token] of argv.entries()) {
+    if (token === '--') break
+    const next = argv[index + 1]
+    if (token.startsWith('--') && token.length > 2) {
+      const name = token.slice(2).split('=')[0] as string
+      out.push({ raw: `--${name}`, name, inline: token.includes('='), next })
+      continue
+    }
+    if (!token.startsWith('-') || token.length < 2) continue
+    // A cluster is one flag per letter and only its last letter can carry a value, so that
+    // is the only letter an inline value or a following token belongs to.
+    const body = token.slice(1)
+    const equals = body.indexOf('=')
+    const letters = [...(equals < 0 ? body : body.slice(0, equals))]
+    for (const [at, letter] of letters.entries()) {
+      const last = at === letters.length - 1
+      out.push({
+        raw: `-${letter}`,
+        name: shorts.get(letter) ?? letter,
+        inline: equals >= 0 && last,
+        next: last ? next : undefined,
+      })
+    }
+  }
+  return out
+}
+
+/**
+ * The first flag on the line the option table refuses, and why, in the tool's own words.
+ * `undefined` means the line is well formed against that table.
+ *
+ * The three shapes are the three `parseArgs` throws: a name the table does not carry, a
+ * value on a flag that takes none, and a flag whose value is missing or would be read as the
+ * next flag. Each is found from the table rather than from the thrown message, which is what
+ * keeps the message out of the output.
+ */
+function flagFault(
+  argv: readonly string[], options: OptionConfig, command: string | undefined,
+): ParseFailure | undefined {
+  const scope = command ?? 'treadle'
+  const fix = [command === undefined ? 'treadle help' : `treadle help ${command}`]
+  for (const token of flagTokens(argv, options)) {
+    const config = options[token.name] as { type?: string } | undefined
+    if (config === undefined) {
+      return { ok: false, cause: `${token.raw} is not a flag of ${scope}`, fix }
+    }
+    if (config.type === 'boolean' && token.inline) {
+      return { ok: false, cause: `${token.raw} takes no value`, fix }
+    }
+    if (config.type !== 'string' || token.inline) continue
+    if (token.next === undefined) {
+      return { ok: false, cause: `${token.raw} needs a value`, fix }
+    }
+    if (token.next.startsWith('-') && token.next.length > 1) {
+      return {
+        ok: false,
+        cause: `${token.raw} needs a value, and one starting with a dash is written ${token.raw}=${token.next}`,
+        fix,
+      }
+    }
+  }
+  return undefined
+}
+
+/** A `parseArgs` throw as a refusal of this tool's own, never as the message it threw. */
+function flagRefusal(
+  argv: readonly string[], options: OptionConfig, command: string | undefined,
+): ParseFailure {
+  const scope = command ?? 'treadle'
+  return flagFault(argv, options, command) ?? {
+    ok: false,
+    cause: `${scope} cannot read the flags on this line`,
+    fix: [command === undefined ? 'treadle help' : `treadle help ${command}`],
+  }
+}
+
 export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
   let first
   try {
     first = parseArgs({ args: [...argv], options: GLOBAL_OPTIONS, allowPositionals: true, strict: false })
-  } catch (error) {
-    return { ok: false, cause: (error as Error).message, fix: ['treadle help'] }
+  } catch {
+    return flagRefusal(argv, GLOBAL_OPTIONS, undefined)
   }
   const command = first.positionals[0]
   if (command === undefined) {
+    // The first pass is not strict, so it accepts an unknown flag rather than throwing, and
+    // with no command word there is no second pass to catch it. Without this the invariant
+    // at the top of the file held for every line but the shortest one: `treadle --nope` ran
+    // the default command and said nothing about the flag it dropped.
+    const fault = flagFault(argv, GLOBAL_OPTIONS, undefined)
+    if (fault !== undefined) return fault
     return {
       ok: true,
       value: {
@@ -154,8 +262,8 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
       allowPositionals: true,
       strict: true,
     })
-  } catch (error) {
-    return { ok: false, cause: (error as Error).message, fix: [`treadle help ${command}`] }
+  } catch {
+    return flagRefusal(argv, { ...GLOBAL_OPTIONS, ...(COMMAND_OPTIONS[command] ?? {}) }, command)
   }
 
   const passed = passedFlags(argv)

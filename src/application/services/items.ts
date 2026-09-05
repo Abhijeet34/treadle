@@ -126,14 +126,16 @@ export const SHOW_SHAPE: ResultShape = {
 
 export const BACKLOG_SHAPE: ResultShape = {
   command: 'backlog',
-  version: 1,
+  // v2 renamed the completed-points scalar from `done` to `done_points`; schemas/README.md
+  // is the rule that a change to a shape's properties bumps the shape.
+  version: 2,
   effect: 'read',
   summary: 'List the items that match a filter, in one stated order.',
   properties: [
     { kind: 'scalar', key: 'filter', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
     { kind: 'scalar', key: 'points', type: 'integer' },
-    { kind: 'scalar', key: 'done', type: 'integer' },
+    { kind: 'scalar', key: 'done_points', type: 'integer' },
     { kind: 'scalar', key: 'none', type: 'string' },
     { kind: 'scalar', key: 'narrowest', type: 'string' },
     { kind: 'scalar', key: 'absent', type: 'string' },
@@ -496,7 +498,10 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   if (page.length > 0) data['sort'] = 'priority,filed,id'
   if (page.length > 0) {
     data['points'] = page.reduce((sum, item) => sum + (item.points ?? 0), 0)
-    data['done'] = page
+    // `done` was this key's name, and beside a list where one of two items is in state
+    // `done` a `done 0` line reads as a count of items rather than of their estimates.
+    // Both aggregates now say what they aggregate over.
+    data['done_points'] = page
       .filter((item) => item.state === 'done')
       .reduce((sum, item) => sum + (item.points ?? 0), 0)
   }

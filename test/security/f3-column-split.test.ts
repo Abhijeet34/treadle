@@ -92,7 +92,7 @@ describe('F3: a column appended after a space-bearing one cannot corrupt the spl
 
   it('refuses a non-final cell that carries a space, whatever put it there', () => {
     assert.throws(() => agentRenderer.render({
-      schema: 'backlog/1', ok: true, code: 'OK', command: 'backlog', workspace: 'w',
+      schema: 'backlog/2', ok: true, code: 'OK', command: 'backlog', workspace: 'w',
       effect: 'read', txn: null, changed: null,
       data: {
         items: {
