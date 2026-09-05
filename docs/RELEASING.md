@@ -173,7 +173,33 @@ A settings script that half-applies is worse than one that refuses, because the 
 | `.github/rulesets/tags.json` | Signed tags on `refs/tags/v*` that cannot be updated or deleted. The name itself is checked by the release preflight, not here: see "Why the tag ruleset does not check the tag name" |
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
-| `.github/settings/actions-workflow-permissions.json` | A read-only default token |
+| `.github/settings/actions-workflow-permissions.json` | A read-only default token, and permission for Actions to open a pull request. See "Why Actions may create pull requests" |
 
 The `npm-publish` environment and its required reviewer are not in that script.
 An environment that gates publication should be created deliberately by the person who owns the account, at the moment they decide to open the gate.
+
+## Why Actions may create pull requests
+
+`can_approve_pull_request_reviews` is `true` in `.github/settings/actions-workflow-permissions.json`, and the name is misleading enough to be worth writing down.
+
+The release workflow's first half opens the release pull request on every push to `main`.
+It could not.
+Every Release run from `build(release): add release automation and supply-chain CI gates (#8)` onward failed on the same line, which is the action's own report of GitHub's refusal:
+
+```text
+release-please failed: GitHub Actions is not permitted to create or approve pull requests.
+```
+
+GitHub couples creating and approving into that one switch, so a job that only wants to open a pull request is blocked by a flag whose name mentions approving.
+Release automation needs the creating half, and there is no narrower setting that grants it.
+
+The approving half grants no power over merges here.
+`.github/rulesets/main.json` sets `required_approving_review_count` to `0`, so an approving review is not a gate on `main` and a token that could leave one still moves nothing.
+`default_workflow_permissions` stays `read`, so this changes nothing about what a job may write: `release-pr` names `contents: write` and `pull-requests: write` in the workflow, and every other job elevates for itself or does not elevate at all.
+
+The other way to let release automation open a pull request is a stored token with wider rights than the workflow token.
+We do not do that, and nobody should "improve" this later by adding one.
+The release design has no long-lived credentials in it: publication goes over OIDC with no stored registry token, and provenance is attested through GitHub's own workflow identity.
+A secret that must be rotated and can leak is a worse thing to own than a repository flag that is small, visible in this tree, and reversible by editing one line and re-running `scripts/apply-repo-settings.sh`.
+
+A permission you can read out of the tree beats a credential you have to trust.
