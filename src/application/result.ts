@@ -12,6 +12,12 @@ export const RESULT_CODES = [
   'NOT_FOUND',
   'STORE_UNAVAILABLE',
   'INTERNAL',
+  /**
+   * The stored files carry something no write path would have accepted: a record the store
+   * holds and cannot serve, or a served record the audit flagged. A read over such a store
+   * refuses with it, and `doctor` answers with it, because both are the same fact.
+   */
+  'INTEGRITY',
 ] as const
 export type ResultCode = (typeof RESULT_CODES)[number]
 
@@ -92,6 +98,13 @@ export type OkInput = {
   readonly workspace: string
   readonly txn?: string | null
   readonly changed?: number | null
+  /**
+   * The verdict the exit status is read from, `OK` unless the command's answer is itself a
+   * verdict on the store. `doctor` is that command: it answers with the findings table and
+   * exits `INTEGRITY` when the table is not empty, so a script asks "is my store intact"
+   * from the status alone. `ok` stays true, because the command produced its answer.
+   */
+  readonly code?: ResultCode
   readonly data: ResultData
 }
 
@@ -101,7 +114,7 @@ export function okResult(shape: ResultShape, input: OkInput): ResultObject {
   return {
     schema: `${shape.command}/${shape.version}`,
     ok: true,
-    code: 'OK',
+    code: input.code ?? 'OK',
     command: shape.command,
     workspace: input.workspace,
     effect: shape.effect,

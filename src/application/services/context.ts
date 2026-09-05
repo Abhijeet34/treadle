@@ -26,7 +26,7 @@ import {
   type WorkItemState,
   type WorkItemType,
 } from '../../domain/index.ts'
-import type { Finding, Store, StoreIdentity, StoreResult } from '../ports/store.ts'
+import { storeFail, type Finding, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input. Workspace
@@ -40,22 +40,54 @@ export function hasReviewStep(type: WorkItemType): boolean {
 
 export type WorkspaceView = {
   readonly identity: StoreIdentity
+  /** Every item the store holds, because a view over fewer is refused before it exists. */
   readonly items: readonly WorkItem[]
   /**
    * A lookup index over `items`, and only that. It used to be the third place a record's
    * identity was decided, because a `Map` keeps the last entry for a repeated key while the
    * store's two owners both refuse one; the map is safe now because neither owner can hand
-   * `list` a repeated id. What a lookup cannot answer is why an id is absent, which is what
-   * `unserved` is for: absent and ambiguous are different refusals.
+   * `list` a repeated id. An id absent here is absent from the store, because a record the
+   * store holds and does not serve refuses the whole read below rather than reaching a lookup.
    */
   readonly byId: ReadonlyMap<ItemId, WorkItem>
-  /** Ids the store holds records for and refuses to serve, with the finding that says why. */
-  readonly unserved: ReadonlyMap<ItemId, Finding>
   readonly hierarchy: HierarchyGraph
   readonly relations: RelationGraph
 }
 
-export async function readWorkspace(store: Store): Promise<StoreResult<WorkspaceView>> {
+/**
+ * Findings that report a fact about content the store still serves: a CRLF file the next
+ * write normalises, a hierarchy that closes a cycle. Every other finding names content the
+ * store holds and does not serve, whether it carries an id (a quarantined record, a duplicated
+ * one) or not (a file over its ceiling, at a newer schema, or without its schema line, an event
+ * line the log could not read). A rule not listed here is treated as hiding content, which is
+ * the loud direction to be wrong in.
+ */
+const SERVED_ANYWAY: ReadonlySet<string> = new Set(['H16', 'S12'])
+
+export function hidesContent(finding: Finding): boolean {
+  return !SERVED_ANYWAY.has(finding.rule)
+}
+
+export type ReadOptions = {
+  /**
+   * Serve the view over a store that holds content it cannot serve. `doctor` is the one
+   * caller, because its answer is the list of what is missing and cannot be refused for it.
+   */
+  readonly partial?: true
+}
+
+/**
+ * The one read every command builds its answer on, and therefore the one place the answer
+ * is refused when it could not be whole. ADR-0003 rule 7 says damage to a record never
+ * silently changes which records exist; the store keeps that promise by quarantining the
+ * record and reporting a finding, and this function keeps it for every command by refusing
+ * to hand out a view the finding says is missing something. Every answer depends on the set:
+ * a backlog counts it, a gate reads an item's children from it, a new id is chosen against
+ * it. A view with a hole is therefore a wrong answer for all of them, not a partial one, so
+ * the refusal names the first hole with its file, line and reason, counts the rest, and
+ * points at `doctor`, which lists them all.
+ */
+export async function readWorkspace(store: Store, options: ReadOptions = {}): Promise<StoreResult<WorkspaceView>> {
   const identity = await store.identity()
   if (!identity.ok) return identity
   const items = await store.list()
@@ -63,17 +95,25 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   const findings = await store.findings()
   if (!findings.ok) return findings
 
-  const byId = new Map(items.value.map((item) => [item.id, item]))
-  const unserved = new Map(findings.value.flatMap(
-    (finding) => (finding.id === undefined || byId.has(finding.id) ? [] : [[finding.id, finding] as const]),
-  ))
+  if (options.partial !== true) {
+    const hidden = findings.value.filter(hidesContent)
+    const first = hidden[0]
+    if (first !== undefined) {
+      const rest = hidden.length === 1 ? 'that finding hides a record' : `${hidden.length} findings hide records`
+      return storeFail(
+        'INTEGRITY', first.rule,
+        `${first.file} line ${first.line}: ${first.reason}; ${rest} this workspace holds, so no answer over it is whole`,
+        first.id === undefined ? [] : [first.id],
+      )
+    }
+  }
+
   return {
     ok: true,
     value: {
       identity: identity.value,
       items: items.value,
-      byId,
-      unserved,
+      byId: new Map(items.value.map((item) => [item.id, item])),
       hierarchy: hierarchyFrom(items.value),
       relations: emptyRelationGraph(),
     },

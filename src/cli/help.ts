@@ -89,6 +89,7 @@ export function commandHelp(name: string, workspace: string): ResultObject | und
       usage: command.usage,
       about: command.shape.summary,
       example: examplesOf(command),
+      ...(command.exits === undefined ? {} : { exit: command.exits.map(([status, meaning]) => `${status} ${meaning}`) }),
       flags,
     },
   })

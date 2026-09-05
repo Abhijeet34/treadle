@@ -261,7 +261,8 @@ describe('a hand edit of severity or priority is a finding', () => {
     await editShard(demo, (text) => text.replace(/^severity: S1$/m, 'severity: S4'))
 
     const found = await cli(['doctor'])
-    assert.equal(found.code, 0)
+    assert.equal(found.code, 7, 'a finding is a verdict the exit status carries')
+    assert.match(found.out, /^ok doctor /, 'the table is the answer, so it stays on stdout')
     assert.match(found.out, /^H20 sess-timeout severity severity is S4 in the record and the last event to record it says S1;/m)
     await demo.dispose()
   })
