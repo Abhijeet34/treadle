@@ -43,6 +43,11 @@ An event file that only grew has the hash of its old prefix compared against the
 
 The index caches each record's canonical source rather than its columns, so `get` returns a whole item without reopening the shard, and every answer is still a parse of bytes that came off disk.
 
+Event queries order by `(at, rowid)` and not by `(at, id)`.
+Instants are second-resolution and event ids are random, so two writes in one second, which is routine under an agent, would otherwise come back in lexicographic id order rather than in the order they happened.
+Rows enter the events table in the order the append-only log holds them, and an instant never spans two files because the file is chosen by the month of that same instant, so `rowid` is that append order.
+Every caller that asks for the last event of an entity depends on it: the conflict message that names who moved a record (ADR-0004) and `explain`'s account of when an item entered its state and why.
+
 ### Deleting the index is harmless, and that is a test
 
 `test/store/index-cache.test.ts` deletes the whole `.index` directory ten times in a loop and asserts the full read set (`list`, `events`, `findings`) is byte-identical each time, then asserts the database file exists again afterwards.

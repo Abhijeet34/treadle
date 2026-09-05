@@ -124,8 +124,11 @@ export class IndexCache {
             item.sprint, item.points, item.priority, item.version, item.assignee,
             item.filed_at, item.title, item.source)
         } catch {
-          // The id is already in the store from another file. D1 obligation 4: a named
-          // refusal for this record, never a silent first-match, and the rest keeps serving.
+          // The id is already in the store. D1 obligation 4: a named refusal for this
+          // record, never a silent first-match, and the rest keeps serving. The finding is
+          // half of that: `duplicateRefusal` in the store port is the other half, because
+          // quarantining the copy on read while the write path picks one by document order
+          // is the silent first-match wearing a report.
           clashes.push({
             file, line: item.line, rule: 'S3', id: item.id,
             reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,
@@ -242,15 +245,23 @@ export class IndexCache {
     const limit = query.limit === undefined ? '' : ' limit ?'
     if (query.limit !== undefined) values.push(query.limit)
     const rows = this.#open()
-      .prepare(`select source from events${clause} order by at, id${limit}`)
+      .prepare(`select source from events${clause} order by at, rowid${limit}`)
       .all(...values) as unknown as readonly { source: string }[]
     return rows.map((row) => JSON.parse(row.source) as StoreEvent)
   }
 
-  /** The write that last moved a record, which a conflict names (interface A.6 rule 5). */
+  /**
+   * The write that last moved a record, which a conflict names (interface A.6 rule 5).
+   *
+   * `rowid` and not `id` breaks the tie. Instants are second-resolution, so two writes in
+   * one second are routine under an agent, and the ids are random: ordering by id then
+   * picks a lexicographic winner rather than the later write. Rows enter this table in the
+   * order the append-only log holds them, and an `at` never spans two files because the file
+   * is chosen by the month of that same instant, so `rowid` is that append order.
+   */
   lastEventFor(entity: string): StoreEvent | undefined {
     const row = this.#open()
-      .prepare('select source from events where entity = ? order by at desc, id desc limit 1')
+      .prepare('select source from events where entity = ? order by at desc, rowid desc limit 1')
       .get(entity) as unknown as { source: string } | undefined
     return row === undefined ? undefined : (JSON.parse(row.source) as StoreEvent)
   }
