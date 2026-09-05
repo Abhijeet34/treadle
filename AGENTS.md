@@ -150,6 +150,11 @@ Before hand-checking any of these, run the suite: it already checks them.
   and every third-party action in every workflow is pinned to a 40-character commit SHA
   (`test/architecture/supply-chain.test.ts`). That file is threat-model finding F13's
   enforcement; `npm run licences` is the other half and refuses a licence off the allowlist.
+- `@types/node`'s major matches `engines.node`'s floor, in the same file.
+  Its major says which Node the code may call, so a major ahead of the floor lets `tsc` accept
+  an API that is absent there and only a test that happens to run the line would catch it.
+  Raise `engines.node` first and the bump follows; `.github/dependabot.yml` ignores the major
+  until then.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
   `scripts/check-dco.sh` and commitlint over a pull request's commits. The trailer's name must
   match the author's name; the address may differ only for a GitHub App author, which is why a
