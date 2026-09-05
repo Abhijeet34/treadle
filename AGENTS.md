@@ -1,6 +1,10 @@
 # Project agent memory
 
-This file is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
+This file is the entry point for any agent or harness working in this repository, and there is no vendor-specific companion to read instead.
+treadle's interface to an agent is its output contract and its schemas, so nothing here is addressed to one tool.
+If your harness looks for a file under another name, point it at this one.
+
+It is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
 - Add durable project-specific notes here as they are discovered through real work.
 
