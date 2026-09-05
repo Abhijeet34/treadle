@@ -151,6 +151,17 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       type: 'task', title: 'Add a health endpoint', id: 'health-endpoint',
       fields: { points: '1', priority: '4' }, actor: ACTOR,
     }))
+    // A second status, taken last so it moves none of the figures above. The workspace has
+    // no missed date until this item exists, so without it the `overdue` scalar and the
+    // `health` block reach no renderer and no schema check.
+    await fileItem(targetFor(demo.store, 'apply'), fixedClock('2026-08-20T09:00:00Z'), ids, {
+      type: 'task', title: 'Rotate the signing key', id: 'key-rotate',
+      fields: { priority: '2', due: '2026-08-28T09:00:00Z' }, actor: ACTOR,
+    })
+    golden.set('status-overdue', await status(demo.store, clock))
+    // The same store read before that date passes, which is the one pair whose difference
+    // is the date alone rather than the date and an extra item.
+    golden.set('status-not-yet-overdue', await status(demo.store, fixedClock('2026-08-27T09:00:00Z')))
     return golden
   } finally {
     await demo.dispose()

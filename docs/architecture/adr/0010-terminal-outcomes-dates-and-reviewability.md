@@ -95,7 +95,7 @@ Measured on the golden 24-item workspace, in the `agent/1` rendering:
 | Read | Before | After | Why |
 |---|---|---|---|
 | `status`, nothing overdue | 440 B | 440 B | both new lines are absent when there is nothing to say |
-| `status`, one overdue item nobody owns | 440 B | 513 B | `overdue 1` and a three-column block naming the record |
+| `status`, one overdue item nobody owns | 448 B | 521 B | `overdue 1` and a three-column block naming the record. One store read either side of one date, which is the only pair whose difference is the date alone; the two goldens are `status-not-yet-overdue` and `status-overdue` |
 | `show`, an item with no due date and no resolution | 273 B | 273 B | an absent optional field is an absent line |
 | `show`, a cancelled item | - | +19 B to +22 B | one `resolution` line, whichever value it carries |
 | `show`, an item two days past its date | - | +35 B | `due` and `overdue` |
