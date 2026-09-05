@@ -96,6 +96,29 @@ export const SHOW_SHAPE: ResultShape = {
       key: 'evidence',
       columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
     },
+    // Everything below reached no read surface at all until the field sweep, so it is
+    // appended rather than placed: STABILITY's output-schema rule makes a field added at the
+    // end of the property order a non-breaking change and a reordering a breaking one, and
+    // the line rendering is a projection of this order. A field absent from a record is an
+    // absent line, so a story pays nothing for a bug's six.
+    { kind: 'scalar', key: 'hrs', type: 'integer' },
+    { kind: 'scalar', key: 'labels', type: 'string' },
+    { kind: 'scalar', key: 'found', type: 'string' },
+    { kind: 'scalar', key: 'fixed', type: 'boolean' },
+    { kind: 'scalar', key: 'timebox', type: 'integer' },
+    { kind: 'scalar', key: 'hold_until', type: 'string' },
+    { kind: 'scalar', key: 'held_from', type: 'string' },
+    { kind: 'scalar', key: 'extra', type: 'integer' },
+    { kind: 'text', key: 'reporter' },
+    { kind: 'text', key: 'reviewer' },
+    { kind: 'text', key: 'component' },
+    { kind: 'text', key: 'hold' },
+    { kind: 'text', key: 'outcome' },
+    { kind: 'text', key: 'question' },
+    { kind: 'text', key: 'repro' },
+    { kind: 'text', key: 'expected' },
+    { kind: 'text', key: 'actual' },
+    { kind: 'text', key: 'findings' },
   ],
 }
 
@@ -304,6 +327,32 @@ export async function showItem(
       })),
     }
   }
+
+  // The rest of the field dictionary, in the shape's own appended order. Each was stored on
+  // every write and printed by nothing, which is the defect class the sweep in
+  // test/architecture/field-visibility.test.ts now holds the whole dictionary to.
+  if (item.hours_estimate !== undefined) data['hrs'] = item.hours_estimate
+  if (item.labels !== undefined && item.labels.length > 0) data['labels'] = item.labels.join(',')
+  if (item.found_in !== undefined) data['found'] = item.found_in
+  if (item.fix_confirmed !== undefined) data['fixed'] = item.fix_confirmed
+  if (item.timebox_hours !== undefined) data['timebox'] = item.timebox_hours
+  if (item.hold_until !== undefined) data['hold_until'] = item.hold_until
+  if (item.held_from !== undefined) data['held_from'] = item.held_from
+  // A count and not the values: `extra` holds keys a newer writer produced that this build
+  // has no meaning for (DR3), and printing one as if it were a field of the record invites a
+  // caller to act on a value nothing here can validate. The count says the record carries
+  // them, which is the part a reader of this version can act on.
+  if (item.extra !== undefined && item.extra.size > 0) data['extra'] = item.extra.size
+  if (item.reporter !== undefined) data['reporter'] = item.reporter
+  if (item.reviewer !== undefined) data['reviewer'] = item.reviewer
+  if (item.component !== undefined) data['component'] = item.component
+  if (item.hold_reason !== undefined) data['hold'] = item.hold_reason
+  if (item.outcome !== undefined) data['outcome'] = item.outcome
+  if (item.question !== undefined) data['question'] = item.question
+  if (item.repro_steps !== undefined) data['repro'] = item.repro_steps
+  if (item.expected !== undefined) data['expected'] = item.expected
+  if (item.actual !== undefined) data['actual'] = item.actual
+  if (item.findings !== undefined) data['findings'] = item.findings
 
   if (field === undefined) return okResult(SHOW_SHAPE, { workspace, data })
   if (!(field in data)) {

@@ -15,9 +15,10 @@ import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
+import { history } from '../application/services/history.ts'
 import { explain, next, status } from '../application/services/insight.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import type { Actor, Mode, Target } from '../application/services/mutation.ts'
+import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
 import { randomIds } from '../adapters/ids.ts'
@@ -235,6 +236,18 @@ async function execute(env: Environment): Promise<number> {
     write: (line) => env.streams.err(`${line}\n`),
   })
 
+  // The actor lands whole in the append-only log, which is the third unbounded prose door
+  // this tool has closed: T7 bounded a transition's reason for the same reason, and the log
+  // is now read back by `history`, so an unbounded identity would be unbounded output too.
+  // The bound applies only where the actor is recorded: a mutating command writes it into an
+  // event, while a read command accepts and ignores it, per the inventory's own 'A' verdict.
+  if (commandNamed(command ?? 'status')?.effect === 'mutate') {
+    const badActor = actorRefusal(actorOf(env, flags))
+    if (badActor !== undefined) {
+      return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)
+    }
+  }
+
   if (command === 'init') {
     const at = flag(flags, 'workspace') ?? path.join(env.cwd, WORKSPACE_DIR)
     const name = flag(flags, 'name')
@@ -329,6 +342,14 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === 'explain') {
     if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadle backlog'])
     return explain(store, id)
+  }
+  if (command === 'history') {
+    if (id === undefined) return validation('history', 'history needs the id of one item', ['treadle backlog'])
+    const cursor = flag(flags, 'cursor')
+    return history(store, id, {
+      limit: positiveInt(flag(flags, 'limit'), 9),
+      ...(cursor === undefined ? {} : { cursor }),
+    })
   }
 
   if (command === 'file') {

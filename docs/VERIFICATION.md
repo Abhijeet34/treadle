@@ -130,6 +130,68 @@ Reading always works, so the bound is a write-time rule and the store's S5 ceili
 
 A bound that stops an old file from being read is not a bound, it is a data loss.
 
+## The fourth field of one class, and the gate that ends it
+
+Question 15 of the benchmark's question-coverage axis, "who changed X", scored `none`, with this verdict:
+
+> every event carries an actor and no read surface prints one; the answer is in the store and not behind a command
+
+That is the third instance of one defect: a field captured faithfully on every write and shown by no command.
+`severity` was required at creation and printed nowhere, a severity change was recorded in no event, and the actor is on every event line and reached no command.
+So this branch answered the question and then swept the whole dictionary for the same shape.
+
+**The sweep, measured.**
+The store persists 35 work-item fields and 14 event keys.
+Counted against the shapes at the branch base, 18 of the 35 and 11 of the 14 reached no read surface at all: `actual`, `component`, `expected`, `extra`, `findings`, `fix_confirmed`, `found_in`, `held_from`, `hold_reason`, `hold_until`, `hours_estimate`, `labels`, `outcome`, `question`, `reporter`, `repro_steps`, `reviewer` and `timebox_hours` on the record, and `actor`, `actor_kind`, `entity_kind`, `entity`, `op`, `before`, `after`, `guards`, `outcome`, `cmd` and `txn` in the log.
+Of those 29, 24 are readable now and 5 are declared hidden with a reason.
+
+**Question 15's answer, as it prints.**
+`history <id>` is the reader [ADR-0011](architecture/adr/0011-evidence-and-the-severity-audit.md) named when it widened the `file` event to carry the fields an item was created with.
+
+```text
+$ treadle history pay-hook
+ok history demo
+item pay-hook
+sort at desc
+~events 4 4
+#at kind op what "by
+2026-09-05T12:10:07Z human item.transition state kim
+2026-09-05T12:10:07Z human item.transition state ravi
+2026-09-05T12:10:07Z agent item.mark severity agent-7
+2026-09-05T12:10:06Z human item.file type,state,filed_at,priority,points,severity,found_in dana
+```
+
+`explain` gains one line for the same fact about the write that put the item where it is, because that is where the axis looked and it already reads that event for `since` and `from_event`:
+
+```text
+$ treadle explain pay-hook
+...
+sev S1
+"by kim
+```
+
+The decision per field is in `test/architecture/field-visibility.test.ts` rather than here, because a table in a document drifts and that one is executed.
+Every persisted field has a line naming the result key that carries it or the reason it stays hidden, and a field with neither fails by name.
+
+**Red before green.**
+Three trees, each the branch tip with one part of the fix removed.
+Back out `show`'s field additions and the gate says `item hours_estimate claims show:hrs, and the show shape declares no hrs`.
+Keep the shape and remove only the assignments and it says `hours_estimate claims show:hrs and no record printed hrs`, so declaring a surface that never prints the field is not a way through.
+Remove the `by` column and the gate states question 15 as a failing assertion: `event actor claims history:by, and the history shape declares no by`.
+The three CLI cases in `test/cli/found-by-use.test.ts` fail at the branch base too: `history` exits 2 as an unknown command, `explain` prints no `by`, and a 201-character actor is accepted.
+
+**What it costs, in bytes.**
+The A.3 budgets are unchanged and every budgeted artefact is inside its own.
+The golden `show` is a story carrying none of the new fields and is 273 B against 310 as before; `explain` moves 429 B to 438 B against 754.
+`history` is a new command and A.3 carries no figure for it: the golden is 280 B, gated here at 380 B, which is the 75 percent fill A.3 gave `backlog` (717 of 960) and `next` (380 of 510).
+
+The finding A.3 does not cover is that one budget for `show` is measured on one record type.
+The same workspace, read with the branch base and then with the tip: a bug goes 263 B to 604 B, a spike 121 B to 336 B, an epic 119 B to 172 B, an item on hold 129 B to 218 B, and a cancelled chore stays at 142 B.
+A bug is the expensive record because a bug has six more stored fields than a task, three of them prose, and the reason its `show` looked cheap was that those fields were not printed.
+That is a budget for the budget owner to state per type, not a set of required fields to hide so a story's figure holds.
+
+A field a caller can set and cannot read back is a field the tool cannot answer for.
+
 ## The defect this work found
 
 Writing the coverage gate exposed two reachable filesystem-failure paths on the same class.

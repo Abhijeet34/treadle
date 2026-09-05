@@ -1,0 +1,353 @@
+// SPDX-License-Identifier: Apache-2.0
+// Every field the store persists, against every field a read surface prints.
+//
+// Three defects of one class have landed in this product, each found by using the tool and
+// none by reading the code: `severity` was required at creation and printed nowhere, a
+// severity or priority change was recorded in no event, and every event carried an actor
+// that no command printed. Each was a field captured faithfully on a write and then never
+// shown, which makes the tool unable to answer for what it stores.
+//
+// This file is the gate that makes a fourth one a failing test rather than a benchmark
+// finding. The rule is not "print everything": adding every field to every output would
+// blow the byte budgets in docs/BENCHMARKS.md that this product competes on. The rule is
+// that every persisted field carries a decision, and that a hidden field is declared with
+// its reason rather than silently missing.
+//
+// WHAT A FUTURE FIELD'S AUTHOR HAS TO DO. Add the field to the dictionary in
+// src/domain/fields.ts, or a key to `EVENT_KEYS` in src/adapters/store/event-log.ts, then
+// add one line to `ITEM_FIELDS` or `EVENT_FIELDS` below:
+//
+//   `readable('<command>:<key>')` naming the result key or block column that carries it,
+//   or `hidden('<why it is not printed>')` with a reason a reader can weigh.
+//
+// There is no third answer. A field with no line fails the first test in this file, by
+// name; a `readable` line whose key no shape declares fails the third; and a `readable`
+// line whose key a real record never prints fails the fifth, so declaring a surface that
+// does not print it is not a way through.
+
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { describe, it, before, after } from 'node:test'
+
+import { WORK_ITEM_TYPES, fieldsOf, type WorkItem } from '../../src/domain/index.ts'
+import { EVENT_KEYS } from '../../src/adapters/store/event-log.ts'
+import { SHAPES } from '../../src/application/shapes.ts'
+import { agentRenderer } from '../../src/adapters/render/agent.ts'
+import type { ResultObject } from '../../src/application/result.ts'
+import type { Store } from '../../src/application/ports/store.ts'
+import { showItem } from '../../src/application/services/items.ts'
+import { history } from '../../src/application/services/history.ts'
+import { explain } from '../../src/application/services/insight.ts'
+import { fileItem } from '../../src/application/services/items.ts'
+import { addEvidence, markItem } from '../../src/application/services/marking.ts'
+import { transition } from '../../src/application/services/lifecycle.ts'
+import { makeEvent, type Actor } from '../../src/application/services/mutation.ts'
+import { fixedClock } from '../../src/adapters/clock.ts'
+import { sequentialIds } from '../../src/adapters/ids.ts'
+import { openWorkspace } from '../../src/adapters/store/index.ts'
+import { targetFor } from '../../src/adapters/target.ts'
+import { initWorkspace } from '../../src/adapters/workspace.ts'
+
+type Decision =
+  | { readonly kind: 'readable'; readonly at: string; readonly note?: string }
+  | { readonly kind: 'hidden'; readonly why: string }
+
+const readable = (at: string, note?: string): Decision =>
+  note === undefined ? { kind: 'readable', at } : { kind: 'readable', at, note }
+const hidden = (why: string): Decision => ({ kind: 'hidden', why })
+
+/** Every field of the work-item dictionary, and the surface that prints it. */
+const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
+  id: readable('show:item'),
+  type: readable('show:type'),
+  state: readable('show:state'),
+  title: readable('show:title'),
+  filed_at: readable('show:filed'),
+  version: readable('show:v'),
+  description: readable('show:desc', 'cut at 64 cells, whole under `show <id> --field desc`'),
+  priority: readable('show:pri'),
+  points: readable('show:pts'),
+  hours_estimate: readable('show:hrs'),
+  parent_id: readable('show:parent'),
+  assignee: readable('show:assignee'),
+  reporter: readable('show:reporter'),
+  reviewer: readable('show:reviewer'),
+  component: readable('show:component'),
+  labels: readable('show:labels'),
+  sprint_id: readable('show:sprint'),
+  due: readable('show:due'),
+  evidence: readable('show:evidence'),
+  hold_reason: readable('show:hold'),
+  hold_until: readable('show:hold_until'),
+  held_from: readable('show:held_from'),
+  resolution: readable('show:resolution'),
+  extra: readable('show:extra', 'the count and not the values: these are keys a newer writer produced that this build has no meaning for (DR3), and printing one as a field of the record invites a caller to act on a value nothing here can validate'),
+  outcome: readable('show:outcome'),
+  acceptance_criteria: readable('show:ac', 'ticked over total; the criteria themselves are the record file, which D1 makes authoritative'),
+  severity: readable('show:sev'),
+  repro_steps: readable('show:repro'),
+  expected: readable('show:expected'),
+  actual: readable('show:actual'),
+  found_in: readable('show:found'),
+  fix_confirmed: readable('show:fixed'),
+  question: readable('show:question'),
+  timebox_hours: readable('show:timebox'),
+  findings: readable('show:findings'),
+}
+
+/** Every key one line of the append-only event log carries, and the surface that prints it. */
+const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
+  id: readable('explain:from_event', 'and the `event` line every mutation prints for the write it just made'),
+  at: readable('history:at'),
+  actor: readable('history:by'),
+  actor_kind: readable('history:kind'),
+  entity_kind: hidden('one value is ever written. `makeEvent` defaults it to `item` and no caller passes another, so a column of it would be a column of one constant; it becomes a column when a second entity kind does, which is the sprint and impediment work that is separately ordered.'),
+  entity: hidden('it is the argument. `history <id>` and `explain <id>` are both asked for one entity and every row they print is that entity, so the column would restate the `item` line above it.'),
+  op: readable('history:op'),
+  before: hidden('the values a change moved away from. `history` names the fields a change moved and `show` prints what they are now, so a `before` column would put a per-row copy of the old record inside a list whose budget is per row. The one question the old value answers alone is whether the record still agrees with the log, and `doctor` H20 asks it against the record rather than printing it.'),
+  after: readable('history:what', 'the field names, not the values: a value may carry a space and the row grammar allows one space-bearing column, which the actor is'),
+  guards: readable('history:what', 'as `override=<guard>`. A guard that fails refuses the write, so every guard in a stored event passed and a column of `pass` would be noise; an overridden guard is the one that is not'),
+  reason: readable('explain:reason', 'for the write that put the item in its current state. It is bounded at 500 characters, so it is printed for the one event a reader asked about rather than on every row of a list'),
+  outcome: readable('history:what', 'as `outcome=<v>`'),
+  cmd: hidden('`op` is the same fact in the vocabulary the store owns: `item.mark` for `mark`. `cmd` is kept in the log so a later rename of a command stays traceable against old events, and printing both prints one fact twice.'),
+  txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
+}
+
+const ACTOR: Actor = { id: 'dana', kind: 'human' }
+const AGENT: Actor = { id: 'agent-7', kind: 'agent' }
+const NOW = '2026-09-05T09:00:00Z'
+
+/** Every field name the record grammar can persist, over every type. */
+function persistedItemFields(): readonly string[] {
+  return [...new Set(WORK_ITEM_TYPES.flatMap((type) => fieldsOf(type)))].sort()
+}
+
+function shapeOf(command: string) {
+  return SHAPES.find((shape) => shape.command === command)
+}
+
+/** Whether one shape declares a key, as a property of its own or as a column of a block. */
+function declares(command: string, key: string): boolean {
+  const shape = shapeOf(command)
+  if (shape === undefined) return false
+  return shape.properties.some((property) =>
+    property.key === key
+    || (property.kind === 'block' && property.columns.some((column) => column.name === key)))
+}
+
+/**
+ * The keys one agent rendering actually printed. A scalar, a marked scalar, a text block, a
+ * truncation note and a block opener all lead with their key; a `#` header names the columns
+ * of the rows under it, each marked column carrying the same leading quote.
+ */
+function printedKeys(text: string): ReadonlySet<string> {
+  const keys = new Set<string>()
+  for (const line of text.split('\n')) {
+    if (line.length === 0) continue
+    if (line.startsWith('#')) {
+      for (const column of line.slice(1).split(' ')) keys.add(column.replace(/^"/, ''))
+      continue
+    }
+    const head = line.split(' ')[0] as string
+    keys.add(head.replace(/^["~|+]/, ''))
+  }
+  return keys
+}
+
+type Rig = {
+  readonly store: Store
+  readonly dispose: () => Promise<void>
+}
+
+/**
+ * One workspace carrying every field of every type, and a log carrying every kind of event.
+ * The items are filed through the real use cases, so a field that no write path can set is
+ * a finding here rather than a fixture the suite writes by hand; `extra` is the exception
+ * and is applied to the store directly, because by construction only a newer writer produces
+ * one, and the overridden guard is appended for the same reason: all three overridable
+ * guards read a relation graph or a board, and neither exists in this build.
+ */
+async function aWorkspaceCarryingEveryField(): Promise<Rig> {
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-fields-'))
+  const root = path.join(parent, 'platform', '.work')
+  const ids = sequentialIds()
+  const clock = fixedClock(NOW)
+  await initWorkspace(clock, ids, { at: root, name: 'field-sweep', actor: ACTOR })
+
+  const opened = await openWorkspace(root)
+  if (!opened.ok) throw new Error(opened.error.message)
+  const store = opened.value
+  const apply = targetFor(store, 'apply')
+
+  const file = async (type: string, title: string, id: string, fields: Record<string, string>) => {
+    const result = await fileItem(apply, clock, ids, {
+      type: type as 'task', title, id, fields, actor: ACTOR,
+    })
+    if (!result.ok) throw new Error(`${id}: ${String(result.data['cause'])}`)
+  }
+  const move = async (id: string, target: string, extra: Record<string, string> = {}) => {
+    const result = await transition(apply, clock, ids, {
+      id, target: target as 'ready', actor: ACTOR, reason: 'fixture', ...extra,
+    })
+    if (!result.ok) throw new Error(`${id} -> ${target}: ${String(result.data['cause'])}`)
+  }
+
+  await file('epic', 'Checkout works end to end', 'every-epic', {
+    outcome: 'a customer can pay without a support ticket',
+  })
+  await file('story', 'Refresh the access token on a 401', 'every-story', {
+    description: 'the client drops the session when the token expires',
+    acceptance_criteria: 'a 401 refreshes once|the retry carries the new token',
+    points: '5', priority: '2', hours_estimate: '6', parent_id: 'every-epic',
+    assignee: 'kim', reporter: 'ravi', reviewer: 'dana', component: 'payments',
+    labels: 'revenue,regression', sprint_id: 'sprint-31', due: '2026-09-30T09:00:00Z',
+  })
+  await file('bug', 'Checkout drops paid orders', 'every-bug', {
+    severity: 'S2', found_in: 'production', fix_confirmed: 'false',
+    repro_steps: 'add two items to the cart and pay with a saved card',
+    expected: 'both orders are listed', actual: 'one order is listed and the other is charged',
+  })
+  await file('spike', 'Which payment retry strategy', 'every-spike', {
+    question: 'do we retry on the gateway or in the queue', timebox_hours: '8',
+    findings: 'the gateway retries twice already',
+  })
+  await file('task', 'Rotate the payment signing key', 'every-held', { points: '2' })
+  await move('every-held', 'ready')
+  await move('every-held', 'on_hold', { until: '2026-10-15T09:00:00Z' })
+  await file('chore', 'Remove OAuth 1 support', 'every-stopped', {})
+  await move('every-stopped', 'cancelled', { resolution: 'superseded' })
+
+  // The bug's own log: a mark, an evidence pointer and a release that names its outcome.
+  const marked = await markItem(apply, clock, ids, {
+    id: 'every-bug', severity: 'S1', reason: 'it drops paid orders', actor: AGENT,
+  })
+  if (!marked.ok) throw new Error(String(marked.data['cause']))
+  const pointed = await addEvidence(apply, clock, ids, {
+    id: 'every-bug', kind: 'run', ref: '8813', label: '664 pass', actor: ACTOR,
+  })
+  if (!pointed.ok) throw new Error(String(pointed.data['cause']))
+  await move('every-bug', 'ready')
+  await move('every-bug', 'in_progress')
+  await move('every-bug', 'ready', { outcome: 'failed' })
+
+  const stored = await store.get('every-story')
+  if (!stored.ok || stored.value === undefined) throw new Error('every-story is not stored')
+  const withExtra = { ...stored.value, extra: new Map([['a_field_from_2027', 'kept verbatim']]) } as WorkItem
+  const applied = await store.apply({
+    txn: 'tfields1',
+    writes: [{ item: withExtra, ifVersion: stored.value.version }],
+    events: [makeEvent({
+      id: 'efields1', at: NOW, actor: ACTOR, entity: 'every-bug', op: 'item.transition',
+      before: { state: 'ready' }, after: { state: 'in_progress' },
+      guards: [{ guard: 'G2', pass: true, overridden: true }],
+      reason: 'an override is the one guard verdict a stored event can disagree about',
+      txn: 'tfields1', command: 'transition',
+    })],
+  })
+  if (!applied.ok) throw new Error(applied.error.message)
+
+  return {
+    store,
+    dispose: async () => {
+      await store.close()
+      await rm(parent, { recursive: true, force: true })
+    },
+  }
+}
+
+describe('every persisted field carries a visibility decision', () => {
+  it('has one decision per field of the work-item dictionary, and none for a field it has not got', () => {
+    assert.deepEqual(
+      Object.keys(ITEM_FIELDS).sort(),
+      persistedItemFields(),
+      'a field of the dictionary with no line in ITEM_FIELDS, or a line naming a field the dictionary does not carry; see the header of this file',
+    )
+  })
+
+  it('has one decision per key of the event log', () => {
+    assert.deepEqual(
+      Object.keys(EVENT_FIELDS).sort(),
+      [...EVENT_KEYS].sort(),
+      'a key of EVENT_KEYS with no line in EVENT_FIELDS, or a line naming a key the log does not carry',
+    )
+  })
+
+  it('names, for every readable decision, a key its command declares', () => {
+    for (const [scope, table] of [['item', ITEM_FIELDS], ['event', EVENT_FIELDS]] as const) {
+      for (const [field, decision] of Object.entries(table)) {
+        if (decision.kind !== 'readable') continue
+        const [command, key] = decision.at.split(':')
+        assert.ok(command !== undefined && key !== undefined, `${scope} ${field}: a readable decision is written <command>:<key>`)
+        assert.ok(
+          declares(command as string, key as string),
+          `${scope} ${field} claims ${decision.at}, and the ${command} shape declares no ${key}`,
+        )
+      }
+    }
+  })
+
+  it('gives, for every hidden decision, a reason rather than a restatement', () => {
+    for (const [scope, table] of [['item', ITEM_FIELDS], ['event', EVENT_FIELDS]] as const) {
+      for (const [field, decision] of Object.entries(table)) {
+        if (decision.kind !== 'hidden') continue
+        assert.ok(
+          decision.why.length >= 40 && decision.why !== field,
+          `${scope} ${field} is hidden with no reason a reader can weigh`,
+        )
+      }
+    }
+  })
+})
+
+describe('a real record and a real log print what the decisions claim', () => {
+  let rig: Rig
+  let itemKeys: ReadonlySet<string>
+  let eventKeys: ReadonlySet<string>
+
+  before(async () => {
+    rig = await aWorkspaceCarryingEveryField()
+    const clock = fixedClock(NOW)
+    const shown = new Set<string>()
+    for (const id of ['every-epic', 'every-story', 'every-bug', 'every-spike', 'every-held', 'every-stopped']) {
+      const result = await showItem(rig.store, clock, id)
+      assert.equal(result.ok, true, `show ${id} refused`)
+      for (const key of printedKeys(agentRenderer.render(result))) shown.add(key)
+    }
+    itemKeys = shown
+
+    const printed = new Set<string>()
+    const log = await history(rig.store, 'every-bug', { limit: 20 })
+    assert.equal(log.ok, true)
+    const why = await explain(rig.store, 'every-bug')
+    assert.equal(why.ok, true)
+    for (const result of [log, why] as readonly ResultObject[]) {
+      for (const key of printedKeys(agentRenderer.render(result))) printed.add(key)
+    }
+    // `what` names the column; the values it carries are what the three decisions claim.
+    const rows = agentRenderer.render(log)
+    assert.match(rows, /override=G2/, 'an overridden guard reaches the what column')
+    assert.match(rows, /outcome=failed/, 'the attempt outcome reaches the what column')
+    assert.match(rows, /item\.mark severity/, 'the fields a change moved reach the what column')
+    eventKeys = printed
+  })
+
+  after(async () => { await rig.dispose() })
+
+  it('prints every key an item decision calls readable', () => {
+    for (const [field, decision] of Object.entries(ITEM_FIELDS)) {
+      if (decision.kind !== 'readable') continue
+      const key = decision.at.split(':')[1] as string
+      assert.ok(itemKeys.has(key), `${field} claims ${decision.at} and no record printed ${key}`)
+    }
+  })
+
+  it('prints every key an event decision calls readable', () => {
+    for (const [field, decision] of Object.entries(EVENT_FIELDS)) {
+      if (decision.kind !== 'readable') continue
+      const key = decision.at.split(':')[1] as string
+      assert.ok(eventKeys.has(key), `${field} claims ${decision.at} and no log printed ${key}`)
+    }
+  })
+})

@@ -78,6 +78,7 @@ function invocations(inside: string, elsewhere: string): ReadonlyMap<string, Inv
     ['doctor', ['doctor']],
     ['next', ['next', '--limit', '3']],
     ['explain', ['explain', 'auth-refresh']],
+    ['history', ['history', 'auth-refresh']],
     ['status', ['status']],
     ['help', ['help']],
     ['version', ['version']],

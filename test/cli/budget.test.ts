@@ -25,6 +25,11 @@ const BUDGET: Readonly<Record<string, number>> = {
   show: 310,
   next: 510,
   explain: 750,
+  // A.3 predates the command, so this figure is derived rather than quoted: the golden
+  // history is 280 B, and 380 gives it the same 75 percent fill that A.3 gave `backlog`
+  // (717 of 960) and `next` (380 of 510). The budget owner reconciles it with A.3 and with
+  // the copy of this table in bench/axes/a3-output.ts.
+  history: 380,
   transition: 230,
   'transition-already': 110,
   'transition-dry-run': 250,

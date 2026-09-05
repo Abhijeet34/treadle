@@ -150,6 +150,45 @@ describe('the defects found by using the tool', () => {
       assert.doesNotMatch(explained.out, /^"?reason/m)
     })
   })
+
+  describe('who changed it: the actor every event carries reaches a read surface', () => {
+    it('names the actor of each change in history, newest first', async () => {
+      const moved = await cli(['transition', 'i18n-dates', 'ready', '--actor', 'ravi'])
+      assert.equal(moved.code, 0, moved.err)
+
+      const log = await cli(['history', 'i18n-dates'])
+      assert.equal(log.code, 0, log.err)
+      assert.match(log.out, /^#at kind op what "by$/m, 'the actor column is marked as third-party content')
+      assert.match(log.out, /^\S+ human item\.transition state ravi$/m)
+      assert.match(log.out, /^\S+ human item\.file [a-z_,]+ dana$/m)
+      const rows = log.out.split('\n').filter((line) => /^2026-/.test(line))
+      assert.deepEqual([...rows].sort().reverse(), rows, 'the rows are newest first')
+    })
+
+    it('names the actor of the write that put the item where it is, in explain', async () => {
+      const explained = await cli(['explain', 'i18n-dates'])
+      assert.equal(explained.code, 0, explained.err)
+      assert.match(explained.out, /^"by ravi$/m)
+    })
+
+    it('refuses an actor the event log could not carry, naming the length and the limit', async () => {
+      const long = 'a'.repeat(201)
+      const refused = await cli(['transition', 'theme-dark', 'ready', '--actor', long])
+      assert.equal(refused.code, 2, `${refused.out}${refused.err}`)
+      assert.match(refused.err, /^"cause an actor is 201 characters and the limit is 200, which is 1 over$/m)
+
+      const events = await demo.store.events({ entity: 'theme-dark' })
+      assert.ok(events.ok)
+      assert.equal(events.value.length, 1, 'the refused move appended nothing')
+    })
+
+    it('accepts and ignores the same out-of-bound actor on a read, which records no event', async () => {
+      const long = 'a'.repeat(201)
+      const shown = await cli(['show', 'auth-refresh', '--actor', long])
+      assert.equal(shown.code, 0, `${shown.out}${shown.err}`)
+      assert.match(shown.out, /^item auth-refresh$/m)
+    })
+  })
 })
 
 describe('S3: a duplicate id refuses the write rather than serving the first match', () => {

@@ -14,6 +14,7 @@ import type { WorkItemType } from '../../src/domain/index.ts'
 import type { ResultObject } from '../../src/application/result.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
+import { history } from '../../src/application/services/history.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
@@ -129,6 +130,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('show', await showItem(demo.store, clock, 'auth-refresh'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
     golden.set('explain', await explain(demo.store, 'sso-saml'))
+    golden.set('history', await history(demo.store, 'sso-saml', { limit: 9 }))
     golden.set('help', topLevelHelp('acme-platform'))
     golden.set('help-command', commandHelp('transition', 'acme-platform') as ResultObject)
     golden.set('not-found', await showItem(demo.store, clock, 'sso-saml-typo'))

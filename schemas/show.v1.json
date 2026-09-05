@@ -215,6 +215,94 @@
               "trust": "data"
             }
           ]
+        },
+        "hrs": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "labels": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "found": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fixed": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "timebox": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "hold_until": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "held_from": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extra": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reporter": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "reviewer": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "component": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "hold": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "outcome": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "question": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "repro": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "expected": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "actual": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "findings": {
+          "type": "string",
+          "x-trust": "data"
         }
       }
     }
