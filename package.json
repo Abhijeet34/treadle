@@ -62,7 +62,7 @@
     "@anthropic-ai/tokenizer": "0.0.4",
     "@commitlint/cli": "^21.2.2",
     "@commitlint/config-conventional": "^21.2.2",
-    "@types/node": "^26.4.1",
+    "@types/node": "^24.7.0",
     "esbuild": "^0.28.2",
     "gpt-tokenizer": "4.0.0",
     "typescript": "^7.0.2"
