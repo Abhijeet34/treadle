@@ -147,8 +147,15 @@ function git(...args: readonly string[]): string {
   return execFileSync('git', args, { encoding: 'utf8' }).trim()
 }
 
-function tagFacts(tag: string, branch: string): TagFacts {
-  const objectType = git('cat-file', '-t', tag)
+function tagFacts(tag: string, branch: string): TagFacts | undefined {
+  let objectType: string
+  try {
+    objectType = git('cat-file', '-t', tag)
+  } catch {
+    // A tag that does not exist is a refusal with a sentence, not a stack trace: the release
+    // path passes `github.ref_name`, so this is what a mis-triggered run should read like.
+    return undefined
+  }
   // `<tag>^{}` dereferences an annotated tag to its commit; a lightweight tag answers the
   // same thing, so one form covers both.
   const commit = git('rev-parse', `${tag}^{}`)
@@ -194,6 +201,12 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   }
 
   const facts = tagFacts(tag, values.branch)
+  if (facts === undefined) {
+    console.error(`::error::${tag} is not a tag in this repository`)
+    console.log('release preflight: 1 problem(s)')
+    process.exitCode = 1
+    process.exit()
+  }
   const problems = preflight({
     tag,
     facts,
