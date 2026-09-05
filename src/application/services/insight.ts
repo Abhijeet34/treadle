@@ -73,6 +73,7 @@ export const EXPLAIN_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'state', type: 'string' },
     { kind: 'scalar', key: 'since', type: 'string' },
     { kind: 'scalar', key: 'from_event', type: 'string' },
+    { kind: 'text', key: 'reason' },
     { kind: 'scalar', key: 'blocked', type: 'string' },
     { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'parent', type: 'string' },
@@ -205,15 +206,18 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   return okResult(NEXT_SHAPE, { workspace, data })
 }
 
-async function enteredAt(
-  store: Store, id: ItemId,
-): Promise<{ readonly at: string; readonly event: string } | undefined> {
+type Entry = { readonly at: string; readonly event: string; readonly reason?: string }
+
+/** The write that put the item in the state it is in, and the reason T4 made it record. */
+async function enteredAt(store: Store, id: ItemId): Promise<Entry | undefined> {
   const events = await store.events({ entity: id })
   if (!events.ok) return undefined
   for (let i = events.value.length - 1; i >= 0; i -= 1) {
     const event = events.value[i]
     if (event !== undefined && (event.op === 'item.transition' || event.op === 'item.file')) {
-      return { at: event.at, event: event.id }
+      return typeof event.reason === 'string'
+        ? { at: event.at, event: event.id, reason: event.reason }
+        : { at: event.at, event: event.id }
     }
   }
   return undefined
@@ -260,7 +264,11 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     type: item.type,
     state: item.state,
   }
-  if (at !== undefined) { data['since'] = at.at; data['from_event'] = at.event }
+  if (at !== undefined) {
+    data['since'] = at.at
+    data['from_event'] = at.event
+    if (at.reason !== undefined) data['reason'] = at.reason
+  }
   data['blocked'] = blockers.length === 0 ? 'no' : `yes ${blockers.join(',')}`
   if (item.sprint_id !== undefined) data['sprint'] = item.sprint_id
   if (item.parent_id !== undefined) data['parent'] = item.parent_id

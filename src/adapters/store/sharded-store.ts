@@ -19,6 +19,7 @@ import {
   type WorkItem,
 } from '../../domain/index.ts'
 import {
+  duplicateRefusal,
   storeFail,
   storeOk,
   type Applied,
@@ -411,8 +412,12 @@ export class ShardedStore implements Store {
   async #applyUnderLock(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     const shards = new Map<string, ParsedFile>()
     const applied: AppliedWrite[] = []
+    const findings = this.#index.findings()
 
     for (const write of transaction.writes) {
+      const clash = duplicateRefusal(write.item.id, findings)
+      if (clash !== undefined) return clash
+
       const file = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
       const shard = shards.get(file) ?? await this.#readShard(file)
       if (!('chunks' in shard)) return shard

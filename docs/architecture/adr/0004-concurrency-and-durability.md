@@ -42,8 +42,29 @@ The unlink that reclaims is guarded by re-reading the token and comparing it byt
 | Holder killed with SIGKILL while holding | next acquirer reclaimed on proof of death in under 1 s |
 | Live pid whose token mtime is 60 s old | reclaimed as a stale heartbeat, and the token that replaced it is a different nonce |
 | Token naming pid 1, which answers `EPERM`, with a fresh mtime | not reclaimed; `LOCK_TIMEOUT` at the caller's bound and the token unchanged |
+| 12 processes each transitioning a distinct item through `bin/treadle.js`, released together on a workspace whose index was deleted | 1 crash and 1 write not applied in 120 transitions with the busy timeout armed second, 0 in 240 with it armed first |
 
 Persisted writes over reported writes is 24 of 24.
+
+### The index is the third thing processes contend on, and it waits too
+
+The lock serialises writers and compare-and-set catches what it does not, and both were measured from the start.
+The derived index is the third, and it was not: every command opens it before it takes the lock, because DR2's freshness check has to run before any answer.
+
+`pragma busy_timeout` is therefore the first statement issued on a connection, ahead of `pragma journal_mode = wal`.
+The ordering is the whole rule.
+Switching a database that is not yet in WAL takes an exclusive lock, and every run that creates the index passes through that state, so a timeout armed after the switch has nothing to wait with and the switch raises `SQLITE_BUSY` on the first contended open.
+That is not a rare shape: `.index/` is gitignored, so every fresh clone and every deliberate deletion of the cache puts a workspace back into it.
+
+Arming the timeout is necessary and not sufficient, because the switch has a second failure mode with a different mechanism.
+Promoting to the exclusive lock while already holding a shared one, when another connection holds a reserved one, is the case SQLite refuses to wait on at all: waiting there could deadlock, so the busy handler is bypassed and `SQLITE_BUSY` is immediate.
+The switch is therefore retried against a two second deadline, which is generous against a window measured in milliseconds and is only ever entered by a run that creates the index, since the pragma is a no-op once the file is in WAL.
+Past the deadline the error is raised and the command boundary turns it into an error object.
+
+`test/cli/index-contention.test.ts` holds both states deterministically rather than reaching them by repetition.
+A child process creates the index in the default journal mode and holds a write lock on it for a stated interval, and the lock class selects which failure the command under test meets: `exclusive` is the one the timeout covers, `immediate` takes the reserved lock that bypasses it.
+The command is then run through the published entry point in its own process.
+Each mechanism is load-bearing and measured to be: against the pre-fix tree both cases fail, with the timeout armed first and no retry the exclusive case passes and the immediate one fails, and with both the two pass.
 
 ### Atomic write, and finding F9
 
@@ -72,6 +93,15 @@ Absent `ifVersion` asserts the item does not exist yet, which is what makes a cr
 
 A mismatch is `CONFLICT` (`S10`) naming the version sent, the version stored, and, from the last event for that record, the actor, the instant and the transaction id of the write that moved it.
 A mutation reads every file it touches under the lock, so the tool never writes from stale memory and never overwrites a hand edit it did not see.
+
+### A duplicated id refuses the write
+
+Two records sharing an id is an `S3` finding, and the index that records it is the same thing that refuses to serve both: its `items` table keys on the id, so the second copy fails to insert, is quarantined by name, and every read answers from one record.
+That left the write path free to pick the first record in document order and move it, which is the reference implementation's own recorded risk reproduced here, and worse on a write than on a read because the caller is never told which copy it moved.
+
+Both stores now read the finding before they write.
+A write whose id carries an `S3` finding is `CONFLICT` (`S3`) naming the file and the line of the copy; the shard is left byte-identical, and every other id in it stays writable.
+The overlay reads the base store's findings for the same reason it round-trips every record: a dry run must not approve what the real write refuses.
 
 ### The transaction journal
 
@@ -114,6 +144,7 @@ A budget converts contention, which resolves itself, into a refusal, which does 
 - **The lock token carries a nonce.** DR4 has `{pid, host, since}`. Two holders can reuse one pid across a reclaim, and the nonce is what lets the release compare byte for byte and the tests assert that a reclaim actually replaced the token rather than finding the same one.
 - **The event log is appended, not written by temp-and-rename.** DR4's "each written file" would cost O(file) to add O(line), and ADR-0002's index tail rule depends on the prefix bytes staying put. The append is fsynced under the same lock, so the durability boundary is identical.
 - **The waiting note is a callback, not a line on stderr.** The store writes to no stream; which stream a note goes to is the CLI's decision and the renderer's format.
+- **A duplicated id refuses writes to that id, not every write in the workspace.** The domain model's H15 puts the refusal in `doctor` and stops the workspace until the duplicate is fixed. `doctor` is not built, and stopping unrelated work is a larger hammer than the ambiguity needs: a write to any other id names exactly one record and leaves both copies of the duplicated one untouched. The wider refusal lands with `doctor`, which is the command H15 actually names.
 - **`--lock-timeout` is a store option rather than a flag.** The flag belongs to the CLI, which is not built. The option it maps to is here and is tested.
 
 ## What would reopen this

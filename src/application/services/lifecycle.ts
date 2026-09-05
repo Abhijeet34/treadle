@@ -10,6 +10,7 @@ import {
   TRANSITION_TABLE,
   evaluateTransition,
   isTerminal,
+  validateWorkItem,
   type GuardId,
   type GuardResult,
   type ItemId,
@@ -151,9 +152,23 @@ export async function transition(
   }
 
   const after = nextItem(item, outcome.to, request)
+  const now = clock.now()
+
+  // The field dictionary's liveness rules need a real instant, and this is the only layer
+  // that has one: the store validates a record with a structural instant so an expired hold
+  // already on disk stays readable, which is right on load and wrong on the write that sets
+  // it. Without this call `--until` in the past was accepted and stored.
+  const live = validateWorkItem(after, { now })
+  if (!live.ok) {
+    return errorResult({
+      code: 'VALIDATION', command: 'transition', workspace, effect: 'mutate',
+      rule: live.error.rule ?? 'V4', entity: `item ${item.id}`, cause: live.error.message,
+      fix: [`treadle help transition`, `treadle show ${item.id}`],
+    })
+  }
+
   const txn = ids.txn()
   const eventId = ids.event()
-  const now = clock.now()
   const applied = await store.apply({
     txn,
     writes: [{ item: after, ifVersion: item.version }],
@@ -161,6 +176,10 @@ export async function transition(
       id: eventId, at: now, actor: request.actor, entity: item.id, op: 'item.transition',
       before: { state: outcome.from }, after: { state: outcome.to },
       guards: outcome.guards, txn, command: 'transition',
+      // T4 requires a reason on six edges and on every override, and until now the only one
+      // that kept it was `hold`, which happens to have a field for it. The event log is
+      // where the other five belong: it is the only record of why the move was made.
+      ...(request.reason === undefined ? {} : { reason: request.reason }),
     })],
   })
   if (!applied.ok) return storeRefusal('transition', 'mutate', applied.error, workspace)

@@ -32,6 +32,7 @@ import { WORKSPACE_DIR, initWorkspace, resolveStore } from '../adapters/workspac
 import { Diagnostics, type Level } from './diagnostics.ts'
 import { EXIT_OF, exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
+import { commandNamed } from './inventory.ts'
 import { FILTER_FLAGS, parse, type FilterFlag } from './parse.ts'
 import { checkRuntime } from './runtime.ts'
 
@@ -148,7 +149,43 @@ function versionResult(env: Environment): ResultObject {
   })
 }
 
+/**
+ * The command boundary. R2 asks for a structured error on every failure path, and an
+ * exception is one: a thrown `Error` that escaped here printed a Node stack trace on stderr
+ * with no envelope, which is a second output grammar for a caller to parse and the one thing
+ * the contract says never happens.
+ */
 export async function run(env: Environment): Promise<number> {
+  try {
+    return await execute(env)
+  } catch (error) {
+    const parsed = parse(env.argv)
+    const flags = parsed.ok ? parsed.value.flags : {}
+    const command = parsed.ok ? parsed.value.command : undefined
+    return emit(env, internal(command, error), flags)
+  }
+}
+
+/** The refusal an escaped exception becomes. It names what failed, never how it was thrown. */
+function internal(command: string | undefined, error: unknown): ResultObject {
+  const named = command ?? 'treadle'
+  const thrown = error instanceof Error ? error : undefined
+  const said = thrown === undefined ? String(error) : `${thrown.name}: ${thrown.message}`
+  return errorResult({
+    code: 'INTERNAL',
+    command: named,
+    workspace: '-',
+    effect: commandNamed(named)?.effect ?? 'read',
+    // A message from anywhere in the runtime is not held to the store's safe-text class, and
+    // a bare carriage return in one would make the renderer throw on the path that exists to
+    // stop a throw. Newlines survive, because the renderer puts a multi-line cause in a
+    // counted block; nothing else the grammar treats as a delimiter does.
+    cause: `${named} did not complete: ${said.replaceAll('\r\n', '\n').replaceAll('\r', ' ')}`,
+    fix: ['treadle version'],
+  })
+}
+
+async function execute(env: Environment): Promise<number> {
   const runtime = checkRuntime(env.nodeVersion)
   if (!runtime.ok) {
     env.streams.err(`err STORE_UNAVAILABLE -\ncause ${runtime.cause}\n`)

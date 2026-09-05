@@ -104,7 +104,9 @@ export const agentRenderer: Renderer = {
     const shape = shapeFor(result.schema)
     if (shape === undefined) throw new RenderInvariant(`no shape is registered for ${result.schema}`)
     const limit = options.fieldLimit === undefined ? DEFAULT_FIELD_LIMIT : options.fieldLimit
-    const quiet = options.quiet === true
+    // B.8: quiet drops the header and the footer and keeps the records. It never suppresses
+    // an error, so a caller that pipes with -q still gets the refusal it has to act on.
+    const quiet = options.quiet === true && result.ok
 
     const lines: string[] = quiet ? [] : [envelope(result)]
     for (const property of shape.properties) {
@@ -129,6 +131,10 @@ export const agentRenderer: Renderer = {
         continue
       }
       const text = scalarText(value)
+      // A2 rule 1 forbids trailing whitespace, and `<key> ` with nothing after the space is
+      // the shape an empty optional value takes. An absent value is an absent line, which is
+      // what the record grammar already says of a field that holds nothing.
+      if (text.length === 0) continue
       guardSingleLine(property.key, text)
       lines.push(`${property.key} ${text}`)
     }

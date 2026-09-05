@@ -30,10 +30,18 @@ below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning fr
 below the floor and prints one `ExperimentalWarning` per process; that line in test output is
 expected too.
 
-Most of the suite's wall time is one file. `test/store/lock.test.ts` spawns 37 real child
-processes through `test/store/fixtures/writer.ts`, because DR4's guarantee is about separate
-processes and an in-process race would prove nothing. Run it with a generous
-`--test-timeout`; the rest of the suite is under a second.
+The suite is about 20 seconds and the two files that spawn processes are the slowest:
+`test/store/lock.test.ts` at about 8 seconds, spawning 37 of them through
+`test/store/fixtures/writer.ts` for DR4's lock, and `test/cli/index-contention.test.ts` at
+about 4, spawning the published entry point against an index another process holds through
+`test/store/fixtures/index-holder.ts`. Run the suite with a generous `--test-timeout`; no
+other file is over about two seconds.
+
+Both files exist because one class of defect is invisible from in-process tests. Driving the
+store API from one process serialises writers on the advisory lock and never contends on the
+index, which opens before the lock is taken; what that hides is a command dying with a raw
+stack trace and losing its write. When a concurrency bug is reported, reach for N processes
+each running the command surface, not N promises against one store.
 
 ## Reading treadle's own output, and the one boundary in it
 

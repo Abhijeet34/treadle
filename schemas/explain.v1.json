@@ -89,6 +89,10 @@
             "null"
           ]
         },
+        "reason": {
+          "type": "string",
+          "x-trust": "data"
+        },
         "blocked": {
           "type": [
             "string",

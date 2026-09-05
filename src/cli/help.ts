@@ -14,6 +14,25 @@ const VERDICT_NOTE: Readonly<Record<string, string>> = {
   X: 'refused: ignoring it would answer a question the caller did not ask',
 }
 
+/**
+ * Verdict `A` is one verdict for four different reasons, and the general note is true of
+ * only one of them: `--yes` is ignored here because the command asks nothing, not because
+ * it is about presentation. A note that says the wrong reason is worse than a terse one,
+ * because a caller reads it as the rule and then predicts the next command wrong.
+ */
+const IGNORED_BECAUSE: Readonly<Record<string, string>> = {
+  '--yes': 'accepted and ignored: this command has no confirmation to answer',
+  '--no-input': 'accepted and ignored: this command has no confirmation to suppress',
+  '--dry-run': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
+  '--preview': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
+  '--actor': 'accepted and ignored: this command records no event, so no actor is attributed',
+}
+
+function noteFor(flag: string, verdict: string): string {
+  if (verdict === 'A') return IGNORED_BECAUSE[flag] ?? VERDICT_NOTE['A'] ?? ''
+  return VERDICT_NOTE[verdict] ?? ''
+}
+
 function commandRows(): readonly Row[] {
   return COMMANDS.map((command): Row => ({
     name: command.name,
@@ -59,7 +78,7 @@ export function commandHelp(name: string, workspace: string): ResultObject | und
     total: GLOBAL_FLAGS.length,
     rows: GLOBAL_FLAGS.map((flag): Row => {
       const verdict = verdictFor(command, flag)
-      return { flag, verdict, note: VERDICT_NOTE[verdict] ?? '' }
+      return { flag, verdict, note: noteFor(flag, verdict) }
     }),
   }
   return okResult(HELP_SHAPE, {
