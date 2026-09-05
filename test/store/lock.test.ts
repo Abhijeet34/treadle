@@ -327,18 +327,20 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
       // the next lock holder's journal replay to finish; one more writer is that holder.
       assert.ok((await writer(workspace.root, 'item-one')).ok)
 
-      // Read from disk, not through any index: one version per update event landed means
-      // no write was overwritten.
+      // Read from disk, not through any index: one version per distinct update event landed
+      // means no write was overwritten. Distinct, because a line the paused writer appends
+      // after the reclaimer already replayed its journal repeats an id rather than losing a
+      // write, and S14 is the finding that owns a repeated id.
       const shard = parseFile(await readFile(path.join(workspace.root, 'items', '2026-09.md'), 'utf8'), 'items/2026-09.md')
       assert.ok(shard.ok)
       const version = Number(shard.value.records[0]?.fields.get('version'))
-      let updates = 0
+      const updates = new Set<string>()
       for (const name of await readdir(path.join(workspace.root, 'events'))) {
         for (const text of (await readFile(path.join(workspace.root, 'events', name), 'utf8')).split('\n')) {
-          if (text.includes('"op":"update"')) updates += 1
+          if (text.includes('"op":"update"')) updates.add((JSON.parse(text) as { id: string }).id)
         }
       }
-      assert.equal(version, updates + 1, `version ${version} against ${updates} update events: a write was lost`)
+      assert.equal(version, updates.size + 1, `version ${version} against ${updates.size} distinct update events: a write was lost`)
 
       // A writer paused after its write had fully landed has nothing left to refuse, so the
       // count is not asserted; what is asserted is that every refusal is one of the two

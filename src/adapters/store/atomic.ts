@@ -89,9 +89,14 @@ async function modeOf(target: string): Promise<number> {
  * temp-and-rename would cost O(file) to add O(line); the durability boundary is the same
  * fsync, and DR2's index tail rule depends on the prefix bytes staying put.
  */
-export async function appendAndSync(target: string, contents: string): Promise<void> {
+export async function appendAndSync(
+  target: string, contents: string, beforeCommit?: () => Promise<void>,
+): Promise<void> {
   const handle = await open(target, 'a', FILE_MODE)
   try {
+    // Asked after the open for the same reason `writeFileAtomic` asks after the fsync: the
+    // write is the commit, and what stands between the check and it should be one syscall.
+    if (beforeCommit !== undefined) await beforeCommit()
     await handle.writeFile(contents, 'utf8')
     await handle.sync()
   } finally {

@@ -759,7 +759,6 @@ export class ShardedStore implements Store {
     for (const log of journal.events) {
       const full = path.join(this.#root, log.path)
       await mkdir(path.dirname(full), { recursive: true, mode: DIR_MODE })
-      await this.#assertHeld(lock, txn, !recovering)
       // Replay is idempotent by event id: on recovery only lines the file's tail does not
       // already carry are appended, so re-applying a journal after a crash duplicates
       // nothing. On the first pass every line is new, and reading the log back to prove it
@@ -768,7 +767,7 @@ export class ShardedStore implements Store {
         ? await eventIdsInTail(full, log.lines.length * MAX_EVENT_LINE_BYTES + 4096)
         : new Set<string>()
       const missing = log.lines.filter((_, at) => !already.has(log.ids[at] as string))
-      if (missing.length > 0) await appendAndSync(full, missing.join(''))
+      if (missing.length > 0) await appendAndSync(full, missing.join(''), () => this.#assertHeld(lock, txn, !recovering))
     }
   }
 
