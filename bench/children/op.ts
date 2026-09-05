@@ -3,12 +3,14 @@
 // figure: an in-process loop would measure a warm V8 and a warm index handle, and DR1's
 // budget is about neither.
 //
-// The command layer does not exist yet, so these are store operations and are labelled as
-// such throughout. When commands land, this child is what they replace, and the axis rows
-// keep their shape.
+// These are store operations and are labelled as such, plus `workspace`, which is the one
+// application-layer read every command performs. The six behaviour axes drive the command
+// surface itself (bench/axes/surface.ts); this child stays underneath it so a timing figure
+// prices the store rather than the renderer.
 //
 // Usage: op.ts <root> <op> [argument]
 
+import { readWorkspace } from '../../src/application/services/context.ts'
 import { ShardedStore } from '../../src/adapters/store/index.ts'
 import type { StoreEvent, StoreResult } from '../../src/application/ports/store.ts'
 import type { WorkItemState } from '../../src/domain/index.ts'
@@ -78,6 +80,17 @@ switch (op) {
     const rows = unwrap(await store.list({ state: argument as WorkItemState, limit: 50 }))
     ops = 1
     detail = { rows: rows.length, state: argument }
+    break
+  }
+  // The read every command performs, and the largest one the product has: `readWorkspace`
+  // lists the store unbounded, indexes it by id and builds the hierarchy graph, because a
+  // backlog counts the whole set and a gate reads an item's children out of it. `list` above
+  // is bounded at 50 rows and prices none of that, so the memory budget was being weighed
+  // over an operation no command makes.
+  case 'workspace': {
+    const view = unwrap(await readWorkspace(store))
+    ops = 1
+    detail = { items: view.items.length }
     break
   }
   case 'create': {

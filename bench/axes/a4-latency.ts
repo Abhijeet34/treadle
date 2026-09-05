@@ -6,8 +6,10 @@
 // spawn floor is measured with the same launcher and subtracted, so the net column is the
 // program's cost rather than the shell's.
 //
-// These are store operations, not commands: the command layer does not exist yet. The rows
-// keep the shape the command rows will have, and the label says which they are.
+// Four of the six operations are store calls and the label says so. `workspace` is the
+// application layer's own `readWorkspace`, the unbounded read every command performs, and it
+// is here because the memory budgets are weighed over the worst of these rows: a `list`
+// bounded at 50 rows prices none of what a backlog at 50,000 items actually holds.
 
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -32,7 +34,7 @@ export type ScaleRow = {
   readonly reindexAfterHandEditMs: number | string
 }
 
-const READ_OPS = ['identity', 'get', 'list'] as const
+const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
 const WRITE_OPS = ['create', 'transition'] as const
 
 export async function runA4(

@@ -25,7 +25,30 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
+import type { ScaleRow } from './axes/a4-latency.ts'
 import type { RunReport } from './report.ts'
+
+/**
+ * The operations each memory budget is weighed over. Both rows named one operation by hand
+ * and both named the wrong one: at 50,000 items on 2026-09-06 `transition` peaked 164,256 KiB
+ * against `create`'s 155,696, so the mutation budget under-reported the worst mutation by
+ * 8,560 KiB, and the read budget priced a bounded `list` while every command in the tool
+ * performs the unbounded `workspace` read. A budget on the worst of a set cannot go stale
+ * when an operation is added.
+ */
+const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
+const WRITE_OPS = ['create', 'transition'] as const
+
+function worstRss(
+  scale: ScaleRow | undefined, ops: readonly string[],
+): { readonly kb: number; readonly op: string } | undefined {
+  let worst: { kb: number; op: string } | undefined
+  for (const op of ops) {
+    const kb = scale?.operations[op]?.peakRssKb
+    if (kb !== undefined && (worst === undefined || kb > worst.kb)) worst = { kb, op }
+  }
+  return worst
+}
 
 export type Budgets = {
   readonly tolerancePercent: number
@@ -204,10 +227,14 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   }
 
   const largest = report.latency[report.latency.length - 1]
-  const readRss = largest?.operations['list']?.peakRssKb
-  const writeRss = largest?.operations['create']?.peakRssKb
-  rows.push(absolute(budgets, 'peakRssReadKb', 'peak RSS, read at the largest scale', readRss ?? 'NOT MEASURED: no RSS reported', 'KiB'))
-  rows.push(absolute(budgets, 'peakRssMutationKb', 'peak RSS, mutation at the largest scale', writeRss ?? 'NOT MEASURED: no RSS reported', 'KiB'))
+  const readRss = worstRss(largest, READ_OPS)
+  const writeRss = worstRss(largest, WRITE_OPS)
+  rows.push(absolute(budgets, 'peakRssReadKb', 'peak RSS, read at the largest scale',
+    readRss?.kb ?? 'NOT MEASURED: no RSS reported', 'KiB',
+    readRss === undefined ? undefined : `the worst of ${READ_OPS.join(', ')}, which was ${readRss.op}`))
+  rows.push(absolute(budgets, 'peakRssMutationKb', 'peak RSS, mutation at the largest scale',
+    writeRss?.kb ?? 'NOT MEASURED: no RSS reported', 'KiB',
+    writeRss === undefined ? undefined : `the worst of ${WRITE_OPS.join(', ')}, which was ${writeRss.op}`))
   rows.push(absolute(budgets, 'firstIndexBuildMs', 'first index build at the largest scale', largest?.firstIndexBuildMs ?? 'NOT MEASURED: no scale ran', 'ms'))
   rows.push(absolute(budgets, 'reindexAfterHandEditMs', 're-index after a hand edit of the largest shard', largest?.reindexAfterHandEditMs ?? 'NOT MEASURED: no scale ran', 'ms'))
 
