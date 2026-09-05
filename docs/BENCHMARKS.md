@@ -302,11 +302,11 @@ It is the next thing to do and it is worth more than the three misses still open
 
 ### What did not change
 
-Every existing test stays green: 983 pass, 0 fail, against 981 before, the two added being the regression tests for the cycle verdict and for the event round trip.
+Every existing test stays green: 984 pass, 0 fail, against 981 before, the three added being the regression tests for the cycle verdict, for the event round trip, and for the crash window between a row commit and the verdict recompute that follows it.
 The A1 durability and A5 malformed-input axes were compared against this branch's base, 01580d0, which predates #7: A1 reported 200 of 200 at N=200 with zero crashes on both trees, and the A5 corpus read identically on both.
 See "The three defects the rig found, and what happened to them" below for #7's closure of the A5 silent drop.
 No invariant was traded.
-The one place where this work could have traded one, the cached hierarchy verdict, is invalidated inside the same transaction that moves the rows it was derived from, so a crash between the two leaves no verdict rather than a stale one.
+The one place where this work could have traded one, the cached hierarchy verdict, is kept correct by a marker of what moved, merged inside the same transaction that moves the rows it describes, so a crash between the two leaves work to redo on the next open rather than a stale verdict silently reused.
 
 `list` and `transition` are not axis targets but bound the same work: `list` went from 160.6 ms to 10.3 ms and `transition` from 457.4 ms to 174.2 ms.
 

@@ -143,10 +143,6 @@ export class ShardedStore implements Store {
   readonly #index: IndexCache
   readonly #options: ShardedStoreOptions
   #cycleFindings: readonly Finding[] = []
-  /** Ids whose parent edge the current refresh moved, which is what it has to re-walk. */
-  #movedParents: Set<string> = new Set()
-  /** Whether the current refresh moved any item row at all, edge or not. */
-  #rowsChanged = false
   /**
    * Shards the refresh inside `apply` re-parsed, for the write that follows it under the
    * same lock. Only the write path fills it, because a read that retained a 1 MB parse for
@@ -306,10 +302,7 @@ export class ShardedStore implements Store {
   async #refresh(keepParses = false): Promise<StoreResult<undefined>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
-    const moved = new Set<string>()
     this.#parsedUnderLock.clear()
-    this.#movedParents = moved
-    this.#rowsChanged = false
 
     for (const file of await this.#storeFiles()) {
       const full = path.join(this.#root, file)
@@ -397,13 +390,10 @@ export class ShardedStore implements Store {
     return storeOk(undefined)
   }
 
-  /** Re-indexes one record file and keeps the parent edges it moved, for the cycle check. */
   #replaceRecordFile(
     file: string, fingerprint: Fingerprint, items: readonly IndexedItem[], findings: readonly Finding[],
   ): void {
-    const outcome = this.#index.replaceRecordFile(file, fingerprint, items, findings)
-    if (outcome.changed) this.#rowsChanged = true
-    for (const id of outcome.movedParents) this.#movedParents.add(id)
+    this.#index.replaceRecordFile(file, fingerprint, items, findings)
   }
 
   async #indexEventFile(
@@ -458,8 +448,9 @@ export class ShardedStore implements Store {
    * The walk needs the parent edges and nothing else, so it reads two index columns rather
    * than decoding every record.
    *
-   * The verdict is then written back beside the rows it came from. Every transaction that
-   * moves an item row drops it, so this recomputes exactly when the row set moved: at 50,000
+   * The verdict is then written back beside the rows it came from, in the same call that
+   * clears the durable dirty marker it accounts for. Every transaction that moves an item row
+   * merges into that marker, so this recomputes exactly when the row set moved: at 50,000
    * items the walk is 111 ms of a 218 ms read, and a command that changed nothing was paying
    * it to reach the same answer as the command before it.
    */
@@ -470,13 +461,17 @@ export class ShardedStore implements Store {
   }
 
   /**
-   * The verdict this refresh is entitled to, at the cost the refresh's own findings earn.
+   * The verdict this refresh is entitled to, read from the index rather than from anything
+   * only this process's memory carries: a marker written and merged in the same transaction
+   * as the rows it describes survives a crash between a commit and this recompute, which an
+   * in-memory tally of what a refresh touched cannot.
    *
-   * A refresh that moved no parent edge reuses the stored verdict. One that moved some, over
-   * a store already known to be acyclic, walks up from those nodes alone: a cycle that was
-   * not there before has to pass through an edge that moved.
+   * No dirty marker reuses the stored verdict outright. One that names moved parent edges,
+   * over a store already known to be acyclic, walks up from those nodes alone: a cycle that
+   * was not there before has to pass through an edge that moved. One marked `full`, from a
+   * moved-edge count past the cap a meta row is worth carrying, recomputes whole.
    *
-   * A store already reported cyclic recomputes whole as soon as any row moves, edge or not.
+   * A store already reported cyclic recomputes whole as soon as any row moved, edge or not.
    * An edit clears a cycle as easily as it closes one, and dropping the edge that closed it
    * moves no edge at all, so a rule that watched only for moved edges would report a cycle
    * that a hand edit had already removed.
@@ -484,17 +479,25 @@ export class ShardedStore implements Store {
   #hierarchyCycle(): readonly string[] | null {
     const stored = this.#index.hierarchyVerdict()
     if (stored === undefined) return this.#recheckHierarchy()
+    const dirty = this.#index.hierarchyDirty()
+    if (dirty === undefined) return JSON.parse(stored) as readonly string[] | null
+
     const known = JSON.parse(stored) as readonly string[] | null
-    if (known !== null) return this.#rowsChanged ? this.#recheckHierarchy() : known
-    if (this.#movedParents.size === 0) return known
-    for (const id of this.#movedParents) {
+    if (known !== null) {
+      if (dirty.rows) return this.#recheckHierarchy()
+      this.#index.setHierarchyVerdict(stored)
+      return known
+    }
+    if (dirty.full) return this.#recheckHierarchy()
+    for (const id of dirty.moved) {
       const cycle = cycleAbove(id, (at) => this.#index.parentOf(at))
       if (cycle !== undefined) {
         this.#index.setHierarchyVerdict(JSON.stringify(cycle))
         return cycle
       }
     }
-    return null
+    this.#index.setHierarchyVerdict(stored)
+    return known
   }
 
   // -- writing ---------------------------------------------------------------------------
@@ -700,7 +703,7 @@ function groupEvents(events: readonly StoreEvent[]): Journal['events'] {
   return [...byFile].map(([file, entry]) => ({ path: file, lines: entry.lines, ids: entry.ids }))
 }
 
-function rowOf(item: WorkItem, file: string, line: number, source: string): IndexedItem {
+export function rowOf(item: WorkItem, file: string, line: number, source: string): IndexedItem {
   return {
     id: item.id, file, line, type: item.type, state: item.state,
     parent: item.parent_id ?? null,

@@ -18,16 +18,9 @@ import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../applicati
 import { DIR_MODE } from './atomic.ts'
 import { eventFrom, eventRest } from './event-log.ts'
 
-/**
- * What one record file's re-index leaves the caller to act on: the cross-shard duplicates it
- * refused, and the ids whose parent edge moved, which are the only nodes a cycle the store
- * did not already know about can pass through.
- */
+/** What one record file's re-index leaves the caller to act on: the cross-shard duplicates it refused. */
 export type RecordFileOutcome = {
   readonly clashes: readonly Finding[]
-  /** Any row inserted or deleted, which is what can clear a cycle as well as close one. */
-  readonly changed: boolean
-  readonly movedParents: readonly string[]
 }
 
 export type Fingerprint = {
@@ -101,11 +94,32 @@ drop table if exists findings;
 /**
  * The load-time hierarchy verdict, cached beside the rows it was derived from.
  *
- * It is dropped inside the same transaction that changes any item row, so a verdict that
- * survives a refresh was computed over exactly the row set that refresh left behind, and a
- * crash between the two leaves no verdict rather than a stale one.
+ * A stored verdict is trusted only while `HIERARCHY_DIRTY_KEY` names nothing outstanding.
+ * `replaceRecordFile` merges what it moved into that marker inside the same transaction as
+ * the row changes it describes, so a crash between the two leaves work to redo, discovered
+ * from the durable marker on the next open, rather than a stale verdict silently reused.
  */
 const HIERARCHY_KEY = 'hierarchy_cycle'
+
+/**
+ * What has moved since `HIERARCHY_KEY` was last written, merged in the same transaction as
+ * the rows it describes. Absent means nothing has moved since; present but `moved` empty
+ * with `full` false means rows changed but no parent edge did.
+ */
+const HIERARCHY_DIRTY_KEY = 'hierarchy_dirty'
+
+/**
+ * Past this many accumulated moved ids, the list is dropped for a `full` marker instead. A
+ * bulk re-index is already paying a full parse of every file, so the whole walk it triggers
+ * is cheaper than carrying tens of thousands of ids through a meta row.
+ */
+const HIERARCHY_MOVED_CAP = 64
+
+export type HierarchyDirty = {
+  readonly rows: boolean
+  readonly moved: readonly string[]
+  readonly full: boolean
+}
 
 /** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
 const WAL_DEADLINE_MS = 2_000
@@ -255,12 +269,32 @@ export class IndexCache {
       }
       this.#insertFindings([...findings, ...clashes])
       this.#setFingerprint(file, fingerprint)
+      if (changed) this.#mergeHierarchyDirty(db, moved)
       db.exec('commit')
     } catch (error) {
       db.exec('rollback')
       throw error
     }
-    return { clashes, changed, movedParents: moved }
+    return { clashes }
+  }
+
+  /** Folds this file's row change into the durable dirty marker, inside the caller's transaction. */
+  #mergeHierarchyDirty(db: DatabaseSync, moved: readonly string[]): void {
+    const existing = db.prepare('select value from meta where key = ?').get(HIERARCHY_DIRTY_KEY) as unknown as { value: string } | undefined
+    const parsed = existing === undefined
+      ? undefined
+      : JSON.parse(existing.value) as { moved?: readonly string[]; full?: boolean }
+    let dirty: string
+    if (parsed?.full === true) {
+      dirty = JSON.stringify({ rows: true, full: true })
+    } else {
+      const combined = new Set(parsed?.moved ?? [])
+      for (const id of moved) combined.add(id)
+      dirty = combined.size > HIERARCHY_MOVED_CAP
+        ? JSON.stringify({ rows: true, full: true })
+        : JSON.stringify({ rows: true, moved: [...combined] })
+    }
+    db.prepare('insert or replace into meta (key, value) values (?, ?)').run(HIERARCHY_DIRTY_KEY, dirty)
   }
 
   replaceEventFile(
@@ -353,7 +387,7 @@ export class IndexCache {
     return row?.parent ?? undefined
   }
 
-  /** The stored verdict as written, or undefined when an item row has moved since. */
+  /** The stored verdict as written, or undefined when no verdict has ever been computed. */
   hierarchyVerdict(): string | undefined {
     const row = this.#open()
       .prepare('select value from meta where key = ?')
@@ -361,10 +395,28 @@ export class IndexCache {
     return row?.value
   }
 
+  /** What has moved since that verdict was written, or undefined when nothing has. */
+  hierarchyDirty(): HierarchyDirty | undefined {
+    const row = this.#open()
+      .prepare('select value from meta where key = ?')
+      .get(HIERARCHY_DIRTY_KEY) as unknown as { value: string } | undefined
+    if (row === undefined) return undefined
+    const parsed = JSON.parse(row.value) as { rows?: boolean; moved?: readonly string[]; full?: boolean }
+    return { rows: parsed.rows ?? false, moved: parsed.moved ?? [], full: parsed.full ?? false }
+  }
+
+  /** Writes the verdict and clears the dirty marker it accounts for, as one transaction. */
   setHierarchyVerdict(value: string): void {
-    this.#open()
-      .prepare('insert or replace into meta (key, value) values (?, ?)')
-      .run(HIERARCHY_KEY, value)
+    const db = this.#open()
+    db.exec('begin immediate')
+    try {
+      db.prepare('insert or replace into meta (key, value) values (?, ?)').run(HIERARCHY_KEY, value)
+      db.prepare('delete from meta where key = ?').run(HIERARCHY_DIRTY_KEY)
+      db.exec('commit')
+    } catch (error) {
+      db.exec('rollback')
+      throw error
+    }
   }
 
   #forgetHierarchyVerdict(): void {
