@@ -97,7 +97,8 @@ A block with no rows also drops its column header, because the `<key> <shown> of
 
 **And the projection puts the blocks last.**
 The group rule is a layout answer, and layout was never the whole defect: `findings` after the `states` table and `points` after `items` are facts about the workspace that had been declared inside another fact's neighbourhood, so a blank line was the most the renderer could do without reordering facts the other two renderings state in the same order.
-Every shape now declares its scalars, lists and text under the root heading and its blocks after them, which is the shape `explain` already had and the reason it always read cleanly.
+Every shape now declares its scalars, lists and text under the root heading and its blocks after them, a reorder this change also gave `explain`, whose `blocks`, `sev` and `by` had followed its `gates`, `moves` and `findings` blocks.
+What already held for `explain` was narrower: its nine leading scalars, `item` through `parent`, were declared under the root heading ahead of its first table, which is why its output read cleanly where `status` and `backlog` did not.
 The services build their result objects in that same order, because `json` renders the object's own keys rather than walking the shape, and an order the three do not share is a fact that moves when the rendering changes.
 `test/render/conformance.test.ts` holds both halves of that.
 The group rule stays and is unchanged: a scalar may still legitimately follow a block in a shape written later, and the blank line is still what a renderer owes it.
