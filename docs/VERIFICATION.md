@@ -219,6 +219,34 @@ rule S13
 
 A return type that says it reports failures has to report them.
 
+## The gate that demanded a field nothing could set
+
+Two defects on the field surface, both found by driving the built bundle and both invisible to every suite.
+
+**A gate can demand a field no command can set.**
+A bug filed without `expected` and `actual` was refused at the ready gate with `GUARD_REFUSED rule G1, the ready gate fails: DOR6, DOR7`, and `explain` printed the remedy `set expected on checkout-drops-paid-orders`.
+No such command existed: the mutating surface was `init`, `file`, `transition`, `mark` and `evidence`, and none of them writes a stored field after creation.
+`explain` on the done gate printed `record a reviewer` and `set fix_confirmed to true`, so the same dead end sat on both gates, and `doctor` reported the workspace clean with the stuck item in it.
+The item was unadvanceable for good, because filing before you know the details is the normal order.
+
+**The write path and the read path disagreed about a field's name.**
+`file task "x" --set description=` was accepted and `--set desc=` refused with `V5, desc is not a field of any work item`, while `show <id> --field desc` printed the block and `--field description` was refused with `C2, carries no field named description`.
+Each path's refusal asserted the other path's name did not exist.
+
+**What holds them closed.**
+`test/domain/gate-remedies.test.ts` sweeps every remedy the shipped gates and two probe gates can emit and asserts each names a command the inventory carries.
+It fails 29 of 34 against the tree before the fix, with `ready DOR6`, `ready DOR7`, `done DOD3` and `done DOD6` among the named failures.
+Every check kind in the evaluator carries a line saying which command performs its remedy, or a reason it has none; `no_open_impediment` is the one such line, because the impediment entity is not in this build and `openImpediments` is a hard-coded 0.
+`writerOf` in the field dictionary is now the single statement of which command writes which field, read by the field editor and by the gate remedies, so a rule cannot tell a caller to `set severity` when `mark` is what writes it.
+`canonicalField` is the single statement of a field's two spellings, and `test/architecture/field-visibility.test.ts` holds it to the same table that says which surface prints each field.
+Two end-to-end cases in `test/cli/found-by-use.test.ts` drive the whole path: a bug reaches `ready` by running the remedy `explain` printed, verbatim, and both spellings of `description` work on both paths.
+
+**What it costs, in bytes.**
+`explain` moves 429 B to 471 B against an allowance that moves 754 to 762, because a remedy that names a command is longer than a sentence and the budget grows four bytes per occurrence of the binary name.
+Every other budgeted artefact is byte-identical.
+
+A remedy is a promise, and a remedy naming no command is a promise nothing keeps.
+
 ## Running it
 
 ```bash

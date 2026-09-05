@@ -13,6 +13,7 @@ import path from 'node:path'
 import type { WorkItemType } from '../../src/domain/index.ts'
 import type { ResultObject } from '../../src/application/result.ts'
 import type { Store } from '../../src/application/ports/store.ts'
+import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
 import { history } from '../../src/application/services/history.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
@@ -164,6 +165,10 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     // The same store read before that date passes, which is the one pair whose difference
     // is the date alone rather than the date and an extra item.
     golden.set('status-not-yet-overdue', await status(demo.store, fixedClock('2026-08-27T09:00:00Z')))
+    // Taken last, on the item `file` above created, so it moves none of the figures over it.
+    golden.set('set', await setFields(targetFor(demo.store, 'apply'), clock, ids, {
+      id: 'health-endpoint', assignments: ['assignee=kim', 'component=platform'], actor: ACTOR,
+    }))
     return golden
   } finally {
     await demo.dispose()
