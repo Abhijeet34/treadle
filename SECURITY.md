@@ -43,8 +43,7 @@ Reports are in scope when they break that boundary.
 
 In scope:
 
-- Code execution, a write outside the resolved workspace, or a read outside it, caused by the content of a cloned workspace: a crafted record, event line, configuration value, or hook path.
-- A hook running without the explicit per-clone trust the tool requires, or a hook path that escapes the workspace by traversal, separator, encoding, or symlink.
+- Code execution of any kind, a write outside the resolved workspace, or a read outside it, caused by the content of a cloned workspace: a crafted record, event line, or configuration value. treadle runs no program and evaluates no string, by the decision in `docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md`, so any execution at all is a report against that record.
 - Output that forges the tool's own agent-facing lines, so a consumer reads a field, an envelope, or a state the tool did not emit, from a crafted title, body, or field.
 - A crafted field that rewrites or spoofs a terminal, or reorders a rendered row, past the store's own validation.
 - An export (CSV, Markdown) that carries an attacker's content into a formula or a script when a person opens it.

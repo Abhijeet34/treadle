@@ -6,41 +6,12 @@
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const SRC = path.join(ROOT, 'src')
+import { codeOnly, ROOT, sources, specifiersOf, SRC } from '../helpers/src-scan.ts'
 
 /** Inward first. A layer may reach anything at or before its own index. */
 const LAYERS = ['domain', 'application', 'adapters', 'cli'] as const
-
-const IMPORT = /(?:^|\n)\s*(?:import|export)[\s\S]*?from\s+['"]([^'"]+)['"]/g
-const DYNAMIC_IMPORT = /\bimport\s*\(\s*['"]([^'"]+)['"]\s*\)/g
-
-function sources(dir: string): readonly string[] {
-  let entries
-  try {
-    entries = readdirSync(dir, { withFileTypes: true })
-  } catch {
-    return []
-  }
-  return entries.flatMap((entry) => {
-    const full = path.join(dir, entry.name)
-    if (entry.isDirectory()) return sources(full)
-    return entry.name.endsWith('.ts') ? [full] : []
-  })
-}
-
-function specifiersOf(file: string): readonly string[] {
-  const text = readFileSync(file, 'utf8')
-  const found: string[] = []
-  for (const re of [IMPORT, DYNAMIC_IMPORT]) {
-    re.lastIndex = 0
-    for (const match of text.matchAll(re)) if (match[1] !== undefined) found.push(match[1])
-  }
-  return found
-}
 
 function layerOf(file: string): (typeof LAYERS)[number] | undefined {
   const rel = path.relative(SRC, file)
@@ -150,11 +121,6 @@ describe('src/domain is pure and I/O-free', () => {
     [/\bperformance\./, 'reads a clock'],
     [/\bconsole\./, 'writes to a stream; the domain returns values instead'],
   ]
-
-  // Comments describe the rule, so scanning them would flag the sentence that states it.
-  // `[^:]` before `//` keeps a URL in a comment from swallowing the rest of the line.
-  const codeOnly = (text: string): string =>
-    text.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1')
 
   for (const file of sources(path.join(SRC, 'domain'))) {
     const rel = path.relative(ROOT, file)

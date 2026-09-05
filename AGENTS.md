@@ -154,6 +154,16 @@ Before hand-checking any of these, run the suite: it already checks them.
 
 - `src/domain` may import nothing but `src/domain`, and may not touch the filesystem, the
   clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
+- Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
+  `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
+  filesystem. `test/security/f1-f7-no-execution.test.ts` and
+  `test/security/f11-adapter-write-safety.test.ts` hold this as an architecture rule over
+  source text and the command inventory; `test/security/f1-no-execution-at-runtime.test.ts`
+  holds the same claim for F1 at runtime, tripping every entry point Node has for running a
+  program or a string against every command in the inventory. Findings closed by absence
+  rather than by a guard have the test as the whole of the control; the walker all three
+  tree-wide source-text rules share (this one, F11's, and layering's above) is
+  `test/helpers/src-scan.ts`.
 - Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
   Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
 - Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
@@ -198,6 +208,22 @@ Neither is a state.
 When the next word for "how work ended" arrives, it is a value in a closed set on an existing edge, not an eighth state: `resolution` on `cancel` and `outcome` on `release` are both `T6`, and `docs/architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md` prices what a state would have cost instead.
 When a fact can be computed from a stored field and the clock, it is derived on read beside the field, never written: `overdue` sits next to `blocked` in that respect, and `src/domain/dates.ts` is where both it and its `H17` finding live.
 A field nothing reads is decoration, so a new one lands with the reads that act on it in the same change.
+
+## The extension surface is closed, and closing it was the decision
+
+DR6 designed a hook as an executable named in a committed `workspace.md` and run on every
+mutation, and A.8 rule 3 designed a generated agent adapter. Neither ships:
+`docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md` refuses the first and
+records that the second has no surface to secure, and the `hooks` story in `.work` is
+`cancelled` with resolution `wont_do` pointing at it. When a request arrives for "run
+something of mine on every mutation", the answers already in the tool are the done gate
+(`DOD7`) and CI, and reopening the hook contract takes a second caller neither can serve,
+argued rather than assumed.
+
+`test/security/findings.test.ts` is the register of the threat model's thirteen findings and
+the place to change one's state: a finding is closed by naming a regression test, and one
+closed by having its surface removed names the decision record too. Twelve are closed and F4,
+CSV formula injection, waits on export.
 
 ## CI runner platforms
 

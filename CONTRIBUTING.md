@@ -55,7 +55,7 @@ CI runs commitlint over every commit in a pull request.
 
 ```text
 feat(domain): add the ready gate evaluator
-fix(store): release the lock when a hook times out
+fix(store): release the lock when an atomic write fails
 docs: record the pre-1.0 stability policy
 ```
 
