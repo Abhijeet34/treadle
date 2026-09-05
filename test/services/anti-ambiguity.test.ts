@@ -142,12 +142,12 @@ describe('next ranks deterministically and prints the weights it used (R11)', ()
     assert.deepEqual(a, b)
   })
 
-  it('carries the six components of each row, and the weights that multiplied them', async () => {
+  it('carries the seven components of each row, and the weights that multiplied them', async () => {
     const result = await next(demo.store, CLOCK, { limit: 3 })
-    assert.equal(result.data['weights'], 'pri 10 age 1 dep 5 spr 8 asg 0 due 4')
+    assert.equal(result.data['weights'], 'pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6')
     const block = result.data['next'] as { rows: readonly Record<string, unknown>[] }
     for (const row of block.rows) {
-      assert.match(String(row['parts']), /^p\d+\/a\d+\/d\d+\/s[01]\/m[01]\/u\d+$/)
+      assert.match(String(row['parts']), /^p\d+\/a\d+\/d\d+\/s[01]\/m[01]\/u\d+\/v[0-4]$/)
     }
   })
 
@@ -173,8 +173,8 @@ describe('next ranks deterministically and prints the weights it used (R11)', ()
     const withActor = scoreOf(view.ok ? view.value : ({} as never), item!, NOW, DEFAULT_WEIGHTS, 'dana')
     assert.equal(withActor.score - without.score, DEFAULT_WEIGHTS.asg)
     const plain = await next(demo.store, CLOCK, { limit: 1 })
-    assert.match(String(plain.data['weights']), / asg 0 due 4$/)
+    assert.match(String(plain.data['weights']), / asg 0 due 4 sev 6$/)
     const personal = await next(demo.store, CLOCK, { limit: 1, forActor: 'dana' })
-    assert.match(String(personal.data['weights']), / asg 8 due 4$/)
+    assert.match(String(personal.data['weights']), / asg 8 due 4 sev 6$/)
   })
 })
