@@ -9,7 +9,7 @@ treadle takes the first horn: the human-readable files are the source of truth a
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
 The domain core has the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs `init`, `file`, `show`, `backlog`, `transition`, `next`, `explain`, `status`, `help` and `version` over that store, through application services, rendered as one result object in three forms.
+`bin/treadle.js` runs `init`, `file`, `show`, `backlog`, `transition`, `mark`, `evidence add`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version` over that store, through application services, rendered as one result object in three forms.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
