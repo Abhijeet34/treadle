@@ -669,6 +669,8 @@ Measured on the 10,000-item corpus before the fix: `treadle backlog --state read
 A writer that transitions the cursor item out of the filter therefore turns a walk into a loop over the first pages, with nothing in the output to read it from.
 
 All three now refuse with `C1`, name the cursor, and give the command that starts the walk again.
+That fix is [#29](https://github.com/Abhijeet34/treadle/pull/29)'s, through the shared `unknownCursor` helper in `src/application/services/refusal.ts`, which landed while this was being measured; the three inline refusals written here were dropped in favour of it, and one of them spliced a caller's filter values into a `fix` line, which A.6 forbids.
+What this branch leaves behind is the counting proof above, the statement of the guarantee, and a test for the case a concurrent writer actually produces: #29's own tests cover a cursor naming nothing, and not a cursor naming an item the workspace still holds and the filter no longer matches.
 
 ## Forward compatibility, measured
 
