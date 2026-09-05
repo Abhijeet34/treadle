@@ -25,7 +25,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
 | No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts. 51 source files scanned against 11 network module specifiers: 0 imports | Proven |
 | Coverage meets the gate | 97.11% lines and 88.95% branches overall against a 90/85 gate; all 7 named files at 96.33% lines or better and 96.26% branches or better | Proven |
-| A flake budget of zero | Measurement in progress; see [Flake](#flake) | Not yet measured |
+| A flake budget of zero | 20 of 20 consecutive full runs completed and green, 651 tests every run, 31.3 s to 54.9 s each, 882 s in total | Proven |
 | One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
 
@@ -72,7 +72,8 @@ Writing those tests is what found the crash below.
 `npm run flake` runs the whole suite 20 times in a row and reports the count that completed alongside the count that passed.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
-The 20-run measurement for this tree has not completed at the time of writing, so the table above says so rather than guessing.
+Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, 651 tests in every run, 882 s in total.
+Individual runs ranged from 31.3 s to 54.9 s, which is a 1.75x spread on an otherwise idle machine and is the reason the fuzzer's time bound is generous rather than tight.
 
 One flake was found and fixed during this work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.
 Catastrophic backtracking is an orders-of-magnitude event, so the budget is now 2 s and the real claim is carried by the star-height scan, which is deterministic.
