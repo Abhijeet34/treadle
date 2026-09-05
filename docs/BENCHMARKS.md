@@ -476,14 +476,18 @@ Peak RSS and in-process time of that read against the bounded `list` the memory 
 | 131 | 101,456 KiB, 7.6 ms | 101,744 KiB, 14.4 ms |
 | 1,320 | 100,448 KiB, 10.8 ms | 114,240 KiB, 46.1 ms |
 | 10,120 | 100,736 KiB, 9.2 ms | 199,200 KiB, 275.7 ms |
-| 50,021 | 102,400 KiB, 9.3 ms | 416,144 KiB, 1,239.1 ms |
-| 100,000 | 103,040 KiB, 43.2 ms | 601,872 KiB, 8,142.5 ms |
+| 50,022 | 102,400 KiB, 9.3 ms | 416,128 KiB, 1,578.4 ms |
+| 100,001 | 103,040 KiB, 43.2 ms | 599,536 KiB, 2,773.2 ms |
+| 200,001 | 100,592 KiB, 22.7 ms | 984,208 KiB, 6,116.7 ms |
 
-Every row above 50,000 is one cold sample rather than a median, and the 100,000 row was taken at a 1-minute load of 28.1 against 4.2 for the rows above it, so read its wall time as an upper bound and its RSS as the figure it is.
+The three rows past 10,000 are the median of three cold samples each, taken back to back at 1-minute loads of 3.7 to 4.3; the rows above them are one sample each from the appended run's corpora.
+RSS is stable across the three: 414,896 to 416,592 KiB at 50,022, 599,360 to 599,776 at 100,001, and 967,024 to 984,768 at 200,001, a spread of 0.4% or less.
+It is not stable against the machine's state, which is why the series exists: a single sample taken immediately after the 200,001-item corpus was generated, with the writeback still draining at a 1-minute load of 28.1, read 1,302,400 KiB, 32% high.
+
+What the corpus adds over the runtime floor is 6.29 KiB per item at 50,022, 4.98 at 100,001 and 4.41 at 200,001, and the marginal cost between the top two scales is 3.85 KiB per item.
 
 The instrument is `process.resourceUsage().maxRSS`, read in the process that did the work; libuv normalises the darwin `ru_maxrss` to KiB, and `/usr/bin/time -l` cannot report it in the sandbox these runs were driven from because `sysctl kern.clockrate` is denied there.
 About 99 MiB of every row is the runtime rather than the corpus, which the floors table prices: `node -e` alone peaks at 41.5 MiB and the store adapter loaded with no work done at 95.9 MiB.
-What the corpus adds is 6.28 KiB per item at 50,000, and it is still 5.0 KiB per item at 100,000.
 
 The same read at the command surface, one process per command, on the 50,021-item corpus at a 1-minute load of 4.2:
 
@@ -511,18 +515,49 @@ A budget met by an operation the product never performs is not a budget.
 `src/adapters/store/limits.ts` caps one shard at 8 MiB and 20,000 records, and ADR-0002's own reopening condition is a month filing more than about 5,000 records.
 The corpus spreads its items over 24 months, and the largest month holds about 4.3% of them.
 
-| Items | Shards | Largest shard | Of the 8 MiB cap | Index / text |
-|---|---|---|---|---|
-| 50,000 | 24 | 2,176 records, 1,115,493 B | 13.3% | 1.538x |
-| 100,000 | 24 | 4,315 records, 2,214,665 B | 26.4% | 1.539x |
+| Items | Shards | Largest shard | Of the 8 MiB cap | Index / text | On disk |
+|---|---|---|---|---|---|
+| 50,000 | 24 | 2,176 records, 1,115,493 B | 13.3% | 1.538x | 110 MiB |
+| 100,000 | 24 | 4,315 records, 2,214,665 B | 26.4% | 1.539x | 221 MiB |
+| 200,000 | 24 | 8,554 records, 4,393,898 B | 52.4% | 1.540x | 441 MiB |
 
-The index ratio does not move with the corpus, and the shard is linear in it: 512.6 B per record at 50,000 and 513.3 at 100,000.
-At 513 B per record the 8 MiB byte cap is reached by a month holding about 16,350 records, which this distribution reaches at roughly 380,000 items, and the 20,000-record cap at roughly 460,000.
-ADR-0002's own reopening condition of 5,000 records in one month arrives first, at about 116,000 items.
+The index ratio does not move with the corpus and the shard is linear in it: 512.6 B per record at 50,000, 513.3 at 100,000 and 513.7 at 200,000.
+At that rate the 8 MiB byte cap is reached by a month holding about 16,330 records, which this distribution reaches at roughly 380,000 items, and the 20,000-record cap at roughly 465,000.
+ADR-0002's own reopening condition of 5,000 records in one month arrives first, at about 116,000 items, and 200,000 is already past it.
 
-So the layout has room the memory does not.
-Read memory crosses DR8's 100 MiB budget between 131 items (101,744 KiB) and 1,320 (114,240 KiB), and most of that is the runtime rather than the corpus: the timed children launch from TypeScript source, and "Peak RSS on a read" above measured the same read at 52.6 MiB through the release path's bundle against 99.2 from source.
-Even from that floor, 6.28 KiB per item spends the remaining headroom by about 7,700 items.
+### The write path builds a shard the read path refuses
+
+That ceiling is not extrapolated here, it is reached: 20,000 records filed into a single month through the landed store.
+
+```text
+$ ls -l items
+-rw-r--r--  1  10246139  2026-09.md
+
+$ treadle status
+err INTEGRITY -
+rule S4
+"cause items/2026-09.md line 1: items/2026-09.md is 10246139 bytes, over the 8388608 byte
+ ceiling for a record file; it is not served; that finding hides a record this workspace
+ holds, so no answer over it is whole
+fix treadle doctor
+[exit 7]
+```
+
+`doctor` reports the same finding and `checked 0`, and `treadle file` into the same workspace exits 7 with it.
+`MAX_FILE_BYTES` is read in `src/adapters/store/grammar.ts:351` and in `src/adapters/store/sharded-store.ts:167`, both on the read path, and nothing consults it before a write.
+So `store.apply` reported `ok` for the transaction that produced the file, and every command since has refused the workspace it produced.
+The refusal is loud, names the file, the byte count and the cap, and there is no command that splits a shard, so the workspace is unrecoverable through the tool.
+
+That is the wall, and it is the one shape of degradation that is not graceful: the ceiling is enforced where the damage is discovered rather than where it is done.
+This is left to whoever owns the store's ceilings rather than fixed here, because the guard belongs beside the four `S` rules in `src/adapters/store/`.
+
+### What gives way, in the order it gives way
+
+1. **From about 1,300 items**, the read every command performs is over DR8's 100 MiB budget. Most of that is the runtime: the timed children launch from TypeScript source, and "Peak RSS on a read" above measured the same read at 52.6 MiB through the release path's bundle against 99.2 from source. Even from that floor, 3.85 KiB per item spends the remaining headroom by about 12,600 items.
+2. **From about 116,000 items**, a month holds more than the 5,000 records ADR-0002 set as its own reopening condition.
+3. **At about 380,000 items**, the largest month crosses the 8 MiB shard cap. The write is accepted and every read of that workspace refuses from then on.
+4. **At about 1,000,000 items**, the whole-workspace read reaches 4 GiB at the marginal 3.85 KiB per item, which is the region of Node's default old-space limit.
+
 The wall this tool meets first is `readWorkspace`, and it is nowhere near the shard key.
 
 ## Deep pagination, proved by counting
