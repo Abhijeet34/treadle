@@ -122,6 +122,43 @@ describe('a finding with no id hides records too', () => {
   })
 })
 
+// The other two instances the adversarial pass measured beside the merge conflict, each with a
+// correct single-item refusal next to a silent list read. The duplicated id is the defect
+// this project fixed once already; the fix reached `show` and never the list.
+describe('the duplicated id and the newer schema refuse the list path too', () => {
+  it('a duplicated id refuses backlog naming both lines, and drops the good item from nothing', async () => {
+    const demo = await aDemoWorkspace()
+    try {
+      await append(demo, ['', '# queue-drain: Drain the dead letter queue on deploy, the copy', '',
+        'type: task', 'state: draft', 'filed_at: 2026-09-04T08:00:00Z', 'version: 1', ''].join('\n'))
+      const listed = await runCli(['backlog'], { cwd: demo.root })
+      assert.equal(listed.code, 7, listed.out)
+      assert.doesNotMatch(listed.out, /^~items /m, 'no count is printed at all, wrong or right')
+      assert.match(listed.err, /^rule S3$/m)
+      assert.match(listed.err, /"cause items\/2026-09\.md line \d+: queue-drain names 2 records in this file, at lines \d+, \d+, so it names none of them; 2 findings hide records/m)
+      const shown = await runCli(['show', 'queue-drain'], { cwd: demo.root })
+      assert.equal(shown.code, 7, 'the single-item path and the list path give one answer')
+    } finally {
+      await demo.dispose()
+    }
+  })
+
+  it('a shard at a newer schema refuses backlog naming the file and both numbers', async () => {
+    const demo = await aDemoWorkspace()
+    try {
+      const file = path.join(demo.root, SHARD)
+      await writeFile(file, (await readFile(file, 'utf8')).replace(/^schema: 1$/m, 'schema: 99'))
+      const listed = await runCli(['backlog'], { cwd: demo.root })
+      assert.equal(listed.code, 7, listed.out)
+      assert.match(listed.err, /^rule S8$/m)
+      assert.match(listed.err, /"cause items\/2026-09\.md line 1: items\/2026-09\.md is schema 99 and this tool understands 1; every other file keeps serving; that finding hides a record/m)
+      assert.doesNotMatch(listed.err, /^entity /m, 'a file-level finding names no record')
+    } finally {
+      await demo.dispose()
+    }
+  })
+})
+
 describe('a count of one is singular', () => {
   it('on the not-found refusal and on the clean doctor line', async () => {
     const demo = await aDemoWorkspace()
