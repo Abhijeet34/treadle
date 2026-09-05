@@ -125,7 +125,7 @@ A mode and a store passed separately can disagree, and a `dry-run` whose store i
 - **`--out` is supported on `version`.** The interface answers N there because its `version` emits no record. Ours does, so a caller that wants it as JSON gets it.
 - **A confirmation class is claimed only where one exists.** Interface B.5 gives `transition <id> cancelled` a severe class and `--yes` is S on `transition` in its matrix. Nothing in this build prompts, so `transition` carries no confirmation class here and `--yes` and `--no-input` are A on it. `init` carries the moderate class it actually implements: it refuses a non-empty directory without `--yes`. A flag advertised as supported that does nothing is worse than one honestly marked accepted-and-ignored, and B.5's severe class lands with `undo`, which is the case that motivates it.
 The help note gives that reason rather than the presentation reason it would otherwise share with `--color`: one verdict letter covers four different reasons for ignoring a flag, and a note that states the wrong one is read as the rule and predicts the next command wrong.
-- **The hook codes are not in the closed set.** DR5 names `HOOK_REFUSED` and `HOOK_FAILED`; hooks are a later task and no code path can produce either today.
+- **The hook codes are not in the closed set.** DR5 names `HOOK_REFUSED` and `HOOK_FAILED`; hooks are a later task and no code path can produce either today. [ADR-0012](0012-the-extension-surface-that-does-not-ship.md) later made that permanent for v1: the codes stay reserved and unreachable, so exit 3 means a guard refused and nothing else.
 
 ## What would reopen this
 
