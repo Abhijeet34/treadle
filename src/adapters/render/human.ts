@@ -65,8 +65,8 @@ function table(
   const pad = (text: string, cells: number): string => text + ' '.repeat(Math.max(0, cells - displayWidth(text)))
   const lines: string[] = []
   // A block with no rows names its count on the header line above, so a column header with
-  // nothing under it is a stranded label. `agent` keeps its `#` header, which is a parser's
-  // schema for the rows that follow rather than a thing a person reads.
+  // nothing under it is a stranded label; `agent` already drops its own `#` header the same
+  // way for an empty block.
   if (rows.length === 0) return lines
   const headerColumns = stacked ? fixed : order
   const header = headerColumns.map((column) =>

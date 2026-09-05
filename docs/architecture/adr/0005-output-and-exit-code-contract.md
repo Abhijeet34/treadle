@@ -92,7 +92,7 @@ A renderer takes the result object and its own presentation options, and looks i
 A scalar, list or text property that follows a block in the shape's order opens a new group, and a group after a block is preceded by one blank line.
 Rows and scalars share the two-space indent, so without that break `findings 0` after the `states` table reads as a state named findings with nothing in it, and `points 5` after `items` reads as an item.
 The rule is the whole layout answer for a scalar after a table: a blank line, no second indent and no borrowed heading, which is the shape `explain` already had from its ordering alone.
-A block with no rows also drops its column header, because the `<key> <shown> of <total>` line above it already states the count and a header with nothing under it is a stranded label; `agent` keeps its `#` header there, which is a parser's schema for the rows rather than something a person reads.
+A block with no rows also drops its column header, because the `<key> <shown> of <total>` line above it already states the count and a header with nothing under it is a stranded label; `agent` already drops its own `#` header the same way for an empty block.
 `test/render/human-layout.test.ts` holds both halves: the invariant that no non-block property renders inside a block's group, and a byte snapshot of every golden object at 60, 80 and 200 cells.
 
 `test/render/conformance.test.ts` feeds every command's golden result object to all three and asserts the grammar invariants over every artefact.
