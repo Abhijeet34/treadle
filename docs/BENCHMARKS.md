@@ -10,6 +10,7 @@ Four of the six meet their target, two miss it, and the two misses are reported 
 
 Reproduce it with `npm run bench`.
 The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T12-08-34-931Z`, with its heading levels demoted one step and nothing else changed.
+Two later four-scale runs are in "The axis table re-derived at 50,000 items"; every paragraph that says "the appended run" means the one in the appendix and not those.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
 
 **One set of figures below is older than the appendix and is marked where it appears.**
@@ -434,6 +435,80 @@ Demonstrated: with the budgets as committed it exits 0, and with the install-siz
 It does not fail on the per-operation timing limits.
 They were derived on this Apple M2 and have never been measured on a GitHub runner, so a red build there would be evidence about the runner.
 `bench/budgets.json` carries `timing.enforced: false` with that reason, the rows still print with their numbers, and arming them means re-deriving on the runner once the runner's own drift has been measured.
+
+## The axis table re-derived at 50,000 items
+
+Two four-scale runs on 2026-09-05, on the machine and runtime the table at the top of this file names.
+The first is unmodified `main` at `5a78152`; the second is this branch, whose only change to the rig is the `workspace` read operation and weighing each memory budget over the worst of its set.
+Neither was taken on an idle machine, and the difference between them is mostly the machine, which is why both are here.
+
+| Run | Tree | Wall | 1-minute load at the start | Across the timed operations | `node -e` floor, median | Store loaded, median |
+|---|---|---|---|---|---|---|
+| `2026-09-05T18-01-21-706Z` | `main` at `5a78152` | 386 s | 3.35 | 3.80 to 4.40 | 38.1 ms | 121.1 ms |
+| `2026-09-05T19-11-55-374Z` | this branch | 539 s | 6.35 | 6.12 to 8.26 | 39.3 ms | 154.3 ms |
+
+The store-loading floor's median moved 27% between them while its best of fifty moved 2% (119.0 to 121.4 ms), so the second run's timing rows carry a scheduler rather than a change in the code.
+
+### The twelve axes
+
+Identical verdicts in both runs on eleven of the twelve.
+
+| Axis | Verdict | Observed |
+|---|---|---|
+| A1 durability under parallel writers | MET | 5/5, 24/24, 60/60, 200/200 landed; zero refusals, zero crashes, no lock or temp file left |
+| A2 the 25 questions | MISSED | 10 full, 7 partial, 8 none, against the reference's 4/6/15; the 8 need an entity or a metric this tree does not implement |
+| A3 output size per command | MET | all 12 artefacts inside their A.3 budget; `status` 463 B against 1,441, `backlog` 724 against 1,781 |
+| A4 latency at scale | MET, then MISSED | `create` p95 147.9 ms in the quiet run and 216.2 ms in the loaded one, against a 150 ms target; `get` p95 8.2 and 14.0 |
+| A5 malformed input | PARTIAL | 206 damaged stores: 0 silent drops, 90 refusals naming the record, 113 absorbed, 1 naming the file only |
+| A6 mis-target | MET | 0 mis-targets in 10 writes with no explicit target, 3 of 3 seam resolutions correct |
+| A7 audit | MET | 50 of 50 explained, 250 events replayed to the state shown, every event carries an actor |
+| A8 lifecycle | MET | 22 of 22 illegal pairs refused naming a rule id, 20 legal pairs as the table says |
+| A9 metric coverage | NOT MEASURED | nothing under `src` computes velocity, cycle time or a burndown series |
+| A10 type validation | MET | 11 of 11 refused with a rule id and nothing created |
+| A11 harness neutrality | NOT MEASURED | no adapter generator exists, ADR-0012 |
+| A12 contract | MISSED | 25 of 26 invocations hold; 3 of 3 parse-level refusals still ignore `--out json` |
+
+A4 is the one that moved, and it moved across the 150 ms line rather than around it: same code, two runs, `create` p95 147.9 and 216.2 ms.
+A single run cannot decide that verdict on this machine, which is what the ten-run series above already said about this axis.
+
+### Every budget, and every one that moved
+
+39 budgets in the second run against 35 in the first: 26 pass, 1 fail, 8 open miss, 4 pending.
+The four new rows are the `workspace` read at each scale, which has no committed limit and prints `pending` with its figure rather than a limit invented from one loaded run.
+
+| Budget | `main` | This branch | Limit | Status |
+|---|---|---|---|---|
+| cold start, store layer loaded | 86.3 ms | 245.5 ms | 213 | **fail**, on the machine |
+| `identity` / `get` / `list` at 50,000 | 83.6 / 86.3 / 91.6 ms | 117.8 / 122.4 / 124.3 ms | 369.8 / 882.1 / 549.9 | pass |
+| `create` / `transition` at 50,000 | 220.9 / 264.5 ms | 305.8 / 342.6 ms | 584.4 / 723.3 | pass |
+| `workspace` read at 100 / 1k / 10k / 50k | absent | 130.9 / 225.6 / 445.7 / 1,541.2 ms | none committed | pending |
+| peak RSS, read at 50,000 | 102,128 KiB | 418,336 KiB | 102,400 | **open miss**, and see below |
+| peak RSS, mutation at 50,000 | 155,696 KiB | 166,064 KiB | 122,880 | open miss |
+| first index build at 50,000 | 10,654 ms | 10,709 ms | 6,000 | open miss |
+| re-index after a hand edit | 109.8 ms | 167.8 ms | 135 | open miss in the loaded run, pass in the quiet one |
+| index size against the text it indexes | 1.54x | 1.54x | 1.6 | pass |
+| runtime dependencies | 0 | 0 | 0 | pass |
+| install size, unpacked | 324,692 B | 327,471 B | 1,572,864 | pass |
+| bundle | 240,598 B | 243,377 B | 512,000 | pass |
+| A1 durability / crashes | 1 / 0 | 1 / 0 | 1 / 0 | pass |
+| A5 silent drops / whole-store refusals / crashes | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | pass |
+| output size per command | 0 over budget | 0 over budget | 0 | pass |
+
+Against the figures this file recorded before either run, four budgets moved and one of them is a change in what is being measured rather than in the product.
+
+- **Peak RSS on a read: 99.2 MiB recorded, 418,336 KiB (408.5 MiB) now.** The product did not get four times heavier. The recorded figure is a `store.list` bounded at 50 rows and the new one is `readWorkspace`, the read every command performs. Both operations are measured in the second run: `list` reads 103,168 KiB and `workspace` 418,336. This is the budget being weighed over the operation it was written about, and it now fails.
+- **Peak RSS on a mutation: 151.4 MiB recorded, 166,064 KiB (162.2 MiB) now.** 155,696 KiB of that move is `create` drifting 0.4% between runs; the remaining 10,368 KiB is the row now reading `transition`, which peaks above `create` at this scale and was not what the budget weighed.
+- **Bundle: 208,691 B recorded, 243,377 B now, and install size 284,749 B recorded, 327,471 B now.** 31,907 bytes of the bundle arrived with the four pull requests that landed between the appended run and this one, and 2,779 bytes with this branch. Both are still 2.1x and 4.8x under their limits, and both are armed, so the movement is visible on every run rather than needing this note.
+- **First index build: 10,250 ms recorded, 10,709 ms now**, a 4.5% drift on a figure whose own run-to-run spread on this machine was measured at 10,578 to 25,920 ms. Nothing here touched it.
+
+Three did not move: the index-to-text ratio at 1.538x in every run, the runtime dependency count at zero, and every A1 and A5 count at its floor.
+
+The re-index row is the one to read carefully rather than as a regression: 100.4 ms when the limit was derived, 109.8 ms on `main` in the quiet run and 167.8 ms on this branch in the loaded one, against a 135 ms limit that already carries a 35% tolerance.
+The work it measures is unchanged, and the difference between 109.8 and 167.8 is the same 27% floor shift the two runs' floors show.
+
+`npm run bench:gate` exits 1 on the second run, for the cold-start row.
+That row is the store-loading floor's median above `node -e`'s median, both taken in the same job, and it is the only row in the file that is a floor rather than a measurement of the product.
+It is 86.3 ms at a 1-minute load of 3.35 and 245.5 ms at 6.35, on the same code, which is the strongest single argument in this file for why the timing budgets are not armed anywhere.
 
 ## Where it stops scaling, and what gives way first
 
