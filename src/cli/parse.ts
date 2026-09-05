@@ -74,6 +74,7 @@ const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   doctor: {},
   next: { for: { type: 'string' } },
   explain: {},
+  history: {},
   status: {},
   help: {},
   version: {},

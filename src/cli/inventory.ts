@@ -10,6 +10,7 @@
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
+import { HISTORY_SHAPE } from '../application/services/history.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from '../application/services/insight.ts'
 import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
@@ -132,6 +133,16 @@ export const COMMANDS: readonly Command[] = [
     columns: false,
     usage: ['treadle explain <id>'],
     examples: [['treadle explain sso-saml', 'why it is where it is, which gate rules fail, and what each move needs']],
+  },
+  {
+    name: 'history', shape: HISTORY_SHAPE, effect: 'read', record: 'list',
+    omits: false, pageable: true, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle history <id> [--limit <n>] [--cursor <event>]'],
+    examples: [
+      ['treadle history checkout-500', 'who changed this item, what they moved and when'],
+      ['treadle history checkout-500 --limit 1', 'the most recent change alone'],
+    ],
   },
   {
     name: 'status', shape: STATUS_SHAPE, effect: 'read', record: 'list',

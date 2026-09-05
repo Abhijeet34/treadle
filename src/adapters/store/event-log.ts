@@ -30,8 +30,12 @@ import {
   MAX_JSON_DEPTH,
 } from './limits.ts'
 
-/** DR3's fixed key order. A rendered line is byte-identical whoever writes it. */
-const EVENT_KEYS = [
+/**
+ * DR3's fixed key order, and the persisted field list of an event: a rendered line is
+ * byte-identical whoever writes it, and test/architecture/field-visibility.test.ts reads
+ * this to hold every one of these keys to a read surface or to a declared reason.
+ */
+export const EVENT_KEYS = [
   'id', 'at', 'actor', 'actor_kind', 'entity_kind', 'entity', 'op',
   'before', 'after', 'guards', 'reason', 'outcome', 'cmd', 'txn',
 ] as const

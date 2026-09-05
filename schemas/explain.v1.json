@@ -301,6 +301,10 @@
               "trust": "data"
             }
           ]
+        },
+        "by": {
+          "type": "string",
+          "x-trust": "data"
         }
       }
     }

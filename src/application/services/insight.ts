@@ -21,7 +21,7 @@ import {
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
-import type { Store } from '../ports/store.ts'
+import type { Store, StoreEvent } from '../ports/store.ts'
 import {
   activeBlockers,
   blockedByThis,
@@ -117,6 +117,7 @@ export const EXPLAIN_SHAPE: ResultShape = {
       key: 'findings',
       columns: [{ name: 'rule' }, { name: 'detail', text: true }],
     },
+    { kind: 'text', key: 'by' },
   ],
 }
 
@@ -245,18 +246,25 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   return okResult(NEXT_SHAPE, { workspace, data })
 }
 
-type Entry = { readonly at: string; readonly event: string; readonly reason?: string }
+type Entry = {
+  readonly at: string
+  readonly event: string
+  readonly by: string
+  readonly reason?: string
+}
 
-/** The write that put the item in the state it is in, and the reason T4 made it record. */
-async function enteredAt(store: Store, id: ItemId): Promise<Entry | undefined> {
-  const events = await store.events({ entity: id })
-  if (!events.ok) return undefined
-  for (let i = events.value.length - 1; i >= 0; i -= 1) {
-    const event = events.value[i]
+/**
+ * The write that put the item in the state it is in: when, which event, who, and the reason
+ * T4 made it record. The actor is the answer to "who changed this" for the change a reader
+ * of `explain` is already asking about; `history` is the same fact for every other change.
+ */
+function enteredAt(events: readonly StoreEvent[]): Entry | undefined {
+  for (let i = events.length - 1; i >= 0; i -= 1) {
+    const event = events[i]
     if (event !== undefined && (event.op === 'item.transition' || event.op === 'item.file')) {
       return typeof event.reason === 'string'
-        ? { at: event.at, event: event.id, reason: event.reason }
-        : { at: event.at, event: event.id }
+        ? { at: event.at, event: event.id, by: event.actor, reason: event.reason }
+        : { at: event.at, event: event.id, by: event.actor }
     }
   }
   return undefined
@@ -297,7 +305,11 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     rows: targets.map((to): Row => ({ to, guards: guardsOnEdge(item, to).join(',') || '-' })),
   }
 
-  const at = await enteredAt(store, id)
+  // One read of this item's log serves both the entry below and the audit further down; it
+  // used to be read twice for the two.
+  const events = await store.events({ entity: id })
+  const log = events.ok ? events.value : []
+  const at = enteredAt(log)
   const data: Record<string, Value> = {
     item: item.id,
     type: item.type,
@@ -317,10 +329,8 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['blocks'] = blocking.length === 0 ? '-' : blocking.join(',')
   if (item.severity !== undefined) data['sev'] = item.severity
 
-  // explain already reads this item's events for the instant it entered its state, so the
-  // audit over the same list is free here and is the per-item half of `doctor`.
-  const events = await store.events({ entity: id })
-  const audit = events.ok ? auditItem(item, events.value) : []
+  // The audit over the list already read is free here, and is the per-item half of `doctor`.
+  const audit = auditItem(item, log)
   if (audit.length > 0) {
     data['findings'] = {
       columns: columnsOf(EXPLAIN_SHAPE, 'findings'),
@@ -329,6 +339,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
       rows: audit.map((finding): Row => ({ rule: finding.rule, detail: finding.detail })),
     }
   }
+  if (at !== undefined) data['by'] = at.by
   return okResult(EXPLAIN_SHAPE, { workspace, data })
 }
 

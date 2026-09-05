@@ -8,7 +8,7 @@
 // an overlay store for a dry run, so a guard that would refuse the real write refuses this
 // one, and nothing in this file knows which store it holds.
 
-import type { WorkItem } from '../../domain/index.ts'
+import { isSafeText, type WorkItem } from '../../domain/index.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 
 /** `apply` writes, `dry-run` evaluates every guard and writes nothing, `preview` evaluates nothing. */
@@ -28,6 +28,26 @@ export type Target = {
 export type Actor = {
   readonly id: string
   readonly kind: 'human' | 'agent'
+}
+
+/** The bound the three identity fields of the dictionary already carry. */
+export const MAX_ACTOR = 200
+
+/**
+ * Why an actor cannot be recorded, or `undefined`. The value comes from a flag or from the
+ * environment and is written verbatim into a committed event log, so it is held to the same
+ * class as `assignee`: one line, no control or bidi override characters, bounded.
+ */
+export function actorRefusal(actor: Actor): string | undefined {
+  if (actor.id.length === 0 || actor.id.trim() !== actor.id) {
+    return 'an actor must be a name with no leading or trailing whitespace'
+  }
+  if (actor.id.length > MAX_ACTOR) {
+    return `an actor is ${actor.id.length} characters and the limit is ${MAX_ACTOR}, which is ${actor.id.length - MAX_ACTOR} over`
+  }
+  return isSafeText(actor.id, 'line')
+    ? undefined
+    : 'an actor must be a single line with no control or bidi override characters'
 }
 
 export type EventInput = {
