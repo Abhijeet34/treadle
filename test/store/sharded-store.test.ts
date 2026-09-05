@@ -7,7 +7,15 @@ import { readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { ShardedStore, renderHeader, renderRecord } from '../../src/adapters/store/index.ts'
+import {
+  IndexCache,
+  ShardedStore,
+  decodeItem,
+  parseFile,
+  renderHeader,
+  renderRecord,
+  rowOf,
+} from '../../src/adapters/store/index.ts'
 import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
 import { storeConformance } from './conformance.ts'
 
@@ -159,6 +167,95 @@ describe('the sharded store on disk', () => {
       const cycle = findings.value.find((f) => f.rule === 'S12')
       assert.ok(cycle, 'expected an S12 hierarchy-cycle finding')
       assert.match(cycle.reason, /closes a cycle/)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('re-reads the cycle verdict when a hand edit moves the edge, in either direction', async () => {
+    // The verdict is cached in the index between commands, so what has to be proved is that
+    // the cache is bound to the rows and not to the process: a second store on the same root
+    // must see a cycle a hand edit added, and stop reporting one a hand edit removed.
+    // The two records sit in different shards, so the edit re-indexes one file and the walk
+    // above the edge it moved has to follow into the other file's rows to close the cycle.
+    const workspace = await aWorkspace()
+    const shard = path.join(workspace.root, 'items/2026-10.md')
+    const s12 = async (store: ShardedStore): Promise<string | undefined> => {
+      const found = await store.findings()
+      assert.ok(found.ok)
+      return found.value.find((f) => f.rule === 'S12')?.reason
+    }
+    try {
+      await workspace.store.apply({
+        txn: 't1',
+        writes: [
+          { item: anItem({ id: 'item-one', parent_id: 'item-two' }) },
+          { item: anItem({ id: 'item-two', filed_at: '2026-10-15T10:00:00Z' }) },
+        ],
+        events: [],
+      })
+      assert.equal(await s12(workspace.store), undefined, 'a forest is not a cycle')
+
+      const clean = await readFile(shard, 'utf8')
+      await writeFile(shard, clean.replace('# item-two: A first task', '# item-two: A first task\nparent_id: item-one'))
+      const reader = new ShardedStore(workspace.root)
+      assert.match(await s12(reader) ?? '', /closes a cycle/, 'the added edge must be found')
+
+      await writeFile(shard, clean)
+      assert.equal(await s12(new ShardedStore(workspace.root)), undefined, 'the removed edge must clear')
+      await reader.close()
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('does not lose a hierarchy cycle when a crash lands between the row commit and the recompute', async () => {
+    // A refresh only re-enters a file whose stat moved since the index last saw it. This
+    // drives the indexing half of a re-index directly against the index cache, the same
+    // durable state a process that crashed right after committing the rows and their
+    // fingerprint, but before recomputing the verdict, would leave on disk: the fingerprint
+    // already matches the edited file, so a later refresh will skip re-parsing it and can
+    // only learn what moved from the durable marker, never from this process's memory.
+    const workspace = await aWorkspace()
+    const file = 'items/2026-10.md'
+    const shard = path.join(workspace.root, file)
+    try {
+      await workspace.store.apply({
+        txn: 't1',
+        writes: [
+          { item: anItem({ id: 'item-one', parent_id: 'item-two' }) },
+          { item: anItem({ id: 'item-two', filed_at: '2026-10-15T10:00:00Z' }) },
+        ],
+        events: [],
+      })
+      const before = await workspace.store.findings()
+      assert.ok(before.ok)
+      assert.equal(before.value.find((f) => f.rule === 'S12'), undefined, 'a forest is not a cycle')
+
+      const clean = await readFile(shard, 'utf8')
+      await writeFile(shard, clean.replace('# item-two: A first task', '# item-two: A first task\nparent_id: item-one'))
+
+      const stats = await stat(shard)
+      const text = await readFile(shard, 'utf8')
+      const parsed = parseFile(text, file)
+      assert.ok(parsed.ok)
+      const items = parsed.value.records.map((record) => {
+        const item = decodeItem(record)
+        assert.ok(item.ok)
+        return rowOf(item.value, file, record.line, record.source)
+      })
+
+      const crashed = new IndexCache(path.join(workspace.root, '.index'))
+      crashed.replaceRecordFile(file, { size: stats.size, mtime: stats.mtimeMs, hash: 'crash', lines: 0 }, items, [])
+      crashed.close()
+
+      const reader = new ShardedStore(workspace.root)
+      const after = await reader.findings()
+      assert.ok(after.ok)
+      const cycle = after.value.find((f) => f.rule === 'S12')
+      assert.ok(cycle, 'the crash-window cycle must still be reported')
+      assert.match(cycle.reason, /closes a cycle/)
+      await reader.close()
     } finally {
       await workspace.dispose()
     }

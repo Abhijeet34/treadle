@@ -14,8 +14,8 @@ import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
 import {
-  findHierarchyCycle,
-  hierarchyFrom,
+  cycleAbove,
+  findParentCycle,
   type WorkItem,
 } from '../../domain/index.ts'
 import {
@@ -143,6 +143,12 @@ export class ShardedStore implements Store {
   readonly #index: IndexCache
   readonly #options: ShardedStoreOptions
   #cycleFindings: readonly Finding[] = []
+  /**
+   * Shards the refresh inside `apply` re-parsed, for the write that follows it under the
+   * same lock. Only the write path fills it, because a read that retained a 1 MB parse for
+   * the rest of the process would pay in resident memory for something nothing reads.
+   */
+  #parsedUnderLock = new Map<string, { readonly size: number; readonly mtime: number; readonly parsed: ParsedFile }>()
 
   constructor(root: string, options: ShardedStoreOptions = {}) {
     this.#root = root
@@ -225,7 +231,7 @@ export class ShardedStore implements Store {
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
       // Freshness first, inside the lock: the conflict message and the cross-shard id check
       // both read the index, and a check that decides a refusal may not read a stale cache.
-      const fresh = await this.#refresh()
+      const fresh = await this.#refresh(true)
       if (!fresh.ok) return fresh
       return await this.#applyUnderLock(transaction)
     } catch (error) {
@@ -241,6 +247,7 @@ export class ShardedStore implements Store {
         [transaction.txn],
       )
     } finally {
+      this.#parsedUnderLock.clear()
       await lock.value.release()
     }
   }
@@ -292,9 +299,10 @@ export class ShardedStore implements Store {
    * re-read, and an event file that only grew has its old prefix hash checked so an append
    * costs the append rather than the file.
    */
-  async #refresh(): Promise<StoreResult<undefined>> {
+  async #refresh(keepParses = false): Promise<StoreResult<undefined>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
+    this.#parsedUnderLock.clear()
 
     for (const file of await this.#storeFiles()) {
       const full = path.join(this.#root, file)
@@ -310,7 +318,7 @@ export class ShardedStore implements Store {
 
       const outcome = file.endsWith('.jsonl')
         ? await this.#indexEventFile(file, full, info.size, info.mtimeMs, previous)
-        : await this.#indexRecordFile(file, full, info.size, info.mtimeMs)
+        : await this.#indexRecordFile(file, full, info.size, info.mtimeMs, keepParses)
       if (!outcome.ok) return outcome
     }
 
@@ -320,13 +328,24 @@ export class ShardedStore implements Store {
     return storeOk(undefined)
   }
 
+  /** The S12 finding a cycle raises, from the verdict this refresh is entitled to reuse. */
+  #hierarchyFindings(): readonly Finding[] {
+    const cycle = this.#hierarchyCycle()
+    if (cycle === null || cycle === undefined) return []
+    return [{
+      file: WORKSPACE_FILE, line: 1, rule: 'S12',
+      reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
+      id: cycle[0] as string,
+    }]
+  }
+
   async #indexRecordFile(
-    file: string, full: string, size: number, mtime: number,
+    file: string, full: string, size: number, mtime: number, keepParse = false,
   ): Promise<StoreResult<undefined>> {
     // The ceiling is checked against the size the stat already gave us, before the file is
     // read: a limit that only fires after the read has happened is not a limit (F8).
     if (size > MAX_FILE_BYTES) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+      this.#replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
         file, line: 1, rule: 'S4',
         reason: `${file} is ${size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
       }])
@@ -335,14 +354,14 @@ export class ShardedStore implements Store {
     const text = await readFile(full, 'utf8')
     const parsed = parseFile(text, file)
     if (!parsed.ok) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: parsed.error.rule, reason: parsed.error.message },
       ])
       return storeOk(undefined)
     }
     const schema = this.#schemaRefusal(parsed.value, file)
     if (schema !== undefined) {
-      this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: schema.rule, reason: schema.message },
       ])
       return storeOk(undefined)
@@ -366,8 +385,15 @@ export class ShardedStore implements Store {
     if (parsed.value.crlf) {
       findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
     }
-    this.#index.replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
+    this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
+    if (keepParse) this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
     return storeOk(undefined)
+  }
+
+  #replaceRecordFile(
+    file: string, fingerprint: Fingerprint, items: readonly IndexedItem[], findings: readonly Finding[],
+  ): void {
+    this.#index.replaceRecordFile(file, fingerprint, items, findings)
   }
 
   async #indexEventFile(
@@ -419,22 +445,59 @@ export class ShardedStore implements Store {
   /**
    * Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an edge
    * a hand edit or a git merge put in a file, and the roll-up runs over exactly that data.
-   * The graph reads five fields, so it is built from index columns rather than by decoding
-   * every record on every command.
+   * The walk needs the parent edges and nothing else, so it reads two index columns rather
+   * than decoding every record.
+   *
+   * The verdict is then written back beside the rows it came from, in the same call that
+   * clears the durable dirty marker it accounts for. Every transaction that moves an item row
+   * merges into that marker, so this recomputes exactly when the row set moved: at 50,000
+   * items the walk is 111 ms of a 218 ms read, and a command that changed nothing was paying
+   * it to reach the same answer as the command before it.
    */
-  #hierarchyFindings(): readonly Finding[] {
-    const items = this.#index.parentEdges().map(([id, parent, type, state, points]) => ({
-      id, type, state,
-      ...(parent === null ? {} : { parent_id: parent }),
-      ...(points === null ? {} : { points }),
-    }))
-    const cycle = findHierarchyCycle(hierarchyFrom(items as unknown as readonly WorkItem[]))
-    if (cycle === undefined) return []
-    return [{
-      file: WORKSPACE_FILE, line: 1, rule: 'S12',
-      reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
-      id: cycle[0] as string,
-    }]
+  #recheckHierarchy(): readonly string[] | null {
+    const cycle = findParentCycle(this.#index.parentEdges()) ?? null
+    this.#index.setHierarchyVerdict(JSON.stringify(cycle))
+    return cycle
+  }
+
+  /**
+   * The verdict this refresh is entitled to, read from the index rather than from anything
+   * only this process's memory carries: a marker written and merged in the same transaction
+   * as the rows it describes survives a crash between a commit and this recompute, which an
+   * in-memory tally of what a refresh touched cannot.
+   *
+   * No dirty marker reuses the stored verdict outright. One that names moved parent edges,
+   * over a store already known to be acyclic, walks up from those nodes alone: a cycle that
+   * was not there before has to pass through an edge that moved. One marked `full`, from a
+   * moved-edge count past the cap a meta row is worth carrying, recomputes whole.
+   *
+   * A store already reported cyclic recomputes whole as soon as any row moved, edge or not.
+   * An edit clears a cycle as easily as it closes one, and dropping the edge that closed it
+   * moves no edge at all, so a rule that watched only for moved edges would report a cycle
+   * that a hand edit had already removed.
+   */
+  #hierarchyCycle(): readonly string[] | null {
+    const stored = this.#index.hierarchyVerdict()
+    if (stored === undefined) return this.#recheckHierarchy()
+    const dirty = this.#index.hierarchyDirty()
+    if (dirty === undefined) return JSON.parse(stored) as readonly string[] | null
+
+    const known = JSON.parse(stored) as readonly string[] | null
+    if (known !== null) {
+      if (dirty.rows) return this.#recheckHierarchy()
+      this.#index.setHierarchyVerdict(stored)
+      return known
+    }
+    if (dirty.full) return this.#recheckHierarchy()
+    for (const id of dirty.moved) {
+      const cycle = cycleAbove(id, (at) => this.#index.parentOf(at))
+      if (cycle !== undefined) {
+        this.#index.setHierarchyVerdict(JSON.stringify(cycle))
+        return cycle
+      }
+    }
+    this.#index.setHierarchyVerdict(stored)
+    return known
   }
 
   // -- writing ---------------------------------------------------------------------------
@@ -482,9 +545,21 @@ export class ShardedStore implements Store {
   }
 
   async #readShard(file: string): Promise<ParsedFile | StoreResult<never>> {
+    const full = path.join(this.#root, file)
+    // The refresh that ran a moment ago, under this same lock, may already have parsed this
+    // shard. A stat is what proves the bytes have not moved since, and it is what the
+    // freshness rule uses everywhere else, so reusing that parse re-reads nothing the rule
+    // does not already treat as unchanged.
+    const kept = this.#parsedUnderLock.get(file)
+    if (kept !== undefined) {
+      const now = await stat(full).catch(() => undefined)
+      if (now !== undefined && now.size === kept.size && now.mtimeMs === kept.mtime) {
+        return this.#writableShard(kept.parsed, file)
+      }
+    }
     let text: string
     try {
-      text = await readFile(path.join(this.#root, file), 'utf8')
+      text = await readFile(full, 'utf8')
     } catch {
       return { schema: SCHEMA, header: renderHeader(SCHEMA), chunks: [], chunkById: new Map(), records: [], quarantined: [], crlf: false }
     }
@@ -492,14 +567,21 @@ export class ShardedStore implements Store {
     if (!parsed.ok) return parsed
     const newer = this.#schemaRefusal(parsed.value, file)
     if (newer !== undefined) return { ok: false, error: newer }
-    if (parsed.value.schema < SCHEMA) {
+    return this.#writableShard(parsed.value, file)
+  }
+
+  /** DR3: a file this tool writes has to be at this tool's schema, in either direction. */
+  #writableShard(parsed: ParsedFile, file: string): ParsedFile | StoreResult<never> {
+    const newer = this.#schemaRefusal(parsed, file)
+    if (newer !== undefined) return { ok: false, error: newer }
+    if (parsed.schema < SCHEMA) {
       return storeFail(
         'SCHEMA_OLDER', 'S9',
-        `${file} is schema ${parsed.value.schema} and this tool writes ${SCHEMA}; run migrate before writing to it`,
-        [file], { file: parsed.value.schema, tool: SCHEMA },
+        `${file} is schema ${parsed.schema} and this tool writes ${SCHEMA}; run migrate before writing to it`,
+        [file], { file: parsed.schema, tool: SCHEMA },
       )
     }
-    return parsed.value
+    return parsed
   }
 
   /** DR4: a stale version is a structured conflict naming who moved it, never an overwrite. */
@@ -621,7 +703,7 @@ function groupEvents(events: readonly StoreEvent[]): Journal['events'] {
   return [...byFile].map(([file, entry]) => ({ path: file, lines: entry.lines, ids: entry.ids }))
 }
 
-function rowOf(item: WorkItem, file: string, line: number, source: string): IndexedItem {
+export function rowOf(item: WorkItem, file: string, line: number, source: string): IndexedItem {
   return {
     id: item.id, file, line, type: item.type, state: item.state,
     parent: item.parent_id ?? null,

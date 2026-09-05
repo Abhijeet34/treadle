@@ -78,13 +78,18 @@ export function childrenOf(graph: HierarchyGraph, id: ItemId): readonly ItemId[]
 }
 
 /**
- * Walks the parent chain of every item and returns the first cycle it finds, as a path
- * that closes on itself. This is the load-time check F8 asks for: it runs before a
- * roll-up, so a hand-edited cycle is a reported finding rather than a stack overflow.
+ * Walks the parent chain of every item that has one and returns the first cycle it finds,
+ * as a path that closes on itself. This is the load-time check F8 asks for: it runs before
+ * a roll-up, so a hand-edited cycle is a reported finding rather than a stack overflow.
+ *
+ * Every node has at most one parent, so a cycle is reachable only from a node that has one:
+ * a start without a parent walks one step and stops. Taking the edge map alone is therefore
+ * the same search, and it is the shape the store can read as two index columns rather than
+ * as a whole graph.
  */
-export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | undefined {
+export function findParentCycle(parentOf: ReadonlyMap<ItemId, ItemId>): readonly ItemId[] | undefined {
   const settled = new Set<ItemId>()
-  for (const start of graph.typeOf.keys()) {
+  for (const start of parentOf.keys()) {
     if (settled.has(start)) continue
     const path: ItemId[] = []
     const seenAt = new Map<ItemId, number>()
@@ -95,9 +100,39 @@ export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | u
       if (settled.has(node)) break
       seenAt.set(node, path.length)
       path.push(node)
-      node = graph.parentOf.get(node)
+      node = parentOf.get(node)
     }
     for (const visited of path) settled.add(visited)
+  }
+  return undefined
+}
+
+export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | undefined {
+  return findParentCycle(graph.parentOf)
+}
+
+/**
+ * The cycle through one node's ancestry, for a caller that knows which edges moved and holds
+ * a graph too large to draw whole. Removing an edge cannot close a cycle and neither can
+ * leaving one alone, so a graph that was acyclic before a set of edges moved is cyclic only
+ * through one of the nodes those edges left, and the walk above each is all that has to run.
+ *
+ * The parent is fetched rather than looked up in a map, so the caller can answer from an
+ * index one row at a time. The visited set and not a depth ceiling is what ends the walk: a
+ * ceiling would stop short of a cycle that closes below it and report the graph clean.
+ */
+export function cycleAbove(
+  start: ItemId, parentOf: (id: ItemId) => ItemId | undefined,
+): readonly ItemId[] | undefined {
+  const path: ItemId[] = [start]
+  const seenAt = new Map<ItemId, number>([[start, 0]])
+  let node = parentOf(start)
+  while (node !== undefined) {
+    const at = seenAt.get(node)
+    if (at !== undefined) return [...path.slice(at), node]
+    seenAt.set(node, path.length)
+    path.push(node)
+    node = parentOf(node)
   }
   return undefined
 }

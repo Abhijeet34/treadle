@@ -62,5 +62,6 @@ export {
   createWorkspace,
   openWorkspace,
   resolveWorkspace,
+  rowOf,
   type ShardedStoreOptions,
 } from './sharded-store.ts'

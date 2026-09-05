@@ -214,6 +214,34 @@ A record boundary is a line, so it cannot be made unreformattable; it is made lo
 `damagedHeadingAt` resynchronises on a heading a hand edit reshaped, and the discriminator is a record's four mandatory field lines (`type`, `state`, `filed_at`, `version`), which is the redundancy the format already carried.
 `test/store/record-boundary.test.ts` holds the property over generated documents: every id an undamaged file served is, after damage, either still served or named by a finding.
 
+## Changing an index column, and what the index is allowed to cache
+
+The index is a cache and never an authority, so its answer to a schema change is to throw the
+rows away rather than migrate them. `src/adapters/store/index-cache.ts` carries `INDEX_FORMAT`:
+bump it in the same change that adds, drops or repurposes a column, and every table is dropped
+and re-derived on the next open. An `alter table` here is the wrong instinct, and a column
+change without the bump leaves an index written by an older build serving the new code.
+
+What the index caches beyond its columns is a decision with a measurement behind it, not a
+convenience. `items.source` holds each record's rendered text so a `get` is one lookup and
+never reopens a shard, which is `docs/architecture/adr/0002-storage-layout.md`'s recorded
+departure from DR2. The events table holds only the half of a line its six columns do not, and
+`eventRest`/`eventFrom` in `src/adapters/store/event-log.ts` own that split. Adding a cached
+column costs index size against the budget in `bench/budgets.json`, whose `why` strings carry
+the `dbstat` decomposition it was derived from.
+
+The load-time hierarchy cycle check (finding F8) is cached the same way, as a verdict in the
+`meta` table, and any transaction that moves an item row reports what it moved. If you add a
+path that writes item rows, it goes through `replaceRecordFile` or the verdict goes stale.
+
+## Measuring a performance change here
+
+Take the before and the after under the same conditions or do not take them. This machine is
+shared: a before and an after forty minutes apart, at 1-minute loads of 68.77 and 6.45, moved
+the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code.
+`docs/BENCHMARKS.md` carries the method, the interleaved-run shape and the floors table, and
+`bench/budgets.json` says which budgets are armed and why the timing ones are not.
+
 ## Where a terminal nuance goes, and where a derived flag goes
 
 Neither is a state.

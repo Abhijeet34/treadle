@@ -16,6 +16,8 @@ The appendix at the end of this file is `bench/results/bench.md` from run `2026-
 The ten-run series in "Targets missed" was taken on 2026-09-04, before [#4](https://github.com/Abhijeet34/treadle/pull/4) and [#7](https://github.com/Abhijeet34/treadle/pull/7) landed, and none of it was re-taken.
 It is kept because it is the only evidence this repository has of how far a figure on this machine drifts between runs, and a single run cannot replace it.
 Everything else on this page was measured in the appended run.
+"Targets missed" also carries what happened to the seven timing, memory and size misses it originally reported: two closed by optimisation, two budgets corrected against a new measurement, and three still open with a smaller number and a named mechanism.
+`bench/budgets.json` carries the two corrected limits, each beside the measurement it is derived from.
 
 ## Read this before you read a number
 
@@ -139,6 +141,176 @@ The mechanism is in the corpus table: a create appends one record to the largest
 Five of the DR8 rows are budgets the landed store has never met, and DR8's numbers came from throwaway spikes that no longer exist rather than from this code.
 They are recorded as open misses: printed with their number, not failing a build for standing still.
 A budget nobody has ever met is a finding, not a regression.
+
+### What happened to the seven timing, memory and size misses
+
+Every figure in this subsection was taken on the machine the table above names, Apple M2, 8 cores, 16 GB, `darwin 25.6.0`, `arm64`, on Node 24.11.1, which is still below the 24.15.0 floor `package.json` declares.
+The corpus is the same one, seed `20260905`, 50,000 items in 24 shards with a largest month of 2,176 records in 1,115,493 bytes, restored from an untouched copy before every measurement so that a mutation never measures the store a previous mutation left.
+The 1-minute load either side of each run is given with it.
+
+Two of the seven are closed by changing the code, two are corrected budgets, and three are still open with a smaller number than they had.
+The before column below is that same corpus re-measured on this machine beside the after, not the median of ten above, because a before and an after have to be taken under the same conditions.
+
+| Target | Budget | Before | After | Verdict |
+|---|---|---|---|---|
+| A4, create at 50k, startup excluded | 150 ms | 322.6 ms | 136.1 ms, p95 139.8 | closed by optimisation |
+| A4, read at 50k, startup excluded | 150 ms | 144.0 ms | 7.2 ms | closed by optimisation |
+| DR8, peak RSS on a read at 50k | 100 MiB | 185.8 MiB | 99.2 MiB from source, 52.6 MiB from the bundle | closed, on the line from source |
+| DR8, peak RSS on a mutation at 50k | 120 MiB | 220.9 MiB | 151.4 MiB from source, 122.7 MiB from the bundle | still open, 1.02x from the bundle |
+| DR8, first index build at 50k | 6,000 ms | 10,504 ms | 10,250 ms | still open, 1.71x |
+| DR8, re-index after a hand edit | 50 ms | 249.1 ms | 100.4 ms | budget corrected to 135 ms |
+| DR8, index size against the text it indexes | 1.0x | 2.064x | 1.538x | budget corrected to 1.6x |
+
+Every before and after in that table is one interleaved run of three repetitions on the same corpus bytes, with the trees alternating inside each repetition and fifteen cold processes per operation.
+That shape is not decoration.
+The first before and after this work produced were taken forty minutes apart, at 1-minute loads of 68.77 and 6.45 on a machine that also moved from 98.7% to 58.7% memory in use, and their `node -e` floors were 504.2 ms and 37.6 ms.
+Those two numbers measured the machine.
+The run in the table sat at a 1-minute load of 3.98 to 5.66 with a `node -e` floor of 37.6 ms on both sides, against the appendix run's own 38.5 ms, and its baseline column reproduces the published medians of ten: create 322.6 against 311.1, read 144.0 against 148.6, read RSS 185.8 against 182.0, mutation RSS 220.9 against 216.6, index ratio 2.064 against 2.06.
+A before and an after taken under different conditions are not a comparison.
+
+### The mechanism, which was one thing and not five
+
+The report above named the create path and it was right about it.
+It was not the largest cost.
+
+A CPU profile of a single warm `get` at 50,000 items put 117 ms of its 218 ms in the load-time hierarchy cycle check, plus most of a further 37 ms of garbage collection that the same check's allocations caused.
+`#hierarchyFindings` read five columns of all 50,000 rows out of SQLite, mapped them into 50,000 objects, and built a `HierarchyGraph` of five Maps, in order to answer a question that only the parent edges decide.
+It ran on every command, and `transition` ran it twice, because `get` refreshes and then `apply` refreshes again inside the lock.
+
+The check itself is not optional.
+Finding F8 is that a write-time cycle check cannot see an edge a hand edit or a git merge put in a file, and decision D1 makes the file the authority.
+What is optional is recomputing it when nothing moved.
+
+The walk now takes the parent edges alone, read as two columns with a `parent is not null` clause, and its verdict is stored in the index beside the rows it came from.
+Any transaction that inserts or deletes an item row also records what it moved.
+A refresh that moved no parent edge reads the verdict.
+A refresh that moved some, over a store already known to be acyclic, walks up from those nodes alone, because a cycle that was not there before has to pass through an edge that moved.
+A store already reported cyclic recomputes whole as soon as any row moves at all, because dropping the edge that closed a cycle moves no edge, and a rule watching only for moved edges would keep reporting a cycle a hand edit had removed.
+That last case is not hypothetical: the regression test for this covers both directions across two shards, and it is what caught the first version of the rule.
+
+Read at 50,000 items went from 144.0 ms to 7.2 ms, and it is now flat: 7.1 ms at 100 items, 7.3 at 1,000, 7.3 at 10,000, 7.3 at 50,000.
+A read no longer scales with the store.
+
+Four smaller changes carry the rest.
+A re-index applied its file's rows as a difference rather than as a drop and a reload, because every column but the key is derived from `source` and a row whose id, line and source are unchanged is the row the reload would have written.
+The write path stopped parsing its shard twice, once in the refresh that runs inside the lock and once again in `readShard`, reusing the first parse when a stat proves the bytes have not moved.
+`items_state` led on `(state, priority)` and no query in this store orders by priority, so a `backlog` read sorted every matching row, each carrying a whole record's source text, to return fifty; it is now `(state, filed_at, id)` with `(filed_at, id)` beside it.
+And the events table stored each log line whole beside six columns that already carried six of its keys, so it now stores the remainder and a read rejoins the two halves in DR3's key order.
+
+### Peak RSS on a read: closed, and the budget was never the store's to miss
+
+Peak RSS on a read at 50,000 items is 99.2 MiB against 100 MiB.
+That is a pass by 0.8%, which is too close to celebrate, so here is what the number is actually made of.
+
+At 100 items the same read peaks at 98.5 MiB.
+At 1,000 it is 99.2, at 10,000 it is 99.0, at 50,000 it is 99.2.
+The store contributes 0.7 MiB across a 500x range in corpus size, and a `npm run bench` whose largest scale is 1,000 items still prints this row as an open miss at 102,544 KiB against 102,400.
+A budget that a thousand-item store misses is not measuring the store.
+
+Measured on the same machine with the same launcher: `node -e` alone peaks at 41.5 MiB, one type-stripped TypeScript file at 68.6 MiB, and the store adapter loaded with no work done at 95.9 MiB.
+Node's type stripper costs 27.1 MiB of resident memory and the module graph another 27.3 before a single record is read.
+The product does not ship TypeScript source.
+Running the identical timed child through esbuild with the release path's own settings puts the same read at 52.6 MiB, 1.9x under the budget, and takes 67 ms off every cold invocation as well.
+
+So the budget is left exactly where it is, because it is met.
+What the rig prints straddles it because the timed children launch from source and the shipped artefact is a bundle, which is the gap the floors table has been pricing since this file was written.
+
+### Re-index after a hand edit: the budget was below the floor of the work
+
+This is the first of two budgets moved, and the argument is a measurement rather than a preference.
+
+ADR-0002 shards by month so that freshness is a stat per file, 0.27 ms across 24 shards.
+The price of that choice, written into the same ADR's consequences, is that a file whose stat moved is re-read and re-parsed whole.
+At 50,000 items over 24 months the largest shard is 2,176 records in 1,115,493 bytes.
+
+Reading, parsing, decoding and hashing that one file, with no index and no store around it, is 59.0 ms at the median of twelve runs: read 0.6, parse 30.3, decode 26.1, hash 1.9.
+DR8's budget is 50 ms.
+No implementation of this layout reaches it on this corpus, because the floor of the unit the design re-indexes is already 9 ms above the budget for the whole operation.
+That is what makes this a budget correction rather than an excuse.
+
+The new limit is that floor plus the measured cost of the freshness pass and the index difference on top of it, 100.4 ms at the median of five hand edits, times the 35% tolerance `bench/budgets.json` already commits to for run-to-run drift: 135 ms.
+It was 249.1 ms before the difference-based re-index landed.
+The figure tracks the shard rather than the store, at 11.0 ms over 9 records, 14.9 over 55, 34.6 over 477 and 100.4 over 2,176, which is 46.1 microseconds per record re-indexed at the largest scale.
+It stays unenforced for the reason every other wall time here does, that a different runner moves it on its own.
+ADR-0002's own reopening condition, a month filing more than about 5,000 records, is the point at which the shard key and not this number is what should change.
+
+### Index size: the budget was measured against a different index
+
+This is the second, and ADR-0002 had already written down half the argument.
+
+DR2 measured 0.7x over an index of columns.
+ADR-0002 departed from that on purpose and recorded the departure: this index also caches every record's rendered source, so that a `get` is one index lookup and never reopens a shard.
+A budget taken from the first design cannot be met by the second, and the departure is the one this store wants to keep, because `get` is 7.3 ms at 50,000 items and flat from 100 items upward.
+
+So the number is corrected against what the index actually holds.
+`dbstat` over the 50,000-item corpus, against 110.3 MiB of records and log:
+
+| Segment | Before | After | What it buys |
+|---|---|---|---|
+| `items` table | 34.6 MiB | 34.6 MiB | 24.4 MiB of it is `items.source`, exactly the record text, which is what makes `get` a lookup |
+| `items` indexes | 3.1 MiB | 6.7 MiB | the two orders `listItems` asks for, replacing one order no query asks for |
+| `events` table | 139.9 MiB | 78.3 MiB | 44.8 MiB of columns and 23.4 MiB of the remainder, where it was 44.8 MiB of columns and 85.4 MiB of whole lines |
+| `events` indexes | 50.1 MiB | 50.1 MiB | the primary key an idempotent append needs, and the two the entity and file queries range over |
+| Total | 227.6 MiB | 169.6 MiB | 2.064x becomes 1.538x |
+
+Reaching 1.0x now means dropping `items.source` and reopening a shard on every `get`, or replacing the event remainder with an offset into the log.
+Both are design reversals, not tuning, and neither is a thing to do on the way past.
+The limit is 1.6x, the measured figure with room for the corpus mix to move.
+It is not armed, and the reason is the gate rather than the drift: a size does not drift run to run, reading 2.064 in every run before this change and 1.538 in every run after, but the gate weighs the largest corpus of the run and a pull-request run stops at 1,000 items, where the same index reads 1.868x because 421,888 bytes of SQLite pages over 230,591 bytes of text is the page floor and not what the index stores.
+
+### Still open: peak RSS on a mutation, and the first index build
+
+Two are still open, and neither is closed by anything in this pull request.
+
+Peak RSS on a mutation is 151.4 MiB from source and 122.7 MiB from the bundle, against 120 MiB.
+It is 1.02x over on the shape the product ships, and it is the only DR8 memory figure that still moves with the store: 99.6 MiB at 100 items, 102.4 at 1,000, 110.5 at 10,000, 151.4 at 50,000.
+The mechanism is the shard the report already named.
+A create rewrites the whole of the largest month, so one mutation holds that file's 1,115,493 bytes as a string, its parse, its re-render, and the journal's JSON copy of the same bytes.
+Closing it means not copying the shard three times, which is a change to DR4's journal format and not a tuning constant.
+
+The first index build is 10,250 ms against 6,000 ms, down from 10,504 ms, which is to say untouched.
+A CPU profile of the cold build puts 6,120 ms of it, 59%, in `replaceEventFile`: 500,000 event rows at about 12 microseconds each, every one of them writing a primary key, an `events_file` entry and an `events_entity` entry.
+The build is linear in the corpus at 57 ms over 100 items, 212 over 1,000, 1,933 over 10,000 and 10,267 over 50,000, so the figure is the row rate and nothing else.
+The next thing to try is inserting events in batched multi-row statements rather than one at a time, and it is not tried here because it is a separate measurement and this pull request already carries five.
+
+A budget nobody has ever met is a finding rather than a regression, and that is still true of these two.
+The difference is that both now have a named mechanism and a number attached to it.
+
+### A finding this work turned up, which is larger than any of the seven
+
+The seven targets are store operations, and this document has said so since it was written: the timed children call `get`, `list` and `apply` at the store seam, not the command surface.
+So a reader who takes a 7.3 ms `get` at 50,000 items as what `treadle show` costs would be wrong by two orders of magnitude, and the number is worth writing down.
+
+The same three commands on the same 50,000-item workspace, index warm, best of five, run from source on both trees:
+
+| Command | Before | After |
+|---|---|---|
+| `treadle show wi-024584` | 1,849 ms | 1,584 ms |
+| `treadle backlog --state ready` | 1,850 ms | 1,814 ms |
+| `treadle status` | 2,043 ms | 1,518 ms |
+
+The output is byte-identical on both.
+A CPU profile of `treadle show` on the new tree accounts for 1,406 ms of it, and 866 ms of that is decoding every record in the store: `decodeItem` 215.7 ms, `validateWorkItem` 190.6, `listItems` 141.1, `parseSegment` 109.5, the safe-text regex 95.0, `#decodeRow` 72.8 and `findUnsafeCharacter` 41.3, with a further 93.5 ms of garbage collection on top.
+
+The mechanism is `readWorkspace` in `src/application/services/context.ts`, which calls `store.list()` with no query and then builds a `byId` map and a full hierarchy off it.
+Every command pays it, including one that prints a single record.
+That is the same shape the store had before this work, one layer up: a whole-store read to answer a question about one item.
+
+It is not fixed here, and the reason is scope rather than difficulty.
+`WorkspaceView`'s contract is one read of the store and every derived fact off that one read, so making it lazy is a change to what the command layer promises the domain, with its own correctness surface, in a file none of the seven targets measures.
+It is the next thing to do and it is worth more than the three misses still open.
+
+### What did not change
+
+Every existing test stays green: 984 pass, 0 fail, against 981 before, the three added being the regression tests for the cycle verdict, for the event round trip, and for the crash window between a row commit and the verdict recompute that follows it.
+The A1 durability and A5 malformed-input axes were compared against this branch's base, 01580d0, which predates #7: A1 reported 200 of 200 at N=200 with zero crashes on both trees, and the A5 corpus read identically on both.
+See "The three defects the rig found, and what happened to them" below for #7's closure of the A5 silent drop.
+No invariant was traded.
+The one place where this work could have traded one, the cached hierarchy verdict, is kept correct by a marker of what moved, merged inside the same transaction that moves the rows it describes, so a crash between the two leaves work to redo on the next open rather than a stale verdict silently reused.
+
+`list` and `transition` are not axis targets but bound the same work: `list` went from 160.6 ms to 10.3 ms and `transition` from 457.4 ms to 174.2 ms.
+
+A budget that a hundred-item store also misses is measuring the runtime, not the code under it.
 
 ## The three defects the rig found, and what happened to them
 
