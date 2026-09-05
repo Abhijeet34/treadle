@@ -32,9 +32,12 @@ on:
 permissions:
   contents: read
 
+# Cancel a superseded pull-request run to keep PR churn cheap, but never a scheduled,
+# push or workflow_dispatch run: those are each the only record of their own result, and
+# cancelling one mid-flight discards a week's 10k/50k measurement for nothing.
 concurrency:
   group: bench-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   gate:

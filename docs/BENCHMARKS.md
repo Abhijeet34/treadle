@@ -2,7 +2,7 @@
 
 The acceptance bar for treadle is a measured margin over the reference on twelve axes, not an adjective.
 This file is the first run that produces those numbers.
-Five of the twelve axes are measured, one is half measured, and six need a harness that drives the command surface.
+Four of the twelve axes are measured, one is half measured, and seven are not measured: six need a harness that drives the command surface and one needs a metrics layer that does not exist yet.
 Every unmeasured one says so in its own row with the reason, because a gap in a table reads as a pass to whoever skims it.
 
 Reproduce it with `npm run bench`.
