@@ -16,7 +16,7 @@
 set -u
 
 REPO="${1:?usage: apply-repo-settings.sh OWNER/REPO}"
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 
 failed=''
 
