@@ -276,6 +276,30 @@ The next thing to try is inserting events in batched multi-row statements rather
 A budget nobody has ever met is a finding rather than a regression, and that is still true of these two.
 The difference is that both now have a named mechanism and a number attached to it.
 
+### A finding this work turned up, which is larger than any of the seven
+
+The seven targets are store operations, and this document has said so since it was written: the timed children call `get`, `list` and `apply` at the store seam, not the command surface.
+So a reader who takes a 7.3 ms `get` at 50,000 items as what `treadle show` costs would be wrong by two orders of magnitude, and the number is worth writing down.
+
+The same three commands on the same 50,000-item workspace, index warm, best of five, run from source on both trees:
+
+| Command | Before | After |
+|---|---|---|
+| `treadle show wi-024584` | 1,849 ms | 1,584 ms |
+| `treadle backlog --state ready` | 1,850 ms | 1,814 ms |
+| `treadle status` | 2,043 ms | 1,518 ms |
+
+The output is byte-identical on both.
+A CPU profile of `treadle show` on the new tree accounts for 1,406 ms of it, and 866 ms of that is decoding every record in the store: `decodeItem` 215.7 ms, `validateWorkItem` 190.6, `listItems` 141.1, `parseSegment` 109.5, the safe-text regex 95.0, `#decodeRow` 72.8 and `findUnsafeCharacter` 41.3, with a further 93.5 ms of garbage collection on top.
+
+The mechanism is `readWorkspace` in `src/application/services/context.ts`, which calls `store.list()` with no query and then builds a `byId` map and a full hierarchy off it.
+Every command pays it, including one that prints a single record.
+That is the same shape the store had before this work, one layer up: a whole-store read to answer a question about one item.
+
+It is not fixed here, and the reason is scope rather than difficulty.
+`WorkspaceView`'s contract is one read of the store and every derived fact off that one read, so making it lazy is a change to what the command layer promises the domain, with its own correctness surface, in a file none of the seven targets measures.
+It is the next thing to do and it is worth more than the three misses still open.
+
 ### What did not change
 
 Every existing test stays green: 983 pass, 0 fail, against 981 before, the two added being the regression tests for the cycle verdict and for the event round trip.
