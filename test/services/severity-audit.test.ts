@@ -169,6 +169,19 @@ describe('a change to severity or priority is an event with a before and an afte
     assert.match(long.err, new RegExp(`a reason is ${MAX_REASON + 1} characters and the limit is ${MAX_REASON}`))
     await demo.dispose()
   })
+
+  it('refuses a non-integer priority rather than silently truncating it', async () => {
+    const fractional = await cli(['mark', 'sess-timeout', '--priority', '3.9', '--reason', 'not a whole number'])
+    assert.equal(fractional.code, 2)
+    assert.match(fractional.err, /priority must be a whole number from 1 to 5/)
+    assert.equal((await events()).some((entry) => entry['op'] === 'item.mark'), false)
+
+    const trailing = await cli(['mark', 'sess-timeout', '--priority', '5xyz', '--reason', 'not a whole number'])
+    assert.equal(trailing.code, 2)
+    assert.match(trailing.err, /priority must be a whole number from 1 to 5/)
+    assert.equal((await events()).some((entry) => entry['op'] === 'item.mark'), false)
+    await demo.dispose()
+  })
 })
 
 describe('mark and evidence answer the two anti-ambiguity modes the flag matrix advertises', () => {

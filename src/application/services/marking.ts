@@ -110,8 +110,7 @@ export async function markItem(
   const draft: Record<string, unknown> = { ...item }
   if (request.severity !== undefined) draft['severity'] = request.severity as BugSeverity
   if (request.priority !== undefined) {
-    const parsed = Number.parseInt(request.priority, 10)
-    draft['priority'] = Number.isInteger(parsed) ? parsed : request.priority
+    draft['priority'] = Number.isInteger(Number(request.priority)) ? Number(request.priority) : request.priority
   }
   const after = draft as unknown as WorkItem
   const changes = diffOf(item, after, MARKED)
