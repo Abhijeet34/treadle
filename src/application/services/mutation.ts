@@ -133,9 +133,7 @@ export type FieldChange = {
  * objects rather than scalars, and `String(criterion)` rendered every one of them as
  * `[object Object]`: two different checklists compared equal, so `set` reported `already` and
  * a criterion could never be ticked. The tick syntax below is the one `--set` itself takes,
- * so what a mutation echoes is what a caller would type to reproduce it. An evidence pointer is
- * the dictionary's other structured field: it is not a list, so `render` below reports it by
- * its `kind` instead, which is what `show` already summarises it by.
+ * so what a mutation echoes is what a caller would type to reproduce it.
  */
 function isCriterion(value: unknown): value is { readonly text: string; readonly ticked: boolean } {
   return typeof value === 'object' && value !== null
@@ -150,10 +148,6 @@ function render(value: unknown): string {
     return value.every(isCriterion)
       ? value.map((criterion) => `[${criterion.ticked ? 'x' : ' '}] ${criterion.text}`).join('|')
       : value.map(render).join(',')
-  }
-  if (typeof value === 'object') {
-    const entry = value as { readonly kind?: unknown }
-    if (typeof entry.kind === 'string') return entry.kind
   }
   return String(value)
 }

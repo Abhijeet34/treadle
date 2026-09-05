@@ -25,7 +25,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import type { ScaleRow } from './axes/a4-latency.ts'
+import { READ_OPS, WRITE_OPS, type ScaleRow } from './axes/a4-latency.ts'
 import type { RunReport } from './report.ts'
 
 /**
@@ -36,9 +36,6 @@ import type { RunReport } from './report.ts'
  * performs the unbounded `workspace` read. A budget on the worst of a set cannot go stale
  * when an operation is added.
  */
-const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
-const WRITE_OPS = ['create', 'transition'] as const
-
 function worstRss(
   scale: ScaleRow | undefined, ops: readonly string[],
 ): { readonly kb: number; readonly op: string } | undefined {

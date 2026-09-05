@@ -34,8 +34,8 @@ export type ScaleRow = {
   readonly reindexAfterHandEditMs: number | string
 }
 
-const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
-const WRITE_OPS = ['create', 'transition'] as const
+export const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
+export const WRITE_OPS = ['create', 'transition'] as const
 
 export async function runA4(
   corpora: readonly Corpus[],
