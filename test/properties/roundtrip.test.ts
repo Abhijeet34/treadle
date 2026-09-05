@@ -133,7 +133,6 @@ describe('a record that parses is a fixed point of parse and render', () => {
         continue
       }
       accepted += 1
-      assert.equal(renderRecord(parsed.record), renderRecord(parsed.record), `seed ${seed} is not stable`)
       const again = parseRecordSource(renderRecord(parsed.record), 1)
       assert.ok(again.ok, `seed ${seed}: a rendered record no longer parses`)
       assert.equal(renderRecord(again.record), renderRecord(parsed.record), `seed ${seed} is not a fixed point`)

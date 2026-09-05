@@ -1,16 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // The map from threat-model finding to regression test, held as a test rather than as a
 // paragraph. Eight of the thirteen findings are closed; each closed one names the file that
-// would catch its return, and this asserts that file exists, names the finding, and carries
-// assertions. The five that are open name the layer they are waiting on instead.
+// would catch its return. This asserts that file exists, then runs all eight named files in
+// one child `node --test` process and asserts the runner's own summary reports a zero exit
+// and a positive pass count. The five that are open name the layer they are waiting on
+// instead.
 //
 // Why a test and not a table in a document: a test file renamed or emptied in a refactor is
 // exactly how a regression suite quietly stops covering the thing it was written for, and a
-// document does not notice. This does.
+// document does not notice. Running the files, rather than grepping their text for the
+// finding id and a count of "assert.", is what proves they still execute and still pass
+// rather than merely still mention the finding somewhere.
 
 import assert from 'node:assert/strict'
-import { readFile, stat } from 'node:fs/promises'
+import { spawnSync } from 'node:child_process'
+import { stat } from 'node:fs/promises'
 import path from 'node:path'
+import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 
@@ -44,22 +50,40 @@ const FINDINGS: readonly Finding[] = [
 const CLOSED = FINDINGS.filter((finding) => finding.test !== undefined)
 const OPEN = FINDINGS.filter((finding) => finding.test === undefined)
 
-describe('every closed threat-model finding has a regression test that names it', () => {
-  it(`holds for all ${CLOSED.length} closed findings`, async (t) => {
+describe('every closed threat-model finding names a regression test that exists and passes', () => {
+  it(`names ${CLOSED.length} files that exist`, async (t) => {
     for (const finding of CLOSED) {
       const file = path.join(TEST_ROOT, finding.test as string)
       const info = await stat(file).catch(() => undefined)
       assert.ok(info !== undefined, `${finding.id} names ${finding.test}, which does not exist`)
-
-      const text = await readFile(file, 'utf8')
-      assert.match(text, new RegExp(`\\b${finding.id}\\b`), `${finding.test} never names ${finding.id}`)
-      const assertions = text.match(/assert\./g)?.length ?? 0
-      assert.ok(assertions >= 3, `${finding.test} carries ${assertions} assertions`)
     }
-    t.diagnostic(`${CLOSED.length} closed findings, each mapped to a named regression test: ${CLOSED.map((f) => f.id).join(', ')}`)
+    t.diagnostic(`${CLOSED.length} closed findings, each naming a file that exists: ${CLOSED.map((f) => f.id).join(', ')}`)
   })
 
-  it('accounts for every one of the thirteen, open or closed', (t) => {
+  it('runs all of them in one child process and requires a clean, non-empty pass', (t) => {
+    const files = CLOSED.map((finding) => finding.test as string)
+    const { NODE_TEST_CONTEXT: _unused, ...childEnv } = process.env
+    const result = spawnSync(
+      process.execPath,
+      ['--test', '--test-reporter=tap', '--test-timeout=120000', ...files],
+      { cwd: TEST_ROOT, encoding: 'utf8', timeout: 120_000, maxBuffer: 16 * 1024 * 1024, env: childEnv },
+    )
+    const output = `${result.stdout ?? ''}${result.stderr ?? ''}`
+    assert.equal(result.status, 0, `node --test over ${files.join(', ')} exited ${result.status}\n${output}`)
+
+    const passed = Number(/^# pass (\d+)$/m.exec(output)?.[1] ?? Number.NaN)
+    assert.ok(Number.isInteger(passed), `no "# pass" line in the test runner's summary:\n${output}`)
+    assert.ok(passed > 0, `the test runner reported ${passed} passing tests`)
+
+    const failed = Number(/^# fail (\d+)$/m.exec(output)?.[1] ?? Number.NaN)
+    assert.equal(failed, 0, `the test runner reported ${failed} failing tests:\n${output}`)
+
+    t.diagnostic(`node --test over ${files.length} named files: ${passed} passing, ${failed} failing, exit ${result.status}`)
+  })
+})
+
+describe('every one of the thirteen findings is accounted for, open or closed', () => {
+  it('holds for all 13', (t) => {
     assert.equal(FINDINGS.length, 13)
     assert.equal(new Set(FINDINGS.map((f) => f.id)).size, 13, 'a finding id appears twice')
     for (const finding of OPEN) {
