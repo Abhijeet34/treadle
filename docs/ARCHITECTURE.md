@@ -36,7 +36,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
-| Event sink | Receives the committed events of one transaction | The monthly event log | A capturing sink, which every event assertion in the suite runs against |
+| Event sink (not built) | Receives the committed events of one transaction | The monthly event log | Unnamed: DR6's answer was hook dispatch, which [ADR-0012](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses |
 | Policy | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, validated on load |
 
 The Store seam exists, with both implementations under one conformance suite; [architecture/adr/0006-the-store-seam.md](architecture/adr/0006-the-store-seam.md) is the record.
@@ -45,6 +45,10 @@ The Renderer seam exists with three implementations plus a fourth that ships now
 [architecture/adr/0005-output-and-exit-code-contract.md](architecture/adr/0005-output-and-exit-code-contract.md) is the record for that seam and for the object it renders.
 
 The Clock and Id generator seams exist for the reason the table gives: every golden result object and every `--dry-run` diff in the suite is byte-stable because the fixed clock and the sequential generator are real implementations rather than test doubles.
+
+The Event sink is the one seam with no second implementation and no interface today: `src/adapters/store/event-log.ts` writes the log, and nothing dispatches to anything.
+DR6's second implementation for it was hook dispatch, and [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses that, so whoever builds this seam owes it a second implementation that exists for a product reason.
+Until one is named, the rule at the top of this section says what to do: an interface with one implementation is not a seam, and the store keeps writing the log itself.
 
 The Policy seam is the other one that already exists.
 Its second implementation is data rather than a second code path: `evaluateGate` takes any `Gate`, so a workspace gate and a built-in gate run through the same evaluator, and what the gate command prints is exactly what guards G1 and G6 decide.

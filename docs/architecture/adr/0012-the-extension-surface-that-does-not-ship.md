@@ -38,8 +38,10 @@ The inventory holds thirteen commands and none of them generates a file for anot
 
 ### Hooks do not ship in v1, and the refusal is the record
 
-The hook dispatch leaves the event-sink seam's implementation list in [../../ARCHITECTURE.md](../../ARCHITECTURE.md).
-The seam itself stays, because its second implementation is the capturing sink the assertions already use, and a seam with one implementation is not a seam.
+The hook dispatch leaves the event-sink seam's implementation list in [../../ARCHITECTURE.md](../../ARCHITECTURE.md), and that list is now empty on the second column.
+The seam is not built: `src/adapters/store/event-log.ts` writes the log and nothing dispatches to anything, so nothing is deleted here and nothing is owed today.
+What this does cost is honest to state: hook dispatch was DR6's product reason for making the sink a seam at all, and with it refused, whoever builds the sink has to name a second implementation that is not a test double, or leave the store writing its own log.
+The rule that decides it is already written down, that an interface with one implementation is not a seam.
 
 `HOOK_REFUSED` and `HOOK_FAILED` stay out of the closed exit-code set, where [ADR-0005](0005-output-and-exit-code-contract.md) already put them, and exit 3 means a guard refused.
 DR5's reservation is untouched: the codes stay reserved and unproduced, which is what makes a later hooks feature additive rather than breaking.
@@ -92,9 +94,9 @@ The gate that would make it safe is specified in section 6 of the `treadle-board
 
 ## Departures from the design record
 
-**DR6's six seams keep their count, and one loses an implementation.**
-The event sink's second implementation is the capturing sink rather than hook dispatch.
-DR6's rule that a seam ships two real implementations still holds, because the capturing sink is what every event assertion in the suite runs against.
+**DR6's six seams keep their count, and one loses the implementation that justified it.**
+The event sink was to be the monthly log plus hook dispatch, and hook dispatch is refused.
+DR6's rule that a seam ships two real implementations for a product reason is what makes this a cost rather than a saving: the sink is unbuilt, and the next person to build it inherits an unanswered question rather than a second implementation.
 
 **DR5's two hook exit codes are reserved and unreachable rather than reserved and coming.**
 ADR-0005 made them unreachable because the feature had not been built; this record makes it a decision rather than a schedule.
