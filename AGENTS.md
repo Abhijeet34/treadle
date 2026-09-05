@@ -70,6 +70,14 @@ because the p95 moved 68.9% between two identical runs on one machine. This mach
 and never idle, so every figure carries the load either side of it; judge a number against its
 load column and against the ten-run series in the report, not on its own.
 
+Six of the twelve comparison axes score behaviour rather than time and share one harness,
+`bench/axes/surface.ts`, which builds a workspace by running `init` and `file` and drives
+`src/cli/main.ts`'s own `run` with argv, the cwd, the environment and both streams passed in.
+A new behaviour claim about the surface belongs there rather than in a new driver, and each
+axis cross-checks one of its reads against the shipped `bin/treadle.js` so the in-process
+shortcut stays honest. Two axes stay `NOT MEASURED` on purpose: A9 has no metrics layer to
+score and A11 no adapter generator, and neither is closed by writing more harness.
+
 Most of the suite's wall time is real processes and generated input. `test/store/lock.test.ts`
 and `test/reliability/kill.test.ts` spawn 73 child processes between them through
 `test/store/fixtures/writer.ts`, because DR4's guarantees are about separate processes and an

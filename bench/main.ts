@@ -11,10 +11,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 import { runA1 } from './axes/a1-durability.ts'
+import { runA2 } from './axes/a2-questions.ts'
 import { runA4 } from './axes/a4-latency.ts'
 import { runA3 } from './axes/a3-output.ts'
 import { runA5 } from './axes/a5-robustness.ts'
-import { runA6, remainingAxes } from './axes/remaining.ts'
+import { runA6 } from './axes/a6-mis-target.ts'
+import { runA7 } from './axes/a7-audit.ts'
+import { runA8 } from './axes/a8-lifecycle.ts'
+import { runA10 } from './axes/a10-validation.ts'
+import { runA12 } from './axes/a12-contract.ts'
+import { remainingAxes } from './axes/remaining.ts'
 import type { AxisResult } from './axes/axis.ts'
 import { loadConfig, samplesFor, type BenchConfig } from './config.ts'
 import { buildCorpus, type Corpus } from './corpus.ts'
@@ -163,8 +169,25 @@ async function main(): Promise<void> {
   say(`bench: A5, ${config.a5.randomEdits} random line edits plus the shaped cases`)
   const a5 = await withLoad(() => runA5(a1Corpus, config.corpusDir, config.a5.randomEdits, config.seed))
 
-  say('bench: A6, store resolution')
-  const a6 = await withLoad(() => runA6(a1Corpus))
+  say('bench: A6, mis-target across the three scenarios at the command surface')
+  const a6 = await withLoad(async () => (await runA6(a1Corpus)).axis)
+
+  // The five surface axes run after the store axes and before the token accounting, because
+  // each builds and tears down its own workspace and none of them touches a corpus.
+  say('bench: A2, the 25 questions put to the command surface')
+  const a2 = await withLoad(async () => (await runA2()).axis)
+
+  say('bench: A7, 50 items through 200 random legal transitions')
+  const a7 = await withLoad(async () => (await runA7(config.seed)).axis)
+
+  say('bench: A8, every ordered state pair at the command surface')
+  const a8 = await withLoad(async () => (await runA8()).axis)
+
+  say('bench: A10, one invalid creation per rule at the command surface')
+  const a10 = await withLoad(async () => (await runA10()).axis)
+
+  say('bench: A12, every verb on both paths against the shipped schemas')
+  const a12 = await withLoad(async () => (await runA12()).axis)
 
   const loaded = loadTokenizers()
   const artefacts = await accountArtefacts(a1Corpus)
@@ -173,7 +196,7 @@ async function main(): Promise<void> {
   say('bench: A3, output bytes and tokens over the golden command results')
   const a3 = await runA3(loaded)
 
-  const axes: AxisResult[] = [a1, a3.axis, a4.axis, a5, a6, ...remainingAxes()]
+  const axes: AxisResult[] = [a1, a2, a3.axis, a4.axis, a5, a6, a7, a8, a10, a12, ...remainingAxes()]
     .sort((a, b) => Number(a.axis.slice(1)) - Number(b.axis.slice(1)))
 
   const committed = loadBudgets(ROOT)

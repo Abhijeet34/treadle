@@ -50,9 +50,9 @@
     },
     "a5SilentDrops": {
       "limit": 0,
-      "enforced": false,
+      "enforced": true,
       "source": "axis A5",
-      "why": "the store has never met this: a record heading renamed out of the grammar is dropped from every query with no finding"
+      "why": "closed by #7, which resynchronises on a heading a hand edit reshaped and quarantines the record instead of dropping it. The shaped heading-rename case now reports `refusal names the record` with one finding, where it reported a silent drop in every run before #7. Armed on a deterministic corpus, and `test/store/record-boundary.test.ts` holds the same property as a test, so the gate is the second line rather than the only one."
     },
     "a5WholeStoreRefusals": {
       "limit": 0,
