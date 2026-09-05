@@ -7,7 +7,11 @@
 // a stated absence rather than degrading to a zero.
 
 import type { AxisResult } from './axes/axis.ts'
+import type { QuestionRow } from './axes/a2-questions.ts'
 import type { OutputRow } from './axes/a3-output.ts'
+import type { ScenarioRow, SeamRow } from './axes/a6-mis-target.ts'
+import type { ValidationRow } from './axes/a10-validation.ts'
+import type { ContractRow } from './axes/a12-contract.ts'
 import type { ScaleRow } from './axes/a4-latency.ts'
 import type { BenchConfig } from './config.ts'
 import type { Corpus } from './corpus.ts'
@@ -116,7 +120,7 @@ export function toMarkdown(report: RunReport): string {
 
   push('## Latency, one cold process per sample', '')
   push('`net p95` is the wall p95 with the spawn floor removed. `in-process p95` excludes Node startup and module loading entirely, which is the form axis A4 targets.')
-  push('These are store operations, not commands. The command layer does not exist in this tree.')
+  push('These are store operations rather than commands: the timed children call the store directly so a millisecond is not mostly argument parsing. The command surface is measured by axes A2, A6, A7, A8, A10 and A12 below, which score behaviour rather than time.')
   push('')
   for (const scale of report.latency) {
     push(`### ${scale.items} items, ${scale.shards} shards, largest shard ${scale.largestShardRecords} records`, '')
@@ -170,6 +174,8 @@ export function toMarkdown(report: RunReport): string {
     push('')
   }
 
+  push(...axisDetail(report))
+
   push('## DR8 budget gate', '')
   push(`Timing limits are program cost at the median: the operation's wall median minus the runner's own \`node -e\` median, measured in the same job.`)
   push(`Tolerance ${report.gate.tolerancePercent}% over the committed limit, because ${report.gate.toleranceWhy}`)
@@ -184,4 +190,95 @@ export function toMarkdown(report: RunReport): string {
   push('')
 
   return out.join('\n')
+}
+
+/** One row per detail table an axis publishes. The full detail is in the JSON beside this. */
+function detailOf<T>(report: RunReport, axis: string, key: string): T | undefined {
+  const detail = report.axes.find((entry) => entry.axis === axis)?.detail
+  if (typeof detail !== 'object' || detail === null) return undefined
+  return (detail as Record<string, unknown>)[key] as T | undefined
+}
+
+/**
+ * The tables a reader needs to check an axis rather than trust it. A2 is published whole,
+ * because 25 questions scored by one worker is exactly the figure that has to be auditable;
+ * the rest are published where the table is short enough to read, with every row in the JSON.
+ */
+function axisDetail(report: RunReport): string[] {
+  const out: string[] = []
+  const push = (...lines: string[]): void => { out.push(...lines) }
+
+  const questions = detailOf<readonly QuestionRow[]>(report, 'A2', 'rows')
+  if (questions !== undefined) {
+    push('### A2, the 25 questions and how each was scored', '')
+    push('One command per question. `full` means the command answers the question whole, `partial` that it answers part of it, `none` that no command in the inventory can be aimed at it.')
+    push('The reference scored 4 full, 6 partial and 15 none on this same list.')
+    push('')
+    push('| # | Question | Command | Exit | Score | What a full answer needs | Note |', '|---|---|---|---|---|---|---|')
+    for (const row of questions) {
+      push(`| ${row.n} | ${row.question} | \`${row.command}\` | ${row.exit} | ${row.score} | ${row.fullNeeds} | ${row.note} |`)
+    }
+    push('')
+  }
+
+  const scenarios = detailOf<readonly ScenarioRow[]>(report, 'A6', 'rows')
+  const seam = detailOf<readonly SeamRow[]>(report, 'A6', 'seam')
+  if (scenarios !== undefined) {
+    push('### A6, where each write landed', '')
+    push('The landing column is read out of both stores after the write, not out of what the command printed.')
+    push('')
+    push('| Scenario | Exit | Expected | Landed in | Identity printed | Store path printed |', '|---|---|---|---|---|---|')
+    for (const row of scenarios) {
+      push(`| ${row.scenario} | ${row.exit} | ${row.expected} | ${row.landedIn} | ${row.printedIdentity === '' ? 'none' : row.printedIdentity} | ${row.printedPath === '' ? 'not on this path' : row.printedPath} |`)
+    }
+    push('')
+    if (seam !== undefined) {
+      push(`At the store seam, which is where resolution is decided: ${seam.filter((row) => row.correct).length} of ${seam.length} resolutions correct.`)
+      push('')
+    }
+  }
+
+  const walk = detailOf<readonly string[]>(report, 'A7', 'statesVisited')
+  const guardRefusals = detailOf<number>(report, 'A7', 'guardRefusalsDuringTheWalk')
+  const applied = detailOf<number>(report, 'A7', 'appliedTransitions')
+  if (walk !== undefined) {
+    push('### A7 and A8, what the walk and the pair sweep did', '')
+    push(`A7's walk applied ${applied} transitions and visited ${walk.join(', ')}; ${guardRefusals} attempts on a legal edge were refused by a guard and are not counted as applied.`)
+    const rules = detailOf<readonly string[]>(report, 'A8', 'rulesSeen')
+    const guarded = detailOf<readonly string[]>(report, 'A8', 'guardRefusedLegalEdges')
+    if (rules !== undefined && guarded !== undefined) {
+      push(`A8's refusals on illegal pairs named ${rules.join(' and ')}; the legal edges a guard refused were ${guarded.join(', ')}, which is the rule table working rather than failing.`)
+    }
+    push('')
+  }
+
+  const validation = detailOf<readonly ValidationRow[]>(report, 'A10', 'rows')
+  if (validation !== undefined) {
+    push('### A10, the eleven creation rules and what each refusal named', '')
+    push('The eleven are enumerated from the prior-art model: five from its own invalid-at-creation column, six from the field dictionary that column defers to.')
+    push('A twelfth row is this product requiring a field the model gives a default, and is reported beside the eleven rather than counted in them.')
+    push('')
+    push('| # | Rule | Source | Exit | Code | Rule id | Nothing created | Cause |', '|---|---|---|---|---|---|---|---|')
+    for (const row of validation) {
+      push(`| ${row.beyond ? `${row.n}, beyond the eleven` : row.n} | ${row.rule} | ${row.source} | ${row.exit} | ${row.code} | ${row.ruleId} | ${row.notCreated ? 'yes' : '**no**'} | ${row.cause} |`)
+    }
+    push('')
+  }
+
+  const contract = detailOf<readonly ContractRow[]>(report, 'A12', 'rows')
+  if (contract !== undefined) {
+    push('### A12, every verb on both paths', '')
+    push('A row holds when the object is on the expected stream, the other stream is empty, the exit status matches the path, and the object validates against the schema this repository ships for it.')
+    push('')
+    push('| Verb | Success schema, exit | Failure schema, exit, code | Both hold |', '|---|---|---|---|')
+    for (const verb of [...new Set(contract.map((row) => row.verb))]) {
+      const success = contract.find((row) => row.verb === verb && row.path === 'success')
+      const failure = contract.find((row) => row.verb === verb && row.path === 'failure')
+      const both = success?.holds === true && failure?.holds === true
+      push(`| ${verb} | ${success?.schema === '' ? 'no object' : success?.schema}, exit ${success?.exit} | ${failure?.schema === '' ? 'no object' : failure?.schema}, exit ${failure?.exit}, ${failure?.code === '' ? 'no code' : failure?.code} | ${both ? 'yes' : `**no**: ${[success, failure].filter((row) => row?.holds === false).map((row) => `${row?.path} ${row?.failures.join('; ')}`).join(' / ')}`} |`)
+    }
+    push('')
+  }
+
+  return out
 }

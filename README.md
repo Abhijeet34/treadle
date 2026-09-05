@@ -94,7 +94,7 @@ See [Status](#status) for the line between implemented and specified-only.
 |---|---|
 | Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
 | Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
-| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; four of the twelve comparison axes measured, one half measured |
+| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; ten of the twelve comparison axes measured, two not (no metrics layer, no adapter generator) |
 | Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
