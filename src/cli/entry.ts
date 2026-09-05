@@ -34,9 +34,12 @@ process.on('SIGINT', () => {
   process.exitCode = 130
 })
 
-// A closed stdout, as under `head`, ends the process with exit 0 and no trace.
+// A closed stdout, as under `head`, ends the process with exit 0 and no trace. The listener's
+// parameter is `Error`, which carries no `code`; the errno cast is the same one the store's
+// filesystem callers use, and it was missing here only because older `@types/node` typed this
+// listener as `any` and checked nothing.
 process.stdout.on('error', (error) => {
-  if (error.code === 'EPIPE') process.exit(0)
+  if ((error as NodeJS.ErrnoException).code === 'EPIPE') process.exit(0)
 })
 
 const code = await run({
