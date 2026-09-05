@@ -36,8 +36,8 @@ Development still has no build step, which is what `AGENTS.md` promised and what
 The 500 KB limit is not written in the build script.
 It is read from `bench/budgets.json`, so `npm run build` and `npm run bench:gate` weigh the bundle against the same number and cannot drift apart.
 
-Measured: 173,891 bytes, 2.9x under the budget.
-The tarball is 18 files, 56.8 kB packed and 236.0 kB unpacked, against DR8's 1.5 MB unpacked limit.
+Measured: 179,471 bytes, 2.9x under the budget.
+The tarball is 18 files, 58.2 kB packed and 241.6 kB unpacked, against DR8's 1.5 MB unpacked limit.
 
 ### A signed annotated tag is the release authorisation
 
@@ -82,7 +82,7 @@ esbuild was chosen partly because it resolves its platform binary through an opt
 
 **Positive**
 
-- The DR8 bundle-size budget weighs a real number for the first time: 173,891 bytes against 512,000.
+- The DR8 bundle-size budget weighs a real number for the first time: 179,471 bytes against 512,000.
 - The rollback policy has been rehearsed rather than only written. `scripts/rollback-drill.sh` signs real tags in a throwaway clone and drives the preflight against each one; eight scenarios, all passing.
 - CI gained CodeQL, dependency review, `npm audit` at `low`, the licence gate and actionlint, behind a single required `checks` context that a skipped job cannot satisfy.
 - The `check` matrix runs the 24.15.0 floor and current Node. Nothing tested the open upper half of `engines.node` before.
