@@ -46,6 +46,8 @@
   "homepage": "https://github.com/Abhijeet34/treadle#readme",
   "scripts": {
     "test": "node --test \"test/**/*.test.ts\"",
+    "coverage": "node scripts/coverage.ts",
+    "flake": "node scripts/flake.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD",

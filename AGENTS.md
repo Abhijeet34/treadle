@@ -41,18 +41,48 @@ because the p95 moved 68.9% between two identical runs on one machine. This mach
 and never idle, so every figure carries the load either side of it; judge a number against its
 load column and against the ten-run series in the report, not on its own.
 
-The suite is about 20 seconds and the two files that spawn processes are the slowest:
-`test/store/lock.test.ts` at about 8 seconds, spawning 37 of them through
-`test/store/fixtures/writer.ts` for DR4's lock, and `test/cli/index-contention.test.ts` at
-about 4, spawning the published entry point against an index another process holds through
-`test/store/fixtures/index-holder.ts`. Run the suite with a generous `--test-timeout`; no
-other file is over about two seconds.
+Most of the suite's wall time is real processes and generated input. `test/store/lock.test.ts`
+and `test/reliability/kill.test.ts` spawn 73 child processes between them through
+`test/store/fixtures/writer.ts`, because DR4's guarantees are about separate processes and an
+in-process race would prove nothing, and `test/cli/index-contention.test.ts` spawns the
+published entry point against an index another process holds through
+`test/store/fixtures/index-holder.ts`; the fuzzer runs 500,000 mutated inputs per run. Run the
+suite with a generous `--test-timeout`.
 
-Both files exist because one class of defect is invisible from in-process tests. Driving the
-store API from one process serialises writers on the advisory lock and never contends on the
-index, which opens before the lock is taken; what that hides is a command dying with a raw
-stack trace and losing its write. When a concurrency bug is reported, reach for N processes
-each running the command surface, not N promises against one store.
+These process-spawning files exist because one class of defect is invisible from in-process
+tests. Driving the store API from one process serialises writers on the advisory lock and
+never contends on the index, which opens before the lock is taken; what that hides is a
+command dying with a raw stack trace and losing its write. When a concurrency bug is reported,
+reach for N processes each running the command surface, not N promises against one store.
+
+Two more gates sit beside `npm run check`, and neither is in it because both cost minutes.
+`npm run coverage` runs the suite under Node's own coverage and holds it to the table in
+`scripts/coverage.ts`: 90 percent lines and 85 percent branches overall, 95 and 90 on the
+parser, the state machine, the escaper, path resolution and the lock. `npm run flake` runs
+the whole suite 20 times and fails on any failure or on the test count moving between runs.
+`docs/VERIFICATION.md` carries every claim with the measurement behind it, and
+`TREADLE_FUZZ_INPUTS=<n>` raises the fuzzer for a soak.
+
+## Proving a property rather than a case
+
+`test/properties/adversary.ts` is the hostile generator: 19 named categories covering the
+delimiters of both of this project's grammars, bidi and zero-width code points, ANSI, lone
+surrogates, normalisation pairs and values sitting on and one past every declared limit.
+Its categories are asserted covered, so a generator that quietly stopped generating fails
+rather than leaving a property green over nothing. Every property suite prints the count it
+actually ran as a `t.diagnostic`.
+
+No invisible code point is ever a literal in this repository, in source, in a test, in a
+document or in the fuzzing corpus. Build it from its number with `String.fromCodePoint`, or
+write it as a `\u` escape. A literal is unreadable in a diff and is indistinguishable from a
+hidden marker; `test/architecture/invisible.test.ts` enforces this over every tracked text
+file, so it is a test rather than a convention.
+
+Before trusting a new property, run it against a deliberately broken build. The mutation
+harness that did this for the nine properties here lives in the task's scratch directory
+rather than the repository, and its shape is one mutation file per property applied to a
+fresh copy of the tree. It caught a real gap: the fuzz suite checked a counted block's byte
+count and its content lines but never the line count a consumer reads to find the end.
 
 ## Reading treadle's own output, and the one boundary in it
 

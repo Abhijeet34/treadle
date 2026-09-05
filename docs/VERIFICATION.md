@@ -1,0 +1,125 @@
+# Verification
+
+What this project claims about itself, what was measured, and what is not proven.
+
+Every figure here comes from a run of the suite in this repository, on Node 24.11.1.
+That is below the declared floor of 24.15 in `package.json`, so `npm install` warns and `node:sqlite` prints one experimental notice per process.
+Both are expected here and neither changes a number below.
+
+Counts are per run, and every property suite prints its own count as a test diagnostic, so a run that generated less than it claims says so rather than reporting a silent pass.
+
+## The claims
+
+| Claim | Measured | Verdict |
+|---|---|---|
+| Round trip is byte-exact over generated adversarial documents | 2,000 documents, 1,987 records served and 1,740 quarantined, 0 bytes moved; 2,000 records are fixed points; 1,000 work items either refuse at encode or return unchanged, 579 returned unchanged | Proven |
+| A mutation applied twice is a no-op that writes nothing | 95 repeated transitions, every one reported `already` with no transaction; 9 of them checked by hashing the authoritative store either side, 0 bytes changed; 5 repeated creates refused with 0 bytes changed | Proven |
+| Any sequence of legal commands leaves a store that still holds | 40 sequences of 25 commands, 1,000 invocations: 498 mutations, 293 reads, 209 refusals; 0 shards left unparseable, 0 quarantined records, 0 answers that changed when the derived index was deleted and rebuilt | Proven |
+| The parser and the escaper survive fuzzing | 500,000 mutated inputs per run and 2,000,000 in the recorded soak, 0 crashes; slowest single input 227.9 ms against a 2,000 ms budget | Proven |
+| No regex that reads foreign input can backtrack | 23 regex literals across the 4 files that read foreign input, every one of star height 1 or 0, by a scanner with its own self-test | Proven |
+| N parallel processes leave zero corruption and zero lost updates | 24 separate processes over one record: 24 of 24 writes persisted, version 25, 24 events, 0 corrupt shards, 0 quarantined, 0 locks left behind | Proven |
+| A process killed mid-write leaves the store intact | 30 SIGKILL trials: 30 stores parseable, 0 corrupt, 0 quarantined, every lock left behind reclaimed by the next writer, every journal replayed | Proven |
+| A stale lock is recovered | Both forms: a holder whose process is provably gone, reclaimed in under 1 s; a live process whose heartbeat stopped, reclaimed. `EPERM` is treated as alive and the lock is not stolen | Proven |
+| A hand edit during an operation is handled | 12 trials: 6 broken records quarantined and reported as findings with the record either side still serving, 6 concurrent edits leaving a shard that still parses, 0 stores left unreadable | Proven |
+| Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
+| The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
+| No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
+| Coverage meets the gate | 97.11% to 97.43% lines and 88.99% to 89.08% branches across three runs, against a 90/85 gate; every one of the 7 named files over its 95/90 bar in every run | Proven |
+| A flake budget of zero | 20 of 20 consecutive full runs completed and green, the same test count in every run, 27.1 s to 34.4 s each, 626 s in total | Proven |
+| One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
+| Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
+| No literal invisible code point ships | 169 tracked text files scanned, 0 carrying one; every such character in the suites is built from its number or written as an escape | Proven |
+
+## What is not proven
+
+**Performance and efficiency.**
+No figure here is a performance measurement, and the fuzzing budget is a ceiling rather than a benchmark.
+A separate branch owns that work.
+
+**The five open threat-model findings.**
+F1 and F7 wait on the hook contract, F4 on export, F11 on the agent adapter, F13 on the release path.
+None of those layers exists, so none of the five has a regression test, and `test/security/findings.test.ts` asserts that each names the layer it waits on rather than silently disappearing from the list.
+
+**Coverage-guided fuzzing.**
+The fuzzer here is mutation-based over a committed corpus.
+A parser with deep state would deserve a coverage-guided one; this one is a single linear pass with no backtracking, which is asserted rather than assumed by the star-height scan.
+[ADR-0007](architecture/adr/0007-proving-the-properties.md) records why no fuzzing dependency was added.
+
+**Correctness of the domain rules themselves.**
+Every property above is about the machinery: the parser round-trips, the renderer cannot be made to forge a line, the store does not lose a write.
+Whether the definition-of-ready gate asks for the right things is a product question these tests do not touch.
+
+## Coverage
+
+`npm run coverage` runs the suite under Node's own coverage and holds the result to a table in `scripts/coverage.ts`.
+The overall gate is 90% lines and 85% branches; the named files are held to 95% and 90%, because those are exactly the files a project-wide average hides.
+
+| File | What it is | Held to | Result |
+|---|---|---|---|
+| `src/adapters/store/grammar.ts` | parser and serializer | 95% lines, 90% branches | met |
+| `src/domain/state-machine.ts` | state machine | 95% lines, 90% branches | met |
+| `src/domain/text.ts` | escaper: the safe-text class | 95% lines, 90% branches | met |
+| `src/adapters/render/grammar.ts` | escaper: the line grammar guards | 95% lines, 90% branches | met |
+| `src/adapters/workspace.ts` | path resolution: the workspace walk | 95% lines, 90% branches | met |
+| `src/adapters/target.ts` | path resolution: the store seam target | 95% lines, 90% branches | met |
+| `src/adapters/store/lock.ts` | lock | 95% lines, 90% branches | met |
+| all files | | 90% lines, 85% branches | 97.11 to 97.43 lines, 88.99 to 89.08 branches |
+
+The overall figures are ranges rather than points, because they move between runs and a single decimal would be spuriously precise.
+The concurrency and durability suites are real processes: how many trials leave a lock file for the next writer to reclaim, how many journalled transactions a kill leaves to be replayed, and how many compare-and-set attempts 24 writers need are all decided by the scheduler, so each run takes a slightly different set of branches through `lock.ts` and the store.
+What is asserted is the gate, which every run met, not the decimal.
+A count that measures a claim is kept here; a count that measures only the size of the tree is not, because it rots into a false statement on the next commit.
+
+The gate has been seen red: before the tests in this branch, `src/adapters/workspace.ts` sat at 80.17% lines and 65.22% branches and `src/adapters/store/lock.ts` at 88.37% branches, and `npm run coverage` named all three misses with their numbers and exited non-zero.
+Writing those tests is what found the crash below.
+
+## Flake
+
+`npm run flake` runs the whole suite 20 times in a row and reports the count that completed alongside the count that passed.
+It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
+
+Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, the same test count in every run, 626 s in total.
+Individual runs ranged from 27.1 s to 34.4 s, which is a 1.27x spread on an otherwise idle machine and is the reason the fuzzer's time bound is generous rather than tight.
+
+One flake was found and fixed during this work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.
+Catastrophic backtracking is an orders-of-magnitude event, so the budget is now 2 s and the real claim is carried by the star-height scan, which is deterministic.
+
+A tight timing bound in a test is a machine measurement wearing a correctness costume.
+
+## The defect this work found
+
+Writing the coverage gate exposed two reachable filesystem-failure paths on the same class.
+`treadle init` where `.work` is already a file, and `treadle file` into a shard directory with its write bit off.
+At the base this branch rebases onto, PR #4's command-boundary backstop already turns both into a structured envelope with no stack trace.
+
+```text
+err INTERNAL -
+"cause init did not complete: Error: ENOTDIR: not a directory, mkdir '.../.work/items'
+fix treadle version
+```
+
+Both were reported as `INTERNAL` with exit 1 and no rule id.
+A filesystem that refuses a write is the store being unavailable, which [STABILITY.md](STABILITY.md) maps to exit 6.
+`createWorkspace` declared a result type it never used, and `apply` let an errno escape the same way.
+Both now return `STORE_UNAVAILABLE` with the rule id `S13`, and `run` carries a backstop for anything that still escapes.
+
+```text
+err STORE_UNAVAILABLE -
+rule S13
+"cause the workspace at .../.work could not be created: mkdir failed with ENOTDIR
+```
+
+`test/cli/robustness.test.ts` fails 3 of 3 against the old sources and passes against the new ones.
+
+A return type that says it reports failures has to report them.
+
+## Running it
+
+```bash
+npm run check      # tsc --noEmit under strict, then the whole suite
+npm run coverage   # the suite under coverage, held to the per-file gate
+npm run flake      # 20 consecutive full runs, budget zero
+npm run flake -- 5 # a shorter local check
+```
+
+`TREADLE_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.

@@ -179,15 +179,13 @@ function opensFieldBlock(lines: readonly Line[], at: number, to: number): boolea
  */
 function damagedHeadingAt(lines: readonly Line[], from: number, to: number, inRecord: boolean): number | undefined {
   const mandatory = new Set<string>()
-  let inSection = false
   for (let i = from; i < to; i += 1) {
     const line = (lines[i] as Line).text
     if (line.startsWith('## ')) {
       if (damagedHeading(line) !== undefined && opensFieldBlock(lines, i + 1, to)) return i
-      inSection = true
       continue
     }
-    if (inRecord && !inSection && mandatory.size < MANDATORY_FIELDS.length) {
+    if (inRecord && mandatory.size < MANDATORY_FIELDS.length) {
       if (line.length === 0) continue
       const sep = line.indexOf(': ')
       const key = sep > 0 ? line.slice(0, sep) : ''

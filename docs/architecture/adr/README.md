@@ -11,6 +11,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0004](0004-concurrency-and-durability.md) | One advisory lock with a heartbeat, exclusive-create atomic writes, per-record compare-and-set |
 | [ADR-0005](0005-output-and-exit-code-contract.md) | One result object per command, three renderings behind one seam, and one exit table over its `code` |
 | [ADR-0006](0006-the-store-seam.md) | The store seam, with the sharded store and the copy-on-write overlay both under one conformance suite |
+| [ADR-0007](0007-proving-the-properties.md) | The properties are proven with the runtime's own tools, and the dependency budget does not move |
 | [ADR-0008](0008-the-measurement-rig.md) | The measurement rig: corpora written through the store, cold-process timing, and a gate that reads the median |
 
 Each record has a "Departures from the design record" section.
@@ -36,6 +37,7 @@ The set is closed.
 | `S10` | A compare-and-set found a different stored version |
 | `S11` | The lock was not acquired within the caller's bound |
 | `S12` | The stored hierarchy closes a cycle |
+| `S13` | A store file could not be created, read or written, and the filesystem said why |
 
 `H16` is the one finding id borrowed from the design's doctor namespace rather than this one, because DR3 rule 6 already named it: a file that arrived with CRLF line endings.
 

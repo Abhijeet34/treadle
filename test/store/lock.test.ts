@@ -9,14 +9,14 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { readFile, stat, utimes, writeFile } from 'node:fs/promises'
+import { readFile, readdir, stat, utimes, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { describe, it } from 'node:test'
 
-import { acquireLock, processIsGone } from '../../src/adapters/store/index.ts'
+import { acquireLock, parseFile, processIsGone } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 const run = promisify(execFile)
@@ -34,7 +34,7 @@ async function writer(root: string, id: string): Promise<Reported> {
 }
 
 describe(`${WRITERS} separate processes writing one record`, () => {
-  it('persists every write it reported, and leaves no lock behind', async () => {
+  it('persists every write it reported, and leaves no lock behind', async (t) => {
     const workspace = await aWorkspace()
     try {
       await workspace.store.apply({ txn: 't0', writes: [{ item: anItem({ priority: 1 }) }], events: [] })
@@ -56,6 +56,23 @@ describe(`${WRITERS} separate processes writing one record`, () => {
       assert.equal(events.ok && events.value.length, WRITERS)
 
       await assert.rejects(() => stat(path.join(workspace.root, '.lock')))
+
+      // Zero lost updates is the version count above. Zero corruption is this: the shards
+      // are read from disk rather than through the index, because a cache that agrees with
+      // itself proves nothing about the files a team commits.
+      const items = path.join(workspace.root, 'items')
+      let quarantined = 0
+      let records = 0
+      for (const name of (await readdir(items)).filter((n) => n.endsWith('.md'))) {
+        const parsed = parseFile(await readFile(path.join(items, name), 'utf8'), `items/${name}`)
+        assert.ok(parsed.ok, `items/${name} does not parse after ${WRITERS} concurrent writers`)
+        quarantined += parsed.value.quarantined.length
+        records += parsed.value.records.length
+      }
+      assert.equal(quarantined, 0, 'a concurrent write quarantined a record')
+      assert.equal(records, 1, `${records} records where one was written`)
+      const attempts = reported.reduce((sum, r) => sum + (r.attempts ?? 0), 0)
+      t.diagnostic(`${WRITERS} parallel processes: 0 lost updates, 0 corrupt shards, 0 quarantined, ${attempts} compare-and-set attempts to land ${WRITERS} writes`)
     } finally {
       await workspace.dispose()
     }
@@ -137,6 +154,82 @@ describe('a holder that dies never wedges the store', () => {
       assert.equal(lock.ok, false)
       assert.equal(lock.ok ? '' : lock.error.code, 'LOCK_TIMEOUT')
       assert.equal(JSON.parse(await readFile(file, 'utf8')).nonce, 'init', 'the lock was not stolen')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('reports a lock it could not create at all, rather than waiting on nothing', async () => {
+    const workspace = await aWorkspace()
+    try {
+      // A directory that does not exist is ENOENT, not EEXIST: nobody holds this lock and
+      // no amount of waiting will change that, so it is a refusal rather than a wait.
+      const nowhere = path.join(workspace.root, 'no', 'such', 'directory', '.lock')
+      const refused = await acquireLock(nowhere, { timeoutMs: 200 })
+      assert.equal(refused.ok, false)
+      assert.equal(refused.ok ? '' : refused.error.code, 'STORE_UNAVAILABLE')
+      assert.equal(refused.ok ? '' : refused.error.rule, 'S11')
+      assert.match(refused.ok ? '' : refused.error.message, /could not be created/)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('says only that it timed out when the lock file names no holder it can read', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      for (const body of ['not json at all', '{"pid":"one","host":"h","since":"s","nonce":"n"}', '{"pid":1,"host":"h"}']) {
+        await writeFile(file, body)
+        const refused = await acquireLock(file, { timeoutMs: 120, staleMs: 60_000 })
+        assert.equal(refused.ok, false, `${body} was treated as a holder`)
+        assert.equal(refused.ok ? '' : refused.error.code, 'LOCK_TIMEOUT')
+        assert.match(refused.ok ? '' : refused.error.message, /was not acquired within 120 ms$/)
+      }
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('tells a waiting caller who is holding it, once, after a second', async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const held = await acquireLock(file)
+      assert.ok(held.ok)
+
+      const notes: { pid: number | undefined; waited: number }[] = []
+      const second = await acquireLock(file, {
+        timeoutMs: 1_600,
+        onWaiting: (token, waited) => { notes.push({ pid: token?.pid, waited }) },
+      })
+      assert.equal(second.ok, false)
+      assert.equal(notes.length, 1, `the caller was told ${notes.length} times`)
+      assert.equal(notes[0]?.pid, process.pid, 'the note does not name the holder')
+      assert.ok((notes[0]?.waited ?? 0) >= 1_000, 'the note came before a second had passed')
+      await held.value.release()
+      t.diagnostic(`the waiting caller was notified once, after ${notes[0]?.waited} ms`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('releases once, and never unlinks a lock that changed hands', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const held = await acquireLock(file)
+      assert.ok(held.ok)
+      await held.value.release()
+      await held.value.release()
+
+      // Somebody else now holds it. A second release from the old handle must not remove it.
+      const next = await acquireLock(file)
+      assert.ok(next.ok)
+      await held.value.release()
+      assert.ok(await stat(file), 'the old handle unlinked the new holder\'s lock')
+      await next.value.release()
+      await assert.rejects(() => stat(file))
     } finally {
       await workspace.dispose()
     }

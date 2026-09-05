@@ -1,0 +1,3 @@
+# The corpus is bytes under test, not text git may normalise. Without this, crlf.md is
+# checked in as LF and the one case it exists for is gone on the next clone.
+* -text

@@ -6,7 +6,7 @@ A backlog that lives in a database is a backlog you cannot branch, diff, or revi
 A backlog that lives in a hand-written markdown list is one the tool cannot enforce anything about.
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
-**This repository ships the domain core, the store layer, and a command surface enough to dogfood the tool on its own backlog.**
+**This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
 The domain core has the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
 `bin/treadle.js` runs `init`, `file`, `show`, `backlog`, `transition`, `next`, `explain`, `status`, `help` and `version` over that store, through application services, rendered as one result object in three forms.
@@ -40,12 +40,19 @@ node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
 
-The test suite is 603 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
+The test suite has no build step, about 31 seconds on Node 24.11.1. Most of that
+is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed
+inputs per run.
 
 ```bash
-npm test        # node --test over test/**/*.test.ts, no build step
-npm run check   # tsc --noEmit under strict, then the tests
+npm test         # node --test over test/**/*.test.ts, no build step
+npm run check    # tsc --noEmit under strict, then the tests
+npm run coverage # the suite under coverage, held to a per-file gate
+npm run flake    # 20 consecutive full runs, budget zero
 ```
+
+[docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each
+figure is, and what is not proven.
 
 The domain core is a library of pure functions.
 Nothing in `src/domain` reads the filesystem, the clock, a random source, or the process, and a test enforces that rather than a comment asking for it.
@@ -100,7 +107,7 @@ The remaining five land in layers that do not exist yet.
 itself. It is the proof that the tool can manage its own backlog, and it is readable and
 reviewable as markdown without running anything:
 
-```text
+```bash
 treadle status                                  # where the project stands
 treadle next                                    # what to pick up, and why that order
 treadle explain history                         # why one item is still in draft
@@ -119,6 +126,7 @@ list. `treadle explain <id>` names the rule.
 - [docs/STABILITY.md](docs/STABILITY.md) - what counts as a breaking change, and the pre-1.0 policy.
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md) - the measured run: the twelve axes, the performance budget, and what is not measured yet.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
+- [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
 
 ## Licence

@@ -137,6 +137,37 @@ describe('one corrupt record is quarantined and every other record keeps serving
   })
 })
 
+describe('a record missing a mandatory field before a later section', () => {
+  it('is not split by a field-shaped line in its own section body', () => {
+    // Regression for damagedHeadingAt resynchronising on `type: reminder` inside the
+    // "## Notes" body: the record above is missing `version`, so the old code turned off
+    // the mandatory-field exemption at the first "## " line rather than at the fourth
+    // mandatory field, and treated the body line as a damaged heading of its own.
+    const text = [
+      'schema: 1',
+      '',
+      '# item-one: A first task',
+      '',
+      'type: task',
+      'state: draft',
+      'filed_at: 2026-09-01T10:00:00Z',
+      '',
+      '## Notes',
+      '',
+      'type: reminder',
+      'state: draft',
+      '',
+    ].join('\n')
+    const parsed = parseFile(text, 'items/2026-09.md')
+    assert.ok(parsed.ok)
+    assert.deepEqual(parsed.value.records.map((r) => r.id), ['item-one'])
+    assert.equal(
+      parsed.value.quarantined.length, 0,
+      `the section body was resynced as a phantom record: ${JSON.stringify(parsed.value.quarantined)}`,
+    )
+  })
+})
+
 describe('a file that is not one of ours, and a schema line that is', () => {
   it('refuses a file whose first line is not "schema: <n>"', () => {
     const parsed = parseFile('# alpha-one: no header\n\nstate: draft\n', 'items/2026-09.md')
