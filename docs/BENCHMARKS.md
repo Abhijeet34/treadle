@@ -57,7 +57,7 @@ Five nested floors, each a strict superset of the one above, so a difference pri
 
 Subtract 2.3 ms of spawn from any wall figure to get the program's own cost.
 Type stripping costs 33.3 ms and loading the store costs 44.8 ms on top of it, so 78 ms of every cold invocation is module loading that a bundle would mostly remove.
-The tree now builds one, weighed at 208,710 bytes in the package table of the appendix, and `npm run build` prints that count against DR8's 512,000 limit and fails rather than warns if it goes over.
+The tree now builds one, weighed in the package table of the appendix, and `npm run build` prints that count against DR8's 512,000 limit and fails rather than warns if it goes over.
 The timed children still launch from TypeScript source, so these figures and DR1's 45 ms budget on a 406 KB bundle are still not the same measurement.
 
 The floors are measured after the corpora are generated and immediately before the operations they are subtracted from, so both share their conditions.
@@ -240,7 +240,7 @@ Stated plainly, because each one bounds what these numbers support.
 1. **The machine was shared throughout.** Sibling workers ran during every run, and the appended run started at a 1-minute load of 5.25 on 8 cores. Load is recorded for the later runs only; the earlier ones contribute timings without it.
 2. **The ten-run series predates #4 and #7.** It measures the store before the busy-timeout fix and before the heading resynchronisation, while the appended run measures the store after both. A series figure and an appendix figure are not measurements of the same store.
 3. **Node 24.11.1 is below the product's declared 24.15.0 floor.** The store runs unchanged on both, and no figure here was taken on the runtime the package will ship against.
-4. **The timed children run from TypeScript source, not from the bundle the package ships.** Every timed figure carries 33.3 ms of type stripping plus 44.8 ms of module loading that the 208,710-byte bundle would mostly remove.
+4. **The timed children run from TypeScript source, not from the bundle the package ships.** Every timed figure carries 33.3 ms of type stripping plus 44.8 ms of module loading that the bundle would mostly remove.
 5. **The timing limits are calibrated to this machine and are not armed anywhere.** They have never been measured on a CI runner.
 6. **The corpora are not DR2's corpora.** Ours holds 2,176 records in 1.06 MiB in its largest shard against the design's 2,084 in 1.69 MB, so a millisecond-for-millisecond comparison with DR2 carries that difference.
 7. **Every reference figure is quoted from the prior-art axes table and none was re-derived.** The reference implementation is not in this tree and was never run.

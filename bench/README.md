@@ -5,7 +5,7 @@ bench:gate` measures it and fails on a regression.
 
 ## Running it
 
-```
+```text
 npm run bench                       # every scale in bench.config.json, writes bench/results/
 npm run bench -- --scales 100,1000  # a fast pass while iterating
 npm run bench -- --reuse-corpus     # skip generation; only valid if no earlier run mutated it
@@ -19,8 +19,8 @@ the malformed-input corpus. `TREADLE_BENCH_DIR` overrides where corpora are writ
 
 ## What it measures, and what it cannot
 
-`docs/BENCHMARKS.md` carries the first real run, the twelve comparison axes and what each
-unfilled one is waiting for. Three rules govern every figure in it.
+`docs/BENCHMARKS.md` carries the run, the twelve comparison axes and what each unfilled one
+is waiting for. Three rules govern every figure in it.
 
 - A value that could not be taken is the string `NOT MEASURED: <reason>`, in the JSON and in
   the Markdown. Never zero, never omitted, never interpolated.
@@ -40,9 +40,16 @@ unfilled one is waiting for. Three rules govern every figure in it.
 | `floors.ts` | what spawning, Node, type stripping and loading the store each cost |
 | `tokens.ts` | bytes and three tokenizers, reported side by side and never averaged |
 | `gate.ts` | the DR8 budget gate, relative to the runner's own Node floor |
-| `axes/` | one file per measurable axis, plus the methods of the ones that are not |
+| `axes/` | one file per measurable axis, plus the methods of the two that are not |
+| `axes/surface.ts` | the command-surface harness the six behaviour axes share |
 | `children/` | the programs each cold sample runs |
 
 The children are separate processes on purpose. Durability under parallel writers is a claim
 about processes, and a crash on malformed input is only observable from outside the process
 that crashes.
+
+The six behaviour axes go the other way and drive `src/cli/main.ts`'s own `run` in process,
+with argv, the working directory, the environment and both streams passed in: 612 spawns
+would have bought about 70 seconds of Node startup and changed nothing they measure. Each one
+runs a single read through the shipped `bin/treadle.js` as a real child and compares the
+bytes, so that trade is checked rather than assumed.
