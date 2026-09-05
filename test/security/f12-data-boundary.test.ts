@@ -44,7 +44,7 @@ describe('F12: content a person wrote is marked as data wherever it is emitted',
   })
 
   it('marks a scalar that carries content, and leaves the tool\'s own speech unmarked', async () => {
-    const shown = await showItem(demo.store, 'injection-probe')
+    const shown = await showItem(demo.store, fixedClock('2026-09-04T09:30:00Z'), 'injection-probe')
     const lines = agentRenderer.render(shown).trimEnd().split('\n')
     assert.ok(lines.includes(`"title ${INSTRUCTION}`), `the title is unmarked:\n${lines.join('\n')}`)
     assert.ok(lines.includes('state draft'), 'a state is the tool speaking and stays unmarked')

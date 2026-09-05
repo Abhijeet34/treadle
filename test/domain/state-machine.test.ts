@@ -7,7 +7,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  ATTEMPT_OUTCOMES,
   GUARD_IDS,
+  RESOLUTIONS,
   TRANSITIONS,
   WORK_ITEM_STATES,
   evaluateTransition,
@@ -20,7 +22,7 @@ import { allowance, context, failing, idempotence, item, refusal } from '../help
 const LEGAL: Readonly<Record<WorkItemState, Readonly<Partial<Record<WorkItemState, TransitionName>>>>> = {
   draft: { ready: 'groom', on_hold: 'hold', cancelled: 'cancel' },
   ready: { draft: 'ungroom', in_progress: 'start', on_hold: 'hold', cancelled: 'cancel' },
-  in_progress: { in_review: 'submit', done: 'finish', on_hold: 'hold', cancelled: 'cancel' },
+  in_progress: { ready: 'release', in_review: 'submit', done: 'finish', on_hold: 'hold', cancelled: 'cancel' },
   in_review: { in_progress: 'rework', done: 'accept', on_hold: 'hold', cancelled: 'cancel' },
   done: { in_progress: 'reopen' },
   // on_hold resumes only to the state it was held from; the fixture below holds from ready,
@@ -30,8 +32,14 @@ const LEGAL: Readonly<Record<WorkItemState, Readonly<Partial<Record<WorkItemStat
 }
 
 const REASON_REQUIRED: ReadonlySet<TransitionName> = new Set<TransitionName>([
-  'ungroom', 'rework', 'reopen', 'hold', 'cancel', 'revive',
+  'ungroom', 'rework', 'reopen', 'hold', 'cancel', 'release', 'revive',
 ])
+
+/** T6: two edges name a value from a closed set, and every other edge refuses one. */
+const CLOSED_VALUE: Readonly<Partial<Record<TransitionName, Record<string, string>>>> = {
+  cancel: { resolution: 'wont_do' },
+  release: { outcome: 'failed' },
+}
 
 function subject(state: WorkItemState) {
   return state === 'on_hold'
@@ -49,18 +57,18 @@ function firstEdgeFor(name: TransitionName): readonly [WorkItemState, WorkItemSt
 }
 
 describe('the transition table matches the model diagram', () => {
-  it('names twelve transitions and eight guards', () => {
+  it('names thirteen transitions and eight guards', () => {
     assert.deepEqual(
       [...TRANSITIONS],
       ['groom', 'ungroom', 'start', 'submit', 'finish', 'rework', 'accept', 'reopen',
-        'hold', 'resume', 'cancel', 'revive'],
+        'hold', 'resume', 'cancel', 'release', 'revive'],
     )
     assert.deepEqual([...GUARD_IDS], ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'])
   })
 
-  it('draws 22 edges once the three resume edges this fixture cannot reach are added back', () => {
+  it('draws 23 edges once the three resume edges this fixture cannot reach are added back', () => {
     const edges = WORK_ITEM_STATES.reduce((n, from) => n + Object.keys(LEGAL[from]).length, 0)
-    assert.equal(edges + 3, 22)
+    assert.equal(edges + 3, 23)
   })
 })
 
@@ -85,6 +93,7 @@ describe('every state-by-target pair, legal and illegal', () => {
           const allowed = allowance(evaluateTransition(setting, {
             target: to,
             reason: REASON_REQUIRED.has(expected) ? 'because' : undefined,
+            ...(CLOSED_VALUE[expected] ?? {}),
           }))
           assert.equal(allowed.transition, expected)
           assert.equal(allowed.from, from)
@@ -147,7 +156,8 @@ describe('reasons', () => {
   for (const name of REASON_REQUIRED) {
     it(`${name} is refused without a reason`, () => {
       const [from, to] = firstEdgeFor(name)
-      const outcome = evaluateTransition(context(subject(from)), { target: to })
+      const setting = context(subject(from), { reviewStep: false })
+      const outcome = evaluateTransition(setting, { target: to, ...(CLOSED_VALUE[name] ?? {}) })
       assert.equal(refusal(outcome).error.rule, 'T4')
     })
   }
@@ -268,10 +278,12 @@ describe('guards', () => {
     assert.equal(refusal(outcome).error.rule, 'G6')
   })
 
+  // Both cancels below carry a resolution, because T6 is evaluated before any guard is:
+  // without one these would refuse for the wrong reason and assert nothing about G7.
   it('G7 refuses cancel while an active item is blocked by this one', () => {
     const { error } = refusal(evaluateTransition(
       context(subject('ready'), { blockedByThis: ['sso-saml', 'audit-log'] }),
-      { target: 'cancelled', reason: 'superseded' },
+      { target: 'cancelled', reason: 'superseded', resolution: 'superseded' },
     ))
     assert.equal(error.rule, 'G7')
     assert.ok(error.message.includes('sso-saml'), error.message)
@@ -280,7 +292,7 @@ describe('guards', () => {
   it('G7 yields to the cascade override', () => {
     allowance(evaluateTransition(
       context(subject('ready'), { blockedByThis: ['sso-saml'] }),
-      { target: 'cancelled', reason: 'superseded', overrides: ['G7'] },
+      { target: 'cancelled', reason: 'superseded', resolution: 'superseded', overrides: ['G7'] },
     ))
   })
 

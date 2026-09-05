@@ -8,6 +8,9 @@
 
 import {
   TRANSITION_TABLE,
+  daysOverdue,
+  healthFindings,
+  isOverdue,
   legalTargetsFrom,
   type GuardId,
   type ItemId,
@@ -33,10 +36,15 @@ export type Weights = {
   readonly dep: number
   readonly spr: number
   readonly asg: number
+  readonly due: number
 }
 
-/** Integer weights, so a score is an integer and two implementations cannot round apart. */
-export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8 }
+/**
+ * Integer weights, so a score is an integer and two implementations cannot round apart.
+ * `due` is four so a day past the date outranks four days of age and never a priority step:
+ * a date the workspace agreed is evidence, and priority is still the thing a person set.
+ */
+export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4 }
 
 const MAX_AGE_DAYS = 30
 const DAY_MS = 86_400_000
@@ -102,6 +110,8 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'points', type: 'integer' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'scalar', key: 'findings', type: 'integer' },
+    { kind: 'scalar', key: 'overdue', type: 'integer' },
+    { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw', text: true }] },
     {
       kind: 'block',
       key: 'next',
@@ -130,9 +140,15 @@ export function scoreOf(
   const dependents = blockedByThis(view, item.id).length
   const sprint = item.sprint_id === undefined ? 0 : 1
   const match = forActor !== undefined && item.assignee === forActor ? 1 : 0
+  const overdue = daysOverdue(item, now)
   const score = priority * weights.pri + age * weights.age + dependents * weights.dep
     + sprint * weights.spr + match * (forActor === undefined ? 0 : weights.asg)
-  return { item, score, parts: `p${priority}/a${age}/d${dependents}/s${sprint}/m${match}` }
+    + overdue * weights.due
+  return {
+    item,
+    score,
+    parts: `p${priority}/a${age}/d${dependents}/s${sprint}/m${match}/u${overdue}`,
+  }
 }
 
 export function rank(
@@ -176,7 +192,7 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
 
   const asg = request.forActor === undefined ? 0 : weights.asg
   const data: Record<string, Value> = {
-    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg}`,
+    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg} due ${weights.due}`,
     next: block,
   }
   if (ranked.length === 0) {
@@ -296,7 +312,10 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   for (const item of view.value.items) counts.set(item.state, (counts.get(item.state) ?? 0) + 1)
   const states = [...counts.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))
 
-  const ranked = rank(view.value, clock.now(), DEFAULT_WEIGHTS, undefined).slice(0, 3)
+  const now = clock.now()
+  const ranked = rank(view.value, now, DEFAULT_WEIGHTS, undefined).slice(0, 3)
+  const overdue = view.value.items.filter((item) => isOverdue(item, now))
+  const health = healthFindings(view.value.items, now)
   return okResult(STATUS_SHAPE, {
     workspace,
     data: {
@@ -310,6 +329,17 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
         rows: states.map(([state, n]): Row => ({ state, n })),
       },
       findings: findings.ok ? findings.value.length : 0,
+      // Both lines are absent when there is nothing to say, which is what keeps the
+      // orientation call the same 440 bytes it was for a workspace that misses no dates.
+      ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
+      ...(health.length === 0 ? {} : {
+        health: {
+          columns: columnsOf(STATUS_SHAPE, 'health'),
+          shown: health.length,
+          total: health.length,
+          rows: health.map((finding): Row => ({ rule: finding.rule, item: finding.id, saw: finding.reason })),
+        },
+      }),
       next: {
         columns: columnsOf(STATUS_SHAPE, 'next'),
         shown: ranked.length,

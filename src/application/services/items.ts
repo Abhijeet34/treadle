@@ -3,6 +3,7 @@
 // renders nothing; the shape beside each is what the schema under schemas/ is generated from.
 
 import {
+  daysOverdue,
   validateWorkItem,
   type AcceptanceCriterion,
   type ItemId,
@@ -76,6 +77,9 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'parent', type: 'string' },
     { kind: 'scalar', key: 'ac', type: 'string' },
+    { kind: 'scalar', key: 'due', type: 'string' },
+    { kind: 'scalar', key: 'overdue', type: 'integer' },
+    { kind: 'scalar', key: 'resolution', type: 'string' },
     { kind: 'text', key: 'assignee' },
     { kind: 'text', key: 'title', whole: true },
     { kind: 'text', key: 'desc' },
@@ -105,14 +109,29 @@ export const BACKLOG_SHAPE: ResultShape = {
 
 const SLUG_TRIM = /^[^a-z0-9]+|[^a-z0-9]+$/g
 
+/** The dictionary allows 64 characters; a slug stops here, at the last whole word under it. */
+const SLUG_LIMIT = 32
+
+/**
+ * An id is the thing every command, diff and event names, and a person reads it hundreds of
+ * times, so it stops at a word rather than at a byte: cutting at 24 produced ids that read
+ * `saml-login-for-enterpris`. The first hyphen at or before the limit is the word boundary,
+ * and a first word longer than the limit is cut at the limit because there is no boundary.
+ */
+function slugHead(base: string): string {
+  if (base.length <= SLUG_LIMIT) return base
+  if (base[SLUG_LIMIT] === '-') return base.slice(0, SLUG_LIMIT)
+  const boundary = base.lastIndexOf('-', SLUG_LIMIT)
+  return boundary >= 3 ? base.slice(0, boundary) : base.slice(0, SLUG_LIMIT)
+}
+
 /** A readable id a person reviewing the file recognises, deduped against what is stored. */
 export function slugFor(title: string, type: WorkItemType, taken: ReadonlySet<string>): ItemId {
-  const base = title
+  const base = slugHead(title
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^a-z0-9]+/g, '-')
-    .replace(SLUG_TRIM, '')
-    .slice(0, 24)
+    .replace(SLUG_TRIM, ''))
     .replace(SLUG_TRIM, '')
   let head = base.length >= 3 ? base : `${type}-${base}`.replace(SLUG_TRIM, '')
   if (head.length < 3) head = `${type}-item`
@@ -149,8 +168,8 @@ function coerce(name: string, value: string): unknown {
 /** The fields a `file` reports as set, in the field dictionary's order. */
 const REPORTED = [
   'type', 'state', 'filed_at', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
-  'outcome', 'target_date', 'severity', 'repro_steps', 'expected', 'actual', 'found_in',
+  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'outcome', 'severity', 'repro_steps', 'expected', 'actual', 'found_in',
   'fix_confirmed', 'question', 'timebox_hours', 'findings',
 ] as const
 
@@ -228,7 +247,9 @@ function tickedOf(criteria: readonly AcceptanceCriterion[] | undefined): string 
   return `${criteria.filter((criterion) => criterion.ticked).length}/${criteria.length}`
 }
 
-export async function showItem(store: Store, id: ItemId, field?: string): Promise<ResultObject> {
+export async function showItem(
+  store: Store, clock: Clock, id: ItemId, field?: string,
+): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('show', 'read', view.error, undefined)
   const workspace = view.value.identity.id
@@ -249,6 +270,10 @@ export async function showItem(store: Store, id: ItemId, field?: string): Promis
   if (item.parent_id !== undefined) data['parent'] = item.parent_id
   const ticked = tickedOf(item.acceptance_criteria)
   if (ticked !== undefined) data['ac'] = ticked
+  if (item.due !== undefined) data['due'] = item.due
+  const overdue = daysOverdue(item, clock.now())
+  if (overdue > 0) data['overdue'] = overdue
+  if (item.resolution !== undefined) data['resolution'] = item.resolution
   if (item.assignee !== undefined) data['assignee'] = item.assignee
   if (item.description !== undefined) data['desc'] = item.description
 
@@ -266,7 +291,7 @@ export async function showItem(store: Store, id: ItemId, field?: string): Promis
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */
 export type Filter = {
-  readonly field: 'state' | 'type' | 'sprint' | 'assignee' | 'priority'
+  readonly field: 'state' | 'type' | 'sprint' | 'assignee' | 'priority' | 'resolution'
   readonly value: string
 }
 
@@ -275,6 +300,7 @@ function fieldOf(item: WorkItem, field: Filter['field']): string | undefined {
   if (field === 'type') return item.type
   if (field === 'sprint') return item.sprint_id
   if (field === 'assignee') return item.assignee
+  if (field === 'resolution') return item.resolution
   return item.priority === undefined ? undefined : String(item.priority)
 }
 

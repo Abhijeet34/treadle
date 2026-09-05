@@ -8,7 +8,7 @@
 
 import path from 'node:path'
 
-import type { WorkItemState, WorkItemType } from '../domain/index.ts'
+import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
 import { WORK_ITEM_STATES, WORK_ITEM_TYPES, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
@@ -320,7 +320,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   const id = operands[0]
   if (command === 'show') {
     if (id === undefined) return validation('show', 'show needs the id of one item', ['treadle backlog'])
-    return showItem(store, id, flag(flags, 'field'))
+    return showItem(store, systemClock, id, flag(flags, 'field'))
   }
   if (command === 'explain') {
     if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadle backlog'])
@@ -352,11 +352,17 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     const reason = flag(flags, 'reason')
     const until = flag(flags, 'until')
     const overrides = flags['override']
+    // Both are closed sets the domain owns (`T6`), so they are carried through unchecked
+    // here: a second copy of the set in the command layer is a second thing to keep in step.
+    const resolution = flag(flags, 'resolution') as Resolution | undefined
+    const outcome = flag(flags, 'outcome') as AttemptOutcome | undefined
     return transition(target, systemClock, randomIds, {
       id,
       target: targetState as WorkItemState | 'resume',
       ...(reason === undefined ? {} : { reason }),
       ...(until === undefined ? {} : { until }),
+      ...(resolution === undefined ? {} : { resolution }),
+      ...(outcome === undefined ? {} : { outcome }),
       ...(Array.isArray(overrides) ? { overrides: overrides as readonly GuardId[] } : {}),
       actor,
     })

@@ -119,6 +119,24 @@
             "null"
           ]
         },
+        "due": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "overdue": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "resolution": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "assignee": {
           "type": "string",
           "x-trust": "data"

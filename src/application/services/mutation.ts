@@ -43,6 +43,7 @@ export type EventInput = {
   readonly after?: unknown
   readonly guards?: unknown
   readonly reason?: string
+  readonly outcome?: string
 }
 
 export function makeEvent(input: EventInput): StoreEvent {
@@ -58,6 +59,7 @@ export function makeEvent(input: EventInput): StoreEvent {
     ...(input.after === undefined ? {} : { after: input.after }),
     ...(input.guards === undefined ? {} : { guards: input.guards }),
     ...(input.reason === undefined ? {} : { reason: input.reason }),
+    ...(input.outcome === undefined ? {} : { outcome: input.outcome }),
     cmd: input.command,
     txn: input.txn,
   }

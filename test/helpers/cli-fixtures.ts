@@ -90,6 +90,8 @@ export async function aDemoWorkspace(): Promise<Demo> {
     for (const target of seed.to ?? []) {
       const moved = await transition(targetFor(store, 'apply'), fixedClock(seed.filed), ids, {
         id: seed.id, target: target as 'ready', reason: 'fixture', actor: ACTOR,
+        // T6: cancel names a resolution from the closed set, so the fixture names one too.
+        ...(target === 'cancelled' ? { resolution: 'wont_do' as const } : {}),
       })
       if (!moved.ok) throw new Error(`${seed.id} -> ${target}: ${String(moved.data['cause'])}`)
     }
@@ -124,12 +126,12 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       filters: [{ field: 'state', value: 'ready' }],
       columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'sso-saml',
     }))
-    golden.set('show', await showItem(demo.store, 'auth-refresh'))
+    golden.set('show', await showItem(demo.store, clock, 'auth-refresh'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
     golden.set('explain', await explain(demo.store, 'sso-saml'))
     golden.set('help', topLevelHelp('acme-platform'))
     golden.set('help-command', commandHelp('transition', 'acme-platform') as ResultObject)
-    golden.set('not-found', await showItem(demo.store, 'sso-saml-typo'))
+    golden.set('not-found', await showItem(demo.store, clock, 'sso-saml-typo'))
     golden.set('transition-dry-run', await transition(targetFor(demo.store, 'dry-run'), clock, ids, {
       id: 'csv-export', target: 'in_progress', actor: ACTOR,
     }))
