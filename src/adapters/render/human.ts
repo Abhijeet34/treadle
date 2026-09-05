@@ -64,6 +64,10 @@ function table(
 
   const pad = (text: string, cells: number): string => text + ' '.repeat(Math.max(0, cells - displayWidth(text)))
   const lines: string[] = []
+  // A block with no rows names its count on the header line above, so a column header with
+  // nothing under it is a stranded label; `agent` already drops its own `#` header the same
+  // way for an empty block.
+  if (rows.length === 0) return lines
   const headerColumns = stacked ? fixed : order
   const header = headerColumns.map((column) =>
     pad(column.name.toUpperCase(), widths[order.indexOf(column)] as number))
@@ -166,6 +170,15 @@ export const humanRenderer: Renderer = {
       lines.push(head.join('  '))
     }
 
+    /**
+     * A block closes the group it is in: a scalar, list or text property that follows one
+     * opens a new group and is preceded by a blank line. Rows and scalars share the two-space
+     * indent, so without the break `findings 0` after the `states` table reads as a state
+     * called findings, which is a value in a column it is not in. The blank line is the whole
+     * rule, and it is the shape `explain` already had by ordering alone.
+     */
+    let afterBlock = false
+
     for (const property of shape.properties) {
       const value = result.data[property.key]
       if (value === undefined) continue
@@ -176,22 +189,32 @@ export const humanRenderer: Renderer = {
           lines.push(`${property.key}  ${value.shown} of ${value.total}`)
         }
         lines.push(...table(value.columns, value.rows, width, ascii))
+        afterBlock = true
         continue
       }
       if (quiet) continue
+      const open = (): void => {
+        if (afterBlock) lines.push('')
+        afterBlock = false
+      }
       if (property.kind === 'list') {
-        for (const entry of value as readonly string[]) lines.push(`  ${property.key}  ${entry}`)
+        const entries = value as readonly string[]
+        if (entries.length === 0) continue
+        open()
+        for (const entry of entries) lines.push(`  ${property.key}  ${entry}`)
         continue
       }
       if (property.kind === 'text') {
         const text = String(value)
         if (text.length === 0) continue
+        open()
         lines.push(`  ${property.key}`)
         lines.push(...wrap(isolated(text), width - 4, '    '))
         continue
       }
       const text = scalarText(value)
       if (text.length === 0) continue
+      open()
       lines.push(`  ${property.key}  ${isolated(text)}`)
     }
     return `${fit(lines, width).join('\n')}\n`

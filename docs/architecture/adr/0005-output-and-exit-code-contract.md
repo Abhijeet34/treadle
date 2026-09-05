@@ -88,6 +88,13 @@ DR6's rule is that a seam with one implementation is not a seam.
 Three renderers ship for a product reason: `agent` is the default off a terminal, `human` is the default on one, and `json` is for a consumer that wants a schema-validated document and will pay 3.27x the bytes for it.
 A renderer takes the result object and its own presentation options, and looks its shape up from `src/application/shapes.ts` by the object's own `schema` string, so the object really is its only input.
 
+**A block closes the group it is in.**
+A scalar, list or text property that follows a block in the shape's order opens a new group, and a group after a block is preceded by one blank line.
+Rows and scalars share the two-space indent, so without that break `findings 0` after the `states` table reads as a state named findings with nothing in it, and `points 5` after `items` reads as an item.
+The rule is the whole layout answer for a scalar after a table: a blank line, no second indent and no borrowed heading, which is the shape `explain` already had from its ordering alone.
+A block with no rows also drops its column header, because the `<key> <shown> of <total>` line above it already states the count and a header with nothing under it is a stranded label; `agent` already drops its own `#` header the same way for an empty block.
+`test/render/human-layout.test.ts` holds both halves: the invariant that no non-block property renders inside a block's group, and a byte snapshot of every golden object at 60, 80 and 200 cells.
+
 `test/render/conformance.test.ts` feeds every command's golden result object to all three and asserts the grammar invariants over every artefact.
 A fourth renderer, `test/render/recorder.ts`, records the object and emits nothing; the same suite renders a `structuredClone` of each object and asserts byte-identical output, and renders again after changing the process's cwd and environment.
 That pair is the proof: what the recorder saw is the whole of what the three had.
@@ -113,7 +120,7 @@ A mode and a store passed separately can disagree, and a `dry-run` whose store i
 ## Consequences
 
 - A command that produces a record it does not declare in its shape emits nothing for it. The shape is the contract, and forgetting to declare a property is a silent omission rather than a crash. The schema test catches a shape that no command fills; nothing catches a command that fills nothing, which is what the golden objects are for.
-- The human rendering is a generic projection with column alignment and the global width rule, not the bespoke layouts of interface section B. Board and chart rendering are a later task and carry their own layouts.
+- The human rendering is a generic projection with column alignment, the global width rule and the group rule below, not the bespoke layouts of interface section B. Board and chart rendering are a later task and carry their own layouts.
 - No colour is emitted at all. Which state gets which of the eight ANSI colours is a decision the interface deliberately left open, and the property that makes deferring it safe is that colour never carries meaning of its own.
 - Byte budgets are enforced in CI and token budgets are not: a tokenizer is a package, and this repository has zero runtime dependencies. The token figures are measured outside the tree and reported with the change.
 
