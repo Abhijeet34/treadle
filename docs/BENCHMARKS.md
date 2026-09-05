@@ -698,7 +698,7 @@ A row holds when the object is on the expected stream, the other stream is empty
 | init | init/1, exit 0 | error/1, exit 2, VALIDATION | yes |
 | file | file/1, exit 0 | error/1, exit 2, VALIDATION | yes |
 | show | show/1, exit 0 | error/1, exit 5, NOT_FOUND | yes |
-| backlog | backlog/1, exit 0 | error/1, exit 2, VALIDATION | yes |
+| backlog | backlog/2, exit 0 | error/1, exit 2, VALIDATION | yes |
 | transition | transition/1, exit 0 | error/1, exit 3, GUARD_REFUSED | yes |
 | mark | mark/1, exit 0 | error/1, exit 2, VALIDATION | yes |
 | evidence | evidence/1, exit 0 | error/1, exit 2, VALIDATION | yes |
