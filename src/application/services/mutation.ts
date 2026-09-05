@@ -105,6 +105,23 @@ export function snapshotOf(changes: readonly FieldChange[], side: 'before' | 'af
   return out
 }
 
+/**
+ * The same snapshot for a change list that may carry prose. A field in AUDITED_FIELDS is
+ * recorded verbatim; anything else is recorded as its length, because a 10,000-character
+ * description in the log duplicates the record it was copied from while the log still has to
+ * say the field moved and by how much.
+ */
+export function auditedSnapshot(changes: readonly FieldChange[], side: 'before' | 'after'): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const change of changes) {
+    const value = change[side]
+    out[change.field] = (AUDITED_FIELDS as readonly string[]).includes(change.field) || value === '-'
+      ? value
+      : `${value.length} chars`
+  }
+  return out
+}
+
 export type FieldChange = {
   readonly field: string
   readonly before: string

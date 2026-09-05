@@ -74,6 +74,96 @@ export function isKnownField(name: string): boolean {
     || WORK_ITEM_TYPES.some((t) => TYPE_FIELDS[t].includes(name))
 }
 
+/**
+ * The short name a read surface prints, against the dictionary name a write takes. Both
+ * spellings are one field, and this table is the one place that is said.
+ *
+ * The two paths disagreed and each denied the other's name existed: `--set description=` was
+ * accepted while `--set desc=` was refused as "not a field of any work item", and
+ * `show --field desc` printed the block while `--field description` was refused as "carries
+ * no field named description". A caller who read a record and set what they had just read
+ * was told it was not a field. Every path resolves a caller's spelling through
+ * `canonicalField` before it decides anything, so neither name can be the unknown one.
+ */
+export const FIELD_ALIASES: Readonly<Record<string, string>> = {
+  item: 'id',
+  filed: 'filed_at',
+  v: 'version',
+  desc: 'description',
+  pri: 'priority',
+  pts: 'points',
+  hrs: 'hours_estimate',
+  parent: 'parent_id',
+  sprint: 'sprint_id',
+  hold: 'hold_reason',
+  ac: 'acceptance_criteria',
+  sev: 'severity',
+  repro: 'repro_steps',
+  found: 'found_in',
+  fixed: 'fix_confirmed',
+  timebox: 'timebox_hours',
+}
+
+const SHORT_OF = new Map(Object.entries(FIELD_ALIASES).map(([short, field]) => [field, short]))
+
+/** How a field is written: by `set`, by a command of its own, or by nothing. */
+export type FieldWriter =
+  | { readonly kind: 'set' }
+  | { readonly kind: 'command'; readonly usage: string }
+  | { readonly kind: 'none'; readonly why: string }
+
+const BY_SET: FieldWriter = { kind: 'set' }
+
+/**
+ * The exceptions to `set`, which writes the rest of the dictionary. This is here, beside the
+ * dictionary, rather than inside the field editor, because a gate remedy reads it too: a
+ * rule that told a caller to `set severity` would name a command that refuses the field, and
+ * the whole point of a remedy is that running it satisfies the rule. One table, both paths.
+ */
+const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
+  id: { kind: 'command', usage: 'treadle file <type> "<title>" --id <value>' },
+  type: { kind: 'command', usage: 'treadle file <value> "<title>"' },
+  state: { kind: 'command', usage: 'treadle transition <id> <state>' },
+  severity: { kind: 'command', usage: 'treadle mark <id> --severity <S1-S4> --reason "<why>"' },
+  priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
+  evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
+  resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
+  hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
+  hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant>' },
+  held_from: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
+  filed_at: { kind: 'none', why: 'the instant the item was filed is a record of what happened, not a field' },
+  version: { kind: 'none', why: 'the store sets a version on every write, which is how a stale write is caught' },
+  extra: { kind: 'none', why: 'a key this build has no meaning for belongs to the record file, which D1 makes authoritative' },
+}
+
+/** What writes this field. Everything the table does not name is `set`'s. */
+export function writerOf(field: string): FieldWriter {
+  return WRITTEN_BY[canonicalField(field)] ?? BY_SET
+}
+
+/**
+ * The command line that writes one field of one item, or `undefined` where no command does.
+ * A caller with nothing to substitute passes a placeholder such as `<value>`.
+ */
+export function writeCommand(field: string, id: string, value: string): string | undefined {
+  const name = canonicalField(field)
+  const writer = writerOf(name)
+  if (writer.kind === 'none') return undefined
+  return writer.kind === 'set'
+    ? `treadle set ${id} ${name}=${value}`
+    : writer.usage.replaceAll('<id>', id).replaceAll('<value>', value)
+}
+
+/** The dictionary name of a field, given either of its spellings. */
+export function canonicalField(name: string): string {
+  return FIELD_ALIASES[name] ?? name
+}
+
+/** The name a read surface prints for a field, given either of its spellings. */
+export function shortField(name: string): string {
+  return SHORT_OF.get(canonicalField(name)) ?? name
+}
+
 // Both patterns are bounded and linear: one character class per position, no nested
 // quantifier, so neither can backtrack (threat model F8's ReDoS discipline).
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/

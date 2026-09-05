@@ -31,7 +31,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
-import { WORK_ITEM_TYPES, fieldsOf, type WorkItem } from '../../src/domain/index.ts'
+import { WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type WorkItem } from '../../src/domain/index.ts'
 import { EVENT_KEYS } from '../../src/adapters/store/event-log.ts'
 import { SHAPES } from '../../src/application/shapes.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
@@ -285,6 +285,19 @@ describe('every persisted field carries a visibility decision', () => {
           `${scope} ${field} claims ${decision.at}, and the ${command} shape declares no ${key}`,
         )
       }
+    }
+  })
+
+  // The alias table is what makes `--set desc=` and `--set description=` the same field, so it
+  // has to agree with the surface these decisions name. Two tables saying one thing is how the
+  // write path and the read path came to deny each other's spelling in the first place.
+  it('agrees with the field dictionary\'s alias table, for every readable item decision', () => {
+    for (const [field, decision] of Object.entries(ITEM_FIELDS)) {
+      if (decision.kind !== 'readable') continue
+      const [command, key] = decision.at.split(':') as [string, string]
+      if (command !== 'show') continue
+      assert.equal(canonicalField(key), field, `${field} is printed as ${key} and canonicalField(${key}) is not ${field}`)
+      assert.equal(shortField(field), key, `${field} is printed as ${key} and shortField(${field}) is not ${key}`)
     }
   })
 

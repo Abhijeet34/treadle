@@ -559,6 +559,8 @@ First index build with the index deleted: 14032 ms. Re-index after a hand edit o
 
 Bytes are the gate and tokens are advisory, per DR8. The budgets are the interface specification's section A.3, adjusted upward by four bytes for every occurrence of the binary name, because A.3 was stated against a three-character name.
 The reference column is quoted from the prior-art axes table and was never re-derived here.
+The explain row was re-derived by executing runA3 in bench/axes/a3-output.ts against the current golden results with the real tokenizers from bench/tokens.ts.
+Only the explain row moved because that axis is a pure function of the golden results and explain is the only golden whose output this change alters.
 
 | Artefact | Bytes | Budget | Within | claude | o200k | cl100k | B/token claude | Reference | Against reference |
 |---|---|---|---|---|---|---|---|---|---|
@@ -567,7 +569,7 @@ The reference column is quoted from the prior-art axes table and was never re-de
 | backlog-empty | 120 | 140 | yes | 35 | 37 | 37 | 3.43 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | show | 273 | 310 | yes | 89 | 91 | 92 | 3.07 | 322 | 273 B against 322 B, 0.85x |
 | next | 380 | 514 | yes | 156 | 147 | 148 | 2.44 | 659 | 380 B against 659 B, 0.58x |
-| explain | 429 | 754 | yes | 151 | 150 | 149 | 2.84 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
+| explain | 471 | 762 | yes | 171 | 166 | 165 | 2.75 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | transition | 131 | 230 | yes | 44 | 44 | 44 | 2.98 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | transition-already | 100 | 110 | yes | 37 | 37 | 37 | 2.7 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |
 | transition-dry-run | 163 | 250 | yes | 53 | 53 | 53 | 3.08 | NOT MEASURED: the prior-art axes table carries no byte count for this artefact | no reference figure |

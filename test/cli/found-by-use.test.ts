@@ -191,6 +191,91 @@ describe('the defects found by using the tool', () => {
   })
 })
 
+describe('a gate that demands a field names a command that can set it', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('files a bug without the fields, sets them, and reaches ready', async () => {
+    const filed = await cli([
+      'file', 'bug', 'Checkout drops paid orders', '--id', 'checkout-500',
+      '--set', 'severity=S2', '--set', 'found_in=production', '--set', 'repro_steps=add to cart, pay',
+    ])
+    assert.equal(filed.code, 0, filed.err)
+
+    const refused = await cli(['transition', 'checkout-500', 'ready'])
+    assert.equal(refused.code, 3, `${refused.out}${refused.err}`)
+    assert.match(refused.err, /the ready gate fails: DOR6, DOR7/)
+
+    // The remedy is run verbatim, which is the whole of the invariant: `explain` prints a
+    // command line and that command line is what makes the rule pass.
+    const why = await cli(['explain', 'checkout-500'])
+    const remedies = why.out.split('\n').filter((line) => line.startsWith('ready DOR'))
+    assert.deepEqual(remedies, [
+      'ready DOR6 fail treadle set checkout-500 expected=<value>',
+      'ready DOR7 fail treadle set checkout-500 actual=<value>',
+    ])
+
+    const set = await cli(['set', 'checkout-500', 'expected=both orders are listed', 'actual=one is charged'])
+    assert.equal(set.code, 0, set.err)
+    assert.match(set.out, /^set expected - -> both orders are listed$/m)
+    assert.match(set.out, /^set actual - -> one is charged$/m)
+
+    const ready = await cli(['transition', 'checkout-500', 'ready'])
+    assert.equal(ready.code, 0, `${ready.out}${ready.err}`)
+    assert.match(ready.out, /^state draft -> ready$/m)
+  })
+
+  it('keeps severity with mark, and says so rather than writing it', async () => {
+    const refused = await cli(['set', 'checkout-500', 'severity=S1'])
+    assert.equal(refused.code, 2, refused.out)
+    assert.match(refused.err, /^"cause severity is not set here; treadle mark checkout-500 --severity/m)
+    assert.match(refused.err, /^fix treadle mark checkout-500 --severity/m)
+  })
+
+  it('records the change in the log, with prose recorded as its length', async () => {
+    const log = await cli(['history', 'checkout-500', '--limit', '9'])
+    assert.equal(log.code, 0, log.err)
+    assert.match(log.out, /item\.set expected,actual/, 'the fields the set moved reach the what column')
+  })
+})
+
+describe('the write path and the read path agree about a field\'s name', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('accepts both spellings on both paths, for the field that first diverged', async () => {
+    const dictionary = await cli(['file', 'task', 'Long form', '--id', 'long-form', '--set', 'description=written long'])
+    assert.equal(dictionary.code, 0, dictionary.err)
+    const short = await cli(['file', 'task', 'Short form', '--id', 'short-form', '--set', 'desc=written short'])
+    assert.equal(short.code, 0, short.err)
+
+    for (const spelling of ['desc', 'description']) {
+      const shown = await cli(['show', 'long-form', '--field', spelling])
+      assert.equal(shown.code, 0, `show --field ${spelling}: ${shown.err}`)
+      assert.match(shown.out, /^"desc written long$/m)
+    }
+
+    const edited = await cli(['set', 'long-form', 'desc=written by the short name'])
+    assert.equal(edited.code, 0, edited.err)
+    assert.match(edited.out, /^set description written long -> written by the short name$/m)
+  })
+
+  it('names both accepted spellings when the field really is unknown', async () => {
+    const refused = await cli(['show', 'auth-refresh', '--field', 'nonesuch'])
+    assert.equal(refused.code, 2, refused.out)
+    assert.match(refused.err, /carries no field named nonesuch/)
+    assert.match(refused.err, /desc\/description/, 'the refusal offers the dictionary name beside the short one')
+  })
+})
+
 describe('S3: a duplicate id refuses the write rather than serving the first match', () => {
   let demo: Demo
 

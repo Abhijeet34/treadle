@@ -71,17 +71,23 @@ export {
 
 export {
   COMMON_FIELDS,
+  FIELD_ALIASES,
   MAX_DESCRIPTION,
   MAX_EVIDENCE_ENTRIES,
   MAX_EVIDENCE_LABEL,
   MAX_EVIDENCE_REF,
   MAX_REASON,
+  canonicalField,
   fieldsOf,
   isInstant,
   isKnownField,
   overLength,
   requiredAtCreation,
+  shortField,
   validateWorkItem,
+  writeCommand,
+  writerOf,
+  type FieldWriter,
   type ValidateOptions,
 } from './fields.ts'
 

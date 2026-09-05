@@ -3,7 +3,9 @@
 // renders nothing; the shape beside each is what the schema under schemas/ is generated from.
 
 import {
+  canonicalField,
   daysOverdue,
+  shortField,
   validateWorkItem,
   type AcceptanceCriterion,
   type ItemId,
@@ -191,12 +193,25 @@ const INT_FIELDS = new Set(['priority', 'points', 'hours_estimate', 'timebox_hou
 const LIST_FIELDS = new Set(['labels'])
 const CRITERIA_FIELDS = new Set(['acceptance_criteria'])
 
-function coerce(name: string, value: string): unknown {
+/**
+ * A leading `[x] ` or `[ ] ` on an acceptance criterion, which is how the tick is written on
+ * the one grammar that carries the list. DOD4 fails until every criterion is ticked, so the
+ * list has to be settable ticked or its remedy names a command that cannot perform it.
+ */
+const CRITERIA_TICK = /^\[([ x])\] /
+
+/** One `<field>=<value>` string as the dictionary's own type for that field. */
+export function coerce(name: string, value: string): unknown {
   if (INT_FIELDS.has(name)) return Number.isInteger(Number(value)) ? Number(value) : value
   if (name === 'fix_confirmed') return value === 'true' ? true : value === 'false' ? false : value
   if (LIST_FIELDS.has(name)) return value.split(',').filter((part) => part.length > 0)
   if (CRITERIA_FIELDS.has(name)) {
-    return value.split('|').filter((part) => part.length > 0).map((text): AcceptanceCriterion => ({ text, ticked: false }))
+    return value.split('|').filter((part) => part.length > 0).map((part): AcceptanceCriterion => {
+      const tick = CRITERIA_TICK.exec(part)
+      return tick === null
+        ? { text: part, ticked: false }
+        : { text: part.slice((tick[0] as string).length), ticked: tick[1] === 'x' }
+    })
   }
   return value
 }
@@ -222,7 +237,12 @@ export async function fileItem(
   const draft: Record<string, unknown> = {
     id, type: request.type, state: 'draft', title: request.title, filed_at: now, version: 1,
   }
-  for (const [name, value] of Object.entries(request.fields)) draft[name] = coerce(name, value)
+  // Through `canonicalField`, so the spelling a read surface printed is a spelling a write
+  // takes: `--set desc=` and `--set description=` are the same field.
+  for (const [name, value] of Object.entries(request.fields)) {
+    const field = canonicalField(name)
+    draft[field] = coerce(field, value)
+  }
 
   const item = draft as unknown as WorkItem
   const valid = validateWorkItem(item, { now })
@@ -355,15 +375,21 @@ export async function showItem(
   if (item.findings !== undefined) data['findings'] = item.findings
 
   if (field === undefined) return okResult(SHOW_SHAPE, { workspace, data })
-  if (!(field in data)) {
-    const known = SHOW_SHAPE.properties.map((property) => property.key).filter((key) => key !== 'item')
+  // Either spelling reaches the same key, and the refusal offers both back: a caller who read
+  // `desc` off a record and asked for `description` was told the record had no such field.
+  const key = shortField(field)
+  if (!(key in data)) {
+    const known = SHOW_SHAPE.properties
+      .map((property) => property.key)
+      .filter((name) => name !== 'item' && name in data)
+      .map((name) => (canonicalField(name) === name ? name : `${name}/${canonicalField(name)}`))
     return errorResult({
       code: 'VALIDATION', command: 'show', workspace, effect: 'read', rule: 'C2', entity: item.id,
-      cause: `${item.id} carries no field named ${field}; this record has ${known.filter((key) => key in data).join(', ')}`,
+      cause: `${item.id} carries no field named ${field}; this record has ${known.join(', ')}`,
       fix: [`treadle show ${item.id}`],
     })
   }
-  return okResult(SHOW_SHAPE, { workspace, data: { item: item.id, [field]: data[field] as Value } })
+  return okResult(SHOW_SHAPE, { workspace, data: { item: item.id, [key]: data[key] as Value } })
 }
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */

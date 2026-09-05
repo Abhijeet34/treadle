@@ -154,11 +154,17 @@ same audit for one item off the events it already reads. The four ids are in
 `docs/architecture/adr/README.md` and argued in ADR-0011; `status`'s `findings` count stays
 what it always was, the store's own load-time findings.
 
-`mark` is the only command that edits a field after filing, and it edits two: severity and
-priority. Both are audited, so a change carries an actor, a reason and a before value. If
-`set` lands, route those two fields through `mark`'s event rather than giving them a second
-write path, for the same reason `#resolve` is the one answer to "which record does this id
-name".
+Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
+table because two readers need it: `set` refuses a field another command owns, and a gate
+remedy names the command that owns it. `set` writes the dictionary; `mark` keeps severity and
+priority because both are audited with a reason, `transition` keeps the lifecycle fields, and
+three fields are written by nothing. A field the dictionary gains with no line there is
+`set`'s, which is the default that cannot re-create a gate demanding a field nothing writes.
+
+A field has two accepted spellings and `canonicalField` in the same file is where that is
+said: the short name a read surface prints (`desc`) and the dictionary name a write takes
+(`description`) resolve to one field on every path. They did not, and each path's refusal
+asserted the other path's name did not exist.
 
 ## Rules that are tests rather than conventions
 
@@ -196,7 +202,16 @@ Before hand-checking any of these, run the suite: it already checks them.
   `test/architecture/dco.test.ts` drives that script over real commits in a throwaway repository,
   so change the rule there and not by loosening the comparison.
 - `schemas/*.json` are generated from the `ResultShape` each service declares. Change a
-  shape, run `npm run schemas`, and commit both; the suite fails otherwise.
+  shape, run `npm run schemas`, and commit both; the suite fails otherwise. A new command is
+  a shape, a line in `src/application/shapes.ts` and in `src/cli/inventory.ts`, an entry in
+  `COMMAND_OPTIONS` in `src/cli/parse.ts`, a branch in `dispatch`, and an invocation in the
+  two tables in `test/security/no-egress.test.ts` and
+  `test/security/f1-no-execution-at-runtime.test.ts`, which assert they exercise every
+  command the inventory names.
+- Every remedy a gate rule emits is a command line, and `test/domain/gate-remedies.test.ts`
+  holds that: each `GateCheck` kind declares the command that performs its remedy, or a
+  reason it has none. A remedy that reads as advice is the defect that left a bug filed
+  without `expected` permanently unadvanceable.
 - No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
   each golden object twice, once from a `structuredClone` and once after moving the process's
   cwd and environment, and asserts the bytes do not move.
