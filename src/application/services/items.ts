@@ -28,7 +28,7 @@ import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
 import { readWorkspace, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
-import { storeRefusal } from './refusal.ts'
+import { storeRefusal, unknownCursor } from './refusal.ts'
 
 /** Columns a list row may carry. `text` marks free text, which the renderer places last (F3). */
 export const ITEM_COLUMNS: readonly ColumnSpec[] = [
@@ -529,8 +529,8 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   }
 
   const matched = view.value.items.filter((item) => matches(item, request.filters)).sort(backlogOrder)
-  const start = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
-  const from = start < 0 ? 0 : start
+  const from = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
+  if (from < 0) return unknownCursor('backlog', workspace, request.cursor as string, request.cursor as string, 'treadle backlog')
   const page = matched.slice(from, from + request.limit)
   const block: Block = {
     columns: columnsFor(request.columns),

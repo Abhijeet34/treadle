@@ -27,7 +27,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import { readWorkspace } from './context.ts'
-import { notFound } from './items.ts'
+import { echoed, notFound } from './items.ts'
 import { diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -141,7 +141,7 @@ export async function markItem(
       [`treadle show ${item.id}`])
   }
 
-  const set = changes.map((change) => `${change.field} ${change.before} -> ${change.after}`)
+  const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)
   if (mode === 'preview') {
     return okResult(MARK_SHAPE, {
       workspace, txn: null, changed: 0,

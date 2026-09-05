@@ -15,6 +15,7 @@ const CODE_OF: Readonly<Record<string, ResultCode>> = {
   SCHEMA_NEWER: 'STORE_UNAVAILABLE',
   SCHEMA_OLDER: 'STORE_UNAVAILABLE',
   LOCK_TIMEOUT: 'STORE_UNAVAILABLE',
+  LOCK_LOST: 'STORE_UNAVAILABLE',
   STORE_UNAVAILABLE: 'STORE_UNAVAILABLE',
 }
 
@@ -41,4 +42,18 @@ export function storeRefusal(
   }
   const entity = error.entities[0]
   return errorResult(entity === undefined ? input : { ...input, entity })
+}
+
+/**
+ * A cursor that names nothing in the list. It used to fall back to the first page, which a
+ * caller paging through a list reads as the list starting again.
+ */
+export function unknownCursor(
+  command: string, workspace: string, entity: string, cursor: string, first: string,
+): ResultObject {
+  return errorResult({
+    code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C1', entity,
+    cause: `--cursor ${cursor} names nothing in this list; a page line carries the cursor to pass`,
+    fix: [first],
+  })
 }

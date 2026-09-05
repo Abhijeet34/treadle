@@ -49,8 +49,14 @@ export function openExclusive(target: string, mode: number): Promise<FileHandle>
  * Writes by exclusive-create, fsync and rename. The temp file is created 0o600 so its
  * contents are never briefly world-readable, and takes the target's own mode if the target
  * exists, so a workspace that tightened its permissions keeps them.
+ *
+ * `beforeCommit` runs after the fsync and before the rename, which is the commit. The
+ * store asks the lock there: the fsync is milliseconds and the rename microseconds, so a
+ * check ahead of the whole write left a window a paused holder was measured landing in.
  */
-export async function writeFileAtomic(target: string, contents: string): Promise<void> {
+export async function writeFileAtomic(
+  target: string, contents: string, beforeCommit?: () => Promise<void>,
+): Promise<void> {
   const temp = tempNameFor(target)
   const mode = await modeOf(target)
   const handle = await openExclusive(temp, 0o600)
@@ -62,6 +68,7 @@ export async function writeFileAtomic(target: string, contents: string): Promise
     await handle.close()
   }
   try {
+    if (beforeCommit !== undefined) await beforeCommit()
     await rename(temp, target)
   } catch (error) {
     await unlink(temp).catch(() => undefined)
@@ -82,9 +89,14 @@ async function modeOf(target: string): Promise<number> {
  * temp-and-rename would cost O(file) to add O(line); the durability boundary is the same
  * fsync, and DR2's index tail rule depends on the prefix bytes staying put.
  */
-export async function appendAndSync(target: string, contents: string): Promise<void> {
+export async function appendAndSync(
+  target: string, contents: string, beforeCommit?: () => Promise<void>,
+): Promise<void> {
   const handle = await open(target, 'a', FILE_MODE)
   try {
+    // Asked after the open for the same reason `writeFileAtomic` asks after the fsync: the
+    // write is the commit, and what stands between the check and it should be one syscall.
+    if (beforeCommit !== undefined) await beforeCommit()
     await handle.writeFile(contents, 'utf8')
     await handle.sync()
   } finally {

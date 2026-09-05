@@ -32,7 +32,7 @@ import { jsonRenderer } from '../adapters/render/json.ts'
 import { clampWidth } from '../adapters/render/human.ts'
 import { RENDERINGS, isRendering, type Rendering, type Renderer } from '../adapters/render/index.ts'
 import { targetFor } from '../adapters/target.ts'
-import { WORKSPACE_DIR, initWorkspace, resolveStore } from '../adapters/workspace.ts'
+import { WORKSPACE_DIR, WorkspaceUnreadable, initWorkspace, resolveStore } from '../adapters/workspace.ts'
 import { Diagnostics, type Level } from './diagnostics.ts'
 import { EXIT_OF, exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
@@ -261,7 +261,16 @@ async function execute(env: Environment): Promise<number> {
     return emit(env, result, flags)
   }
 
-  const root = flag(flags, 'workspace') ?? await resolveStore(env.cwd)
+  let root: string | undefined
+  try {
+    root = flag(flags, 'workspace') ?? await resolveStore(env.cwd)
+  } catch (error) {
+    if (!(error instanceof WorkspaceUnreadable)) throw error
+    return emit(env, errorResult({
+      code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read', rule: 'S13',
+      cause: `${error.message}; make it readable, or name another store with --workspace`,
+    }), flags)
+  }
   if (root === undefined) {
     if (command === undefined) return emit(env, topLevelHelp('-'), flags)
     return emit(env, errorResult({

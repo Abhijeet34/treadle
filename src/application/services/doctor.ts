@@ -10,6 +10,13 @@
 // legitimate edit and git is where its authorship is proved. What the tool can do is notice
 // that the record no longer agrees with the log that recorded the value, and say so with
 // both numbers, so an S1 quietly becoming an S4 is a finding rather than a diff nobody read.
+//
+// The log is a committed file too. H23 is the one thing a well-formed hand-written event
+// line can say that no write path would have: a change dated before the item was filed.
+// It is not refused on load, because the line is well formed; it is reported here, because
+// `history` and `explain` answer from it. An event naming an item the store does not hold
+// is not a finding: a record removed by hand is a legitimate edit under D1, and the event
+// reaches no read surface.
 
 import { MAX_DESCRIPTION, type ItemId, type WorkItem } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
@@ -42,8 +49,25 @@ export type DoctorFinding = {
   readonly detail: string
 }
 
-/** The audited fields whose divergence from the log is a finding, in report order. */
-const MARKED_FIELDS = ['severity', 'priority'] as const
+/**
+ * The audited fields whose divergence from the log is a finding, in report order. `state`
+ * is here because `explain` answers "since when, and who" from the last event that moved
+ * it: a forged line saying `done` over a record that says `draft` was that answer.
+ */
+const MARKED_FIELDS = ['state', 'severity', 'priority'] as const
+
+/** The longest a non-final cell may be, which is the field dictionary's own line bound. */
+const MAX_CELL = 200
+
+/**
+ * A value from a file as a non-final row cell. Whitespace would split the row and move
+ * every value after it (F3), so such a value prints as absent; the detail column, which is
+ * the free-text one, carries it. A shard named with a space took `doctor` down with an
+ * internal error, which is the one surface that would have named the shard.
+ */
+function cell(value: string): string {
+  return value.length > 0 && value.length <= MAX_CELL && !/\s/.test(value) ? value : '-'
+}
 
 function renderField(item: WorkItem, field: string): string {
   const value = (item as unknown as Record<string, unknown>)[field]
@@ -97,14 +121,23 @@ export function auditItem(
   }
 
   for (const event of events) {
-    if (event.entity !== item.id || event.op !== 'item.mark') continue
+    if (event.entity !== item.id) continue
+    if (Date.parse(event.at) < Date.parse(item.filed_at)) {
+      findings.push({
+        rule: 'H23',
+        id: item.id,
+        where: cell(event.id),
+        detail: `event ${event.id} is dated ${event.at}, before the item was filed at ${item.filed_at}; no write path records a change to an item that does not exist yet`,
+      })
+    }
+    if (event.op !== 'item.mark') continue
     if (item.assignee === undefined || event.actor !== item.assignee) continue
     const after = event.after
     const changed = typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
     findings.push({
       rule: 'H19',
       id: item.id,
-      where: event.id,
+      where: cell(event.id),
       detail: `${event.actor} changed ${changed} on an item they are assigned; the audit says who and a reader decides`,
     })
   }
@@ -140,8 +173,8 @@ export async function doctor(store: Store): Promise<ResultObject> {
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
       rule: finding.rule,
-      id: finding.id ?? '-',
-      where: `${finding.file}:${finding.line}`,
+      id: finding.id === undefined ? '-' : cell(finding.id),
+      where: `${cell(finding.file)}:${finding.line}`,
       detail: finding.reason,
     })),
     ...auditWorkspace(view.value, events.value),

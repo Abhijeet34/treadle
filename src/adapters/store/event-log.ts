@@ -44,6 +44,18 @@ const REQUIRED = ['id', 'at', 'actor', 'actor_kind', 'entity_kind', 'entity', 'o
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
 
 /**
+ * The shape alone let `2026-13-45T25:61:61Z` through, and `Date.parse` alone lets
+ * `2026-02-30` through as the second of March. An instant is one only if the calendar
+ * fields it names are the ones it denotes; the log is ordered by this string, so an
+ * impossible one sorts after every real event and becomes the latest change on record.
+ */
+function isCalendarInstant(value: string): boolean {
+  if (!INSTANT.test(value)) return false
+  const parsed = Date.parse(value)
+  return !Number.isNaN(parsed) && new Date(parsed).toISOString().slice(0, 19) === value.slice(0, 19)
+}
+
+/**
  * Rebuilds parsed JSON with null-prototype objects, refusing a prototype-slot key by name
  * and a nesting depth past the ceiling. Two controls for one hole, as in the domain's
  * `buildRecord`: the null prototype means there is nothing to poison, and the deny-list
@@ -103,8 +115,8 @@ export function parseEventLine(line: string, file: string, at: number): StoreRes
       return storeFail('INTEGRITY', 'S1', `${file} line ${at}: ${key} must be a non-empty single-line string`, [file])
     }
   }
-  if (!INSTANT.test(event['at'] as string)) {
-    return storeFail('INTEGRITY', 'S1', `${file} line ${at}: at must be an RFC 3339 instant in UTC`, [file])
+  if (!isCalendarInstant(event['at'] as string)) {
+    return storeFail('INTEGRITY', 'S1', `${file} line ${at}: at must be an RFC 3339 instant in UTC that names a real date and time`, [file])
   }
 
   return storeOk(event as unknown as StoreEvent)
@@ -154,9 +166,16 @@ export function renderEvent(event: StoreEvent): string {
 
 export type EventScan = {
   readonly events: readonly StoreEvent[]
+  /** The line each event was read from, parallel to `events`, for a finding that names it. */
+  readonly at: readonly number[]
   readonly findings: readonly Finding[]
   /** Bytes consumed, so a caller can record the fingerprint it just indexed. */
   readonly bytes: number
+  /**
+   * Lines consumed, blank ones included, so an append re-index resumes at the line number
+   * the file actually has. Counting only events and findings drifted by every blank line.
+   */
+  readonly lines: number
 }
 
 /**
@@ -171,6 +190,7 @@ export async function scanEventFile(
   fromLine = 0,
 ): Promise<StoreResult<EventScan>> {
   const events: StoreEvent[] = []
+  const at: number[] = []
   const findings: Finding[] = []
   const decoder = new StringDecoder('utf8')
   let pending = ''
@@ -184,7 +204,7 @@ export async function scanEventFile(
     }
     if (text.length === 0) return undefined
     const event = parseEventLine(text, file, line)
-    if (event.ok) events.push(event.value)
+    if (event.ok) { events.push(event.value); at.push(line) }
     else findings.push({ file, line, rule: event.error.rule, reason: event.error.message })
     return undefined
   }
@@ -211,7 +231,7 @@ export async function scanEventFile(
     }
   } catch (error) {
     const code = (error as NodeJS.ErrnoException).code
-    if (code === 'ENOENT') return storeOk({ events: [], findings: [], bytes: 0 })
+    if (code === 'ENOENT') return storeOk({ events: [], at: [], findings: [], bytes: 0, lines: 0 })
     return storeFail('STORE_UNAVAILABLE', 'S6', `${file} could not be read: ${(error as Error).message}`, [file])
   }
 
@@ -220,7 +240,7 @@ export async function scanEventFile(
     const refusal = take(pending)
     if (refusal !== undefined) return refusal
   }
-  return storeOk({ events, findings, bytes: consumed })
+  return storeOk({ events, at, findings, bytes: consumed, lines: line })
 }
 
 /** The ids already in the file's last `window` bytes, for journal replay's idempotence. */

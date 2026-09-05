@@ -14,6 +14,7 @@ import { hostname } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
+import { setTimeout as delay } from 'node:timers/promises'
 import { describe, it } from 'node:test'
 
 import { acquireLock, parseFile, processIsGone } from '../../src/adapters/store/index.ts'
@@ -245,6 +246,108 @@ describe('a holder that dies never wedges the store', () => {
       assert.equal(second.ok, false)
       assert.match(second.ok ? '' : second.error.message, new RegExp(`held by pid ${process.pid}`))
       await held.value.release()
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+/**
+ * Stops a running writer inside its critical section, which is where a `Ctrl-Z` lands
+ * often enough, and returns whether it got there. The lock file carrying the writer's pid
+ * is the proof that the stop landed while the lock was held.
+ */
+async function stopInsideCriticalSection(root: string, child: ReturnType<typeof spawn>): Promise<boolean> {
+  for (let attempt = 0; attempt < 400; attempt += 1) {
+    child.kill('SIGSTOP')
+    await delay(5)
+    const token = await readFile(path.join(root, '.lock'), 'utf8').then((t) => JSON.parse(t) as { pid: number }).catch(() => undefined)
+    if (token?.pid === child.pid) return true
+    child.kill('SIGCONT')
+    await delay(7)
+  }
+  return false
+}
+
+describe('a holder that stalls past the heartbeat window has lost its lock', () => {
+  it('reports held() false after a stall longer than the stale window, with the file still its own', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const lock = await acquireLock(path.join(workspace.root, '.lock'), { heartbeatMs: 50, staleMs: 200 })
+      assert.ok(lock.ok)
+      assert.equal(await lock.value.held(), true)
+      // A blocked event loop is what a pause looks like from inside: no heartbeat fires.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300)
+      assert.equal(await lock.value.held(), false)
+      await lock.value.release()
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('reports held() false once the file carries another token', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const lock = await acquireLock(file)
+      assert.ok(lock.ok)
+      await writeFile(file, JSON.stringify({ pid: 999999, host: hostname(), since: '2026-01-01T00:00:00Z', nonce: 'other' }))
+      assert.equal(await lock.value.held(), false)
+      await lock.value.release()
+      assert.ok((await readFile(file, 'utf8')).includes('other'), 'a release never unlinks a lock it does not hold')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('refuses the write of a writer paused past the window, so the reclaimer\'s write is never overwritten', async () => {
+    const workspace = await aWorkspace()
+    try {
+      await workspace.store.apply({ txn: 't0', writes: [{ item: anItem({ priority: 1 }) }], events: [] })
+      await workspace.store.close()
+
+      const churn = spawn(process.execPath, [WRITER, 'churn', workspace.root, 'item-one'], { stdio: ['ignore', 'pipe', 'inherit'] })
+      let output = ''
+      churn.stdout?.on('data', (chunk: Buffer) => { output += chunk.toString() })
+      await new Promise<void>((resolve) => { churn.stdout?.once('data', () => resolve()) })
+      await delay(200)
+      const stopped = await stopInsideCriticalSection(workspace.root, churn)
+      assert.ok(stopped, 'the writer was never caught inside its critical section')
+
+      // Past the stale window a waiter is entitled to reclaim, and this one does.
+      await delay(5_600)
+      const competitor = await writer(workspace.root, 'item-one')
+      assert.ok(competitor.ok, `the competitor did not reclaim the stalled lock: ${JSON.stringify(competitor)}`)
+
+      churn.kill('SIGCONT')
+      await delay(1_500)
+      churn.kill('SIGKILL')
+      await new Promise<void>((resolve) => { churn.once('exit', () => resolve()) })
+      // The kill can land between a shard rename and its event append, which DR4 leaves for
+      // the next lock holder's journal replay to finish; one more writer is that holder.
+      assert.ok((await writer(workspace.root, 'item-one')).ok)
+
+      // Read from disk, not through any index: one version per distinct update event landed
+      // means no write was overwritten. Distinct, because a line the paused writer appends
+      // after the reclaimer already replayed its journal repeats an id rather than losing a
+      // write, and S14 is the finding that owns a repeated id.
+      const shard = parseFile(await readFile(path.join(workspace.root, 'items', '2026-09.md'), 'utf8'), 'items/2026-09.md')
+      assert.ok(shard.ok)
+      const version = Number(shard.value.records[0]?.fields.get('version'))
+      const updates = new Set<string>()
+      for (const name of await readdir(path.join(workspace.root, 'events'))) {
+        for (const text of (await readFile(path.join(workspace.root, 'events', name), 'utf8')).split('\n')) {
+          if (text.includes('"op":"update"')) updates.add((JSON.parse(text) as { id: string }).id)
+        }
+      }
+      assert.equal(version, updates.size + 1, `version ${version} against ${updates.size} distinct update events: a write was lost`)
+
+      // A writer paused after its write had fully landed has nothing left to refuse, so the
+      // count is not asserted; what is asserted is that every refusal is one of the two
+      // honest ones, and that nothing else happened to a write.
+      const outcomes = output.split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l) as { ok: boolean; code?: string; rule?: string })
+      const refused = outcomes.filter((o) => !o.ok)
+      assert.ok(refused.every((o) => (o.code === 'LOCK_LOST' && o.rule === 'S16') || (o.code === 'CONFLICT' && o.rule === 'S10')), JSON.stringify(refused))
     } finally {
       await workspace.dispose()
     }

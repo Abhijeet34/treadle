@@ -17,6 +17,7 @@ export type StoreErrorCode =
   | 'SCHEMA_NEWER'
   | 'SCHEMA_OLDER'
   | 'LOCK_TIMEOUT'
+  | 'LOCK_LOST'
   | 'STORE_UNAVAILABLE'
 
 export type StoreError = {

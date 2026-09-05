@@ -37,6 +37,16 @@ Counts are per run, and every property suite prints its own count as a test diag
 | Both prose bounds refuse and neither truncates | 90,000-character description refused naming 90000, 10000 and 80000 over, shard unchanged; 10,000-character reason refused at `T7` naming 500 | Proven |
 | A record over the old bound still reads | A 42,000-character stored description serves on `show` and is finding `H18`, where the first build quarantined it and reported `checked 0` | Proven |
 | A done item points at evidence | `DOD7` is the only failing rule on an otherwise complete bug, and its remedy is the command that fixes it; a hand edit removing the section is `H21` | Proven |
+| A paused lock holder never overwrites the writer that reclaimed it | A writer stopped with `SIGSTOP` inside its critical section, a competitor reclaiming after the 5 s window: before, 1 lost update in 117 writes with `doctor` clean; after, 5 runs of 5 with version equal to update events plus one, the paused writer refusing `LOCK_LOST`/`S16` or `CONFLICT`/`S10` (`test/store/lock.test.ts`) | Proven |
+| No symbolic link at or below the workspace root is followed | 7 paths each replaced by a link to a directory outside the workspace, `items` among them: before, `file` wrote its shard through the link; after, every read and write refuses `S15` naming the link and its target, 0 bytes written outside (`test/store/symlink.test.ts`) | Proven |
+| The event log holds the same property the record files hold | A repeated event id across two month files replaced the real creation event in `history` and `explain` with `doctor` clean; now `S14` at the line, every read refusing at 7. An instant naming month 13 sorted after every real event; now refused. A blank line moved the reported line of an appended bad line by one; now the line the file has (`test/store/event-log-integrity.test.ts`, `test/services/event-audit.test.ts`) | Proven |
+| A duplicate-id finding goes with the file it clashed against | A shard copied to a second month and then removed left `S3` refusing every read until the surviving shard changed or the index was deleted; the index now records which file a clash was decided against and re-reads the survivor when that file changes or goes, for `S3` and `S14` alike (`test/store/event-log-integrity.test.ts`) | Proven |
+| The store never writes a record it would not serve back | `set acceptance_criteria="a\nb"` landed and every read after it exited 7; now refused at 2 as `V4`, and the store parses every record it renders before the write (`test/cli/found-by-use.test.ts`) | Proven |
+| The lock reclaim race resolves without an overlapping hold | 24 waiters over 600 contended reclaims, 0 overlapping holds | Proven |
+| A symlinked or a foreign-pid lock does not wedge the store | both forms reclaimed within the 5 s window | Proven |
+| No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
+| A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
+| The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
 
 ## What is not proven
 

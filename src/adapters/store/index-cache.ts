@@ -11,16 +11,20 @@
 // an append re-indexes the append rather than the file.
 
 import { DatabaseSync } from 'node:sqlite'
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 
 import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../application/ports/store.ts'
 import { DIR_MODE } from './atomic.ts'
 import { eventFrom, eventRest } from './event-log.ts'
 
-/** What one record file's re-index leaves the caller to act on: the cross-shard duplicates it refused. */
-export type RecordFileOutcome = {
+/**
+ * What one file's re-index leaves the caller to act on: the cross-file duplicates it refused,
+ * and whether another file's fingerprint was dropped because it clashed against this one.
+ */
+export type ReindexOutcome = {
   readonly clashes: readonly Finding[]
+  readonly invalidated: boolean
 }
 
 export type Fingerprint = {
@@ -69,9 +73,14 @@ create table if not exists events (
   actor text not null, txn text not null, file text not null, rest text not null);
 create index if not exists events_file on events(file);
 create index if not exists events_entity on events(entity, at);
+-- \`against\` names the file whose copy won when this finding is a duplicate-id clash. A
+-- clash is the one finding whose truth depends on another file, so when that file changes
+-- or goes, the fingerprint of the file carrying the clash is dropped and it is re-read.
+-- Without it a removed duplicate shard left the S3 on the surviving shard for good.
 create table if not exists findings (
-  file text not null, line integer not null, rule text not null, reason text not null, id text);
+  file text not null, line integer not null, rule text not null, reason text not null, id text, against text);
 create index if not exists findings_file on findings(file);
+create index if not exists findings_against on findings(against);
 `
 
 /** Created before the version check, because the version is read out of it. */
@@ -82,7 +91,7 @@ const META_SCHEMA = 'create table if not exists meta (key text primary key, valu
  * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
  * that cannot leave a half-migrated table behind.
  */
-const INDEX_FORMAT = '2'
+const INDEX_FORMAT = '3'
 const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
@@ -119,6 +128,25 @@ export type HierarchyDirty = {
   readonly rows: boolean
   readonly moved: readonly string[]
   readonly full: boolean
+}
+
+/**
+ * The index could not be opened, and deleting it did not help. The store turns this into a
+ * refusal naming the path; a stack trace here read as "file is not a database" with the
+ * remedy `treadle version`.
+ */
+export class IndexUnavailable extends Error {
+  readonly path: string
+
+  constructor(path: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.path = path
+  }
+}
+
+/** The database and the two files WAL mode keeps beside it. */
+function indexFiles(file: string): readonly string[] {
+  return [file, `${file}-wal`, `${file}-shm`]
 }
 
 /** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
@@ -173,6 +201,25 @@ export class IndexCache {
       this.#db = undefined
     }
     mkdirSync(path.dirname(this.#file), { recursive: true, mode: DIR_MODE })
+    // A cache that will not open is deleted and rebuilt, which is the same answer as a
+    // cache that is absent: nothing in it is authoritative. Only a second failure, such as
+    // a directory sitting at the path or a parent that refuses writes, is a refusal.
+    try {
+      this.#db = this.#openFresh()
+    } catch (first) {
+      for (const stale of indexFiles(this.#file)) {
+        try { rmSync(stale, { force: true }) } catch { /* a directory at the path; the retry says so */ }
+      }
+      try {
+        this.#db = this.#openFresh()
+      } catch (second) {
+        throw new IndexUnavailable(this.#file, second ?? first)
+      }
+    }
+    return this.#db
+  }
+
+  #openFresh(): DatabaseSync {
     const db = new DatabaseSync(this.#file)
     // The busy timeout is armed before anything that can meet another process's lock, and
     // the journal-mode switch is the first such statement: it takes an exclusive lock on a
@@ -192,7 +239,6 @@ export class IndexCache {
     } else {
       db.exec(SCHEMA)
     }
-    this.#db = db
     return db
   }
 
@@ -218,9 +264,9 @@ export class IndexCache {
     fingerprint: Fingerprint,
     items: readonly IndexedItem[],
     findings: readonly Finding[],
-  ): RecordFileOutcome {
+  ): ReindexOutcome {
     const db = this.#open()
-    const clashes: Finding[] = []
+    const clashes: { finding: Finding; against: string }[] = []
     const moved: string[] = []
     let changed = false
     db.exec('begin immediate')
@@ -245,6 +291,7 @@ export class IndexCache {
       const insert = db.prepare(`insert into items
         (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, source)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      const holder = db.prepare('select file from items where id = ?')
       for (const item of items) {
         const was = previous.get(item.id)
         if (was !== undefined && was.line === item.line && was.source === item.source) continue
@@ -262,20 +309,46 @@ export class IndexCache {
           // raises is what `duplicateRefusal` reads, and what stops a write resolving a
           // cross-shard duplicate by taking whichever copy this insert happened to keep.
           clashes.push({
-            file, line: item.line, rule: 'S3', id: item.id,
-            reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,
+            against: (holder.get(item.id) as unknown as { file: string } | undefined)?.file ?? file,
+            finding: {
+              file, line: item.line, rule: 'S3', id: item.id,
+              reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,
+            },
           })
         }
       }
-      this.#insertFindings([...findings, ...clashes])
+      this.#insertFindings(findings)
+      this.#insertClashes(clashes)
       this.#setFingerprint(file, fingerprint)
       if (changed) this.#mergeHierarchyDirty(db, moved)
+      const invalidated = changed && this.#invalidateAgainst(file)
       db.exec('commit')
+      return { clashes: clashes.map((clash) => clash.finding), invalidated }
     } catch (error) {
       db.exec('rollback')
       throw error
     }
-    return { clashes }
+  }
+
+  /**
+   * Drops the fingerprint of every other file carrying a clash against `file`, so the next
+   * refresh pass re-reads it and re-decides the clash against what `file` now holds.
+   */
+  #invalidateAgainst(file: string): boolean {
+    const dropped = this.#open()
+      .prepare('delete from files where path in (select file from findings where against = ? and file != ?)')
+      .run(file, file)
+    return Number(dropped.changes) > 0
+  }
+
+  #insertClashes(clashes: readonly { finding: Finding; against: string }[]): void {
+    if (clashes.length === 0) return
+    const insert = this.#open().prepare(
+      'insert into findings (file, line, rule, reason, id, against) values (?, ?, ?, ?, ?, ?)',
+    )
+    for (const { finding, against } of clashes) {
+      insert.run(finding.file, finding.line, finding.rule, finding.reason, finding.id ?? null, against)
+    }
   }
 
   /** Folds this file's row change into the durable dirty marker, inside the caller's transaction. */
@@ -297,40 +370,67 @@ export class IndexCache {
     db.prepare('insert or replace into meta (key, value) values (?, ?)').run(HIERARCHY_DIRTY_KEY, dirty)
   }
 
+  /**
+   * `lines` is parallel to `events`: the line each was read from, which is what a finding
+   * on one of them names.
+   */
   replaceEventFile(
     file: string,
     fingerprint: Fingerprint,
     events: readonly StoreEvent[],
+    lines: readonly number[],
     findings: readonly Finding[],
     append: boolean,
-  ): void {
+  ): ReindexOutcome {
     const db = this.#open()
+    const clashes: { finding: Finding; against: string }[] = []
     db.exec('begin immediate')
     try {
       if (!append) this.#dropRows(file)
-      const insert = db.prepare(`insert or ignore into events
+      const insert = db.prepare(`insert into events
         (id, at, entity, op, actor, txn, file, rest) values (?, ?, ?, ?, ?, ?, ?, ?)`)
-      for (const event of events) {
-        insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
-          eventRest(event))
-      }
+      const holder = db.prepare('select file from events where id = ?')
+      events.forEach((event, i) => {
+        try {
+          insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
+            eventRest(event))
+        } catch {
+          // The id is this table's primary key and its one owner across files. An `insert
+          // or ignore` here kept whichever copy was indexed first and dropped the other
+          // without a word: a second file carrying an existing id replaced the real event
+          // in every read while `doctor` reported the store clean.
+          const first = (holder.get(event.id) as unknown as { file: string } | undefined)?.file ?? file
+          clashes.push({
+            against: first,
+            finding: {
+              file, line: lines[i] as number, rule: 'S14', id: event.id,
+              reason: `event ${event.id} at ${file} line ${lines[i]} repeats an id ${first} already carries; this copy is not served`,
+            },
+          })
+        }
+      })
       this.#insertFindings(findings)
+      this.#insertClashes(clashes)
       this.#setFingerprint(file, fingerprint)
+      const invalidated = !append && this.#invalidateAgainst(file)
       db.exec('commit')
+      return { clashes: clashes.map((clash) => clash.finding), invalidated }
     } catch (error) {
       db.exec('rollback')
       throw error
     }
   }
 
-  dropFile(file: string): void {
+  dropFile(file: string): boolean {
     const db = this.#open()
     db.exec('begin immediate')
     try {
       this.#dropRows(file)
       db.prepare('delete from files where path = ?').run(file)
       this.#forgetHierarchyVerdict()
+      const invalidated = this.#invalidateAgainst(file)
       db.exec('commit')
+      return invalidated
     } catch (error) {
       db.exec('rollback')
       throw error
@@ -387,21 +487,33 @@ export class IndexCache {
     return row?.parent ?? undefined
   }
 
-  /** The stored verdict as written, or undefined when no verdict has ever been computed. */
-  hierarchyVerdict(): string | undefined {
+  /**
+   * A meta row as JSON, or undefined when it is absent or not JSON. A row that does not
+   * parse is treated as never written, so a damaged cache costs a recompute and not a
+   * stack trace; the same rule the whole index lives by.
+   */
+  #metaJson(key: string): unknown {
     const row = this.#open()
       .prepare('select value from meta where key = ?')
-      .get(HIERARCHY_KEY) as unknown as { value: string } | undefined
-    return row?.value
+      .get(key) as unknown as { value: string } | undefined
+    if (row === undefined) return undefined
+    try {
+      return JSON.parse(row.value)
+    } catch {
+      return undefined
+    }
+  }
+
+  /** The stored verdict as written, or undefined when no verdict has ever been computed. */
+  hierarchyVerdict(): string | undefined {
+    const parsed = this.#metaJson(HIERARCHY_KEY)
+    return parsed === undefined ? undefined : JSON.stringify(parsed)
   }
 
   /** What has moved since that verdict was written, or undefined when nothing has. */
   hierarchyDirty(): HierarchyDirty | undefined {
-    const row = this.#open()
-      .prepare('select value from meta where key = ?')
-      .get(HIERARCHY_DIRTY_KEY) as unknown as { value: string } | undefined
-    if (row === undefined) return undefined
-    const parsed = JSON.parse(row.value) as { rows?: boolean; moved?: readonly string[]; full?: boolean }
+    const parsed = this.#metaJson(HIERARCHY_DIRTY_KEY) as { rows?: boolean; moved?: readonly string[]; full?: boolean } | undefined
+    if (parsed === undefined || typeof parsed !== 'object' || parsed === null) return undefined
     return { rows: parsed.rows ?? false, moved: parsed.moved ?? [], full: parsed.full ?? false }
   }
 
