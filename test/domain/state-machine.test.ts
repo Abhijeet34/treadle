@@ -142,6 +142,67 @@ describe('resume', () => {
   })
 })
 
+describe('T6, the closed-set value two edges record', () => {
+  it('refuses a cancel that names no resolution, and lists the set it wanted', () => {
+    const { error } = refusal(evaluateTransition(context(subject('ready')), {
+      target: 'cancelled', reason: 'superseded by the export story',
+    }))
+    assert.equal(error.code, 'VALIDATION')
+    assert.equal(error.rule, 'T6')
+    for (const value of RESOLUTIONS) assert.ok(error.message.includes(value), error.message)
+  })
+
+  it('refuses a resolution that is not in the set, rather than storing it', () => {
+    const { error } = refusal(evaluateTransition(context(subject('ready')), {
+      target: 'cancelled', reason: 'why', resolution: 'obsolete' as 'wont_do',
+    }))
+    assert.equal(error.rule, 'T6')
+    assert.ok(error.message.includes('obsolete'), error.message)
+  })
+
+  it('accepts each of the five resolutions on a cancel', () => {
+    for (const resolution of RESOLUTIONS) {
+      const allowed = allowance(evaluateTransition(context(subject('ready')), {
+        target: 'cancelled', reason: 'why', resolution,
+      }))
+      assert.equal(allowed.transition, 'cancel')
+    }
+  })
+
+  it('refuses a resolution on an edge that does not stop the item', () => {
+    const { error } = refusal(evaluateTransition(context(subject('draft')), {
+      target: 'ready', resolution: 'duplicate',
+    }))
+    assert.equal(error.rule, 'T6')
+    assert.ok(error.message.includes('cancel'), error.message)
+  })
+
+  it('refuses a release that names no attempt outcome, and lists the set it wanted', () => {
+    const { error } = refusal(evaluateTransition(context(subject('in_progress')), {
+      target: 'ready', reason: 'the migration will not apply',
+    }))
+    assert.equal(error.rule, 'T6')
+    for (const value of ATTEMPT_OUTCOMES) assert.ok(error.message.includes(value), error.message)
+  })
+
+  it('refuses an attempt outcome on an edge that is not a release', () => {
+    const { error } = refusal(evaluateTransition(context(subject('ready')), {
+      target: 'cancelled', reason: 'why', resolution: 'wont_do', outcome: 'failed',
+    }))
+    assert.equal(error.rule, 'T6')
+    assert.ok(error.message.includes('release'), error.message)
+  })
+
+  it('evaluates no guard on the release edge, so a failed attempt always has an exit', () => {
+    const allowed = allowance(evaluateTransition(
+      context(subject('in_progress'), { reviewStep: true, blockers: ['sso-saml'] }),
+      { target: 'ready', reason: 'the vendor endpoint is down', outcome: 'yielded' },
+    ))
+    assert.equal(allowed.transition, 'release')
+    assert.deepEqual(allowed.guards, [])
+  })
+})
+
 describe('an unknown target', () => {
   it('is a validation error, not a guard refusal', () => {
     const { error } = refusal(
