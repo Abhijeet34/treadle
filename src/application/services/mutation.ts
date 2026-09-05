@@ -128,9 +128,27 @@ export type FieldChange = {
   readonly after: string
 }
 
+/**
+ * An acceptance criterion, structurally. The list is the one stored value whose entries are
+ * objects rather than scalars, and `String(criterion)` rendered every one of them as
+ * `[object Object]`: two different checklists compared equal, so `set` reported `already` and
+ * a criterion could never be ticked. The tick syntax below is the one `--set` itself takes,
+ * so what a mutation echoes is what a caller would type to reproduce it.
+ */
+function isCriterion(value: unknown): value is { readonly text: string; readonly ticked: boolean } {
+  return typeof value === 'object' && value !== null
+    && typeof (value as { text?: unknown }).text === 'string'
+    && typeof (value as { ticked?: unknown }).ticked === 'boolean'
+}
+
 function render(value: unknown): string {
   if (value === undefined || value === null) return '-'
-  if (Array.isArray(value)) return value.length === 0 ? '-' : value.map(render).join(',')
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '-'
+    return value.every(isCriterion)
+      ? value.map((criterion) => `[${criterion.ticked ? 'x' : ' '}] ${criterion.text}`).join('|')
+      : value.map(render).join(',')
+  }
   return String(value)
 }
 

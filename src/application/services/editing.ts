@@ -29,7 +29,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import { readWorkspace } from './context.ts'
-import { coerce, notFound } from './items.ts'
+import { coerce, echoed, notFound } from './items.ts'
 import { auditedSnapshot, diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -142,7 +142,7 @@ export async function setFields(
     return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadle show ${item.id}`])
   }
 
-  const set = changes.map((change) => `${change.field} ${change.before} -> ${change.after}`)
+  const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)
   if (mode === 'preview') {
     return okResult(SET_SHAPE, {
       workspace, txn: null, changed: 0,

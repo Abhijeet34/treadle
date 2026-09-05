@@ -121,6 +121,14 @@ export const SHOW_SHAPE: ResultShape = {
       key: 'evidence',
       columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
     },
+    // Appended after `evidence`, which STABILITY's output-schema rule makes a non-breaking
+    // addition. `ac` above stays the tick count; this is the text the count is over, which
+    // no read surface carried: a story's criteria were written, committed and unreadable.
+    {
+      kind: 'block',
+      key: 'criteria',
+      columns: [{ name: 'n' }, { name: 'tick' }, { name: 'text', text: true }],
+    },
   ],
 }
 
@@ -220,11 +228,26 @@ export function coerce(name: string, value: string): unknown {
 
 /** The fields a `file` reports as set, in the field dictionary's order. */
 const REPORTED = [
-  'type', 'state', 'filed_at', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
-  'outcome', 'severity', 'repro_steps', 'expected', 'actual', 'found_in',
-  'fix_confirmed', 'question', 'timebox_hours', 'findings',
+  'type', 'state', 'filed_at', 'description', 'priority', 'points', 'hours_estimate',
+  'parent_id', 'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'outcome', 'acceptance_criteria', 'severity', 'repro_steps', 'expected', 'actual',
+  'found_in', 'fix_confirmed', 'question', 'timebox_hours', 'findings',
 ] as const
+
+/** The longest a reported value prints before it is reported as its size instead. */
+export const MAX_ECHO = 120
+
+/**
+ * One side of a reported change, as a line the grammar can carry. A prose field may hold
+ * newlines and thousands of characters: `file` handed a multi-line `repro_steps` straight to
+ * the line renderer, which refused it as a delimiter, so the caller got `err INTERNAL` and
+ * exit 1 over a write that had already landed and would collide on the retry. Everything
+ * that fits stays verbatim, because the point of the echo is that a caller can see what was
+ * stored without a second command.
+ */
+export function echoed(value: string): string {
+  return value.length <= MAX_ECHO && !/[\n\t]/.test(value) ? value : `${value.length} chars`
+}
 
 export async function fileItem(
   target: Target, clock: Clock, ids: IdGenerator, request: FileRequest,
@@ -264,7 +287,7 @@ export async function fileItem(
     type: request.type,
     state: 'draft',
     title: request.title,
-    set: changes.map((change) => `${change.field} ${change.before} -> ${change.after}`),
+    set: changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`),
   }
 
   if (mode === 'preview') {
@@ -306,6 +329,29 @@ export async function fileItem(
 function tickedOf(criteria: readonly AcceptanceCriterion[] | undefined): string | undefined {
   if (criteria === undefined || criteria.length === 0) return undefined
   return `${criteria.filter((criterion) => criterion.ticked).length}/${criteria.length}`
+}
+
+/**
+ * The criteria a story's `ac` tally is a tally of, built only when the caller asks for that
+ * field by name. `show --field ac` returned `ac 0/1` and nothing else, so a checklist a team wrote
+ * and committed was readable through no command in the tool.
+ *
+ * It is a projection rather than a line of the whole record because the whole record has a
+ * budget: `show` is 310 B against A.3's figure with no headroom, and two criteria cost 52 B
+ * on every read of every story. This is the shape `desc` already takes, which is cut at 64
+ * cells in the record and printed whole under `show <id> --field desc`.
+ */
+function criteriaBlock(item: WorkItem): Block | undefined {
+  const criteria = item.acceptance_criteria ?? []
+  if (criteria.length === 0) return undefined
+  return {
+    columns: columnsOf(SHOW_SHAPE, 'criteria'),
+    shown: criteria.length,
+    total: criteria.length,
+    rows: criteria.map((criterion, at): Row => ({
+      n: at + 1, tick: criterion.ticked ? 'x' : '-', text: criterion.text,
+    })),
+  }
 }
 
 export async function showItem(
@@ -392,7 +438,10 @@ export async function showItem(
       fix: [`treadle show ${item.id}`],
     })
   }
-  return okResult(SHOW_SHAPE, { workspace, data: { item: item.id, [key]: data[key] as Value } })
+  const projection: Record<string, Value> = { item: item.id, [key]: data[key] as Value }
+  const detail = key === 'ac' ? criteriaBlock(item) : undefined
+  if (detail !== undefined) projection['criteria'] = detail
+  return okResult(SHOW_SHAPE, { workspace, data: projection })
 }
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */

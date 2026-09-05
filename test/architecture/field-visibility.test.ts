@@ -24,6 +24,15 @@
 // name; a `readable` line whose key no shape declares fails the third; and a `readable`
 // line whose key a real record never prints fails the fifth, so declaring a surface that
 // does not print it is not a way through.
+//
+// A KEY IS NOT CONTENT, WHICH IS WHAT THIS FILE MISSED. Every test above asks whether the
+// field's name reaches a surface. `acceptance_criteria` passed all of them while the tool
+// printed `ac 0/1` and no command anywhere would print the criteria: the name resolved, the
+// content did not, and a team's committed checklist was unreadable through the tool that
+// held it. The last suite in this file closes that: for every field a real record carries,
+// the stored value's own text has to appear in `show <id>` or in `show <id> --field <name>`,
+// and a field that deliberately prints a summary instead is declared in `CONTENT_HELD_BACK`
+// with its reason. A count, a length or a tally is not a read surface for the thing counted.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -85,7 +94,7 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   resolution: readable('show:resolution'),
   extra: readable('show:extra', 'the count and not the values: these are keys a newer writer produced that this build has no meaning for (DR3), and printing one as a field of the record invites a caller to act on a value nothing here can validate'),
   outcome: readable('show:outcome'),
-  acceptance_criteria: readable('show:ac', 'ticked over total; the criteria themselves are the record file, which D1 makes authoritative'),
+  acceptance_criteria: readable('show:ac', 'ticked over total, with the criteria themselves in the `criteria` block beside it and under `show <id> --field ac`'),
   severity: readable('show:sev'),
   repro_steps: readable('show:repro'),
   expected: readable('show:expected'),
@@ -115,9 +124,37 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
 }
 
+/**
+ * The fields whose stored content no read surface prints, each with the reason. Everything
+ * else has to be recoverable verbatim, which is what the key sweep above never asked.
+ */
+const CONTENT_HELD_BACK: Readonly<Record<string, string>> = {
+  extra: 'the count and not the values: these are keys a newer writer produced that this build has no meaning for, and printing one invites a caller to act on a value nothing here can validate',
+  version: 'it is printed as `v`, and a bare integer is matched by any record; the first suite already holds its key',
+}
+
+/**
+ * The atoms of a stored value that a read surface has to print: the value itself for a
+ * scalar, and every string a collection's entries carry, because a list whose entries print
+ * as a count is the defect this file exists for. A boolean inside an entry is a flag each
+ * surface renders in its own vocabulary - the criteria block prints a tick as `x` - so what
+ * has to survive is the entry's text and not the word `false`.
+ */
+function contentOf(value: unknown, nested = false): readonly string[] {
+  if (value === undefined || value === null) return []
+  if (Array.isArray(value)) return value.flatMap((entry) => contentOf(entry, true))
+  if (typeof value === 'object') {
+    return Object.values(value as Record<string, unknown>).flatMap((entry) => contentOf(entry, true))
+  }
+  return nested && typeof value !== 'string' ? [] : [String(value)]
+}
+
 const ACTOR: Actor = { id: 'dana', kind: 'human' }
 const AGENT: Actor = { id: 'agent-7', kind: 'agent' }
 const NOW = '2026-09-05T09:00:00Z'
+
+/** The six records the fixture below builds, one per work-item type. */
+const ITEMS = ['every-epic', 'every-story', 'every-bug', 'every-spike', 'every-held', 'every-stopped'] as const
 
 /** Every field name the record grammar can persist, over every type. */
 function persistedItemFields(): readonly string[] {
@@ -323,7 +360,7 @@ describe('a real record and a real log print what the decisions claim', () => {
     rig = await aWorkspaceCarryingEveryField()
     const clock = fixedClock(NOW)
     const shown = new Set<string>()
-    for (const id of ['every-epic', 'every-story', 'every-bug', 'every-spike', 'every-held', 'every-stopped']) {
+    for (const id of ITEMS) {
       const result = await showItem(rig.store, clock, id)
       assert.equal(result.ok, true, `show ${id} refused`)
       for (const key of printedKeys(agentRenderer.render(result))) shown.add(key)
@@ -362,5 +399,34 @@ describe('a real record and a real log print what the decisions claim', () => {
       const key = decision.at.split(':')[1] as string
       assert.ok(eventKeys.has(key), `${field} claims ${decision.at} and no log printed ${key}`)
     }
+  })
+
+  // The assertion the four tests above cannot make. Each of them is satisfied by a key, and
+  // `ac 0/1` is a key over content no command would print.
+  it('prints the stored content of every readable field, and not merely its name', async (t) => {
+    const clock = fixedClock(NOW)
+    let checked = 0
+    for (const id of ITEMS) {
+      const stored = await rig.store.get(id)
+      assert.equal(stored.ok && stored.value !== undefined, true, `${id} is not stored`)
+      const item = (stored as { value: WorkItem }).value as unknown as Record<string, unknown>
+      for (const [field, decision] of Object.entries(ITEM_FIELDS)) {
+        if (decision.kind !== 'readable') continue
+        if (field in CONTENT_HELD_BACK) continue
+        const value = item[field]
+        if (value === undefined) continue
+        const whole = await showItem(rig.store, clock, id, field)
+        assert.equal(whole.ok, true, `show ${id} --field ${field} refused`)
+        const printed = `${agentRenderer.render(await showItem(rig.store, clock, id))}\n${agentRenderer.render(whole)}`
+        for (const atom of contentOf(value)) {
+          assert.ok(
+            printed.includes(atom),
+            `${id}: ${field} holds ${JSON.stringify(atom)} and no read surface printed it; see the header of this file`,
+          )
+          checked += 1
+        }
+      }
+    }
+    t.diagnostic(`${checked} stored values checked for content, over ${ITEMS.length} records`)
   })
 })

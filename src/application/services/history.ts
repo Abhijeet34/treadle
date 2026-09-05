@@ -12,16 +12,31 @@
 // because an event file is a committed file a hand edit can reach and a value carrying a
 // space would shift every field after it.
 //
-// `what` names the fields an event moved and, where the event recorded both sides safely,
-// the values it moved them between. The names alone left "when did this reach in_review,
-// and who moved it there" unanswerable from any read surface: `show` has the current state,
-// `explain` has `since` and `from_event`, and this column had the word `state`.
+// THE `what` COLUMN HAS ONE CONVENTION, AND A NEW OP INHERITS IT. Every part of the cell is
+// `name=value` or `name=from->to`, and a bare name never appears. One column carried three
+// vocabularies before this rule: `state=in_progress->in_review` from a transition, the bare
+// `expected,actual` from a `set` over prose, and the bare word `evidence` from an append that
+// named neither the kind of artefact nor what it pointed at. A reader could not tell whether
+// `expected,actual` meant those fields moved or that the values were literally those words.
+//
+// A side the log did not record as a printable token is a marker from the closed set below,
+// never a silent omission: `(unset)` for a field that was not set, `(text:<n>)` for the
+// character count the log stores in place of prose, and `(?)` for anything else. A stored
+// value that would collide with a marker prints as `(?)`, so no record's own content can
+// forge one. `outcome=` and `override=` already had this shape, and `test/services/
+// history-convention.test.ts` holds every part of every op's cell to it.
+//
+// `what` names the fields an event moved and the values it moved them between. The names
+// alone left "when did this reach in_review, and who moved it there" unanswerable from any
+// read surface: `show` has the current state, `explain` has `since` and `from_event`, and
+// this column had the word `state`.
 
 import { isKnownField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
 import { notFound } from './items.ts'
+import { AUDITED_FIELDS } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const HISTORY_SHAPE: ResultShape = {
@@ -67,10 +82,23 @@ function overridden(event: StoreEvent): readonly string[] {
 
 /**
  * Ops whose `after` is the value that was written rather than a snapshot keyed by field
- * name. `evidence add` appends one pointer, so its `after` is the pointer; the field it
- * moved is still one field, and this is where that is said once rather than at the reader.
+ * name. An append has no before to name, so it takes the convention's `name=value` form; the
+ * kind is a closed-set token and always prints, which is the least a reader needs to tell one
+ * pointer from another. This is where a future append-shaped op says how it reads.
  */
-const FIELD_OF_OP: Readonly<Record<string, string>> = { 'item.evidence.add': 'evidence' }
+const VALUE_OF_OP: Readonly<Record<string, {
+  readonly field: string
+  readonly of: (after: Readonly<Record<string, unknown>>) => string
+}>> = {
+  'item.evidence.add': {
+    field: 'evidence',
+    of: (after) => {
+      const kind = side(after['kind'], 'kind')
+      const ref = side(after['ref'], 'ref')
+      return ref === UNKNOWN ? kind : `${kind}:${ref}`
+    },
+  },
+}
 
 /**
  * The longest value a move may print per side. An audited value is a state, an instant, a
@@ -86,41 +114,55 @@ function snapshot(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
+/** The three markers a side prints when the log recorded no printable value for it. */
+const UNSET = '(unset)'
+const UNKNOWN = '(?)'
+const PROSE = /^(\d+) chars$/
+
 /**
- * One side of a move as it prints, or `undefined` when it cannot print. `-` is the
- * snapshot's own marker for a field that was not set, and it prints as an empty side:
- * `reviewer=->abhijeet` reads as a move from nothing, where the two glyphs of `-` and `->`
- * would collide into `-->`.
+ * Fields whose value is never the `<n> chars` length marker `auditedSnapshot` writes in place
+ * of prose, so `side` must never sniff one out of them. Every `AUDITED_FIELDS` entry is
+ * recorded verbatim by `auditedSnapshot` and can legitimately read like a count (an assignee
+ * literally named "3 chars"); `ref` is not a dictionary field at all and is never put through
+ * that length-marker conversion, so a pointer that happens to read "8 chars" is its own value.
  */
-function side(value: unknown): string | undefined {
-  if (value === '-') return ''
-  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_VALUE) return undefined
-  return /\s/.test(value) ? undefined : value
+const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
+
+/**
+ * One side of a move as it prints. `-` is the snapshot's own marker for a field that was not
+ * set, and it printed as an empty string: `reviewer=->dev` reads as a typo rather than as a
+ * field that had no previous value. Every marker is parenthesised, and a stored value that
+ * opens with the same glyph is reported unknown rather than allowed to forge one.
+ */
+function side(value: unknown, field: string): string {
+  if (value === '-') return UNSET
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_VALUE) return UNKNOWN
+  const prose = NEVER_PROSE.has(field) ? null : PROSE.exec(value)
+  if (prose !== null) return `(text:${prose[1] as string})`
+  return /\s/.test(value) || value.startsWith('(') ? UNKNOWN : value
 }
 
 /**
- * One moved field as `field=from->to`, or its name alone when the event did not record both
- * sides safely. A creation has no `before`, so its fields moved from nothing in particular
- * and their values are the ones `show` prints today; a value carrying a space, an unbounded
- * prose length or the `N chars` the log records in place of prose has no side to print.
+ * One moved field as `field=from->to`, or as `field=to` where the event recorded no before at
+ * all, which is what a creation is. Neither form is ever a bare name.
  */
 function move(
   field: string,
   before: Record<string, unknown> | undefined,
   after: Record<string, unknown> | undefined,
 ): string {
-  if (before === undefined || after === undefined) return field
-  const from = side(before[field])
-  const to = side(after[field])
-  return from === undefined || to === undefined ? field : `${field}=${from}->${to}`
+  const to = side(after?.[field], field)
+  return before === undefined ? `${field}=${to}` : `${field}=${side(before[field], field)}->${to}`
 }
 
 /** The item fields one event moved, in the order the event recorded them. */
 function movedBy(event: StoreEvent): readonly string[] {
-  const named = FIELD_OF_OP[event.op]
-  if (named !== undefined) return [named]
   const before = snapshot(event.before)
   const after = snapshot(event.after)
+  const named = VALUE_OF_OP[event.op]
+  if (named !== undefined) {
+    return [`${named.field}=${after === undefined ? UNKNOWN : named.of(after)}`]
+  }
   const source = after ?? before
   if (source === undefined) return []
   const keys = Object.keys(source)
@@ -128,7 +170,7 @@ function movedBy(event: StoreEvent): readonly string[] {
   const moves = known.map((key) => move(key, before, after))
   // A key this build does not know is counted rather than printed: it is text from a file
   // that no dictionary bounds, and the count is the part a reader can act on.
-  return known.length === keys.length ? moves : [...moves, `+${keys.length - known.length}`]
+  return known.length === keys.length ? moves : [...moves, `unknown=${keys.length - known.length}`]
 }
 
 /**
@@ -144,13 +186,15 @@ function whatOf(event: StoreEvent): string {
   const kept: string[] = []
   let width = 0
   for (const part of parts) {
-    // The `+n` that replaces the rest needs room of its own, so the fit is tested against a
-    // cell that already carries it.
-    if (width + part.length + 1 > MAX_CELL - 6) break
+    // The `more=n` that replaces the rest needs room of its own, so the fit is tested against
+    // a cell that already carries it.
+    if (width + part.length + 1 > MAX_CELL - 12) break
     kept.push(part)
     width += part.length + 1
   }
-  return kept.length === parts.length ? parts.join(',') : [...kept, `+${parts.length - kept.length}`].join(',')
+  return kept.length === parts.length
+    ? parts.join(',')
+    : [...kept, `more=${parts.length - kept.length}`].join(',')
 }
 
 export type HistoryRequest = {

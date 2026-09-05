@@ -129,6 +129,9 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'sso-saml',
     }))
     golden.set('show', await showItem(demo.store, clock, 'auth-refresh'))
+    // The `ac` projection, which is the one read surface that prints a story's criteria: the
+    // record itself carries the tally alone, because `show` has no headroom against A.3.
+    golden.set('show-criteria', await showItem(demo.store, clock, 'auth-refresh', 'ac'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
     golden.set('explain', await explain(demo.store, 'sso-saml'))
     golden.set('history', await history(demo.store, 'sso-saml', { limit: 9 }))
