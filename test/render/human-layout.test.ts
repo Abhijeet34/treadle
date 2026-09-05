@@ -13,13 +13,64 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, before } from 'node:test'
 
-import type { ResultObject } from '../../src/application/result.ts'
+import type { Block, ResultObject } from '../../src/application/result.ts'
 import { shapeFor } from '../../src/application/shapes.ts'
-import { humanRenderer } from '../../src/adapters/render/human.ts'
+import { MAX_WIDTH, MIN_WIDTH, humanRenderer } from '../../src/adapters/render/human.ts'
+import { displayWidth } from '../../src/adapters/render/width.ts'
 import { goldenResults } from '../helpers/cli-fixtures.ts'
 
 /** 60 drops a free-text column, 80 is the default off a pipe, 200 is the clamp's ceiling. */
 const WIDTHS = [60, 80, 200] as const
+
+/** The clamp's floor and ceiling, the two the snapshot skips, and the width that first broke. */
+const EVERY_WIDTH = [MIN_WIDTH, 60, 80, 100, MAX_WIDTH] as const
+
+/** The field dictionary's title ceiling, with no space for a wrap to break at. */
+const UNBREAKABLE = 'x'.repeat(200)
+
+/**
+ * The golden objects plus two that carry an unbreakable title: a list whose stacked
+ * continuation line was emitted whole at 60 cells, and a record whose title scalar is one
+ * word. Titles in the demo workspace all have spaces, which is why the snapshot never saw it.
+ */
+function withUnbreakableTitles(golden: ReadonlyMap<string, ResultObject>): ReadonlyMap<string, ResultObject> {
+  const out = new Map(golden)
+  const list = golden.get('backlog') as ResultObject
+  const items = list.data['items'] as Block
+  out.set('backlog-unbreakable', {
+    ...list,
+    data: { ...list.data, items: { ...items, rows: items.rows.map((row) => ({ ...row, title: UNBREAKABLE })) } },
+  })
+  const record = golden.get('show') as ResultObject
+  out.set('show-unbreakable', { ...record, data: { ...record.data, title: UNBREAKABLE, desc: `${UNBREAKABLE} ${UNBREAKABLE}` } })
+  return out
+}
+
+describe('no emitted line exceeds the width (B.4)', () => {
+  let cases: ReadonlyMap<string, ResultObject>
+
+  before(async () => {
+    cases = withUnbreakableTitles(await goldenResults())
+  })
+
+  it('holds at every width from the floor to the ceiling, for a title with no space in it too', () => {
+    for (const [name, result] of cases) {
+      for (const width of EVERY_WIDTH) {
+        const lines = humanRenderer.render(result, { width }).trimEnd().split('\n')
+        const longest = Math.max(...lines.map(displayWidth))
+        assert.ok(longest <= width, `${name} at ${width}: the longest line is ${longest} cells`)
+      }
+    }
+  })
+
+  // At the floor the fixed columns leave the title under 16 cells, so it stacks on its own
+  // line and is broken rather than truncated; joining the continuation lines gives it back.
+  it('loses no character of the title when it breaks it', () => {
+    const result = cases.get('backlog-unbreakable') as ResultObject
+    const rendered = humanRenderer.render(result, { width: MIN_WIDTH }).replaceAll(/\n\s+/g, '')
+    assert.ok(rendered.includes(UNBREAKABLE), 'the broken title does not reassemble')
+  })
+})
 
 const SNAPSHOT = path.join(path.dirname(fileURLToPath(import.meta.url)), 'human.snapshot.txt')
 
