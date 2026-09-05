@@ -14,6 +14,7 @@ import { humanRenderer, isolated } from '../../src/adapters/render/human.ts'
 import { jsonRenderer } from '../../src/adapters/render/json.ts'
 import { RENDERINGS, type Renderer } from '../../src/adapters/render/index.ts'
 import { displayWidth } from '../../src/adapters/render/width.ts'
+import { SHAPES, shapeFor } from '../../src/application/shapes.ts'
 import { goldenResults } from '../helpers/cli-fixtures.ts'
 import { RecordingRenderer } from './recorder.ts'
 import { keyValueRenderer } from './third-party.ts'
@@ -224,5 +225,45 @@ describe('right-to-left content is confined to its own field in the human render
     const rendered = humanRenderer.render(errorResult, { width: 80 })
     assert.ok(rendered.includes(`\u2068${RTL}\u2069`), 'the error-path field is not isolated')
     assert.equal(rendered.includes('\u2068treadle explain history'), false, 'a fix line was isolated too')
+  })
+})
+
+// The projection order the three renderings share. `agent` and `human` walk the shape,
+// `json` walks the object's own key order, so an order the two disagree on is a fact that
+// moves between renderings. Both halves are asserted, because a shape whose scalars come
+// first is still projected wrong by a service that inserts a block ahead of them.
+describe('a scalar is a fact of the result, not a member of the block it follows', () => {
+  let golden: ReadonlyMap<string, ResultObject>
+
+  before(async () => {
+    golden = await goldenResults()
+  })
+
+  it('declares every block after every scalar, list and text property of its shape', () => {
+    for (const shape of SHAPES) {
+      let block: string | undefined
+      for (const property of shape.properties) {
+        if (property.kind === 'block') { block = property.key; continue }
+        assert.equal(block, undefined,
+          `${shape.command} declares ${property.key} after the ${String(block)} block`)
+      }
+    }
+  })
+
+  it('builds every result object in its shape\'s own order, which is what json renders', () => {
+    let checked = 0
+    for (const [name, result] of golden) {
+      const shape = shapeFor(result.schema)
+      assert.ok(shape !== undefined, `no shape for ${result.schema}`)
+      const order = shape.properties.map((property) => property.key)
+      let at = -1
+      for (const key of Object.keys(result.data)) {
+        const index = order.indexOf(key)
+        assert.ok(index > at, `${name}: ${key} is emitted out of ${shape.command}'s declared order`)
+        at = index
+        checked += 1
+      }
+    }
+    assert.ok(checked > 0, 'no result object carried a property at all')
   })
 })

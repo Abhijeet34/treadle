@@ -71,6 +71,60 @@
             "null"
           ]
         },
+        "points": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "done": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "narrowest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -149,60 +203,6 @@
             {
               "name": "sev"
             }
-          ]
-        },
-        "points": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "done": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "none": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "narrowest": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "absent": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "clause": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "store": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "more": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "page": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

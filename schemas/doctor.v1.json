@@ -71,6 +71,12 @@
             "null"
           ]
         },
+        "clean": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "findings": {
           "type": "object",
           "additionalProperties": false,
@@ -133,12 +139,6 @@
               "name": "detail",
               "trust": "data"
             }
-          ]
-        },
-        "clean": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

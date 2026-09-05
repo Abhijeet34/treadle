@@ -3,6 +3,9 @@ status  acme-platform
   store  <store>
   items  24
   points  83
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -13,8 +16,6 @@ states  7 of 7
   in_review    1
   on_hold      1
   ready        6
-
-  findings  0
 
 next  3 of 3
   ID           PTS  SCORE  TITLE
@@ -22,14 +23,14 @@ next  3 of 3
   csv-export   5    42     Export a filtered list to CSV
   gdpr-export  5    42     Export everything we hold on o…
 
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
-
 ### status @ 80
 status  acme-platform
   store  <store>
   items  24
   points  83
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -41,22 +42,20 @@ states  7 of 7
   on_hold      1
   ready        6
 
-  findings  0
-
 next  3 of 3
   ID           PTS  SCORE  TITLE
   flaky-e2e    2    69     Checkout suite fails, one run in five
   csv-export   5    42     Export a filtered list to CSV
   gdpr-export  5    42     Export everything we hold on one account
-
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
 
 ### status @ 200
 status  acme-platform
   store  <store>
   items  24
   points  83
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -68,20 +67,19 @@ states  7 of 7
   on_hold      1
   ready        6
 
-  findings  0
-
 next  3 of 3
   ID           PTS  SCORE  TITLE
   flaky-e2e    2    69     Checkout suite fails, one run in five
   csv-export   5    42     Export a filtered list to CSV
   gdpr-export  5    42     Export everything we hold on one account
 
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
-
 ### backlog @ 60
 backlog  acme-platform
   sort  priority,filed,id
+  points  39
+  done  0
+  more  15
+  page  treadle backlog --cursor queue-drain
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -95,14 +93,13 @@ items  9 of 24
   gdpr-export   story  ready        5    Export everythin…
   stale-cache   bug    draft        2    Profile cache se…
 
+### backlog @ 80
+backlog  acme-platform
+  sort  priority,filed,id
   points  39
   done  0
   more  15
   page  treadle backlog --cursor queue-drain
-
-### backlog @ 80
-backlog  acme-platform
-  sort  priority,filed,id
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -116,14 +113,13 @@ items  9 of 24
   gdpr-export   story  ready        5    Export everything we hold on one acc…
   stale-cache   bug    draft        2    Profile cache serves a deleted avatar
 
+### backlog @ 200
+backlog  acme-platform
+  sort  priority,filed,id
   points  39
   done  0
   more  15
   page  treadle backlog --cursor queue-drain
-
-### backlog @ 200
-backlog  acme-platform
-  sort  priority,filed,id
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -137,42 +133,38 @@ items  9 of 24
   gdpr-export   story  ready        5    Export everything we hold on one account
   stale-cache   bug    draft        2    Profile cache serves a deleted avatar
 
-  points  39
-  done  0
-  more  15
-  page  treadle backlog --cursor queue-drain
-
 ### backlog-empty @ 60
 backlog  acme-platform
   filter  state ready assignee kim
-
-items  0 of 0
-
   none  searched 24 matched 0
   narrowest  assignee kim 2
+
+items  0 of 0
 
 ### backlog-empty @ 80
 backlog  acme-platform
   filter  state ready assignee kim
-
-items  0 of 0
-
   none  searched 24 matched 0
   narrowest  assignee kim 2
+
+items  0 of 0
 
 ### backlog-empty @ 200
 backlog  acme-platform
   filter  state ready assignee kim
-
-items  0 of 0
-
   none  searched 24 matched 0
   narrowest  assignee kim 2
+
+items  0 of 0
 
 ### backlog-absence @ 60
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
+  points  18
+  done  0
+  absent  sso-saml
+  clause  state want ready got in_progress
 
 items  6 of 6
   ID             TYPE   STATE  PTS  TITLE
@@ -183,15 +175,14 @@ items  6 of 6
   dep-bump       chore  ready  1    Move the toolchain to…
   avatar-crop    task   ready  2    Crop an uploaded avat…
 
-  points  18
-  done  0
-  absent  sso-saml
-  clause  state want ready got in_progress
-
 ### backlog-absence @ 80
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
+  points  18
+  done  0
+  absent  sso-saml
+  clause  state want ready got in_progress
 
 items  6 of 6
   ID             TYPE   STATE  PTS  TITLE
@@ -201,16 +192,15 @@ items  6 of 6
   webhook-retry  task   ready  3    Retry a failed webhook three times
   dep-bump       chore  ready  1    Move the toolchain to the current release
   avatar-crop    task   ready  2    Crop an uploaded avatar to a square
-
-  points  18
-  done  0
-  absent  sso-saml
-  clause  state want ready got in_progress
 
 ### backlog-absence @ 200
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
+  points  18
+  done  0
+  absent  sso-saml
+  clause  state want ready got in_progress
 
 items  6 of 6
   ID             TYPE   STATE  PTS  TITLE
@@ -220,11 +210,6 @@ items  6 of 6
   webhook-retry  task   ready  3    Retry a failed webhook three times
   dep-bump       chore  ready  1    Move the toolchain to the current release
   avatar-crop    task   ready  2    Crop an uploaded avatar to a square
-
-  points  18
-  done  0
-  absent  sso-saml
-  clause  state want ready got in_progress
 
 ### show @ 60
 show  acme-platform
@@ -284,6 +269,8 @@ show  acme-platform
 ### next @ 60
 next  acme-platform
   weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  more  3
+  page  treadle next --cursor webhook-retry
 
 next  3 of 6
   ID           PTS  SCORE  PARTS
@@ -294,12 +281,11 @@ next  3 of 6
   gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0
     Export everything we hold on one account
 
-  more  3
-  page  treadle next --cursor webhook-retry
-
 ### next @ 80
 next  acme-platform
   weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  more  3
+  page  treadle next --cursor webhook-retry
 
 next  3 of 6
   ID           PTS  SCORE  PARTS                  TITLE
@@ -307,21 +293,17 @@ next  3 of 6
   csv-export   5    42     p3/a12/d0/s0/m0/u0/v0  Export a filtered list to C…
   gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0   Export everything we hold o…
 
-  more  3
-  page  treadle next --cursor webhook-retry
-
 ### next @ 200
 next  acme-platform
   weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  more  3
+  page  treadle next --cursor webhook-retry
 
 next  3 of 6
   ID           PTS  SCORE  PARTS                  TITLE
   flaky-e2e    2    69     p4/a11/d0/s0/m0/u0/v3  Checkout suite fails, one run in five
   csv-export   5    42     p3/a12/d0/s0/m0/u0/v0  Export a filtered list to CSV
   gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0   Export everything we hold on one account
-
-  more  3
-  page  treadle next --cursor webhook-retry
 
 ### explain @ 60
 explain  acme-platform
@@ -333,6 +315,9 @@ explain  acme-platform
   reason
     fixture
   blocked  no
+  blocks  -
+  by
+    dana
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
@@ -348,10 +333,6 @@ moves  5 of 5
   cancelled  G7
   ready      -
 
-  blocks  -
-  by
-    dana
-
 ### explain @ 80
 explain  acme-platform
   item  sso-saml
@@ -362,6 +343,9 @@ explain  acme-platform
   reason
     fixture
   blocked  no
+  blocks  -
+  by
+    dana
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
@@ -377,10 +361,6 @@ moves  5 of 5
   cancelled  G7
   ready      -
 
-  blocks  -
-  by
-    dana
-
 ### explain @ 200
 explain  acme-platform
   item  sso-saml
@@ -391,6 +371,9 @@ explain  acme-platform
   reason
     fixture
   blocked  no
+  blocks  -
+  by
+    dana
 
 gates  3 of 10
   GATE  RULE  VERDICT  NEED
@@ -405,10 +388,6 @@ moves  5 of 5
   on_hold    -
   cancelled  G7
   ready      -
-
-  blocks  -
-  by
-    dana
 
 ### history @ 60
 history  acme-platform
@@ -460,6 +439,21 @@ help  acme-platform
   about
     Agile work management for a team and its agents,
     over files you commit to git.
+  example  treadle init # create a workspace in .work here,
+    and say what it created
+  example  treadle file story "Refresh the access token on a
+    401" # file a story in draft
+  example  treadle file bug "Checkout fails" --set
+    severity=S2 --set found_in=production --set
+    repro_steps="add to cart, pay" # a bug needs the three
+    fields its type requires at creation
+  example  treadle show auth-refresh --field desc # the
+    description whole, rather than cut at 64 cells
+  example  treadle backlog --state ready # what is ready to
+    pick up
+  example  treadle backlog --state cancelled --resolution
+    duplicate # count what was stopped as a duplicate,
+    without reading any prose
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -479,22 +473,6 @@ commands  15 of 15
   help        read    no        Print the command invento…
   version     read    no        Print the tool version, t…
 
-  example  treadle init # create a workspace in .work here,
-    and say what it created
-  example  treadle file story "Refresh the access token on a
-    401" # file a story in draft
-  example  treadle file bug "Checkout fails" --set
-    severity=S2 --set found_in=production --set
-    repro_steps="add to cart, pay" # a bug needs the three
-    fields its type requires at creation
-  example  treadle show auth-refresh --field desc # the
-    description whole, rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to
-    pick up
-  example  treadle backlog --state cancelled --resolution
-    duplicate # count what was stopped as a duplicate,
-    without reading any prose
-
 ### help @ 80
 help  acme-platform
   topic  treadle
@@ -504,6 +482,18 @@ help  acme-platform
   about
     Agile work management for a team and its agents, over files you commit
     to git.
+  example  treadle init # create a workspace in .work here, and say what it
+    created
+  example  treadle file story "Refresh the access token on a 401" # file a story
+    in draft
+  example  treadle file bug "Checkout fails" --set severity=S2 --set
+    found_in=production --set repro_steps="add to cart, pay" # a bug needs the
+    three fields its type requires at creation
+  example  treadle show auth-refresh --field desc # the description whole,
+    rather than cut at 64 cells
+  example  treadle backlog --state ready # what is ready to pick up
+  example  treadle backlog --state cancelled --resolution duplicate # count what
+    was stopped as a duplicate, without reading any prose
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -523,19 +513,6 @@ commands  15 of 15
   help        read    no        Print the command inventory, or one command's…
   version     read    no        Print the tool version, the store schema vers…
 
-  example  treadle init # create a workspace in .work here, and say what it
-    created
-  example  treadle file story "Refresh the access token on a 401" # file a story
-    in draft
-  example  treadle file bug "Checkout fails" --set severity=S2 --set
-    found_in=production --set repro_steps="add to cart, pay" # a bug needs the
-    three fields its type requires at creation
-  example  treadle show auth-refresh --field desc # the description whole,
-    rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to pick up
-  example  treadle backlog --state cancelled --resolution duplicate # count what
-    was stopped as a duplicate, without reading any prose
-
 ### help @ 200
 help  acme-platform
   topic  treadle
@@ -544,6 +521,12 @@ help  acme-platform
   usage  treadle help <command>
   about
     Agile work management for a team and its agents, over files you commit to git.
+  example  treadle init # create a workspace in .work here, and say what it created
+  example  treadle file story "Refresh the access token on a 401" # file a story in draft
+  example  treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay" # a bug needs the three fields its type requires at creation
+  example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
+  example  treadle backlog --state ready # what is ready to pick up
+  example  treadle backlog --state cancelled --resolution duplicate # count what was stopped as a duplicate, without reading any prose
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -563,13 +546,6 @@ commands  15 of 15
   help        read    no        Print the command inventory, or one command's contract, flags and examples.
   version     read    no        Print the tool version, the store schema version and the agent contract version.
 
-  example  treadle init # create a workspace in .work here, and say what it created
-  example  treadle file story "Refresh the access token on a 401" # file a story in draft
-  example  treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay" # a bug needs the three fields its type requires at creation
-  example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to pick up
-  example  treadle backlog --state cancelled --resolution duplicate # count what was stopped as a duplicate, without reading any prose
-
 ### help-command @ 60
 help  acme-platform
   topic  transition
@@ -585,6 +561,21 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on
     that edge evaluated.
+  example  treadle transition sso-saml in_progress # start
+    work; refused if a guard on that edge fails
+  example  treadle transition sso-saml cancelled
+    --resolution rejected --reason "the reviewer refused it
+    outright" # stop the item and say which of the five
+    reasons it stopped for
+  example  treadle transition sso-saml ready --outcome
+    failed --reason "the migration will not apply" # give up
+    the attempt and put the item back in the queue, with the
+    failure in the log
+  example  treadle transition sso-saml in_progress --dry-run
+    # the field diff and the exit status the real run would
+    return
+  example  treadle transition sso-saml in_progress --preview
+    # which store and which guards, evaluating none of them
 
 flags  16 of 16
   FLAG               VERDICT  NOTE
@@ -605,22 +596,6 @@ flags  16 of 16
   --limit            X        refused: ignoring it would …
   --explain-absence  X        refused: ignoring it would …
 
-  example  treadle transition sso-saml in_progress # start
-    work; refused if a guard on that edge fails
-  example  treadle transition sso-saml cancelled
-    --resolution rejected --reason "the reviewer refused it
-    outright" # stop the item and say which of the five
-    reasons it stopped for
-  example  treadle transition sso-saml ready --outcome
-    failed --reason "the migration will not apply" # give up
-    the attempt and put the item back in the queue, with the
-    failure in the log
-  example  treadle transition sso-saml in_progress --dry-run
-    # the field diff and the exit status the real run would
-    return
-  example  treadle transition sso-saml in_progress --preview
-    # which store and which guards, evaluating none of them
-
 ### help-command @ 80
 help  acme-platform
   topic  transition
@@ -633,6 +608,18 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on that edge
     evaluated.
+  example  treadle transition sso-saml in_progress # start work; refused if a
+    guard on that edge fails
+  example  treadle transition sso-saml cancelled --resolution rejected --reason
+    "the reviewer refused it outright" # stop the item and say which of the five
+    reasons it stopped for
+  example  treadle transition sso-saml ready --outcome failed --reason "the
+    migration will not apply" # give up the attempt and put the item back in the
+    queue, with the failure in the log
+  example  treadle transition sso-saml in_progress --dry-run # the field diff
+    and the exit status the real run would return
+  example  treadle transition sso-saml in_progress --preview # which store and
+    which guards, evaluating none of them
 
 flags  16 of 16
   FLAG               VERDICT  NOTE
@@ -653,19 +640,6 @@ flags  16 of 16
   --limit            X        refused: ignoring it would answer a question th…
   --explain-absence  X        refused: ignoring it would answer a question th…
 
-  example  treadle transition sso-saml in_progress # start work; refused if a
-    guard on that edge fails
-  example  treadle transition sso-saml cancelled --resolution rejected --reason
-    "the reviewer refused it outright" # stop the item and say which of the five
-    reasons it stopped for
-  example  treadle transition sso-saml ready --outcome failed --reason "the
-    migration will not apply" # give up the attempt and put the item back in the
-    queue, with the failure in the log
-  example  treadle transition sso-saml in_progress --dry-run # the field diff
-    and the exit status the real run would return
-  example  treadle transition sso-saml in_progress --preview # which store and
-    which guards, evaluating none of them
-
 ### help-command @ 200
 help  acme-platform
   topic  transition
@@ -676,6 +650,11 @@ help  acme-platform
   usage  treadle transition <id> <target> --override <guard> --reason <text>
   about
     Move one item to a target state, with every guard on that edge evaluated.
+  example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
+  example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
+  example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
+  example  treadle transition sso-saml in_progress --preview # which store and which guards, evaluating none of them
 
 flags  16 of 16
   FLAG               VERDICT  NOTE
@@ -695,12 +674,6 @@ flags  16 of 16
   --fields           X        refused: ignoring it would answer a question the caller did not ask
   --limit            X        refused: ignoring it would answer a question the caller did not ask
   --explain-absence  X        refused: ignoring it would answer a question the caller did not ask
-
-  example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
-  example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
-  example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
-  example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
-  example  treadle transition sso-saml in_progress --preview # which store and which guards, evaluating none of them
 
 ### not-found @ 60
 sso-saml-typo is in no record here; this workspace holds 24
@@ -926,6 +899,10 @@ status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  overdue  1
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -936,9 +913,6 @@ states  7 of 7
   in_review    1
   on_hold      1
   ready        5
-
-  findings  0
-  overdue  1
 
 health  1 of 1
   RULE  ITEM        SAW
@@ -950,14 +924,15 @@ next  3 of 3
   gdpr-export    5    42     Export everything we hold on…
   webhook-retry  3    33     Retry a failed webhook three…
 
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
-
 ### status-overdue @ 80
 status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  overdue  1
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -969,9 +944,6 @@ states  7 of 7
   on_hold      1
   ready        5
 
-  findings  0
-  overdue  1
-
 health  1 of 1
   RULE  ITEM        SAW
   H17   key-rotate  2026-08-28T09:00:00Z
@@ -981,15 +953,16 @@ next  3 of 3
   flaky-e2e      2    69     Checkout suite fails, one run in five
   gdpr-export    5    42     Export everything we hold on one account
   webhook-retry  3    33     Retry a failed webhook three times
-
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
 
 ### status-overdue @ 200
 status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  overdue  1
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -1000,9 +973,6 @@ states  7 of 7
   in_review    1
   on_hold      1
   ready        5
-
-  findings  0
-  overdue  1
 
 health  1 of 1
   RULE  ITEM        SAW
@@ -1014,14 +984,14 @@ next  3 of 3
   gdpr-export    5    42     Export everything we hold on one account
   webhook-retry  3    33     Retry a failed webhook three times
 
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
-
 ### status-not-yet-overdue @ 60
 status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -1032,8 +1002,6 @@ states  7 of 7
   in_review    1
   on_hold      1
   ready        5
-
-  findings  0
 
 next  3 of 3
   ID             PTS  SCORE  TITLE
@@ -1041,14 +1009,14 @@ next  3 of 3
   gdpr-export    5    40     Export everything we hold on…
   webhook-retry  3    30     Retry a failed webhook three…
 
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
-
 ### status-not-yet-overdue @ 80
 status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -1060,22 +1028,20 @@ states  7 of 7
   on_hold      1
   ready        5
 
-  findings  0
-
 next  3 of 3
   ID             PTS  SCORE  TITLE
   flaky-e2e      2    61     Checkout suite fails, one run in five
   gdpr-export    5    40     Export everything we hold on one account
   webhook-retry  3    30     Retry a failed webhook three times
-
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
 
 ### status-not-yet-overdue @ 200
 status  acme-platform
   store  <store>
   items  26
   points  84
+  findings  0
+  absent_features  sprint board impediment relation
+  defects  S1 1 S2 1 S3 1
 
 states  7 of 7
   STATE        N
@@ -1087,16 +1053,11 @@ states  7 of 7
   on_hold      1
   ready        5
 
-  findings  0
-
 next  3 of 3
   ID             PTS  SCORE  TITLE
   flaky-e2e      2    61     Checkout suite fails, one run in five
   gdpr-export    5    40     Export everything we hold on one account
   webhook-retry  3    30     Retry a failed webhook three times
-
-  absent_features  sprint board impediment relation
-  defects  S1 1 S2 1 S3 1
 
 ### set @ 60
 set  acme-platform  1 changed  txn t0904

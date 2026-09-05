@@ -174,7 +174,11 @@ describe('streams and renderings, end to end', () => {
     const cursor = /^page treadle next --cursor (\S+)$/m.exec(first.out)?.[1] as string
     const second = await runCli(['next', '--limit', '2', '--cursor', cursor], { cwd })
     assert.match(second.out, new RegExp(`^${cursor} `, 'm'))
-    const firstRow = first.out.split('\n')[4] as string
+    // The first row is the line after the column header, found rather than counted: the
+    // scalars above the block are the page cursor's own, and how many there are is the
+    // projection's business.
+    const lines = first.out.split('\n')
+    const firstRow = lines[lines.findIndex((line) => line.startsWith('#')) + 1] as string
     assert.equal(second.out.includes(firstRow), false, `the second page repeats the first row: ${firstRow}`)
   })
 

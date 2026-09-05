@@ -77,6 +77,30 @@
             "null"
           ]
         },
+        "findings": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "overdue": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "absent_features": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defects": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "states": {
           "type": "object",
           "additionalProperties": false,
@@ -132,18 +156,6 @@
             {
               "name": "n"
             }
-          ]
-        },
-        "findings": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "overdue": {
-          "type": [
-            "integer",
-            "null"
           ]
         },
         "health": {
@@ -268,18 +280,6 @@
               "name": "title",
               "trust": "data"
             }
-          ]
-        },
-        "absent_features": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "defects": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

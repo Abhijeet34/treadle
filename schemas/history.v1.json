@@ -71,6 +71,24 @@
             "null"
           ]
         },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "events": {
           "type": "object",
           "additionalProperties": false,
@@ -136,24 +154,6 @@
               "name": "by",
               "trust": "data"
             }
-          ]
-        },
-        "none": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "more": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "page": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

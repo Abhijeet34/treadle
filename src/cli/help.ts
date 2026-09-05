@@ -63,8 +63,8 @@ export function topLevelHelp(workspace: string): ResultObject {
         'treadle help <command>',
       ],
       about: 'Agile work management for a team and its agents, over files you commit to git.',
-      commands,
       example: COMMANDS.flatMap(examplesOf).slice(0, 6),
+      commands,
     },
   })
 }
@@ -88,8 +88,8 @@ export function commandHelp(name: string, workspace: string): ResultObject | und
       effect: command.effect,
       usage: command.usage,
       about: command.shape.summary,
-      flags,
       example: examplesOf(command),
+      flags,
     },
   })
 }
