@@ -49,7 +49,8 @@ Measured on the sibling repository this pipeline is modelled on: `GET /git/refs/
 
 So a person creates the tag with `git tag -s` and pushes it, and that push is what fires the release.
 `scripts/release-preflight.ts` refuses a tag that is lightweight, unsigned, not `v<semver>`, naming a version the tree does not declare, or pointing at a commit that never reached `main`.
-`.github/rulesets/tags.json` refuses the same shapes at the forge and refuses to update or delete a `v*` tag afterwards.
+`.github/rulesets/tags.json` requires the signature at the forge and refuses to update or delete a `v*` tag afterwards.
+It does not check the tag's name; see docs/RELEASING.md, "Why the tag ruleset does not check the tag name", for the measurement.
 
 ### Publication is built and cannot fire
 
