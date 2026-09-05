@@ -18,9 +18,13 @@ import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../applicati
 import { DIR_MODE } from './atomic.ts'
 import { eventFrom, eventRest } from './event-log.ts'
 
-/** What one record file's re-index leaves the caller to act on: the cross-shard duplicates it refused. */
-export type RecordFileOutcome = {
+/**
+ * What one file's re-index leaves the caller to act on: the cross-file duplicates it refused,
+ * and whether another file's fingerprint was dropped because it clashed against this one.
+ */
+export type ReindexOutcome = {
   readonly clashes: readonly Finding[]
+  readonly invalidated: boolean
 }
 
 export type Fingerprint = {
@@ -69,9 +73,14 @@ create table if not exists events (
   actor text not null, txn text not null, file text not null, rest text not null);
 create index if not exists events_file on events(file);
 create index if not exists events_entity on events(entity, at);
+-- \`against\` names the file whose copy won when this finding is a duplicate-id clash. A
+-- clash is the one finding whose truth depends on another file, so when that file changes
+-- or goes, the fingerprint of the file carrying the clash is dropped and it is re-read.
+-- Without it a removed duplicate shard left the S3 on the surviving shard for good.
 create table if not exists findings (
-  file text not null, line integer not null, rule text not null, reason text not null, id text);
+  file text not null, line integer not null, rule text not null, reason text not null, id text, against text);
 create index if not exists findings_file on findings(file);
+create index if not exists findings_against on findings(against);
 `
 
 /** Created before the version check, because the version is read out of it. */
@@ -82,7 +91,7 @@ const META_SCHEMA = 'create table if not exists meta (key text primary key, valu
  * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
  * that cannot leave a half-migrated table behind.
  */
-const INDEX_FORMAT = '2'
+const INDEX_FORMAT = '3'
 const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
@@ -255,9 +264,9 @@ export class IndexCache {
     fingerprint: Fingerprint,
     items: readonly IndexedItem[],
     findings: readonly Finding[],
-  ): RecordFileOutcome {
+  ): ReindexOutcome {
     const db = this.#open()
-    const clashes: Finding[] = []
+    const clashes: { finding: Finding; against: string }[] = []
     const moved: string[] = []
     let changed = false
     db.exec('begin immediate')
@@ -282,6 +291,7 @@ export class IndexCache {
       const insert = db.prepare(`insert into items
         (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, source)
         values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      const holder = db.prepare('select file from items where id = ?')
       for (const item of items) {
         const was = previous.get(item.id)
         if (was !== undefined && was.line === item.line && was.source === item.source) continue
@@ -299,20 +309,46 @@ export class IndexCache {
           // raises is what `duplicateRefusal` reads, and what stops a write resolving a
           // cross-shard duplicate by taking whichever copy this insert happened to keep.
           clashes.push({
-            file, line: item.line, rule: 'S3', id: item.id,
-            reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,
+            against: (holder.get(item.id) as unknown as { file: string } | undefined)?.file ?? file,
+            finding: {
+              file, line: item.line, rule: 'S3', id: item.id,
+              reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,
+            },
           })
         }
       }
-      this.#insertFindings([...findings, ...clashes])
+      this.#insertFindings(findings)
+      this.#insertClashes(clashes)
       this.#setFingerprint(file, fingerprint)
       if (changed) this.#mergeHierarchyDirty(db, moved)
+      const invalidated = changed && this.#invalidateAgainst(file)
       db.exec('commit')
+      return { clashes: clashes.map((clash) => clash.finding), invalidated }
     } catch (error) {
       db.exec('rollback')
       throw error
     }
-    return { clashes }
+  }
+
+  /**
+   * Drops the fingerprint of every other file carrying a clash against `file`, so the next
+   * refresh pass re-reads it and re-decides the clash against what `file` now holds.
+   */
+  #invalidateAgainst(file: string): boolean {
+    const dropped = this.#open()
+      .prepare('delete from files where path in (select file from findings where against = ? and file != ?)')
+      .run(file, file)
+    return Number(dropped.changes) > 0
+  }
+
+  #insertClashes(clashes: readonly { finding: Finding; against: string }[]): void {
+    if (clashes.length === 0) return
+    const insert = this.#open().prepare(
+      'insert into findings (file, line, rule, reason, id, against) values (?, ?, ?, ?, ?, ?)',
+    )
+    for (const { finding, against } of clashes) {
+      insert.run(finding.file, finding.line, finding.rule, finding.reason, finding.id ?? null, against)
+    }
   }
 
   /** Folds this file's row change into the durable dirty marker, inside the caller's transaction. */
@@ -345,9 +381,9 @@ export class IndexCache {
     lines: readonly number[],
     findings: readonly Finding[],
     append: boolean,
-  ): void {
+  ): ReindexOutcome {
     const db = this.#open()
-    const clashes: Finding[] = []
+    const clashes: { finding: Finding; against: string }[] = []
     db.exec('begin immediate')
     try {
       if (!append) this.#dropRows(file)
@@ -365,28 +401,36 @@ export class IndexCache {
           // in every read while `doctor` reported the store clean.
           const first = (holder.get(event.id) as unknown as { file: string } | undefined)?.file ?? file
           clashes.push({
-            file, line: lines[i] as number, rule: 'S14',
-            reason: `event ${event.id} at ${file} line ${lines[i]} repeats an id ${first} already carries; this copy is not served`,
+            against: first,
+            finding: {
+              file, line: lines[i] as number, rule: 'S14', id: event.id,
+              reason: `event ${event.id} at ${file} line ${lines[i]} repeats an id ${first} already carries; this copy is not served`,
+            },
           })
         }
       })
-      this.#insertFindings([...findings, ...clashes])
+      this.#insertFindings(findings)
+      this.#insertClashes(clashes)
       this.#setFingerprint(file, fingerprint)
+      const invalidated = !append && this.#invalidateAgainst(file)
       db.exec('commit')
+      return { clashes: clashes.map((clash) => clash.finding), invalidated }
     } catch (error) {
       db.exec('rollback')
       throw error
     }
   }
 
-  dropFile(file: string): void {
+  dropFile(file: string): boolean {
     const db = this.#open()
     db.exec('begin immediate')
     try {
       this.#dropRows(file)
       db.prepare('delete from files where path = ?').run(file)
       this.#forgetHierarchyVerdict()
+      const invalidated = this.#invalidateAgainst(file)
       db.exec('commit')
+      return invalidated
     } catch (error) {
       db.exec('rollback')
       throw error

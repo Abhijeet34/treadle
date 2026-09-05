@@ -8,12 +8,12 @@
 // and a blank line moved every line number an append re-index reported.
 
 import assert from 'node:assert/strict'
-import { appendFile, mkdir, writeFile } from 'node:fs/promises'
+import { appendFile, copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
 import { parseEventLine } from '../../src/adapters/store/index.ts'
-import { aWorkspace } from '../helpers/store-fixtures.ts'
+import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 function line(id: string, at: string, extra: Record<string, unknown> = {}): string {
   return `${JSON.stringify({
@@ -102,6 +102,53 @@ describe('a finding on an appended line names the line the file has', () => {
       const bad = findings.value.find((finding) => finding.rule === 'S1')
       assert.ok(bad !== undefined, `no S1 among ${JSON.stringify(findings.value)}`)
       assert.equal(bad.line, 4)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+describe('a clash finding goes with the file it clashed against', () => {
+  it('serves the surviving event file again once the other copy is removed', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const events = path.join(workspace.root, 'events')
+      await mkdir(events, { recursive: true })
+      await writeFile(path.join(events, '2026-08.jsonl'), line('dup', '2026-08-05T10:00:00Z', { actor: 'mallory' }))
+      await writeFile(path.join(events, '2026-09.jsonl'), line('dup', '2026-09-01T10:00:00Z'))
+      const clashed = await workspace.store.findings()
+      assert.ok(clashed.ok && clashed.value.some((finding) => finding.rule === 'S14'))
+
+      await rm(path.join(events, '2026-08.jsonl'))
+      const findings = await workspace.store.findings()
+      assert.ok(findings.ok)
+      assert.deepEqual(findings.value.filter((finding) => finding.rule === 'S14'), [], 'the S14 outlived the file it clashed against')
+      const served = await workspace.store.events()
+      assert.ok(served.ok)
+      assert.equal(served.value.length, 1)
+      assert.equal(served.value[0]?.actor, 'a')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('serves the surviving shard again once a duplicate shard is removed, which the S3 did not before', async () => {
+    const workspace = await aWorkspace()
+    try {
+      await workspace.store.apply({ txn: 't0', writes: [{ item: anItem() }], events: [] })
+      const items = path.join(workspace.root, 'items')
+      const [shard] = (await readdir(items)).filter((name) => name.endsWith('.md'))
+      await copyFile(path.join(items, shard as string), path.join(items, '2026-01.md'))
+      const clashed = await workspace.store.findings()
+      assert.ok(clashed.ok && clashed.value.some((finding) => finding.rule === 'S3'))
+
+      await rm(path.join(items, '2026-01.md'))
+      const findings = await workspace.store.findings()
+      assert.ok(findings.ok)
+      assert.deepEqual(findings.value.filter((finding) => finding.rule === 'S3'), [], 'the S3 outlived the duplicate shard')
+      const served = await workspace.store.list()
+      assert.ok(served.ok)
+      assert.equal(served.value.length, 1)
     } finally {
       await workspace.dispose()
     }

@@ -331,9 +331,26 @@ export class ShardedStore implements Store {
     }
   }
 
+  /**
+   * A pass re-reads every file whose fingerprint moved. A duplicate-id clash is the one
+   * finding whose truth depends on a second file, so a pass that changed or dropped a file
+   * other clashes name drops those files' fingerprints, and one more pass re-decides them.
+   * Two files clashing both ways settle on the second pass; the bound is a guard, not a budget.
+   */
   async #refreshIndex(keepParses: boolean): Promise<StoreResult<undefined>> {
+    for (let pass = 0; pass < 3; pass += 1) {
+      const again = await this.#refreshPass(keepParses)
+      if (!again.ok) return again
+      if (!again.value) break
+    }
+    this.#cycleFindings = this.#hierarchyFindings()
+    return storeOk(undefined)
+  }
+
+  async #refreshPass(keepParses: boolean): Promise<StoreResult<boolean>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
+    let invalidated = false
     this.#parsedUnderLock.clear()
 
     for (const file of await this.#storeFiles()) {
@@ -353,12 +370,11 @@ export class ShardedStore implements Store {
         ? await this.#indexEventFile(file, full, info.size, info.mtimeMs, previous)
         : await this.#indexRecordFile(file, full, info.size, info.mtimeMs, keepParses)
       if (!outcome.ok) return outcome
+      invalidated ||= outcome.value
     }
 
-    for (const file of known.keys()) if (!seen.has(file)) this.#index.dropFile(file)
-
-    this.#cycleFindings = this.#hierarchyFindings()
-    return storeOk(undefined)
+    for (const file of known.keys()) if (!seen.has(file)) invalidated ||= this.#index.dropFile(file)
+    return storeOk(invalidated)
   }
 
   /**
@@ -403,30 +419,27 @@ export class ShardedStore implements Store {
 
   async #indexRecordFile(
     file: string, full: string, size: number, mtime: number, keepParse = false,
-  ): Promise<StoreResult<undefined>> {
+  ): Promise<StoreResult<boolean>> {
     // The ceiling is checked against the size the stat already gave us, before the file is
     // read: a limit that only fires after the read has happened is not a limit (F8).
     if (size > MAX_FILE_BYTES) {
-      this.#replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
+      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
         file, line: 1, rule: 'S4',
         reason: `${file} is ${size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
-      }])
-      return storeOk(undefined)
+      }]))
     }
     const text = await readFile(full, 'utf8')
     const parsed = parseFile(text, file)
     if (!parsed.ok) {
-      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: parsed.error.rule, reason: parsed.error.message },
-      ])
-      return storeOk(undefined)
+      ]))
     }
     const schema = this.#schemaRefusal(parsed.value, file)
     if (schema !== undefined) {
-      this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
+      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
         { file, line: 1, rule: schema.rule, reason: schema.message },
-      ])
-      return storeOk(undefined)
+      ]))
     }
 
     const items: IndexedItem[] = []
@@ -447,26 +460,25 @@ export class ShardedStore implements Store {
     if (parsed.value.crlf) {
       findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
     }
-    this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
+    const invalidated = this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
     if (keepParse) this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
-    return storeOk(undefined)
+    return storeOk(invalidated)
   }
 
   #replaceRecordFile(
     file: string, fingerprint: Fingerprint, items: readonly IndexedItem[], findings: readonly Finding[],
-  ): void {
-    this.#index.replaceRecordFile(file, fingerprint, items, findings)
+  ): boolean {
+    return this.#index.replaceRecordFile(file, fingerprint, items, findings).invalidated
   }
 
   async #indexEventFile(
     file: string, full: string, size: number, mtime: number, previous: Fingerprint | undefined,
-  ): Promise<StoreResult<undefined>> {
+  ): Promise<StoreResult<boolean>> {
     if (size > MAX_EVENT_FILE_BYTES) {
-      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [{
+      return storeOk(this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [{
         file, line: 1, rule: 'S6',
         reason: `${file} is ${size} bytes, over the ${MAX_EVENT_FILE_BYTES} byte ceiling for an event file; it is not served`,
-      }], false)
-      return storeOk(undefined)
+      }], false).invalidated)
     }
     const grew = previous !== undefined && size > previous.size
     const appendOnly = grew && await this.#prefixUnchanged(full, previous)
@@ -475,18 +487,16 @@ export class ShardedStore implements Store {
     const fromLine = appendOnly ? (previous as Fingerprint).lines : 0
     const read = await scanEventFile(full, file, from, fromLine)
     if (!read.ok) {
-      this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [
+      return storeOk(this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [
         { file, line: 1, rule: read.error.rule, reason: read.error.message },
-      ], false)
-      return storeOk(undefined)
+      ], false).invalidated)
     }
     const whole = await readFile(full)
-    this.#index.replaceEventFile(
+    return storeOk(this.#index.replaceEventFile(
       file,
       { size, mtime, hash: hashOf(whole), lines: read.value.lines },
       read.value.events, read.value.at, read.value.findings, appendOnly,
-    )
-    return storeOk(undefined)
+    ).invalidated)
   }
 
   async #prefixUnchanged(full: string, previous: Fingerprint): Promise<boolean> {
