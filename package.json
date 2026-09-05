@@ -56,8 +56,7 @@
     "bench": "node bench/main.ts",
     "bench:gate": "node bench/main.ts --gate",
     "audit": "npm audit --audit-level=low",
-    "licences": "node scripts/check-licences.ts",
-    "supply-chain": "node scripts/check-supply-chain.ts"
+    "licences": "node scripts/check-licences.ts"
   },
   "devDependencies": {
     "@anthropic-ai/tokenizer": "0.0.4",

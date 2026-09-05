@@ -221,7 +221,7 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
 
   rows.push(absolute(budgets, 'runtimeDependencies', 'runtime dependencies', report.packageFacts.runtimeDependencies, 'packages'))
   rows.push(absolute(budgets, 'installUnpackedBytes', 'install size, unpacked', report.packageFacts.unpackedBytes, 'bytes',
-    'the `files` list has no dist/ yet, so this weighs the metadata only'))
+    'the packed tarball: the bundle, the schemas and the three licence files'))
   rows.push(absolute(budgets, 'bundleBytes', 'bundle', report.packageFacts.bundleBytes, 'bytes'))
 
   const a1 = report.axes.find((a) => a.axis === 'A1')
