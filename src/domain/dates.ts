@@ -32,11 +32,15 @@ export function daysOverdue(item: WorkItem, now: Instant): number {
   return Math.max(0, Math.min(MAX_OVERDUE_DAYS, days))
 }
 
-/** One workspace-health finding: a rule id, the record it names and what was observed. */
+/**
+ * One workspace-health finding: a rule id, the record it names and the value it saw. The
+ * rule id says what the condition is, as every rule id in this tool does, so the third
+ * column carries the observed value rather than a sentence restating the id.
+ */
 export type HealthFinding = {
   readonly rule: string
   readonly id: ItemId
-  readonly reason: string
+  readonly observed: string
 }
 
 /**
@@ -48,10 +52,6 @@ export type HealthFinding = {
 export function healthFindings(items: readonly WorkItem[], now: Instant): readonly HealthFinding[] {
   return items
     .filter((item) => isOverdue(item, now) && item.assignee === undefined)
-    .map((item): HealthFinding => ({
-      rule: 'H17',
-      id: item.id,
-      reason: `due ${String(item.due)} and assigned to nobody`,
-    }))
+    .map((item): HealthFinding => ({ rule: 'H17', id: item.id, observed: String(item.due) }))
     .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
 }

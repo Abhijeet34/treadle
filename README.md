@@ -34,8 +34,8 @@ npm ci
 ```
 
 What a published install would carry is one file of executable code.
-`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 18 files, 58.5 kB packed and 242.8 kB unpacked.
-The bundle is 180,105 bytes against DR1's 500 KB budget, and the build fails rather than warns if it goes over.
+`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 18 files, 60.2 kB packed and 250.7 kB unpacked.
+The bundle is 186,164 bytes against DR1's 500 KB budget, and the build fails rather than warns if it goes over.
 
 ## Quick start
 
@@ -101,7 +101,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `set`, `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `history`, `doctor`, `config` | Specified, not implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, hooks, completions | Specified, not implemented |
-| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 180,105 bytes |
+| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 186,164 bytes |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 

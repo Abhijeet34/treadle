@@ -127,7 +127,7 @@ describe('a due date is a thing three reads act on', () => {
     const before = await status(demo.store, CLOCK)
     assert.equal(before.data['overdue'], 1)
     const health = before.data['health'] as Block
-    assert.deepEqual(health.rows, [{ rule: 'H17', item: 'key-rotate', saw: 'due 2026-09-02T09:00:00Z and assigned to nobody' }])
+    assert.deepEqual(health.rows, [{ rule: 'H17', item: 'key-rotate', saw: '2026-09-02T09:00:00Z' }])
   })
 
   it('says nothing at all when no date has passed, which is the common read', async () => {

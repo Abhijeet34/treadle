@@ -111,7 +111,7 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'scalar', key: 'findings', type: 'integer' },
     { kind: 'scalar', key: 'overdue', type: 'integer' },
-    { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw', text: true }] },
+    { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
     {
       kind: 'block',
       key: 'next',
@@ -337,7 +337,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
           columns: columnsOf(STATUS_SHAPE, 'health'),
           shown: health.length,
           total: health.length,
-          rows: health.map((finding): Row => ({ rule: finding.rule, item: finding.id, saw: finding.reason })),
+          rows: health.map((finding): Row => ({ rule: finding.rule, item: finding.id, saw: finding.observed })),
         },
       }),
       next: {

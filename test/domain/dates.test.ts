@@ -56,7 +56,7 @@ describe('H17, the finding that stops a due date from being decoration', () => {
     assert.equal(found.length, 1)
     assert.equal(found[0]?.rule, 'H17')
     assert.equal(found[0]?.id, 'queue-drain')
-    assert.match(String(found[0]?.reason), /2026-09-01T09:00:00Z/)
+    assert.equal(found[0]?.observed, '2026-09-01T09:00:00Z')
   })
 
   it('says nothing about an overdue item somebody owns, or an owned item that is on time', () => {

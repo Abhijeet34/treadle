@@ -15,6 +15,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0007](0007-proving-the-properties.md) | The properties are proven with the runtime's own tools, and the dependency budget does not move |
 | [ADR-0008](0008-the-measurement-rig.md) | The measurement rig: corpora written through the store, cold-process timing, and a gate that reads the median |
 | [ADR-0009](0009-release-and-supply-chain.md) | One esbuild bundle as the published product, a signed annotated tag as the release authorisation, and the supply-chain controls around both |
+| [ADR-0010](0010-terminal-outcomes-dates-and-reviewability.md) | A resolution and an attempt outcome instead of four new states, one due date with three reads that act on it, and two reviewability controls |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -41,7 +42,9 @@ The set is closed.
 | `S12` | The stored hierarchy closes a cycle |
 | `S13` | A store file could not be created, read or written, and the filesystem said why |
 
-`H16` is the one finding id borrowed from the design's doctor namespace rather than this one, because DR3 rule 6 already named it: a file that arrived with CRLF line endings.
+`H16` and `H17` are the two finding ids borrowed from the design's doctor namespace rather than this one.
+DR3 rule 6 already named `H16`, a file that arrived with CRLF line endings.
+`H17` is an overdue item assigned to nobody, which ADR-0010 puts on `status` until `doctor` lands.
 
 ## The CLI's rule ids
 
