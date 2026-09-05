@@ -110,6 +110,38 @@ export function parseEventLine(line: string, file: string, at: number): StoreRes
   return storeOk(event as unknown as StoreEvent)
 }
 
+/** The event keys the index carries as columns; the rest of the line is stored beside them. */
+export const EVENT_COLUMN_KEYS = ['id', 'at', 'entity', 'op', 'actor', 'txn'] as const
+
+/**
+ * The half of an event the index does not hold in a column, as JSON.
+ *
+ * Storing the whole line beside columns that already carry six of its keys made the events
+ * table 139.9 MiB of a 227.6 MiB index at 500,000 events, of which 44.8 MiB was a second
+ * copy of the columns. An event that carries a key this file does not name keeps it here, so
+ * the round trip is total rather than only total for the shapes DR3 lists.
+ */
+export function eventRest(event: StoreEvent): string {
+  const rest = Object.create(null) as Record<string, unknown>
+  for (const [key, value] of Object.entries(event)) {
+    if ((EVENT_COLUMN_KEYS as readonly string[]).includes(key)) continue
+    if (value !== undefined) rest[key] = value
+  }
+  return JSON.stringify(rest)
+}
+
+/** The inverse, in the key order `renderEvent` writes rather than in the order it was read. */
+export function eventFrom(columns: Readonly<Record<string, string>>, rest: string): StoreEvent {
+  const parsed = JSON.parse(rest) as Record<string, unknown>
+  const out = Object.create(null) as Record<string, unknown>
+  for (const key of EVENT_KEYS) {
+    const value = (EVENT_COLUMN_KEYS as readonly string[]).includes(key) ? columns[key] : parsed[key]
+    if (value !== undefined) out[key] = value
+  }
+  for (const key of Object.keys(parsed)) if (!(key in out)) out[key] = parsed[key]
+  return out as unknown as StoreEvent
+}
+
 /** The canonical line. Keys in DR3's order, no whitespace, exactly one trailing newline. */
 export function renderEvent(event: StoreEvent): string {
   const ordered = Object.create(null) as Record<string, unknown>

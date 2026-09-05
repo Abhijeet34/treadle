@@ -16,6 +16,7 @@ import path from 'node:path'
 
 import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../application/ports/store.ts'
 import { DIR_MODE } from './atomic.ts'
+import { eventFrom, eventRest } from './event-log.ts'
 
 export type Fingerprint = {
   readonly size: number
@@ -60,13 +61,29 @@ create index if not exists items_state_filed on items(state, filed_at, id);
 create index if not exists items_filed on items(filed_at, id);
 create table if not exists events (
   id text primary key, at text not null, entity text not null, op text not null,
-  actor text not null, txn text not null, file text not null, source text not null);
+  actor text not null, txn text not null, file text not null, rest text not null);
 create index if not exists events_file on events(file);
 create index if not exists events_entity on events(entity, at);
 create table if not exists findings (
   file text not null, line integer not null, rule text not null, reason text not null, id text);
 create index if not exists findings_file on findings(file);
-create table if not exists meta (key text primary key, value text not null);
+`
+
+/** Created before the version check, because the version is read out of it. */
+const META_SCHEMA = 'create table if not exists meta (key text primary key, value text not null);'
+
+/**
+ * The index's own format. A change to a column re-derives every row rather than migrating
+ * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
+ * that cannot leave a half-migrated table behind.
+ */
+const INDEX_FORMAT = '2'
+const FORMAT_KEY = 'index_format'
+const RESET = `
+drop table if exists files;
+drop table if exists items;
+drop table if exists events;
+drop table if exists findings;
 `
 
 /**
@@ -139,7 +156,16 @@ export class IndexCache {
     db.exec('pragma busy_timeout = 5000')
     enterWal(db)
     db.exec('pragma synchronous = normal')
-    db.exec(SCHEMA)
+    db.exec(META_SCHEMA)
+    const format = db.prepare('select value from meta where key = ?').get(FORMAT_KEY) as unknown as { value: string } | undefined
+    if (format?.value !== INDEX_FORMAT) {
+      db.exec(RESET)
+      db.exec('delete from meta')
+      db.exec(SCHEMA)
+      db.prepare('insert into meta (key, value) values (?, ?)').run(FORMAT_KEY, INDEX_FORMAT)
+    } else {
+      db.exec(SCHEMA)
+    }
     this.#db = db
     return db
   }
@@ -236,10 +262,10 @@ export class IndexCache {
     try {
       if (!append) this.#dropRows(file)
       const insert = db.prepare(`insert or ignore into events
-        (id, at, entity, op, actor, txn, file, source) values (?, ?, ?, ?, ?, ?, ?, ?)`)
+        (id, at, entity, op, actor, txn, file, rest) values (?, ?, ?, ?, ?, ?, ?, ?)`)
       for (const event of events) {
         insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
-          JSON.stringify(event))
+          eventRest(event))
       }
       this.#insertFindings(findings)
       this.#setFingerprint(file, fingerprint)
@@ -348,9 +374,9 @@ export class IndexCache {
     const limit = query.limit === undefined ? '' : ' limit ?'
     if (query.limit !== undefined) values.push(query.limit)
     const rows = this.#open()
-      .prepare(`select source from events${clause} order by at, rowid${limit}`)
-      .all(...values) as unknown as readonly { source: string }[]
-    return rows.map((row) => JSON.parse(row.source) as StoreEvent)
+      .prepare(`select id, at, entity, op, actor, txn, rest from events${clause} order by at, rowid${limit}`)
+      .all(...values) as unknown as readonly (Record<string, string> & { rest: string })[]
+    return rows.map((row) => eventFrom(row, row.rest))
   }
 
   /**
@@ -364,9 +390,9 @@ export class IndexCache {
    */
   lastEventFor(entity: string): StoreEvent | undefined {
     const row = this.#open()
-      .prepare('select source from events where entity = ? order by at desc, rowid desc limit 1')
-      .get(entity) as unknown as { source: string } | undefined
-    return row === undefined ? undefined : (JSON.parse(row.source) as StoreEvent)
+      .prepare('select id, at, entity, op, actor, txn, rest from events where entity = ? order by at desc, rowid desc limit 1')
+      .get(entity) as unknown as (Record<string, string> & { rest: string }) | undefined
+    return row === undefined ? undefined : eventFrom(row, row.rest)
   }
 
   findings(): readonly Finding[] {
