@@ -32,6 +32,14 @@ export function random(seed: number): () => number {
   }
 }
 
+/**
+ * A family emoji, whose two U+200D joiners the safe-text class allows only between two
+ * pictographs. Built from its code points rather than written as a literal: no invisible
+ * character is a literal anywhere in this repository, because one is unreadable in a diff
+ * and indistinguishable from a hidden marker. `test/architecture/invisible.test.ts` enforces it.
+ */
+const FAMILY = String.fromCodePoint(0x1f468, 0x200d, 0x1f469, 0x200d, 0x1f467)
+
 export class Gen {
   readonly #next: () => number
 
@@ -69,7 +77,7 @@ export class Gen {
       ...'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789',
       ...' .,;:!?()[]{}<>/\\|@#$%^&*-_=+"\'`~',
       'é', 'ü', 'ß', 'ñ', 'ø', 'ç', 'æ', 'Ω', 'π', 'д', 'ж', '中', '文', '日', '本',
-      '🙂', '🚀', '👨‍👩‍👧', 'حرف', 'עברית',
+      '🙂', '🚀', FAMILY, 'حرف', 'עברית',
     ]
     for (;;) {
       const length = this.int(min, max)

@@ -72,9 +72,11 @@ Its categories are asserted covered, so a generator that quietly stopped generat
 rather than leaving a property green over nothing. Every property suite prints the count it
 actually ran as a `t.diagnostic`.
 
-No invisible code point is ever a literal in this repository, in source or in the fuzzing
-corpus. Build it from its number with `String.fromCodePoint`, or write it as a `\u` escape.
-A literal is unreadable in a diff and the machine-wide provenance scan refuses one on sight.
+No invisible code point is ever a literal in this repository, in source, in a test, in a
+document or in the fuzzing corpus. Build it from its number with `String.fromCodePoint`, or
+write it as a `\u` escape. A literal is unreadable in a diff and is indistinguishable from a
+hidden marker; `test/architecture/invisible.test.ts` enforces this over every tracked text
+file, so it is a test rather than a convention.
 
 Before trusting a new property, run it against a deliberately broken build. The mutation
 harness that did this for the nine properties here lives in the task's scratch directory

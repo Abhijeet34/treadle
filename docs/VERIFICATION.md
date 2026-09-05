@@ -28,6 +28,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 651 tests every run, 31.3 s to 54.9 s each, 882 s in total | Proven |
 | One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
+| No literal invisible code point ships | 169 tracked text files scanned, 0 carrying one; every such character in the suites is built from its number or written as an escape | Proven |
 
 ## What is not proven
 
