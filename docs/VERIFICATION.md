@@ -24,8 +24,8 @@ Counts are per run, and every property suite prints its own count as a test diag
 | Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
 | No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts. 51 source files scanned against 11 network module specifiers: 0 imports | Proven |
-| Coverage meets the gate | 97.11% lines and 88.95% branches overall against a 90/85 gate; all 7 named files at 96.33% lines or better and 96.26% branches or better | Proven |
-| A flake budget of zero | 20 of 20 consecutive full runs completed and green, 651 tests every run, 31.3 s to 54.9 s each, 882 s in total | Proven |
+| Coverage meets the gate | 97.11% lines and 88.99% branches overall against a 90/85 gate; all 7 named files at 96.33% lines or better and 96.26% branches or better | Proven |
+| A flake budget of zero | 20 of 20 consecutive full runs completed and green, 654 tests every run, 25.8 s to 42.5 s each, 692 s in total | Proven |
 | One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
 | No literal invisible code point ships | 169 tracked text files scanned, 0 carrying one; every such character in the suites is built from its number or written as an escape | Proven |
@@ -62,8 +62,8 @@ The overall gate is 90% lines and 85% branches; the named files are held to 95% 
 | `src/adapters/render/grammar.ts` | escaper: the line grammar guards | 100.00 | 100.00 |
 | `src/adapters/workspace.ts` | path resolution: the workspace walk | 100.00 | 100.00 |
 | `src/adapters/target.ts` | path resolution: the store seam target | 100.00 | 100.00 |
-| `src/adapters/store/lock.ts` | lock | 100.00 | 98.00 |
-| all files | | 97.11 | 88.95 |
+| `src/adapters/store/lock.ts` | lock | 100.00 | 100.00 |
+| all files | | 97.11 | 88.99 |
 
 The gate has been seen red: before the tests in this branch, `src/adapters/workspace.ts` sat at 80.17% lines and 65.22% branches and `src/adapters/store/lock.ts` at 88.37% branches, and `npm run coverage` named all three misses with their numbers and exited non-zero.
 Writing those tests is what found the crash below.
@@ -73,8 +73,8 @@ Writing those tests is what found the crash below.
 `npm run flake` runs the whole suite 20 times in a row and reports the count that completed alongside the count that passed.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
-Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, 651 tests in every run, 882 s in total.
-Individual runs ranged from 31.3 s to 54.9 s, which is a 1.75x spread on an otherwise idle machine and is the reason the fuzzer's time bound is generous rather than tight.
+Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, 654 tests in every run, 692 s in total.
+Individual runs ranged from 25.8 s to 42.5 s, which is a 1.65x spread on an otherwise idle machine and is the reason the fuzzer's time bound is generous rather than tight.
 
 One flake was found and fixed during this work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.
 Catastrophic backtracking is an orders-of-magnitude event, so the budget is now 2 s and the real claim is carried by the star-height scan, which is deterministic.
