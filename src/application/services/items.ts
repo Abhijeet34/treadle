@@ -428,6 +428,17 @@ export async function showItem(
   // `desc` off a record and asked for `description` was told the record had no such field.
   const key = shortField(field)
   if (!(key in data)) {
+    // A key a newer version wrote is on the record and is not a field this build has, and the
+    // two are different answers. Saying the record carries no such field is false about the
+    // file, which is the same defect this function already closed for `desc`; the value stays
+    // unprinted for the reason `extra` is a count above.
+    if (item.extra?.has(field) === true || item.extra?.has(key) === true) {
+      return errorResult({
+        code: 'VALIDATION', command: 'show', workspace, effect: 'read', rule: 'C2', entity: item.id,
+        cause: `${item.id} carries ${field} and this build has no field of that name; a newer version wrote it, and it is preserved on the record and counted by extra`,
+        fix: [`treadle show ${item.id}`],
+      })
+    }
     const known = SHOW_SHAPE.properties
       .map((property) => property.key)
       .filter((name) => name !== 'item' && name in data)
