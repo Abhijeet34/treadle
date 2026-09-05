@@ -106,7 +106,7 @@ export async function runA4(
         : `at ${largest?.items} items, startup excluded: read p95 ${readP95.toFixed(1)} ms, create p95 ${createP95.toFixed(1)} ms`,
       operations,
       samples,
-      detail: { note: 'store operations run from TypeScript source under Node type stripping, not the bundle DR1 specifies; see the floors table for the gap' },
+      detail: { note: 'store operations run from TypeScript source under Node type stripping, not the bundle the release path ships; see the floors table for the gap' },
     },
   }
 }

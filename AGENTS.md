@@ -19,10 +19,23 @@ the design that preceded it.
 
 ## Build and test
 
-`npm run check` is the gate: `tsc --noEmit` then `node --test`. There is no build step in
-development. Node runs the TypeScript directly by stripping types, which is why
-`tsconfig.json` sets `erasableSyntaxOnly` and the code uses `const` objects and union types
+`npm run check` is the gate: `tsc --noEmit`, then `node --test`, then `npm run build`. There
+is no build step in development. Node runs the TypeScript directly by stripping types, which is
+why `tsconfig.json` sets `erasableSyntaxOnly` and the code uses `const` objects and union types
 rather than enums, and why every relative import carries its `.ts` extension.
+
+Two entry points, and only one of them ships. `bin/treadle.js` is a one-line shim over
+`src/cli/entry.ts` and runs from source, which is what the README and the process-spawning
+tests use. `npm run build` bundles that same entry file to `dist/treadle.js` with esbuild, and
+that bundle is what `bin` points at and `files` ships: no source reaches the tarball. Change
+the entry file, not one of the two. `docs/architecture/adr/0009-release-and-supply-chain.md`
+carries why, and `docs/RELEASING.md` carries how a release happens and how to roll one back.
+
+Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
+the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release
+also needs a signed annotated `v<semver>` tag that a person pushes, because release-please
+creates lightweight unsigned tags and `scripts/release-preflight.ts` refuses one. Do not tag,
+release or publish without the captain saying so.
 
 `package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
 below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
@@ -111,6 +124,11 @@ Before hand-checking any of these, run the suite: it already checks them.
 - Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
   Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
 - Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
+- `.npmrc` keeps `ignore-scripts=true`, the lockfile stays committed, every workflow installs
+  the tree with `npm ci`, `bin`/`files`/`bench/package-facts.ts` all name `dist/treadle.js`,
+  and every third-party action in every workflow is pinned to a 40-character commit SHA
+  (`test/architecture/supply-chain.test.ts`). That file is threat-model finding F13's
+  enforcement; `npm run licences` is the other half and refuses a licence off the allowlist.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
   `scripts/check-dco.sh` and commitlint over a pull request's commits.
 - `schemas/*.json` are generated from the `ResultShape` each service declares. Change a

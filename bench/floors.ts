@@ -4,8 +4,8 @@
 // Five floors, each one a strict superset of the one above it, so the difference between two
 // rows prices exactly one thing: spawning a process, starting Node, evaluating a JavaScript
 // file, stripping types from a TypeScript file, and loading the store adapter. The last gap
-// is what separates these figures from DR1's, which were taken on a bundle this tree has no
-// build step to produce.
+// is what separates these figures from DR1's, which were taken on the bundle the tree now
+// builds and these children still do not run.
 
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'

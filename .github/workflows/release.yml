@@ -14,8 +14,8 @@
 #
 # What that buys, beyond the signature: nothing here can release anything by itself. The
 # publication gate the identity screen holds is not a flag someone might forget to unset, it
-# is the absence of a signed tag. docs/RELEASING.md carries the procedure and docs/ROLLBACK.md
-# what to do when a release was wrong.
+# is the absence of a signed tag. docs/RELEASING.md carries the procedure, the three
+# interlocks in front of npm, and what to do when a release was wrong.
 #
 # No `concurrency` block. Cancelling a publish mid-flight causes real damage, and GitHub keeps
 # only one pending run per group even when nothing is cancelled in flight, so a third push can

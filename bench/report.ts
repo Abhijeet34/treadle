@@ -102,7 +102,7 @@ export function toMarkdown(report: RunReport): string {
   for (const row of report.floors.rows) push(measurementRow(row.label, row))
   push('')
   push(`Type stripping costs ${typeof report.floors.typeStrippingMs === 'number' ? `${ms(report.floors.typeStrippingMs)} ms` : report.floors.typeStrippingMs} and loading the store adapter costs ${typeof report.floors.storeLoadMs === 'number' ? `${ms(report.floors.storeLoadMs)} ms` : report.floors.storeLoadMs} on top of it, both taken from the ${report.floors.derivedFromStatistic}: they are fixed costs, and the cleanest launch of the fifty is the closest thing to an uncontaminated reading of one.`)
-  push('DR1 measured its budget on a 406 KB bundle. This tree has no build step, so every figure below runs from TypeScript source and carries both of those costs.')
+  push(`DR1 measured its budget on a 406 KB bundle. The tree now builds one, weighed in the package table above, but the timed children below still run from TypeScript source and carry both of those costs; bundling them is what would make these figures comparable with DR1's.`)
   push('')
 
   push('## Corpora', '')

@@ -67,11 +67,19 @@ describe('F13 control two: the lockfile is committed and is what CI installs', (
     assert.ok(workflows.length >= 3, `only ${workflows.length} workflows found`)
     for (const workflow of workflows) {
       const text = readFileSync(path.join(ROOT, workflow), 'utf8')
-      const installs = text.match(/npm (ci|install)\b[^\n]*/g) ?? []
+      const installs = text.match(/npm (?:ci|install)\b[^\n]*/g) ?? []
       for (const line of installs) {
+        if (line.startsWith('npm ci')) continue
+        // `npm install <spec>` names a package from the registry, which is what the smoke job
+        // does to the published tarball. What must never appear is the form that resolves this
+        // repository's own tree, because that is the one the lockfile binds.
+        const named = line
+          .replace(/^npm install\b/, '')
+          .split(/\s+/)
+          .filter((token) => token.length > 0 && !token.startsWith('-'))
         assert.ok(
-          line.startsWith('npm ci'),
-          `${workflow} runs "${line}"; npm ci is what makes the lockfile bind`,
+          named.length > 0,
+          `${workflow} runs "${line}", which resolves this repository's tree without the lockfile; use npm ci`,
         )
       }
     }

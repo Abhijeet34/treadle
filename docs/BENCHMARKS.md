@@ -5,6 +5,12 @@ This file is the first run that produces those numbers.
 Four of the twelve axes are measured, one is half measured, and seven are not measured: six need a harness that drives the command surface and one needs a metrics layer that does not exist yet.
 Every unmeasured one says so in its own row with the reason, because a gap in a table reads as a pass to whoever skims it.
 
+**One thing in this file has changed since it was written.**
+Every "there is no bundle" and "the bundle-size budget has nothing to weigh" below was true of the tree that produced these figures, and is no longer.
+[ADR-0009](architecture/adr/0009-release-and-supply-chain.md) added the build step: `dist/treadle.js` is 173,891 bytes against DR8's 512,000 limit, so the last pending budget in the appendix is a `PASS` on the next run rather than a `NOT MEASURED`.
+The timing figures are untouched by that, because the timed children still launch from TypeScript source; that gap is the one the floors table prices, and closing it is what would make these numbers comparable with DR1's.
+The appendix is left exactly as the run produced it, because a measured record that is edited afterwards is not one.
+
 Reproduce it with `npm run bench`.
 The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T01-11-11-759Z`, with its heading levels demoted one step and nothing else changed.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
