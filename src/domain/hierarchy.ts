@@ -78,13 +78,18 @@ export function childrenOf(graph: HierarchyGraph, id: ItemId): readonly ItemId[]
 }
 
 /**
- * Walks the parent chain of every item and returns the first cycle it finds, as a path
- * that closes on itself. This is the load-time check F8 asks for: it runs before a
- * roll-up, so a hand-edited cycle is a reported finding rather than a stack overflow.
+ * Walks the parent chain of every item that has one and returns the first cycle it finds,
+ * as a path that closes on itself. This is the load-time check F8 asks for: it runs before
+ * a roll-up, so a hand-edited cycle is a reported finding rather than a stack overflow.
+ *
+ * Every node has at most one parent, so a cycle is reachable only from a node that has one:
+ * a start without a parent walks one step and stops. Taking the edge map alone is therefore
+ * the same search, and it is the shape the store can read as two index columns rather than
+ * as a whole graph.
  */
-export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | undefined {
+export function findParentCycle(parentOf: ReadonlyMap<ItemId, ItemId>): readonly ItemId[] | undefined {
   const settled = new Set<ItemId>()
-  for (const start of graph.typeOf.keys()) {
+  for (const start of parentOf.keys()) {
     if (settled.has(start)) continue
     const path: ItemId[] = []
     const seenAt = new Map<ItemId, number>()
@@ -95,11 +100,15 @@ export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | u
       if (settled.has(node)) break
       seenAt.set(node, path.length)
       path.push(node)
-      node = graph.parentOf.get(node)
+      node = parentOf.get(node)
     }
     for (const visited of path) settled.add(visited)
   }
   return undefined
+}
+
+export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | undefined {
+  return findParentCycle(graph.parentOf)
 }
 
 function ancestors(graph: HierarchyGraph, from: ItemId): Result<readonly ItemId[]> {

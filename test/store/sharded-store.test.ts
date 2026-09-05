@@ -164,6 +164,41 @@ describe('the sharded store on disk', () => {
     }
   })
 
+  it('re-reads the cycle verdict when a hand edit moves the edge, in either direction', async () => {
+    // The verdict is cached in the index between commands, so what has to be proved is that
+    // the cache is bound to the rows and not to the process: a second store on the same root
+    // must see a cycle a hand edit added, and stop reporting one a hand edit removed.
+    const workspace = await aWorkspace()
+    const shard = path.join(workspace.root, 'items/2026-09.md')
+    const s12 = async (store: ShardedStore): Promise<string | undefined> => {
+      const found = await store.findings()
+      assert.ok(found.ok)
+      return found.value.find((f) => f.rule === 'S12')?.reason
+    }
+    try {
+      await workspace.store.apply({
+        txn: 't1',
+        writes: [
+          { item: anItem({ id: 'item-one', parent_id: 'item-two' }) },
+          { item: anItem({ id: 'item-two' }) },
+        ],
+        events: [],
+      })
+      assert.equal(await s12(workspace.store), undefined, 'a forest is not a cycle')
+
+      const clean = await readFile(shard, 'utf8')
+      await writeFile(shard, clean.replace('# item-two: A first task', '# item-two: A first task\nparent_id: item-one'))
+      const reader = new ShardedStore(workspace.root)
+      assert.match(await s12(reader) ?? '', /closes a cycle/, 'the added edge must be found')
+
+      await writeFile(shard, clean)
+      assert.equal(await s12(new ShardedStore(workspace.root)), undefined, 'the removed edge must clear')
+      await reader.close()
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
   it('creates the workspace layout git needs, and nothing else', async () => {
     const workspace = await aWorkspace()
     try {

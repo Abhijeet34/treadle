@@ -59,7 +59,17 @@ create index if not exists events_entity on events(entity, at);
 create table if not exists findings (
   file text not null, line integer not null, rule text not null, reason text not null, id text);
 create index if not exists findings_file on findings(file);
+create table if not exists meta (key text primary key, value text not null);
 `
+
+/**
+ * The load-time hierarchy verdict, cached beside the rows it was derived from.
+ *
+ * It is dropped inside the same transaction that changes any item row, so a verdict that
+ * survives a refresh was computed over exactly the row set that refresh left behind, and a
+ * crash between the two leaves no verdict rather than a stale one.
+ */
+const HIERARCHY_KEY = 'hierarchy_cycle'
 
 /** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
 const WAL_DEADLINE_MS = 2_000
@@ -169,6 +179,7 @@ export class IndexCache {
       }
       this.#insertFindings([...findings, ...clashes])
       this.#setFingerprint(file, fingerprint)
+      this.#forgetHierarchyVerdict()
       db.exec('commit')
     } catch (error) {
       db.exec('rollback')
@@ -209,6 +220,7 @@ export class IndexCache {
     try {
       this.#dropRows(file)
       db.prepare('delete from files where path = ?').run(file)
+      this.#forgetHierarchyVerdict()
       db.exec('commit')
     } catch (error) {
       db.exec('rollback')
@@ -244,13 +256,36 @@ export class IndexCache {
     return row === undefined ? undefined : (row as unknown as IndexedItem)
   }
 
-  /** id and parent for every indexed record, for the load-time hierarchy cycle check. */
-  parentEdges(): readonly (readonly [string, string | null, string, string, number | null])[] {
-    const rows = this.#open().prepare('select id, parent, type, state, points from items').all()
-    return rows.map((row) => {
-      const r = row as unknown as { id: string; parent: string | null; type: string; state: string; points: number | null }
-      return [r.id, r.parent, r.type, r.state, r.points] as const
-    })
+  /**
+   * The parent edges, for the load-time hierarchy cycle check. Only rows that carry a parent
+   * are edges, and a node without one cannot sit on a cycle, so the `parent is not null`
+   * clause is the whole edge set rather than a sample of it.
+   */
+  parentEdges(): ReadonlyMap<string, string> {
+    const rows = this.#open()
+      .prepare('select id, parent from items where parent is not null')
+      .all() as unknown as readonly { id: string; parent: string }[]
+    const edges = new Map<string, string>()
+    for (const row of rows) edges.set(row.id, row.parent)
+    return edges
+  }
+
+  /** The stored verdict as written, or undefined when an item row has moved since. */
+  hierarchyVerdict(): string | undefined {
+    const row = this.#open()
+      .prepare('select value from meta where key = ?')
+      .get(HIERARCHY_KEY) as unknown as { value: string } | undefined
+    return row?.value
+  }
+
+  setHierarchyVerdict(value: string): void {
+    this.#open()
+      .prepare('insert or replace into meta (key, value) values (?, ?)')
+      .run(HIERARCHY_KEY, value)
+  }
+
+  #forgetHierarchyVerdict(): void {
+    this.#open().prepare('delete from meta where key = ?').run(HIERARCHY_KEY)
   }
 
   listItems(query: ItemQuery): readonly IndexedItem[] {

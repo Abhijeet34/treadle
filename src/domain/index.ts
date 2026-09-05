@@ -115,6 +115,7 @@ export {
   MAX_HIERARCHY_DEPTH,
   childrenOf,
   findHierarchyCycle,
+  findParentCycle,
   hierarchyFrom,
   rollUp,
   setParent,

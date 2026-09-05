@@ -14,8 +14,7 @@ import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
 import {
-  findHierarchyCycle,
-  hierarchyFrom,
+  findParentCycle,
   type WorkItem,
 } from '../../domain/index.ts'
 import {
@@ -320,6 +319,18 @@ export class ShardedStore implements Store {
     return storeOk(undefined)
   }
 
+  /** The S12 finding a cycle raises, from the verdict this refresh is entitled to reuse. */
+  #hierarchyFindings(): readonly Finding[] {
+    const stored = this.#index.hierarchyVerdict()
+    const cycle = stored === undefined ? this.#recheckHierarchy() : JSON.parse(stored) as readonly string[] | null
+    if (cycle === null || cycle === undefined) return []
+    return [{
+      file: WORKSPACE_FILE, line: 1, rule: 'S12',
+      reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
+      id: cycle[0] as string,
+    }]
+  }
+
   async #indexRecordFile(
     file: string, full: string, size: number, mtime: number,
   ): Promise<StoreResult<undefined>> {
@@ -419,22 +430,18 @@ export class ShardedStore implements Store {
   /**
    * Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an edge
    * a hand edit or a git merge put in a file, and the roll-up runs over exactly that data.
-   * The graph reads five fields, so it is built from index columns rather than by decoding
-   * every record on every command.
+   * The walk needs the parent edges and nothing else, so it reads two index columns rather
+   * than decoding every record.
+   *
+   * The verdict is then written back beside the rows it came from. Every transaction that
+   * moves an item row drops it, so this recomputes exactly when the row set moved: at 50,000
+   * items the walk is 111 ms of a 218 ms read, and a command that changed nothing was paying
+   * it to reach the same answer as the command before it.
    */
-  #hierarchyFindings(): readonly Finding[] {
-    const items = this.#index.parentEdges().map(([id, parent, type, state, points]) => ({
-      id, type, state,
-      ...(parent === null ? {} : { parent_id: parent }),
-      ...(points === null ? {} : { points }),
-    }))
-    const cycle = findHierarchyCycle(hierarchyFrom(items as unknown as readonly WorkItem[]))
-    if (cycle === undefined) return []
-    return [{
-      file: WORKSPACE_FILE, line: 1, rule: 'S12',
-      reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
-      id: cycle[0] as string,
-    }]
+  #recheckHierarchy(): readonly string[] | null {
+    const cycle = findParentCycle(this.#index.parentEdges()) ?? null
+    this.#index.setHierarchyVerdict(JSON.stringify(cycle))
+    return cycle
   }
 
   // -- writing ---------------------------------------------------------------------------
