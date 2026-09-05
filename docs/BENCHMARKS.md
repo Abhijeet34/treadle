@@ -7,7 +7,8 @@ Every unmeasured one says so in its own row with the reason, because a gap in a 
 
 **One thing in this file has changed since it was written.**
 Every "there is no bundle" and "the bundle-size budget has nothing to weigh" below was true of the tree that produced these figures, and is no longer.
-[ADR-0009](architecture/adr/0009-release-and-supply-chain.md) added the build step: `dist/treadle.js` is 186,164 bytes against DR8's 512,000 limit, so the last pending budget in the appendix is a `PASS` on the next run rather than a `NOT MEASURED`.
+[ADR-0009](architecture/adr/0009-release-and-supply-chain.md) added the build step: `dist/treadle.js` now has something to weigh against DR8's 512,000 limit, so the last pending budget in the appendix is a `PASS` on the next run rather than a `NOT MEASURED`.
+A current figure comes from the build itself, which prints the count and the margin and fails rather than warns if it goes over; on 2026-09-05 `npm run build` printed `bundle: 208691 bytes against 512000 (DR8, 500 KB bundle), 2.5x under`.
 The timing figures are untouched by that, because the timed children still launch from TypeScript source; that gap is the one the floors table prices, and closing it is what would make these numbers comparable with DR1's.
 The appendix is left exactly as the run produced it, because a measured record that is edited afterwards is not one.
 

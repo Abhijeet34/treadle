@@ -34,8 +34,9 @@ npm ci
 ```
 
 What a published install would carry is one file of executable code.
-`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 18 files, 60.2 kB packed and 250.7 kB unpacked.
-The bundle is 186,164 bytes against DR1's 500 KB budget, and the build fails rather than warns if it goes over.
+`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
+The bundle sits comfortably inside DR1's 500 KB budget, and the build fails rather than warns if it goes over.
+The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
 ## Quick start
 
@@ -103,7 +104,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | `doctor`: four findings over records and the event log; the rest wait on entities that do not exist yet | Partly implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
-| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; 186,164 bytes |
+| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
