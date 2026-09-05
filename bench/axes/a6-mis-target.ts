@@ -53,6 +53,7 @@ export async function runA6(corpus: Corpus): Promise<{
 }> {
   const surface = await openSurface('a6')
   const rows: ScenarioRow[] = []
+  let driven = 0
 
   try {
     const intended = surface.root
@@ -107,6 +108,7 @@ export async function runA6(corpus: Corpus): Promise<{
     await write('the supported --workspace flag, run from the intended root', intended, 'a6-flag-decoy', {
       cwd: intended, extra: ['--workspace', path.join(decoy, '.work')], expect: 'decoy',
     })
+    driven = surface.calls()
   } finally {
     await surface.dispose()
   }
@@ -138,7 +140,7 @@ export async function runA6(corpus: Corpus): Promise<{
       observed: met
         ? `0 mis-targets in ${implicit.length} writes with no explicit target, across all three scenarios; ${explicit.length} explicit --workspace write landed where it was pointed; ${seam.length} of ${seam.length} seam resolutions correct; no command invented a store; every write that landed printed the workspace identity in its envelope, while the filesystem path is printed by status, doctor and --preview but not by an applied write`
         : `${misTargets.length} of ${rows.length} writes mis-targeted, ${invented.length} invented a store, ${silent.length} printed no identity, ${seamWrong} of ${seam.length} seam resolutions wrong`,
-      operations: rows.length + seam.length,
+      operations: driven + seam.length,
       samples: rows.length,
       detail: {
         rows,
