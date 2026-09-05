@@ -156,11 +156,11 @@ export class IndexCache {
             item.sprint, item.points, item.priority, item.version, item.assignee,
             item.filed_at, item.title, item.source)
         } catch {
-          // The id is already in the store. D1 obligation 4: a named refusal for this
-          // record, never a silent first-match, and the rest keeps serving. The finding is
-          // half of that: `duplicateRefusal` in the store port is the other half, because
-          // quarantining the copy on read while the write path picks one by document order
-          // is the silent first-match wearing a report.
+          // The id is already in the store, and because the parser refuses a repeat inside
+          // one file, "already" now means another shard. That is the half of D1 obligation 4
+          // no single file can see, and this primary key is its one owner: the finding it
+          // raises is what `duplicateRefusal` reads, and what stops a write resolving a
+          // cross-shard duplicate by taking whichever copy this insert happened to keep.
           clashes.push({
             file, line: item.line, rule: 'S3', id: item.id,
             reason: `${item.id} is already a record in this store; the copy in ${file} line ${item.line} is quarantined`,

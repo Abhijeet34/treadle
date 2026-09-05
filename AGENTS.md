@@ -81,6 +81,16 @@ Before hand-checking any of these, run the suite: it already checks them.
   carry one free-text column, which renders last. Both fail loudly rather than corrupting a
   row; findings F2 and F3.
 
+## Where a record's identity and its boundary are decided
+
+One place each, and both are in `src/adapters/store/grammar.ts`.
+`parseFile` publishes `chunkById`, the file's only id-to-chunk map, and quarantines every copy of a repeated id rather than naming a winner; the sharded store's `#resolve` is the only method that turns an id into a record on the write path.
+If you find yourself adding a second answer to "which record does this id name", that is the defect, not the fix: it was decided in three places that tie-broke differently and the reduction is recorded in `docs/architecture/adr/0003-record-format-and-migration.md` rules 1 and 7.
+
+A record boundary is a line, so it cannot be made unreformattable; it is made loud instead.
+`damagedHeadingAt` resynchronises on a heading a hand edit reshaped, and the discriminator is a record's four mandatory field lines (`type`, `state`, `filed_at`, `version`), which is the redundancy the format already carried.
+`test/store/record-boundary.test.ts` holds the property over generated documents: every id an undamaged file served is, after damage, either still served or named by a finding.
+
 ## CI runner platforms
 
 If this project runs GitHub Actions, a pull request runs Linux runners only.
