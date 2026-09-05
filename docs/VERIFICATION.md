@@ -27,7 +27,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | Coverage meets the gate | 97.07% to 97.66% lines and 89.08% to 89.69% branches across three runs on this branch, against a 90/85 gate; every one of the 7 named files over its 95/90 bar in every run | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 757 tests in every run, 49.8 s to 88.6 s each, 1,147 s in total | Proven |
 | One regression test per closed security finding | 12 closed findings, each mapped to a named test that names the finding and carries assertions, 198 assertions passing across the 11 files in one child run; 1 open finding naming the layer it waits on | Proven |
-| Every character of a random id is equally likely | Chi-squared 26.1 to 56.5 over ten runs of 600,000 characters against a ceiling of 120 on 35 degrees of freedom; the `byte % 36` implementation this replaced scored 1,190.2 on the same test | Proven |
+| Every character of a random id is equally likely | Chi-squared 23.3 to 46.2 over ten runs of 600,000 characters against a ceiling of 120 on 35 degrees of freedom; the `byte % 36` implementation this replaced scored 1,340.6 on the same test | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
 | No literal invisible code point ships | 169 tracked text files scanned, 0 carrying one; every such character in the suites is built from its number or written as an escape | Proven |
 | Severity reaches every read surface | 5 of 5 surfaces print it for an S1 bug, against 0 of 5 before; `show --field sev` answers where it was a `C2` refusal | Proven |
