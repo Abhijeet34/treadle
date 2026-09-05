@@ -39,8 +39,15 @@ const INPUTS = Number(process.env['TREADLE_FUZZ_INPUTS'] ?? 250_000)
 const PARSER_INPUTS = INPUTS
 const ESCAPER_INPUTS = INPUTS
 
-/** No parse of any input this suite generates may take longer than this (F8's ReDoS half). */
-const TIME_BUDGET_MS = 250
+/**
+ * The per-input ceiling, and it is deliberately loose. Catastrophic backtracking is an
+ * orders-of-magnitude event: a nested quantifier on a hostile input takes seconds to
+ * minutes, while a garbage collection pause or a descheduled process on a loaded machine
+ * takes tens to low hundreds of milliseconds. A tight bound here measures the machine and
+ * flakes, which it did at 250 ms on a 12-byte input; 2 s separates the two populations with
+ * nothing in between. The structural check below is the deterministic half of the same claim.
+ */
+const TIME_BUDGET_MS = 2_000
 
 type Corpus = { readonly documents: readonly string[]; readonly values: readonly string[] }
 
@@ -139,6 +146,106 @@ describe('the record parser survives a mutation fuzzer', () => {
     assert.equal(crashes, 0)
     t.diagnostic(`${PARSER_INPUTS} inputs: ${parsed} parsed, ${refused} refused at file level, ${served} records served, ${quarantined} quarantined`)
     t.diagnostic(`crashes: 0; slowest single parse: ${slowest.toFixed(1)} ms against a ${TIME_BUDGET_MS} ms budget`)
+  })
+})
+
+/**
+ * Star height: the nesting depth of unbounded quantifiers. Height 1 is `a+` and is linear.
+ * Height 2 is `(a+)+`, where the engine can split one run of `a` between the inner and the
+ * outer quantifier in exponentially many ways, and that is what every catastrophic
+ * backtrack is built from. A pattern of height at most 1 has no such input.
+ *
+ * This is a scanner rather than a regex, because deciding whether a group is both quantified
+ * and quantifying needs the bracket matching a regex cannot do. A first attempt with a
+ * pattern flagged `(.+)`, which is height 1 and perfectly linear.
+ */
+export function starHeight(source: string): number {
+  const stack: { unbounded: boolean }[] = [{ unbounded: false }]
+  let best = 0
+  let inClass = false
+
+  const quantifierAt = (at: number): { unbounded: boolean; length: number } | undefined => {
+    const character = source[at]
+    if (character === '*' || character === '+') return { unbounded: true, length: 1 }
+    if (character === '?') return { unbounded: false, length: 1 }
+    if (character !== '{') return undefined
+    const brace = /^\{(\d+)(,(\d*))?\}/.exec(source.slice(at))
+    if (brace === null) return undefined
+    return { unbounded: brace[2] !== undefined && brace[3] === '', length: brace[0].length }
+  }
+
+  for (let at = 0; at < source.length; at += 1) {
+    const character = source[at]
+    if (character === '\\') { at += 1; continue }
+    if (inClass) { if (character === ']') inClass = false; continue }
+    if (character === '[') { inClass = true; continue }
+    if (character === '(') { stack.push({ unbounded: false }); continue }
+    if (character === ')') {
+      const group = stack.pop() ?? { unbounded: false }
+      const quantifier = quantifierAt(at + 1)
+      const frame = stack[stack.length - 1] as { unbounded: boolean }
+      if (quantifier !== undefined) {
+        at += quantifier.length
+        if (quantifier.unbounded) {
+          best = Math.max(best, group.unbounded ? 2 : 1)
+          frame.unbounded = true
+        }
+      }
+      if (group.unbounded) frame.unbounded ||= false
+      continue
+    }
+    const quantifier = quantifierAt(at)
+    if (quantifier !== undefined && quantifier.unbounded) {
+      at += quantifier.length - 1
+      best = Math.max(best, 1)
+      ;(stack[stack.length - 1] as { unbounded: boolean }).unbounded = true
+    }
+  }
+  return best
+}
+
+/**
+ * The files whose regexes read input somebody else wrote. F8's ReDoS finding is closed by a
+ * discipline rather than by a timing measurement: every pattern in these is linear, and the
+ * scanner above is what says so about all inputs rather than about the ones a fuzzer drew.
+ */
+const PATTERN_HOLDERS = [
+  'src/domain/text.ts',
+  'src/domain/record.ts',
+  'src/adapters/store/grammar.ts',
+  'src/adapters/render/grammar.ts',
+]
+
+describe('no regex that reads foreign input can backtrack', () => {
+  it('recognises the shape it is looking for, so a green result means something', () => {
+    assert.equal(starHeight('(a+)+'), 2)
+    assert.equal(starHeight('(a|a)*'), 1)
+    assert.equal(starHeight('(a*)*'), 2)
+    assert.equal(starHeight('(x{1,}){1,}'), 2)
+    assert.equal(starHeight('(.+)'), 1)
+    assert.equal(starHeight('^([a-z0-9][a-z0-9-]{1,62}[a-z0-9]): (.+)$'), 1)
+    assert.equal(starHeight('[\\p{Cc}\\p{Cf}]'), 0)
+    assert.equal(starHeight('^[a-z_][a-z0-9_]*$'), 1)
+  })
+
+  it('holds for every pattern in the parser and the escaper', async (t) => {
+    let patterns = 0
+    for (const file of PATTERN_HOLDERS) {
+      const text = await readFile(new URL(`../../${file}`, import.meta.url), 'utf8')
+      // Regex literals only: a pattern built at runtime would need the same treatment, and
+      // there is none in these files, which this also asserts.
+      assert.equal(/new RegExp\(/.test(text), false, `${file} builds a pattern at runtime`)
+      for (const match of text.matchAll(/(?:^|[=(,\s])\/((?:[^/\\\n[]|\\.|\[(?:[^\]\\]|\\.)*\])+)\/[a-z]*/gm)) {
+        const source = match[1] as string
+        patterns += 1
+        assert.ok(
+          starHeight(source) <= 1,
+          `${file} carries a pattern of star height 2, which can backtrack: /${source}/`,
+        )
+      }
+    }
+    assert.ok(patterns >= 6, `only ${patterns} patterns were found, so the scan is not finding them`)
+    t.diagnostic(`${patterns} regex literals across ${PATTERN_HOLDERS.length} files, every one of star height 1 or 0`)
   })
 })
 
