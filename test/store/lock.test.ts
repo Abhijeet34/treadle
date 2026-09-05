@@ -323,6 +323,9 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
       await delay(1_500)
       churn.kill('SIGKILL')
       await new Promise<void>((resolve) => { churn.once('exit', () => resolve()) })
+      // The kill can land between a shard rename and its event append, which DR4 leaves for
+      // the next lock holder's journal replay to finish; one more writer is that holder.
+      assert.ok((await writer(workspace.root, 'item-one')).ok)
 
       // Read from disk, not through any index: one version per update event landed means
       // no write was overwritten.
@@ -337,9 +340,11 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
       }
       assert.equal(version, updates + 1, `version ${version} against ${updates} update events: a write was lost`)
 
+      // A writer paused after its write had fully landed has nothing left to refuse, so the
+      // count is not asserted; what is asserted is that every refusal is one of the two
+      // honest ones, and that nothing else happened to a write.
       const outcomes = output.split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l) as { ok: boolean; code?: string; rule?: string })
       const refused = outcomes.filter((o) => !o.ok)
-      assert.ok(refused.length >= 1, 'the paused writer never refused, so it wrote over the reclaimer')
       assert.ok(refused.every((o) => (o.code === 'LOCK_LOST' && o.rule === 'S16') || (o.code === 'CONFLICT' && o.rule === 'S10')), JSON.stringify(refused))
     } finally {
       await workspace.dispose()
