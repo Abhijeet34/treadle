@@ -44,9 +44,9 @@
     },
     "a1Crashes": {
       "limit": 0,
-      "enforced": false,
+      "enforced": true,
       "source": "axis A1",
-      "why": "the store has never met this: at 200 parallel writers a few processes throw an uncaught `Error: database is locked` from `pragma journal_mode = wal` at src/adapters/store/index-cache.ts:85, which runs before `pragma busy_timeout = 5000` at line 87"
+      "why": "closed by #4, which armed `pragma busy_timeout` before the journal-mode switch and retried the promotion SQLite refuses to wait on. Verified here at 0 crashes in 1,445 writers across five runs at 1-minute loads of 3.13 to 116.12, against 126 crashes in 2,890 writers before it. Armed, so a return of it fails the build."
     },
     "a5SilentDrops": {
       "limit": 0,

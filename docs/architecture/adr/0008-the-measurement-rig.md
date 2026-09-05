@@ -124,7 +124,7 @@ Every reference figure in the axes table is quoted from the prior-art report and
 
 - The landed store now has measured numbers against the design that specified it, and five DR8 budgets are recorded as missed rather than assumed met.
 - Axis A3 is measured in-repo, tokens included. `test/cli/budget.test.ts` gates the bytes and records that its token figures were taken outside the tree, because a tokenizer is a package and the product ships none; this rig carries all three as development dependencies.
-- Two defects surfaced that no test reaches: a record heading renamed out of the grammar is dropped from every query with no finding, and a few of 200 parallel writers die with an uncaught `database is locked`.
+- Two defects surfaced that no test reached: a record heading renamed out of the grammar is dropped from every query with no finding, and a parallel writer could die with an uncaught `database is locked`. The second was closed by #4 and re-measured here at 0 crashes in 1,445 writers across five runs, so its budget is armed rather than open. Neither was fixed by this record's own branch, which is what let the verification mean something.
 - A run is reproducible from its seed, and across ten runs `transition` at 50k spread 4.4% and `get` 6.9% at the median, loaded runs included.
 
 **Negative**
