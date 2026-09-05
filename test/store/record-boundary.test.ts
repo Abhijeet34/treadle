@@ -52,7 +52,8 @@ describe('a record heading a hand edit damaged', () => {
         const shard = path.join(workspace.root, SHARD)
         const text = await readFile(shard, 'utf8')
         assert.ok(text.includes(HEADING), 'the fixture did not write the heading this case damages')
-        await writeFile(shard, text.replace(HEADING, damaged))
+        // A function replacement, because a `$` sequence in a plain one is substitution syntax.
+        await writeFile(shard, text.replace(HEADING, () => damaged))
 
         const listed = await workspace.store.list()
         assert.ok(listed.ok, listed.ok ? '' : listed.error.message)
@@ -123,7 +124,7 @@ describe('damaging a heading never silently changes which records exist', () => 
           ['no space', `#${spec.id}: ${spec.title}`],
           ['no hash', `${spec.id}: ${spec.title}`],
         ] as const) {
-          const parsed = parseFile(text.replace(heading, shape), SHARD)
+          const parsed = parseFile(text.replace(heading, () => shape), SHARD)
           assert.ok(parsed.ok, `seed ${seed} ${label}: the file stopped serving entirely`)
           const served = new Set(parsed.value.records.map((r) => r.id))
           const named = new Set(parsed.value.quarantined.flatMap((q) => (q.id === undefined ? [] : [q.id])))

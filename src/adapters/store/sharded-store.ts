@@ -42,7 +42,7 @@ import {
   renderFile,
   renderHeader,
   renderRecord,
-  type Chunk,
+  withRecord,
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
@@ -415,16 +415,14 @@ export class ShardedStore implements Store {
     const findings = this.#index.findings()
 
     for (const write of transaction.writes) {
-      const clash = duplicateRefusal(write.item.id, findings)
-      if (clash !== undefined) return clash
-
       const file = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
       const shard = shards.get(file) ?? await this.#readShard(file)
       if (!('chunks' in shard)) return shard
       shards.set(file, shard)
 
-      const at = shard.chunks.findIndex((c) => c.kind === 'record' && c.record.id === write.item.id)
-      const stored = at === -1 ? undefined : (shard.chunks[at] as { record: ParsedRecord }).record
+      const resolved = this.#resolve(write.item.id, file, shard, findings)
+      if (!resolved.ok) return resolved
+      const stored = resolved.value
       const conflict = await this.#compareAndSet(write.item.id, stored, write.ifVersion)
       if (conflict !== undefined) return conflict
 
@@ -432,14 +430,9 @@ export class ShardedStore implements Store {
       const encoded = encodeItem({ ...write.item, version }, stored)
       if (!encoded.ok) return encoded
 
-      const chunk: Chunk = { kind: 'record', record: { ...encoded.value, source: renderRecord(encoded.value), line: 0 } }
-      const chunks = at === -1 ? [...shard.chunks, chunk] : shard.chunks.with(at, chunk)
-      shards.set(file, { ...shard, chunks })
+      shards.set(file, withRecord(shard, { ...encoded.value, source: renderRecord(encoded.value), line: 0 }))
       applied.push({ id: write.item.id, version })
     }
-
-    const duplicate = this.#duplicateAcrossShards(transaction)
-    if (duplicate !== undefined) return duplicate
 
     const files = [...shards].map(([file, parsed]) => ({
       path: file,
@@ -463,7 +456,7 @@ export class ShardedStore implements Store {
     try {
       text = await readFile(path.join(this.#root, file), 'utf8')
     } catch {
-      return { schema: SCHEMA, header: renderHeader(SCHEMA), chunks: [], records: [], quarantined: [], crlf: false }
+      return { schema: SCHEMA, header: renderHeader(SCHEMA), chunks: [], chunkById: new Map(), records: [], quarantined: [], crlf: false }
     }
     const parsed = parseFile(text, file)
     if (!parsed.ok) return parsed
@@ -505,16 +498,40 @@ export class ShardedStore implements Store {
     )
   }
 
-  /** An id may live in exactly one shard; a create into a second month is a named refusal. */
-  #duplicateAcrossShards(transaction: StoreTransaction): StoreResult<never> | undefined {
-    for (const write of transaction.writes) {
-      const home = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
-      const row = this.#index.itemRow(write.item.id)
-      if (row !== undefined && row.file !== home) {
-        return storeFail('CONFLICT', 'S3', `${write.item.id} is already a record in ${row.file}; a record never moves between shards`, [write.item.id])
-      }
+  /**
+   * The store's one answer to "which record does this id name", and the only place the write
+   * path resolves an identity. It replaced three mechanisms that tie-broke differently: a
+   * scan that took the first record chunk in document order, a separate consult of the
+   * duplicate finding, and a separate cross-shard check.
+   *
+   * The two owners it reads are the two that already refuse a duplicate. In-file it is the
+   * parser's `chunkById`, which quarantines every copy of a repeated id rather than naming a
+   * winner; across shards it is the index's `id text primary key`, whose refusal is the S3
+   * finding. A chunk the parser quarantined for any other reason is a record the read path
+   * does not serve, so a write to it is refused too: without that, a create found no record
+   * chunk and filed a second copy of the id into the same shard.
+   */
+  #resolve(
+    id: string, home: string, shard: ParsedFile, findings: readonly Finding[],
+  ): StoreResult<ParsedRecord | undefined> {
+    const clash = duplicateRefusal(id, findings)
+    if (clash !== undefined) return clash
+
+    const at = shard.chunkById.get(id)
+    const chunk = at === undefined ? undefined : shard.chunks[at]
+    if (chunk !== undefined && chunk.kind === 'quarantine') {
+      return storeFail(
+        'CONFLICT', chunk.quarantine.rule,
+        `${id} is a record ${home} does not serve, so a write cannot say what it is changing: line ${chunk.quarantine.line}: ${chunk.quarantine.reason}`,
+        [id],
+      )
     }
-    return undefined
+
+    const row = this.#index.itemRow(id)
+    if (row !== undefined && row.file !== home) {
+      return storeFail('CONFLICT', 'S3', `${id} is already a record in ${row.file}; a record never moves between shards`, [id])
+    }
+    return storeOk(chunk === undefined ? undefined : chunk.record)
   }
 
   async #applyJournal(journal: Journal, recovering: boolean): Promise<void> {
