@@ -158,7 +158,7 @@ const QUESTIONS: readonly Question[] = [
     fullNeeds: 'the children of E with a rollup of their states',
     full: (answer) => listed('children')(answer),
     partial: present('parent'),
-    note: 'the parent edge is writable and printed, which is more than the reference managed; no verb lists an epic children and none rolls their states up',
+    note: 'the parent edge is writable and printed, which is more than the reference managed; no verb lists the children of an epic and none rolls their states up',
   },
   {
     n: 17, question: 'what is the priority order',
