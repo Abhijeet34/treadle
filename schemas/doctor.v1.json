@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "backlog.v1.json",
-  "title": "backlog/1",
-  "description": "List the items that match a filter, in one stated order.",
+  "$id": "doctor.v1.json",
+  "title": "doctor/1",
+  "description": "Report what the stored files say that no write path would have accepted.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "backlog/1"
+      "const": "doctor/1"
     },
     "ok": {
       "type": "boolean"
@@ -35,7 +35,7 @@
       ]
     },
     "command": {
-      "const": "backlog"
+      "const": "doctor"
     },
     "workspace": {
       "type": "string"
@@ -59,19 +59,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "filter": {
+        "store": {
           "type": [
             "string",
             "null"
           ]
         },
-        "sort": {
+        "checked": {
           "type": [
-            "string",
+            "integer",
             "null"
           ]
         },
-        "items": {
+        "findings": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -121,85 +121,21 @@
           },
           "x-columns": [
             {
+              "name": "rule"
+            },
+            {
               "name": "id"
             },
             {
-              "name": "type"
+              "name": "where"
             },
             {
-              "name": "state"
-            },
-            {
-              "name": "pts"
-            },
-            {
-              "name": "pri"
-            },
-            {
-              "name": "sprint"
-            },
-            {
-              "name": "assignee",
+              "name": "detail",
               "trust": "data"
-            },
-            {
-              "name": "title",
-              "trust": "data"
-            },
-            {
-              "name": "sev"
             }
           ]
         },
-        "points": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "done": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "none": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "narrowest": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "absent": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "clause": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "store": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "more": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "page": {
+        "clean": {
           "type": [
             "string",
             "null"

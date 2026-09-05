@@ -11,6 +11,7 @@ import {
   type WorkItemType,
 } from '../../domain/index.ts'
 import {
+  columnsOf,
   errorResult,
   okResult,
   type Block,
@@ -24,7 +25,7 @@ import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
 import { readWorkspace, type WorkspaceView } from './context.ts'
-import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
+import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
 /** Columns a list row may carry. `text` marks free text, which the renderer places last (F3). */
@@ -37,9 +38,15 @@ export const ITEM_COLUMNS: readonly ColumnSpec[] = [
   { name: 'sprint' },
   { name: 'assignee', text: true },
   { name: 'title', text: true },
+  { name: 'sev' },
 ]
 
-export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'pts', 'title'] as const
+/**
+ * `sev` is in the default set because severity was required at creation and then printed
+ * nowhere: a caller triaging defects had no read surface that carried it. It costs one `-`
+ * cell on a non-bug row, which is what `pts` already costs an unestimated one.
+ */
+export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'pts', 'sev', 'title'] as const
 
 export const FILE_SHAPE: ResultShape = {
   command: 'file',
@@ -83,6 +90,12 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'text', key: 'assignee' },
     { kind: 'text', key: 'title', whole: true },
     { kind: 'text', key: 'desc' },
+    { kind: 'scalar', key: 'sev', type: 'string' },
+    {
+      kind: 'block',
+      key: 'evidence',
+      columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
+    },
   ],
 }
 
@@ -224,8 +237,11 @@ export async function fileItem(
     txn,
     writes: [{ item }],
     events: [makeEvent({
+      // The file event used to carry `state` and `type` alone, so the severity and the
+      // priority an item was created with were nowhere in the log and `history` could never
+      // say who set them. It now carries every audited field the confirmation prints.
       id: eventId, at: now, actor: request.actor, entity: id, op: 'item.file',
-      after: { state: 'draft', type: request.type }, txn, command: 'file',
+      after: snapshotOf(diffOf(undefined, item, AUDITED_FIELDS), 'after'), txn, command: 'file',
     })],
   })
   if (!applied.ok) return storeRefusal('file', 'mutate', applied.error, workspace)
@@ -276,6 +292,18 @@ export async function showItem(
   if (item.resolution !== undefined) data['resolution'] = item.resolution
   if (item.assignee !== undefined) data['assignee'] = item.assignee
   if (item.description !== undefined) data['desc'] = item.description
+  if (item.severity !== undefined) data['sev'] = item.severity
+  const evidence = item.evidence ?? []
+  if (evidence.length > 0) {
+    data['evidence'] = {
+      columns: columnsOf(SHOW_SHAPE, 'evidence'),
+      shown: evidence.length,
+      total: evidence.length,
+      rows: evidence.map((pointer): Row => ({
+        kind: pointer.kind, ref: pointer.ref, label: pointer.label ?? null,
+      })),
+    }
+  }
 
   if (field === undefined) return okResult(SHOW_SHAPE, { workspace, data })
   if (!(field in data)) {
@@ -328,6 +356,7 @@ export function rowFor(item: WorkItem, columns: readonly string[]): Row {
     else if (column === 'sprint') row[column] = item.sprint_id ?? null
     else if (column === 'assignee') row[column] = item.assignee ?? null
     else if (column === 'title') row[column] = item.title
+    else if (column === 'sev') row[column] = item.severity ?? null
     else row[column] = null
   }
   return row

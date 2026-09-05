@@ -65,6 +65,13 @@ const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     outcome: { type: 'string' },
     override: { type: 'string', multiple: true },
   },
+  mark: {
+    severity: { type: 'string' },
+    priority: { type: 'string' },
+    reason: { type: 'string' },
+  },
+  evidence: {},
+  doctor: {},
   next: { for: { type: 'string' } },
   explain: {},
   status: {},

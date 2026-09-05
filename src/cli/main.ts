@@ -12,7 +12,9 @@ import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '..
 import { WORK_ITEM_STATES, WORK_ITEM_TYPES, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
-import { backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
+import { doctor } from '../application/services/doctor.ts'
+import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
+import { addEvidence, markItem } from '../application/services/marking.ts'
 import { explain, next, status } from '../application/services/insight.ts'
 import { transition } from '../application/services/lifecycle.ts'
 import type { Actor, Mode, Target } from '../application/services/mutation.ts'
@@ -293,7 +295,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === undefined || command === 'status') return status(store, systemClock)
 
   if (command === 'backlog') {
-    const columns = fieldsOf(flags, ['id', 'type', 'state', 'pts', 'title'])
+    const columns = fieldsOf(flags, DEFAULT_BACKLOG_COLUMNS)
     const absence = flag(flags, 'explain-absence')
     const cursor = flag(flags, 'cursor')
     return backlog(store, {
@@ -304,6 +306,8 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       ...(absence === undefined ? {} : { explainAbsence: absence }),
     })
   }
+
+  if (command === 'doctor') return doctor(store)
 
   if (command === 'next') {
     const forActor = flag(flags, 'for')
@@ -338,6 +342,35 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return fileItem(target, systemClock, randomIds, {
       type: type as WorkItemType, title, ...(chosen === undefined ? {} : { id: chosen }),
       fields: setFieldsOf(flags), actor,
+    })
+  }
+
+  if (command === 'mark') {
+    if (id === undefined) return validation('mark', 'mark needs the id of one item', ['treadle backlog'])
+    const severity = flag(flags, 'severity')
+    const priority = flag(flags, 'priority')
+    const reason = flag(flags, 'reason')
+    return markItem(target, systemClock, randomIds, {
+      id,
+      ...(severity === undefined ? {} : { severity }),
+      ...(priority === undefined ? {} : { priority }),
+      ...(reason === undefined ? {} : { reason }),
+      actor,
+    })
+  }
+
+  if (command === 'evidence') {
+    // One subcommand today, and it is named rather than assumed: `evidence add` is append,
+    // and a later `evidence list` or `evidence drop` must not silently inherit this path.
+    const [verb, entity, kind, ref, label] = operands
+    if (verb !== 'add') {
+      return validation('evidence', `evidence takes one subcommand, add, not ${verb ?? 'nothing'}`, ['treadle help evidence'])
+    }
+    if (entity === undefined || kind === undefined || ref === undefined) {
+      return validation('evidence', 'evidence add needs an id, a kind and a ref', ['treadle help evidence'])
+    }
+    return addEvidence(target, systemClock, randomIds, {
+      id: entity, kind, ref, ...(label === undefined ? {} : { label }), actor,
     })
   }
 

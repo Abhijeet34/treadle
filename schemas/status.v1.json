@@ -275,6 +275,12 @@
             "string",
             "null"
           ]
+        },
+        "defects": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }
