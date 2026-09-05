@@ -69,7 +69,10 @@ export const COMMANDS: readonly Command[] = [
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
     usage: ['treadle show <id> [--field <name>]'],
-    examples: [['treadle show auth-refresh --field desc', 'the description whole, rather than cut at 64 cells']],
+    examples: [
+      ['treadle show auth-refresh --field desc', 'the description whole, rather than cut at 64 cells'],
+      ['treadle show auth-refresh --field ac', 'the tick count and every acceptance criterion under it'],
+    ],
   },
   {
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
@@ -108,6 +111,7 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
       ['treadle set checkout-500 fix_confirmed=true reviewer=kim', 'the two fields the done gate reads, in one write'],
+      ['treadle set save-cart acceptance_criteria="[x] a shopper reopens a saved cart|[ ] the cart expires after 30 days"', 'rewrite the whole checklist; a leading [x] ticks a criterion, which is how ac 0/2 becomes 1/2'],
     ],
   },
   {
