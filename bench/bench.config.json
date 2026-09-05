@@ -1,0 +1,12 @@
+{
+  "seed": 20260905,
+  "lastMonth": "2026-09",
+  "months": 24,
+  "eventsPerItem": 10,
+  "scales": [100, 1000, 10000, 50000],
+  "samples": { "default": 30, "50000": 20 },
+  "floorSamples": 50,
+  "corpusDir": "/tmp/treadle-bench",
+  "a1WriterCounts": [5, 24, 60, 200],
+  "a5": { "corpusScale": 1000, "randomEdits": 200 }
+}

@@ -1,0 +1,70 @@
+# SPDX-License-Identifier: Apache-2.0
+# DR8's regression gate. Linux only on a pull request, for the reason ci.yml states.
+#
+# What has teeth on any runner: the axis outcomes (durability under parallel writers, whole-
+# store refusals, crashes on malformed input) and the budgets that are properties of the
+# package rather than of a machine (dependency count, install size, index-to-text ratio,
+# peak memory). Those transfer, so a failure is evidence about the change.
+#
+# What does not have teeth yet: the per-operation timing limits. They were derived on one
+# machine and have never been measured on a GitHub runner, so a red build there would be
+# evidence about the runner. `bench/budgets.json` carries `timing.enforced: false` with that
+# reason, the rows still print with their numbers, and arming them means re-deriving on the
+# runner with `--write-budgets`. A limit nobody has measured is not a limit.
+
+name: Benchmarks
+
+on:
+  pull_request:
+    paths:
+      - 'bench/**'
+      - 'src/**'
+      - 'package.json'
+      - '.github/workflows/bench.yml'
+  push:
+    branches: [main]
+  schedule:
+    # Weekly, at every scale. A pull request runs the two small scales; 10k and 50k cost
+    # minutes of corpus generation and belong where they are not paid per push.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel a superseded pull-request run to keep PR churn cheap, but never a scheduled,
+# push or workflow_dispatch run: those are each the only record of their own result, and
+# cancelling one mid-flight discards a week's 10k/50k measurement for nothing.
+concurrency:
+  group: bench-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  gate:
+    name: Measure and gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+
+      - name: Measure and gate
+        env:
+          TREADLE_BENCH_DIR: ${{ runner.temp }}/treadle-bench
+          # A pull request measures the two small scales; the weekly run measures all four.
+          SCALES: ${{ github.event_name == 'pull_request' && '100,1000' || '100,1000,10000,50000' }}
+        run: npm run bench:gate -- --scales "$SCALES" --out bench/results
+
+      - name: Summary
+        if: always()
+        run: cat bench/results/bench.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: bench-${{ github.run_id }}
+          path: bench/results/

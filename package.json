@@ -49,12 +49,16 @@
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test",
     "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD",
-    "schemas": "node scripts/generate-schemas.ts"
+    "schemas": "node scripts/generate-schemas.ts",
+    "bench": "node bench/main.ts",
+    "bench:gate": "node bench/main.ts --gate"
   },
   "devDependencies": {
+    "@anthropic-ai/tokenizer": "0.0.4",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@types/node": "^24.7.0",
+    "gpt-tokenizer": "4.0.0",
     "typescript": "^5.9.3"
   }
 }

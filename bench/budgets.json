@@ -1,0 +1,117 @@
+{
+  "tolerancePercent": 35,
+  "toleranceWhy": "six four-scale runs on 2026-09-05 put the worst run-to-run drift of any operation's program cost at 19.9% across the three runs where the machine was quiet (list at 1,000 items, 87.5 / 87.4 / 104.7 ms); 35% clears that by 1.76x. The in-process median was measured as an alternative and drifts 17.8% on the same case, so the statistic is not what the variance comes from. A run taken under load drifts further and shows up as an open miss, which is the correct outcome for a gate nobody has armed yet. The p95 moved 68.9% between two runs, which is why the gate reads the median and reports the p95 without gating on it.",
+  "derivedFrom": {
+    "runId": "2026-09-04T23-39-28-387Z",
+    "date": "2026-09-04",
+    "machine": "Apple M2, 8 cores, darwin 25.6.0",
+    "node": "24.11.1",
+    "note": "timing limits are program cost at the median: the operation wall median minus the runner's own node floor median, measured in the same job"
+  },
+  "coldStartMs": 157.8,
+  "timing": {
+    "enforced": false,
+    "why": "the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured.",
+    "limits": {
+      "identity@100": 178.4,
+      "get@100": 172.1,
+      "list@100": 199.1,
+      "create@100": 189,
+      "transition@100": 170.1,
+      "identity@1000": 79,
+      "get@1000": 85.3,
+      "list@1000": 89.6,
+      "create@1000": 115.8,
+      "transition@1000": 120.7,
+      "identity@10000": 206.6,
+      "get@10000": 325.1,
+      "list@10000": 230.9,
+      "create@10000": 172,
+      "transition@10000": 198.4,
+      "identity@50000": 273.9,
+      "get@50000": 653.4,
+      "list@50000": 407.3,
+      "create@50000": 432.9,
+      "transition@50000": 535.8
+    }
+  },
+  "axes": {
+    "a1Durability": {
+      "limit": 1,
+      "enforced": true,
+      "source": "axis A1",
+      "why": ""
+    },
+    "a1Crashes": {
+      "limit": 0,
+      "enforced": true,
+      "source": "axis A1",
+      "why": "closed by #4, which armed `pragma busy_timeout` before the journal-mode switch and retried the promotion SQLite refuses to wait on. Verified here at 0 crashes in 1,445 writers across five runs at 1-minute loads of 3.13 to 116.12, against 126 crashes in 2,890 writers before it. Armed, so a return of it fails the build."
+    },
+    "a5SilentDrops": {
+      "limit": 0,
+      "enforced": false,
+      "source": "axis A5",
+      "why": "the store has never met this: a record heading renamed out of the grammar is dropped from every query with no finding"
+    },
+    "a5WholeStoreRefusals": {
+      "limit": 0,
+      "enforced": true,
+      "source": "axis A5",
+      "why": ""
+    },
+    "a5Crashes": {
+      "limit": 0,
+      "enforced": true,
+      "source": "axis A5",
+      "why": ""
+    }
+  },
+  "absolute": {
+    "peakRssReadKb": {
+      "limit": 102400,
+      "enforced": false,
+      "source": "DR8, 100 MiB for a read at 50k",
+      "why": "the landed store has never met this: a read at 50k peaks at about 182 MiB against DR8 100 MiB, measured twice"
+    },
+    "peakRssMutationKb": {
+      "limit": 122880,
+      "enforced": false,
+      "source": "DR8, 120 MiB for a mutation at 50k",
+      "why": "the landed store has never met this: a mutation at 50k peaks at about 212 MiB against DR8 120 MiB, measured twice"
+    },
+    "firstIndexBuildMs": {
+      "limit": 6000,
+      "enforced": false,
+      "source": "DR8, 6 s for 50k items and 500k events",
+      "why": "the landed store has never met this: 11.1 s against DR8 6 s, and the figure is a wall time that a different runner would move on its own"
+    },
+    "reindexAfterHandEditMs": {
+      "limit": 50,
+      "enforced": false,
+      "source": "DR8, 50 ms after a hand edit of the largest shard",
+      "why": "the landed store has never met this: 257 ms against DR8 50 ms, and the figure is a wall time that a different runner would move on its own"
+    },
+    "indexToTextRatio": {
+      "limit": 1,
+      "enforced": false,
+      "source": "DR8, index at most 1.0x the text size",
+      "why": "the landed index stores each record's and each event's source text, which the DR2 spike that measured 0.7x did not; the store owner has to decide whether the budget or the index changes"
+    },
+    "runtimeDependencies": {
+      "limit": 0,
+      "enforced": true,
+      "source": "DR7, zero runtime dependencies"
+    },
+    "installUnpackedBytes": {
+      "limit": 1572864,
+      "enforced": true,
+      "source": "DR8, 1.5 MB unpacked"
+    },
+    "bundleBytes": {
+      "limit": 512000,
+      "enforced": true,
+      "source": "DR8, 500 KB bundle"
+    }
+  }
+}

@@ -11,6 +11,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0004](0004-concurrency-and-durability.md) | One advisory lock with a heartbeat, exclusive-create atomic writes, per-record compare-and-set |
 | [ADR-0005](0005-output-and-exit-code-contract.md) | One result object per command, three renderings behind one seam, and one exit table over its `code` |
 | [ADR-0006](0006-the-store-seam.md) | The store seam, with the sharded store and the copy-on-write overlay both under one conformance suite |
+| [ADR-0008](0008-the-measurement-rig.md) | The measurement rig: corpora written through the store, cold-process timing, and a gate that reads the median |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
