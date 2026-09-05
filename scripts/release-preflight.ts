@@ -59,7 +59,7 @@ export function preflight(input: {
   const problems: string[] = []
 
   if (!SEMVER.test(tag)) {
-    problems.push(`tag ${tag} is not v<semver>, which .github/rulesets/tags.json requires`)
+    problems.push(`tag ${tag} is not v<semver>, which the release path requires`)
   }
   if (tag !== `v${manifest.version}`) {
     problems.push(`tag ${tag} does not name package.json's version ${manifest.version}`)
