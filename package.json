@@ -4,7 +4,7 @@
   "description": "Agile work management for a team and its agents, over files you commit to git.",
   "license": "Apache-2.0",
   "bin": {
-    "treadle": "bin/treadle.js"
+    "treadle": "dist/treadle.js"
   },
   "author": "Abhijeet Halder",
   "private": true,
@@ -13,12 +13,12 @@
     "node": ">=24.15.0"
   },
   "files": [
-    "bin/",
-    "src/",
+    "dist/",
     "schemas/",
     "LICENSE",
     "NOTICE",
-    "README.md"
+    "README.md",
+    "THIRD-PARTY-NOTICES.md"
   ],
   "keywords": [
     "agile",
@@ -45,22 +45,30 @@
   },
   "homepage": "https://github.com/Abhijeet34/treadle#readme",
   "scripts": {
+    "build": "node scripts/build.ts",
     "test": "node --test \"test/**/*.test.ts\"",
     "coverage": "node scripts/coverage.ts",
     "flake": "node scripts/flake.ts",
     "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run typecheck && npm test && npm run build",
     "commitlint": "commitlint --config scripts/commitlint.config.js --from origin/main --to HEAD",
     "schemas": "node scripts/generate-schemas.ts",
     "bench": "node bench/main.ts",
-    "bench:gate": "node bench/main.ts --gate"
+    "bench:gate": "node bench/main.ts --gate",
+    "audit": "npm audit --audit-level=low",
+    "licences": "node scripts/check-licences.ts",
+    "supply-chain": "node scripts/check-supply-chain.ts"
   },
   "devDependencies": {
     "@anthropic-ai/tokenizer": "0.0.4",
     "@commitlint/cli": "^20.1.0",
     "@commitlint/config-conventional": "^20.0.0",
     "@types/node": "^24.7.0",
+    "esbuild": "^0.28.2",
     "gpt-tokenizer": "4.0.0",
     "typescript": "^5.9.3"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
