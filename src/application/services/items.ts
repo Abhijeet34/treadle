@@ -332,11 +332,27 @@ function tickedOf(criteria: readonly AcceptanceCriterion[] | undefined): string 
 }
 
 /**
- * A scalar that summarises a block beside it, so `--field <name>` hands back the content and
- * not only the summary. `show --field ac` returned `ac 0/1` and nothing else, which is a
- * count of a checklist whose text the tool would not print.
+ * The criteria a story's `ac` tally is a tally of, built only when the caller asks for that
+ * field by name. `show --field ac` returned `ac 0/1` and nothing else, so a checklist a team wrote
+ * and committed was readable through no command in the tool.
+ *
+ * It is a projection rather than a line of the whole record because the whole record has a
+ * budget: `show` is 310 B against A.3's figure with no headroom, and two criteria cost 52 B
+ * on every read of every story. This is the shape `desc` already takes, which is cut at 64
+ * cells in the record and printed whole under `show <id> --field desc`.
  */
-const DETAIL_OF: Readonly<Record<string, string>> = { ac: 'criteria' }
+function criteriaBlock(item: WorkItem): Block | undefined {
+  const criteria = item.acceptance_criteria ?? []
+  if (criteria.length === 0) return undefined
+  return {
+    columns: columnsOf(SHOW_SHAPE, 'criteria'),
+    shown: criteria.length,
+    total: criteria.length,
+    rows: criteria.map((criterion, at): Row => ({
+      n: at + 1, tick: criterion.ticked ? 'x' : '-', text: criterion.text,
+    })),
+  }
+}
 
 export async function showItem(
   store: Store, clock: Clock, id: ItemId, field?: string,
@@ -407,18 +423,6 @@ export async function showItem(
     }
   }
 
-  const criteria = item.acceptance_criteria ?? []
-  if (criteria.length > 0) {
-    data['criteria'] = {
-      columns: columnsOf(SHOW_SHAPE, 'criteria'),
-      shown: criteria.length,
-      total: criteria.length,
-      rows: criteria.map((criterion, at): Row => ({
-        n: at + 1, tick: criterion.ticked ? 'x' : '-', text: criterion.text,
-      })),
-    }
-  }
-
   if (field === undefined) return okResult(SHOW_SHAPE, { workspace, data })
   // Either spelling reaches the same key, and the refusal offers both back: a caller who read
   // `desc` off a record and asked for `description` was told the record had no such field.
@@ -435,9 +439,8 @@ export async function showItem(
     })
   }
   const projection: Record<string, Value> = { item: item.id, [key]: data[key] as Value }
-  const detail = DETAIL_OF[key]
-  const block = detail === undefined ? undefined : data[detail]
-  if (detail !== undefined && block !== undefined) projection[detail] = block
+  const detail = key === 'ac' ? criteriaBlock(item) : undefined
+  if (detail !== undefined) projection['criteria'] = detail
   return okResult(SHOW_SHAPE, { workspace, data: projection })
 }
 

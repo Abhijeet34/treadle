@@ -63,7 +63,12 @@ export function topLevelHelp(workspace: string): ResultObject {
         'treadle help <command>',
       ],
       about: 'Agile work management for a team and its agents, over files you commit to git.',
-      example: COMMANDS.flatMap(examplesOf).slice(0, 6),
+      // The first example of each command rather than the first six of the whole table: the
+      // flat form never reached past `backlog`, so the page toured three of fifteen commands
+      // and adding an example to one of them pushed another command's off the page entirely.
+      example: COMMANDS.map((command) => examplesOf(command)[0])
+        .filter((example): example is string => example !== undefined)
+        .slice(0, 6),
       commands,
     },
   })

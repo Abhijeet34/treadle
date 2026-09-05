@@ -162,7 +162,9 @@ describe('the defects found by using the tool', () => {
       // "when did this reach ready, and who moved it there" is answered by this one row, so
       // the `what` cell carries both states and not only the name of the field that moved.
       assert.match(log.out, /^\S+ human item\.transition state=draft->ready ravi$/m)
-      assert.match(log.out, /^\S+ human item\.file [a-z_,]+ dana$/m)
+      // Every part of the cell is name=value or name=from->to, which is the convention
+      // test/services/history-convention.test.ts holds over every op.
+      assert.match(log.out, /^\S+ human item\.file type=task,state=draft,\S+ dana$/m)
       const rows = log.out.split('\n').filter((line) => /^2026-/.test(line))
       assert.deepEqual([...rows].sort().reverse(), rows, 'the rows are newest first')
     })
@@ -241,7 +243,11 @@ describe('a gate that demands a field names a command that can set it', () => {
   it('records the change in the log, with prose recorded as its length', async () => {
     const log = await cli(['history', 'checkout-500', '--limit', '9'])
     assert.equal(log.code, 0, log.err)
-    assert.match(log.out, /item\.set expected,actual/, 'the fields the set moved reach the what column')
+    assert.match(
+      log.out,
+      /item\.set expected=\(unset\)->\(text:\d+\),actual=\(unset\)->\(text:\d+\)/,
+      'the fields the set moved reach the what column, each with the length the log stored for it',
+    )
   })
 })
 

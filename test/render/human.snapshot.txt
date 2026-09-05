@@ -266,6 +266,36 @@ show  acme-platform
   desc
     The client currently drops the session when the access token expires, and the user is signed out in the middle of a task they had already started.
 
+### show-criteria @ 60
+show  acme-platform
+  item  auth-refresh
+  ac  0/2
+
+criteria  2 of 2
+  N  TICK  TEXT
+  1  -     a 401 refreshes once
+  2  -     the retry carries the new token
+
+### show-criteria @ 80
+show  acme-platform
+  item  auth-refresh
+  ac  0/2
+
+criteria  2 of 2
+  N  TICK  TEXT
+  1  -     a 401 refreshes once
+  2  -     the retry carries the new token
+
+### show-criteria @ 200
+show  acme-platform
+  item  auth-refresh
+  ac  0/2
+
+criteria  2 of 2
+  N  TICK  TEXT
+  1  -     a 401 refreshes once
+  2  -     the retry carries the new token
+
 ### next @ 60
 next  acme-platform
   weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
@@ -403,7 +433,8 @@ events  3 of 3
     state=draft->ready
     dana
   2026-08-21T09:00:00Z  human  item.file       
-    type,state,filed_at,priority,points,assignee
+    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,pri
+    ority=1,points=8,assignee=kim
     dana
 
 ### history @ 80
@@ -418,7 +449,8 @@ events  3 of 3
   2026-08-21T09:00:00Z  human  item.transition  state=draft->ready
     dana
   2026-08-21T09:00:00Z  human  item.file       
-    type,state,filed_at,priority,points,assignee
+    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,ass
+    ignee=kim
     dana
 
 ### history @ 200
@@ -427,10 +459,10 @@ history  acme-platform
   sort  at desc
 
 events  3 of 3
-  AT                    KIND   OP               WHAT                                          BY
-  2026-08-21T09:00:00Z  human  item.transition  state=ready->in_progress                      dana
-  2026-08-21T09:00:00Z  human  item.transition  state=draft->ready                            dana
-  2026-08-21T09:00:00Z  human  item.file        type,state,filed_at,priority,points,assignee  dana
+  AT                    KIND   OP               WHAT                                                                                   BY
+  2026-08-21T09:00:00Z  human  item.transition  state=ready->in_progress                                                               dana
+  2026-08-21T09:00:00Z  human  item.transition  state=draft->ready                                                                     dana
+  2026-08-21T09:00:00Z  human  item.file        type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,assignee=kim  dana
 
 ### help @ 60
 help  acme-platform
@@ -445,17 +477,15 @@ help  acme-platform
     and say what it created
   example  treadle file story "Refresh the access token on a
     401" # file a story in draft
-  example  treadle file bug "Checkout fails" --set
-    severity=S2 --set found_in=production --set
-    repro_steps="add to cart, pay" # a bug needs the three
-    fields its type requires at creation
   example  treadle show auth-refresh --field desc # the
     description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to
     pick up
-  example  treadle backlog --state cancelled --resolution
-    duplicate # count what was stopped as a duplicate,
-    without reading any prose
+  example  treadle transition sso-saml in_progress # start
+    work; refused if a guard on that edge fails
+  example  treadle set checkout-500 expected="both orders
+    are listed" actual="one is charged" # fill in what a bug
+    was filed without, which is what the ready gate reads
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -488,14 +518,14 @@ help  acme-platform
     created
   example  treadle file story "Refresh the access token on a 401" # file a story
     in draft
-  example  treadle file bug "Checkout fails" --set severity=S2 --set
-    found_in=production --set repro_steps="add to cart, pay" # a bug needs the
-    three fields its type requires at creation
   example  treadle show auth-refresh --field desc # the description whole,
     rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
-  example  treadle backlog --state cancelled --resolution duplicate # count what
-    was stopped as a duplicate, without reading any prose
+  example  treadle transition sso-saml in_progress # start work; refused if a
+    guard on that edge fails
+  example  treadle set checkout-500 expected="both orders are listed"
+    actual="one is charged" # fill in what a bug was filed without, which is
+    what the ready gate reads
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -525,10 +555,10 @@ help  acme-platform
     Agile work management for a team and its agents, over files you commit to git.
   example  treadle init # create a workspace in .work here, and say what it created
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
-  example  treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay" # a bug needs the three fields its type requires at creation
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
-  example  treadle backlog --state cancelled --resolution duplicate # count what was stopped as a duplicate, without reading any prose
+  example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 
 commands  15 of 15
   NAME        EFFECT  PAGEABLE  SUMMARY

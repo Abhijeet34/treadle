@@ -134,17 +134,19 @@ const CONTENT_HELD_BACK: Readonly<Record<string, string>> = {
 }
 
 /**
- * The atoms of a stored value that a read surface has to print. A scalar is its own text; a
- * collection is every element's, because a list whose entries print as a count is the defect
- * this file exists for.
+ * The atoms of a stored value that a read surface has to print: the value itself for a
+ * scalar, and every string a collection's entries carry, because a list whose entries print
+ * as a count is the defect this file exists for. A boolean inside an entry is a flag each
+ * surface renders in its own vocabulary - the criteria block prints a tick as `x` - so what
+ * has to survive is the entry's text and not the word `false`.
  */
-function contentOf(value: unknown): readonly string[] {
+function contentOf(value: unknown, nested = false): readonly string[] {
   if (value === undefined || value === null) return []
-  if (Array.isArray(value)) return value.flatMap((entry) => contentOf(entry))
+  if (Array.isArray(value)) return value.flatMap((entry) => contentOf(entry, true))
   if (typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).flatMap((entry) => contentOf(entry))
+    return Object.values(value as Record<string, unknown>).flatMap((entry) => contentOf(entry, true))
   }
-  return [String(value)]
+  return nested && typeof value !== 'string' ? [] : [String(value)]
 }
 
 const ACTOR: Actor = { id: 'dana', kind: 'human' }
