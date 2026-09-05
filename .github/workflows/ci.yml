@@ -6,9 +6,9 @@
 # A pull request runs Linux runners only. GitHub bills a macOS minute at about 10x a Linux one
 # and a Windows minute at about 1.67x, against the same allowance, so a three-platform matrix
 # here would spend most of the budget proving what the cheapest runner already proved.
-# cross-platform.yml carries macOS and Windows, weekly and on the release path. The one
-# exception is the release pull request, at the bottom of this file, and it exists because
-# merging that pull request is what makes a release possible.
+# cross-platform.yml carries macOS and Windows on the weekly schedule, on dispatch, and on
+# the release path, where release.yml calls it on the signed tag before any artifact is
+# attached. No pull request in this repository starts a macOS or Windows runner.
 #
 # Third-party actions are pinned to a full commit SHA with the version in a trailing comment,
 # never to a tag: a tag can be repointed at new code by whoever owns the action.
@@ -195,25 +195,13 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE" "$HEAD"
 
-  # The one pull request that runs macOS and Windows, and the reason the rule above is "a
-  # pull request runs Linux runners only" rather than "no pull request runs anything else".
-  # Merging this pull request is what makes main's head releasable, and a release is cut from
-  # main's head, so this is the last moment three platforms can be checked before the tag.
-  #
-  # The same-repository clause is not decoration: without it a fork could open a pull request
-  # from a branch it names release-please--anything and spend the macOS and Windows matrix.
-  cross-platform:
-    name: cross-platform
-    if: github.event_name == 'pull_request' && startsWith(github.head_ref, 'release-please--') && github.event.pull_request.head.repo.full_name == github.repository
-    uses: ./.github/workflows/cross-platform.yml
-
   # The single required context. Everything above reaches the branch ruleset through this job
   # and nowhere else, so `if: always()` is load-bearing: without it a failed dependency would
   # leave this job skipped, and a skipped required check is not a failing one.
   checks:
     name: checks
     if: always()
-    needs: [check, audit, codeql, actionlint, dependency-review, commits, cross-platform]
+    needs: [check, audit, codeql, actionlint, dependency-review, commits]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -223,9 +211,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "results: $RESULTS"
-          # 'skipped' is accepted only because three jobs above skip themselves by event or by
-          # branch: dependency-review and commits off a pull request, cross-platform off the
-          # release pull request. No job here `needs:` another, so nothing else produces it.
+          # 'skipped' is accepted only because two jobs above skip themselves off a pull
+          # request: dependency-review and commits. No job here `needs:` another, so nothing
+          # else produces it.
           for result in $RESULTS; do
             case "$result" in
               success|skipped) ;;

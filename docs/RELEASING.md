@@ -10,7 +10,7 @@ Five steps, and a person is the third one.
 
 1. Work merges to `main` through a pull request, as always.
 2. `release-please` opens or updates a release pull request on every push to `main`. It carries the version bump and the changelog entry and nothing else.
-3. Someone reviews that pull request and merges it. Merging is what makes `main`'s head releasable; the `cross-platform` job runs on that pull request, so macOS and Windows have seen the tree before it is a candidate.
+3. Someone reviews that pull request and merges it. Merging is what makes `main`'s head releasable.
 4. Someone tags `main`'s head with a signed annotated tag and pushes it:
 
    ```sh

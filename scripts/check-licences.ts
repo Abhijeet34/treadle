@@ -14,9 +14,9 @@ import { readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
+import { parseArgs } from 'node:util'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
-const NOTICES = path.join(ROOT, 'THIRD-PARTY-NOTICES.md')
 
 // Permissive licences only. A copyleft licence on a build tool is not an emergency, but it is
 // a decision, and this list is where the decision would be recorded rather than discovered.
@@ -24,6 +24,19 @@ const ALLOWED = new Set([
   'MIT', 'Apache-2.0', 'ISC', 'BSD-2-Clause', 'BSD-3-Clause', '0BSD',
   'CC0-1.0', 'Unlicense', 'BlueOak-1.0.0', 'Python-2.0',
 ])
+
+/**
+ * A bare licence id behaves exactly as before. A compound SPDX expression such as
+ * `(MIT OR Apache-2.0)` is accepted when every term it names is on the allowlist: strip the
+ * surrounding parentheses, split on the `OR`/`AND` operators, drop any `WITH` exception clause
+ * per term, and require each remaining id to be allowed.
+ */
+function isAllowedLicence(licence: string): boolean {
+  const stripped = licence.trim().replace(/^\((.*)\)$/, '$1')
+  return stripped
+    .split(/\s+(?:OR|AND)\s+/)
+    .every((term) => ALLOWED.has(term.trim().split(/\s+WITH\s+/)[0]?.trim() ?? term))
+}
 
 /** What each direct development dependency is for. A package with no line here fails. */
 const PURPOSE: Readonly<Record<string, string>> = {
@@ -36,10 +49,10 @@ const PURPOSE: Readonly<Record<string, string>> = {
   typescript: 'type checking; Node strips the types at run time and never compiles them',
 }
 
-type Installed = { readonly name: string; readonly version: string; readonly licence: string }
+export type Installed = { readonly name: string; readonly version: string; readonly licence: string }
 
 /** Every package in the installed tree, including transitive ones and nested trees. */
-function installed(dir: string, scope = ''): Installed[] {
+export function installed(dir: string, scope = ''): Installed[] {
   if (!existsSync(dir)) return []
   const found: Installed[] = []
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
@@ -64,6 +77,28 @@ function installed(dir: string, scope = ''): Installed[] {
     found.push(...installed(path.join(home, 'node_modules')))
   }
   return found
+}
+
+/**
+ * The problem list for a walked tree: a disallowed licence anywhere in it, and a declared
+ * devDependency that is either missing from the tree or missing its PURPOSE line.
+ */
+export function findProblems(
+  tree: readonly Installed[],
+  devDependencies: Readonly<Record<string, string>>,
+): string[] {
+  const problems: string[] = []
+  for (const pkg of tree) {
+    if (!isAllowedLicence(pkg.licence)) {
+      problems.push(`${pkg.name}@${pkg.version} is ${pkg.licence}, which is not on the allowlist`)
+    }
+  }
+  const byName = new Map(tree.map((p) => [p.name, p]))
+  for (const name of Object.keys(devDependencies).sort()) {
+    if (!byName.has(name)) problems.push(`${name} is a devDependency but is not installed`)
+    else if (PURPOSE[name] === undefined) problems.push(`${name} has no line in PURPOSE; say what it is for`)
+  }
+  return problems
 }
 
 function notices(direct: readonly Installed[]): string {
@@ -99,50 +134,56 @@ This file is generated. Run \`npm run licences -- --write\` after changing a dev
 `
 }
 
-const args = new Set(process.argv.slice(2))
-const tree = installed(path.join(ROOT, 'node_modules'))
-if (tree.length === 0) {
-  console.error('no packages are installed, so this check would pass vacuously; run npm ci first')
-  process.exit(1)
-}
+if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
+  const { values } = parseArgs({
+    options: {
+      root: { type: 'string' },
+      list: { type: 'boolean', default: false },
+      write: { type: 'boolean', default: false },
+    },
+  })
+  const root = values.root !== undefined ? path.resolve(values.root) : ROOT
+  const noticesFile = path.join(root, 'THIRD-PARTY-NOTICES.md')
 
-const problems: string[] = []
-for (const pkg of tree) {
-  if (!ALLOWED.has(pkg.licence)) {
-    problems.push(`${pkg.name}@${pkg.version} is ${pkg.licence}, which is not on the allowlist`)
+  const tree = installed(path.join(root, 'node_modules'))
+  if (tree.length === 0) {
+    console.error('no packages are installed, so this check would pass vacuously; run npm ci first')
+    process.exit(1)
   }
-}
 
-const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
-  devDependencies?: Record<string, string>
-}
-const byName = new Map(tree.map((p) => [p.name, p]))
-const direct: Installed[] = []
-for (const name of Object.keys(manifest.devDependencies ?? {}).sort()) {
-  const found = byName.get(name)
-  if (found === undefined) problems.push(`${name} is a devDependency but is not installed`)
-  else if (PURPOSE[name] === undefined) problems.push(`${name} has no line in PURPOSE; say what it is for`)
-  else direct.push(found)
-}
-
-if (args.has('--list')) {
-  for (const pkg of [...tree].sort((a, b) => a.name.localeCompare(b.name))) {
-    console.log(`${pkg.name}@${pkg.version}\t${pkg.licence}`)
+  const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as {
+    dependencies?: Record<string, string>
+    devDependencies?: Record<string, string>
   }
-}
+  const problems = findProblems(tree, manifest.devDependencies ?? {})
 
-const wanted = notices(direct)
-if (args.has('--write')) {
-  writeFileSync(NOTICES, wanted)
-  console.log(`wrote ${path.relative(ROOT, NOTICES)}`)
-} else if (!existsSync(NOTICES) || readFileSync(NOTICES, 'utf8') !== wanted) {
-  problems.push('THIRD-PARTY-NOTICES.md is not what this script generates; run npm run licences -- --write')
-}
+  const byName = new Map(tree.map((p) => [p.name, p]))
+  const direct: Installed[] = []
+  for (const name of Object.keys(manifest.devDependencies ?? {}).sort()) {
+    const found = byName.get(name)
+    if (found !== undefined && PURPOSE[name] !== undefined) direct.push(found)
+  }
 
-for (const problem of problems) console.error(problem)
-console.log(
-  problems.length === 0
-    ? `licences: ok, ${tree.length} installed packages, ${direct.length} direct, 0 shipped`
-    : `licences: ${problems.length} problem(s) over ${tree.length} installed packages`,
-)
-process.exitCode = problems.length === 0 ? 0 : 1
+  if (values.list) {
+    for (const pkg of [...tree].sort((a, b) => a.name.localeCompare(b.name))) {
+      console.log(`${pkg.name}@${pkg.version}\t${pkg.licence}`)
+    }
+  }
+
+  const wanted = notices(direct)
+  if (values.write) {
+    writeFileSync(noticesFile, wanted)
+    console.log(`wrote ${path.relative(root, noticesFile)}`)
+  } else if (!existsSync(noticesFile) || readFileSync(noticesFile, 'utf8') !== wanted) {
+    problems.push('THIRD-PARTY-NOTICES.md is not what this script generates; run npm run licences -- --write')
+  }
+
+  const shipped = Object.keys(manifest.dependencies ?? {}).length
+  for (const problem of problems) console.error(problem)
+  console.log(
+    problems.length === 0
+      ? `licences: ok, ${tree.length} installed packages, ${direct.length} direct, ${shipped} shipped`
+      : `licences: ${problems.length} problem(s) over ${tree.length} installed packages`,
+  )
+  process.exitCode = problems.length === 0 ? 0 : 1
+}

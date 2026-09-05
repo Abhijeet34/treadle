@@ -1,8 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# The rehearsal for docs/ROLLBACK.md. It runs the release gate against tags that should be
-# refused and tags that should be accepted, in a throwaway clone of this repository, so the
-# procedure in that document is one somebody has watched work rather than one somebody wrote.
+# The rehearsal for docs/RELEASING.md's "Rolling back" and "The drill" sections. It runs the
+# release gate against tags that should be refused and tags that should be accepted, in a
+# throwaway clone of this repository, so the procedure in that document is one somebody has
+# watched work rather than one somebody wrote.
 #
 # It creates tags. It creates them in a clone under a temporary directory and pushes nothing,
 # which is why it is safe to run at any time and why it is not a workflow: a drill that could
@@ -105,8 +106,8 @@ check "publishing while the name has not been cleared" "publication interlock" \
 
 echo
 echo "== the hotfix path"
-# What docs/ROLLBACK.md tells a person to do when a release was wrong: branch from the tag
-# that was released, land the fix, and cut the next patch from it.
+# What docs/RELEASING.md's "Rolling back" section tells a person to do when a release was
+# wrong: branch from the tag that was released, land the fix, and cut the next patch from it.
 git checkout --quiet -b "hotfix/v$VERSION" "v$VERSION"
 patch="$(node -p "const [a,b,c]=require('./package.json').version.split('.'); [a,b,Number(c)+1].join('.')")"
 node -e '
