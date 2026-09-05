@@ -25,7 +25,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
 | No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.11% to 97.43% lines and 88.99% to 89.08% branches across three runs, against a 90/85 gate; every one of the 7 named files over its 95/90 bar in every run | Proven |
-| A flake budget of zero | 20 of 20 consecutive full runs completed and green, 678 tests every run, 27.1 s to 34.4 s each, 626 s in total | Proven |
+| A flake budget of zero | 20 of 20 consecutive full runs completed and green, the same test count in every run, 27.1 s to 34.4 s each, 626 s in total | Proven |
 | One regression test per closed security finding | 8 closed findings, each mapped to a named test that names the finding and carries assertions; 5 open findings each naming the layer they wait on | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
 | No literal invisible code point ships | 169 tracked text files scanned, 0 carrying one; every such character in the suites is built from its number or written as an escape | Proven |
@@ -54,20 +54,21 @@ Whether the definition-of-ready gate asks for the right things is a product ques
 `npm run coverage` runs the suite under Node's own coverage and holds the result to a table in `scripts/coverage.ts`.
 The overall gate is 90% lines and 85% branches; the named files are held to 95% and 90%, because those are exactly the files a project-wide average hides.
 
-| File | What it is | Line % | Branch % |
+| File | What it is | Held to | Result |
 |---|---|---|---|
-| `src/adapters/store/grammar.ts` | parser and serializer | 96.33 | 96.26 |
-| `src/domain/state-machine.ts` | state machine | 100.00 | 100.00 |
-| `src/domain/text.ts` | escaper: the safe-text class | 100.00 | 100.00 |
-| `src/adapters/render/grammar.ts` | escaper: the line grammar guards | 100.00 | 100.00 |
-| `src/adapters/workspace.ts` | path resolution: the workspace walk | 100.00 | 100.00 |
-| `src/adapters/target.ts` | path resolution: the store seam target | 100.00 | 100.00 |
-| `src/adapters/store/lock.ts` | lock | 100.00 | 98.00 to 100.00 |
-| all files | | 97.11 to 97.43 | 88.99 to 89.08 |
+| `src/adapters/store/grammar.ts` | parser and serializer | 95% lines, 90% branches | met |
+| `src/domain/state-machine.ts` | state machine | 95% lines, 90% branches | met |
+| `src/domain/text.ts` | escaper: the safe-text class | 95% lines, 90% branches | met |
+| `src/adapters/render/grammar.ts` | escaper: the line grammar guards | 95% lines, 90% branches | met |
+| `src/adapters/workspace.ts` | path resolution: the workspace walk | 95% lines, 90% branches | met |
+| `src/adapters/target.ts` | path resolution: the store seam target | 95% lines, 90% branches | met |
+| `src/adapters/store/lock.ts` | lock | 95% lines, 90% branches | met |
+| all files | | 90% lines, 85% branches | 97.11 to 97.43 lines, 88.99 to 89.08 branches |
 
-Two of those figures are ranges rather than points, because they move between runs and a single decimal would be spuriously precise.
+The overall figures are ranges rather than points, because they move between runs and a single decimal would be spuriously precise.
 The concurrency and durability suites are real processes: how many trials leave a lock file for the next writer to reclaim, how many journalled transactions a kill leaves to be replayed, and how many compare-and-set attempts 24 writers need are all decided by the scheduler, so each run takes a slightly different set of branches through `lock.ts` and the store.
 What is asserted is the gate, which every run met, not the decimal.
+A count that measures a claim is kept here; a count that measures only the size of the tree is not, because it rots into a false statement on the next commit.
 
 The gate has been seen red: before the tests in this branch, `src/adapters/workspace.ts` sat at 80.17% lines and 65.22% branches and `src/adapters/store/lock.ts` at 88.37% branches, and `npm run coverage` named all three misses with their numbers and exited non-zero.
 Writing those tests is what found the crash below.
@@ -77,7 +78,7 @@ Writing those tests is what found the crash below.
 `npm run flake` runs the whole suite 20 times in a row and reports the count that completed alongside the count that passed.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
-Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, 678 tests in every run, 626 s in total.
+Measured on this tree: 20 of 20 runs completed, 20 green, 0 failed, the same test count in every run, 626 s in total.
 Individual runs ranged from 27.1 s to 34.4 s, which is a 1.27x spread on an otherwise idle machine and is the reason the fuzzer's time bound is generous rather than tight.
 
 One flake was found and fixed during this work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.

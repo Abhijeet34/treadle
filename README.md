@@ -40,7 +40,7 @@ node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
 
-The test suite is 678 tests and no build step, about 31 seconds on Node 24.11.1. Most of that
+The test suite has no build step, about 31 seconds on Node 24.11.1. Most of that
 is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed
 inputs per run.
 
