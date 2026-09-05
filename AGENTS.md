@@ -218,6 +218,10 @@ Before hand-checking any of these, run the suite: it already checks them.
 - No emitted value may carry a byte the line grammar treats as a delimiter, and a block may
   carry one free-text column, which renders last. Both fail loudly rather than corrupting a
   row; findings F2 and F3.
+- A shape declares its scalars, lists and text first and its blocks after them, and the
+  service builds its result object in that same order, because `json` renders the object's
+  own keys while `agent` and `human` walk the shape. `test/render/conformance.test.ts` holds
+  both halves; ADR-0005 says why.
 - In the human rendering a block closes the group it is in, so a scalar after a table is
   separated by a blank line; the rule is ADR-0005 and `test/render/human-layout.test.ts`
   holds it. That suite pins the bytes of every golden object at 60, 80 and 200 cells, so a
