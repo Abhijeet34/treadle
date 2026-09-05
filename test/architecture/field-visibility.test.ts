@@ -112,7 +112,7 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   reason: readable('explain:reason', 'for the write that put the item in its current state. It is bounded at 500 characters, so it is printed for the one event a reader asked about rather than on every row of a list'),
   outcome: readable('history:what', 'as `outcome=<v>`'),
   cmd: hidden('`op` is the same fact in the vocabulary the store owns: `item.mark` for `mark`. `cmd` is kept in the log so a later rename of a command stays traceable against old events, and printing both prints one fact twice.'),
-  txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. On a read surface it groups writes across entities, and no command in this build writes more than one entity, so every group would hold one event.'),
+  txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
 }
 
 const ACTOR: Actor = { id: 'dana', kind: 'human' }

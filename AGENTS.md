@@ -212,6 +212,8 @@ Neither is a state.
 When the next word for "how work ended" arrives, it is a value in a closed set on an existing edge, not an eighth state: `resolution` on `cancel` and `outcome` on `release` are both `T6`, and `docs/architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md` prices what a state would have cost instead.
 When a fact can be computed from a stored field and the clock, it is derived on read beside the field, never written: `overdue` sits next to `blocked` in that respect, and `src/domain/dates.ts` is where both it and its `H17` finding live.
 A field nothing reads is decoration, so a new one lands with the reads that act on it in the same change.
+`test/architecture/field-visibility.test.ts` is that rule as a test rather than a hope: every field the dictionary and every key `EVENT_KEYS` persists carries one line naming the result key that prints it, or a declared reason it stays hidden, and the file's header says what to write.
+Three fields reached a benchmark finding before it existed, each captured on every write and shown by nothing.
 
 ## The extension surface is closed, and closing it was the decision
 
