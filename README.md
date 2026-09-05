@@ -40,12 +40,19 @@ node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
 
-The test suite is 603 tests, no build step, about 9 seconds, most of it the concurrency suite's 37 child processes.
+The test suite is 651 tests and no build step, about 42 seconds on Node 24.11.1. Most of that
+is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed
+inputs per run.
 
 ```bash
-npm test        # node --test over test/**/*.test.ts, no build step
-npm run check   # tsc --noEmit under strict, then the tests
+npm test         # node --test over test/**/*.test.ts, no build step
+npm run check    # tsc --noEmit under strict, then the tests
+npm run coverage # the suite under coverage, held to a per-file gate
+npm run flake    # 20 consecutive full runs, budget zero
 ```
+
+[docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each
+figure is, and what is not proven.
 
 The domain core is a library of pure functions.
 Nothing in `src/domain` reads the filesystem, the clock, a random source, or the process, and a test enforces that rather than a comment asking for it.
@@ -100,7 +107,7 @@ The remaining five land in layers that do not exist yet.
 itself. It is the proof that the tool can manage its own backlog, and it is readable and
 reviewable as markdown without running anything:
 
-```text
+```bash
 treadle status                                  # where the project stands
 treadle next                                    # what to pick up, and why that order
 treadle explain history                         # why one item is still in draft
@@ -119,6 +126,7 @@ list. `treadle explain <id>` names the rule.
 - [docs/STABILITY.md](docs/STABILITY.md) - what counts as a breaking change, and the pre-1.0 policy.
 - [docs/BENCHMARKS.md](docs/BENCHMARKS.md) - the measured run: the twelve axes, the performance budget, and what is not measured yet.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
+- [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
 
 ## Licence
