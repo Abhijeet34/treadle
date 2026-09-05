@@ -139,6 +139,12 @@ A multi-line value never appears as a bare line: it arrives as `|<key> <lines> <
 followed by exactly that many content lines. Read the count, not the newlines. That is
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
+A `page` line is a cursor to follow, not an offset. The walk is exact over a workspace nothing
+is writing to, proved by count at 50,021 items over 101 pages, and it is read-committed rather
+than a snapshot: an item whose sort key moves past the cursor while the walk runs is skipped,
+and one that moves the other way is returned twice. A cursor the list no longer holds is
+refused with `C1` rather than served as the first page, which is what it used to be.
+
 ## Narrowing a bound after files exist
 
 A bound the tool did not always have cannot be applied where the value is read.
@@ -293,6 +299,21 @@ shared: a before and an after forty minutes apart, at 1-minute loads of 68.77 an
 the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code.
 `docs/BENCHMARKS.md` carries the method, the interleaved-run shape and the floors table, and
 `bench/budgets.json` says which budgets are armed and why the timing ones are not.
+
+A figure taken at the store seam is not a figure about a command. Every command goes through
+`readWorkspace`, which lists the store with no query, indexes it by id and builds the
+hierarchy, so `store.get` at 7.4 ms and `treadle show` at 1.6 s are both true and only one of
+them is what a caller pays. A4 times that read as the `workspace` operation and `bench/gate.ts`
+weighs each memory budget over the worst of a named set rather than over one operation, which
+is what stopped the read budget being met by a `list` bounded at 50 rows. Adding an operation
+to A4 therefore changes what a budget prices, deliberately.
+
+Two things are known to give way past 50,000 items and neither is the shard key. The read
+above is 416 MiB at 50,000 and 984 MiB at 200,000, and anything that pairs items with events
+must bucket the log by entity first: `doctor` scanned the whole log once per item and had no
+answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path only, so a
+month past 8 MiB is written happily and then refused by every command with `S4` and no way
+back. "Where it stops scaling" in `docs/BENCHMARKS.md` carries the measurements.
 
 ## Where a terminal nuance goes, and where a derived flag goes
 

@@ -58,7 +58,11 @@ export const COMMANDS: readonly Command[] = [
     name: 'file', shape: FILE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle file <type> <title> [--points <n>] [--priority <1-5>] [--set <field>=<value>]'],
+    usage: [
+      'treadle file <type> <title> [--id <slug>] [--points <n>] [--priority <1-5>] [--assignee <name>]',
+      'treadle file <type> <title> [--desc <text>] [--label <name>] [--sprint <id>] [--parent <id>]',
+      'treadle file <type> <title> [--set <field>=<value>]',
+    ],
     examples: [
       ['treadle file story "Refresh the access token on a 401"', 'file a story in draft'],
       ['treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay"', 'a bug needs the three fields its type requires at creation'],
@@ -78,7 +82,10 @@ export const COMMANDS: readonly Command[] = [
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: true,
-    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>] [--fields <list>] [--limit <n>]'],
+    usage: [
+      'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
+      'treadle backlog [--sprint <id>] [--priority <1-5>] [--fields <list>] [--limit <n>] [--cursor <id>]',
+    ],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
@@ -149,7 +156,7 @@ export const COMMANDS: readonly Command[] = [
     name: 'next', shape: NEXT_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle next [--limit <n>] [--for <actor>]'],
+    usage: ['treadle next [--limit <n>] [--cursor <id>] [--for <actor>]'],
     examples: [['treadle next', 'what to pick up, with the score components and the weights that ranked it']],
   },
   {
@@ -207,7 +214,7 @@ export type Verdict = 'S' | 'A' | 'N' | 'X'
 export const GLOBAL_FLAGS = [
   '--help', '--version', '--out', '--quiet', '--verbose', '--color', '--workspace',
   '--dry-run', '--preview', '--yes', '--no-input', '--actor', '--width', '--fields',
-  '--limit', '--explain-absence',
+  '--limit', '--cursor', '--explain-absence',
 ] as const
 export type GlobalFlag = (typeof GLOBAL_FLAGS)[number]
 
@@ -230,6 +237,10 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     case '--actor': return command.effect === 'mutate' ? 'S' : 'A'
     case '--fields': return command.columns ? 'S' : 'X'
     case '--limit': return command.pageable ? 'S' : 'X'
+    // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
+    // the tool prints itself in every `page` line, and `treadle version --cursor x` was
+    // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.
+    case '--cursor': return command.pageable ? 'S' : 'X'
     case '--explain-absence': return command.omits ? 'S' : 'X'
   }
 }

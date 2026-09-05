@@ -609,7 +609,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --preview
     # which store and which guards, evaluating none of them
 
-flags  16 of 16
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what …
   --version          N        another scope: passing it h…
@@ -626,6 +626,7 @@ flags  16 of 16
   --width            A        accepted and ignored: it on…
   --fields           X        refused: ignoring it would …
   --limit            X        refused: ignoring it would …
+  --cursor           X        refused: ignoring it would …
   --explain-absence  X        refused: ignoring it would …
 
 ### help-command @ 80
@@ -653,7 +654,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --preview # which store and
     which guards, evaluating none of them
 
-flags  16 of 16
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or…
   --version          N        another scope: passing it here is a validation …
@@ -670,6 +671,7 @@ flags  16 of 16
   --width            A        accepted and ignored: it only changes presentat…
   --fields           X        refused: ignoring it would answer a question th…
   --limit            X        refused: ignoring it would answer a question th…
+  --cursor           X        refused: ignoring it would answer a question th…
   --explain-absence  X        refused: ignoring it would answer a question th…
 
 ### help-command @ 200
@@ -688,7 +690,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
   example  treadle transition sso-saml in_progress --preview # which store and which guards, evaluating none of them
 
-flags  16 of 16
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or shows
   --version          N        another scope: passing it here is a validation error naming the correct form
@@ -705,6 +707,7 @@ flags  16 of 16
   --width            A        accepted and ignored: it only changes presentation, and here there is nothing to present
   --fields           X        refused: ignoring it would answer a question the caller did not ask
   --limit            X        refused: ignoring it would answer a question the caller did not ask
+  --cursor           X        refused: ignoring it would answer a question the caller did not ask
   --explain-absence  X        refused: ignoring it would answer a question the caller did not ask
 
 ### not-found @ 60
