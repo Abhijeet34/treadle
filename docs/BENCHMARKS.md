@@ -97,7 +97,8 @@ Of 35 budgets in the appended run: 22 pass, 0 fail, 13 open miss, 0 pending.
 
 ## Targets missed
 
-Three of these are measured once in the appended run, at the command surface, and are counts rather than timings.
+The first two are measured once in the appended run, at the command surface, and are counts rather than timings.
+The third is a timing, and the series below is what bounds it.
 
 | Target | Reference | Measured | Miss |
 |---|---|---|---|
@@ -113,7 +114,7 @@ Against the reference on the same list this is 2.5x as many questions answered w
 A12's one miss is a defect in this product and is described below.
 
 The remaining rows are the ten-run series, taken on 2026-09-04 on the tree before #4 and #7, and no figure in it was re-taken.
-It is the only evidence here of run-to-run drift, so it is kept and marked rather than replaced by one quiet run.
+It is the only evidence here of run-to-run drift, so it is kept and marked rather than replaced by any single run.
 
 | Target | Budget | Median of ten runs | Range | Over by |
 |---|---|---|---|---|
