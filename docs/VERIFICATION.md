@@ -42,6 +42,11 @@ Counts are per run, and every property suite prints its own count as a test diag
 | The event log holds the same property the record files hold | A repeated event id across two month files replaced the real creation event in `history` and `explain` with `doctor` clean; now `S14` at the line, every read refusing at 7. An instant naming month 13 sorted after every real event; now refused. A blank line moved the reported line of an appended bad line by one; now the line the file has (`test/store/event-log-integrity.test.ts`, `test/services/event-audit.test.ts`) | Proven |
 | A duplicate-id finding goes with the file it clashed against | A shard copied to a second month and then removed left `S3` refusing every read until the surviving shard changed or the index was deleted; the index now records which file a clash was decided against and re-reads the survivor when that file changes or goes, for `S3` and `S14` alike (`test/store/event-log-integrity.test.ts`) | Proven |
 | The store never writes a record it would not serve back | `set acceptance_criteria="a\nb"` landed and every read after it exited 7; now refused at 2 as `V4`, and the store parses every record it renders before the write (`test/cli/found-by-use.test.ts`) | Proven |
+| The lock reclaim race resolves without an overlapping hold | 24 waiters over 600 contended reclaims, 0 overlapping holds | Proven |
+| A symlinked or a foreign-pid lock does not wedge the store | both forms reclaimed within the 5 s window | Proven |
+| No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
+| A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
+| The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
 
 ## What is not proven
 
