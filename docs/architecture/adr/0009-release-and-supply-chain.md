@@ -37,7 +37,7 @@ The 500 KB limit is not written in the build script.
 It is read from `bench/budgets.json`, so `npm run build` and `npm run bench:gate` weigh the bundle against the same number and cannot drift apart.
 
 Measured: 173,891 bytes, 2.9x under the budget.
-The tarball is 17 files, 55.5 kB packed and 232.7 kB unpacked, against DR8's 1.5 MB unpacked limit.
+The tarball is 18 files, 56.8 kB packed and 236.0 kB unpacked, against DR8's 1.5 MB unpacked limit.
 
 ### A signed annotated tag is the release authorisation
 

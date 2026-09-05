@@ -34,7 +34,7 @@ npm ci
 ```
 
 What a published install would carry is one file of executable code.
-`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 17 files, 55.5 kB packed.
+`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball: 18 files, 56.8 kB packed and 236.0 kB unpacked.
 The bundle is 173,891 bytes against DR1's 500 KB budget, and the build fails rather than warns if it goes over.
 
 ## Quick start
