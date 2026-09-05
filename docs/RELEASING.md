@@ -39,9 +39,34 @@ The gate that holds publication is not a flag someone might forget to unset, it 
 
 `scripts/release-preflight.ts` is where that becomes enforcement rather than habit.
 It refuses a tag that is lightweight, that carries no signature `git verify-tag` accepts, that is not `v<semver>`, that names a version the tree does not declare, or that points at a commit which never reached `main`.
-`.github/rulesets/tags.json` refuses the same shapes at the forge, and refuses to let a `v*` tag be updated or deleted once it exists.
+`.github/rulesets/tags.json` requires the signature at the forge as well, and refuses to let a `v*` tag be updated or deleted once it exists.
+It does not check the tag's name; the next section says why.
 
 A signed tag is the authorisation, not a label on one.
+
+## Why the tag ruleset does not check the tag name
+
+`.github/rulesets/tags.json` carries `update`, `deletion` and `required_signatures`, and deliberately carries no `tag_name_pattern` rule.
+GitHub's ruleset documentation lists that rule for a tag target, and GitHub refuses it on this repository with HTTP 422.
+
+Measured on 2026-09-05 by posting each rule alone against a disabled probe ruleset and deleting it afterwards:
+
+| Rule posted alone | Verdict |
+|---|---|
+| `required_signatures` on a tag target | accepted |
+| `tag_name_pattern`, `regex` operator, with a `name` key | HTTP 422 |
+| `tag_name_pattern`, `regex` operator, without a `name` key | HTTP 422 |
+| `tag_name_pattern`, `starts_with` operator | HTTP 422 |
+
+So the rule type is refused in every shape and operator tried, rather than one parameter block being malformed.
+The sibling repository's working tag ruleset carries only `update` and `deletion`, which is consistent with the same limit rather than with an oversight there.
+
+Do not add the rule back from the documentation.
+While it was in the file every run of `scripts/apply-repo-settings.sh` failed on it.
+
+Tag naming is enforced where the tag is created instead.
+`.github/workflows/release.yml` fires only on `refs/tags/v*`, and `scripts/release-preflight.ts` refuses a tag that is not `v<semver>` before anything is built, attached or published.
+A tag that reached the forge with the wrong name releases nothing.
 
 ## What a release produces
 
@@ -137,10 +162,15 @@ scripts/apply-repo-settings.sh Abhijeet34/treadle
 
 It is idempotent: a ruleset whose name already exists is updated in place rather than duplicated.
 
+It applies every setting it can and names the ones it could not, together, at the end, and exits non-zero when anything failed.
+That is deliberate: it used to stop at the first refusal, so the tag ruleset GitHub rejects left the repository settings and both Actions permission calls unapplied while the exit code said only that something had gone wrong.
+A settings script that half-applies is worse than one that refuses, because the operator cannot tell from the exit code which half happened.
+`test/release/repo-settings.test.ts` holds that behaviour, driving the real script against a stubbed `gh-axi`.
+
 | File | What it sets |
 |---|---|
 | `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the single required `checks` context |
-| `.github/rulesets/tags.json` | Signed `v<semver>` tags that cannot be updated or deleted |
+| `.github/rulesets/tags.json` | Signed tags on `refs/tags/v*` that cannot be updated or deleted. The name itself is checked by the release preflight, not here: see "Why the tag ruleset does not check the tag name" |
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
 | `.github/settings/actions-workflow-permissions.json` | A read-only default token |

@@ -37,6 +37,14 @@ also needs a signed annotated `v<semver>` tag that a person pushes, because rele
 creates lightweight unsigned tags and `scripts/release-preflight.ts` refuses one. Do not tag,
 release or publish without the captain saying so.
 
+Branch protection, the tag rules and the Actions policy are checked in under
+`.github/rulesets/` and `.github/settings/`, and `scripts/apply-repo-settings.sh` is the only
+thing that applies them: never configure one by hand on the forge, because a hand-made
+ruleset beside the file is the drift the files exist to prevent. The script applies every
+setting it can and names the ones it could not, together, at the end. Not every rule GitHub
+documents is available here, and `docs/RELEASING.md` carries which and the measurement behind
+it, so read that before adding a rule to one of those files.
+
 `package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
 below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
 `npm install` here is expected and is not a defect to fix. `node:sqlite` also works unflagged
