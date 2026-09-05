@@ -58,7 +58,11 @@ export const COMMANDS: readonly Command[] = [
     name: 'file', shape: FILE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle file <type> <title> [--points <n>] [--priority <1-5>] [--set <field>=<value>]'],
+    usage: [
+      'treadle file <type> <title> [--id <slug>] [--points <n>] [--priority <1-5>] [--assignee <name>]',
+      'treadle file <type> <title> [--desc <text>] [--label <name>] [--sprint <id>] [--parent <id>]',
+      'treadle file <type> <title> [--set <field>=<value>]',
+    ],
     examples: [
       ['treadle file story "Refresh the access token on a 401"', 'file a story in draft'],
       ['treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay"', 'a bug needs the three fields its type requires at creation'],
@@ -78,7 +82,10 @@ export const COMMANDS: readonly Command[] = [
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: true,
-    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>] [--fields <list>] [--limit <n>] [--cursor <id>]'],
+    usage: [
+      'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
+      'treadle backlog [--sprint <id>] [--priority <1-5>] [--fields <list>] [--limit <n>] [--cursor <id>]',
+    ],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],

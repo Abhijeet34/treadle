@@ -11,6 +11,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
+import { COMMAND_OPTIONS } from '../../src/cli/parse.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
 /** 69 bytes, which is the length that first showed `show` cutting a title at 64 cells. */
@@ -573,5 +574,31 @@ describe('the defects a caller found on its first walk through the tool', () => 
     assert.equal(refused.code, 2)
     assert.match(refused.err, /--cursor cannot apply to show/)
     assert.match(refused.err, /^fix treadle help show$/m)
+  })
+})
+
+describe('help names every flag the parser accepts', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('has a usage line for each command flag, so a caller finds one by asking', async () => {
+    // `file` accepted --id, --desc, --assignee, --label, --sprint and --parent, and `backlog`
+    // accepted --sprint and --priority, none of which appeared in any help output. A caller's
+    // only way to those eight was the refusal it got for guessing wrong.
+    const missing: string[] = []
+    for (const [command, options] of Object.entries(COMMAND_OPTIONS)) {
+      const help = await cli(['help', command])
+      assert.equal(help.code, 0, help.err)
+      for (const flag of Object.keys(options)) {
+        if (!help.out.includes(`--${flag} `) && !help.out.includes(`--${flag}=`)) {
+          missing.push(`${command} --${flag}`)
+        }
+      }
+    }
+    assert.deepEqual(missing, [], `help does not name: ${missing.join(', ')}`)
   })
 })

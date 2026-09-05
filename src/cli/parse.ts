@@ -43,7 +43,13 @@ const GLOBAL_OPTIONS: OptionConfig = {
   'log-values': { type: 'boolean' },
 }
 
-const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
+/**
+ * The flags each command takes beyond the global set. Exported so a test can hold the rule
+ * that `help <command>` names every one of them: six of `file`'s and two of `backlog`'s were
+ * accepted by this table and absent from every help page, so a caller found them by being
+ * refused rather than by asking.
+ */
+export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   init: { name: { type: 'string' } },
   file: {
     id: { type: 'string' },
