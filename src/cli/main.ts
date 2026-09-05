@@ -239,9 +239,13 @@ async function execute(env: Environment): Promise<number> {
   // The actor lands whole in the append-only log, which is the third unbounded prose door
   // this tool has closed: T7 bounded a transition's reason for the same reason, and the log
   // is now read back by `history`, so an unbounded identity would be unbounded output too.
-  const badActor = actorRefusal(actorOf(env, flags))
-  if (badActor !== undefined) {
-    return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)
+  // The bound applies only where the actor is recorded: a mutating command writes it into an
+  // event, while a read command accepts and ignores it, per the inventory's own 'A' verdict.
+  if (commandNamed(command ?? 'status')?.effect === 'mutate') {
+    const badActor = actorRefusal(actorOf(env, flags))
+    if (badActor !== undefined) {
+      return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)
+    }
   }
 
   if (command === 'init') {

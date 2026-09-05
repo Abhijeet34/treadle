@@ -181,6 +181,13 @@ describe('the defects found by using the tool', () => {
       assert.ok(events.ok)
       assert.equal(events.value.length, 1, 'the refused move appended nothing')
     })
+
+    it('accepts and ignores the same out-of-bound actor on a read, which records no event', async () => {
+      const long = 'a'.repeat(201)
+      const shown = await cli(['show', 'auth-refresh', '--actor', long])
+      assert.equal(shown.code, 0, `${shown.out}${shown.err}`)
+      assert.match(shown.out, /^item auth-refresh$/m)
+    })
   })
 })
 
