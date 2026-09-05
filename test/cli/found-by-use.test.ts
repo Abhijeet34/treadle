@@ -159,7 +159,9 @@ describe('the defects found by using the tool', () => {
       const log = await cli(['history', 'i18n-dates'])
       assert.equal(log.code, 0, log.err)
       assert.match(log.out, /^#at kind op what "by$/m, 'the actor column is marked as third-party content')
-      assert.match(log.out, /^\S+ human item\.transition state ravi$/m)
+      // "when did this reach ready, and who moved it there" is answered by this one row, so
+      // the `what` cell carries both states and not only the name of the field that moved.
+      assert.match(log.out, /^\S+ human item\.transition state=draft->ready ravi$/m)
       assert.match(log.out, /^\S+ human item\.file [a-z_,]+ dana$/m)
       const rows = log.out.split('\n').filter((line) => /^2026-/.test(line))
       assert.deepEqual([...rows].sort().reverse(), rows, 'the rows are newest first')
@@ -317,5 +319,69 @@ describe('S3: a duplicate id refuses the write rather than serving the first mat
   it('leaves every other record writable, so one bad id does not stop the workspace', async () => {
     const moved = await cli(['transition', 'i18n-dates', 'ready'])
     assert.equal(moved.code, 0, moved.err)
+  })
+})
+
+describe('a refusal about a flag is written by the tool, not by its argument parser', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  /** Byte sequences only `node:util`'s parseArgs writes. None of them may reach a surface. */
+  const PARSER_PROSE = /Unknown option|does not take an argument|argument missing|argument is ambiguous|place it at the end of the command/
+
+  const lines: readonly (readonly [string, readonly string[], RegExp])[] = [
+    ['an unknown long flag', ['show', 'i18n-dates', '--bogus'], /^"cause --bogus is not a flag of show$/m],
+    ['an unknown short flag', ['show', 'i18n-dates', '-Z'], /^"cause -Z is not a flag of show$/m],
+    ['a flag another command owns', ['transition', 'i18n-dates', 'ready', '--set', 'x=y'], /^"cause --set is not a flag of transition$/m],
+    ['a value on a flag that takes none', ['show', 'i18n-dates', '--quiet=1'], /^"cause --quiet takes no value$/m],
+    ['a flag whose value is missing', ['show', 'i18n-dates', '--field'], /^"cause --field needs a value$/m],
+    ['a value that starts with a dash', ['backlog', '--limit', '-x'], /^"cause --limit needs a value, and one starting with a dash is written --limit=-x$/m],
+    // The first pass is not strict and there is no command word to trigger the second, so
+    // this line used to run the default command with the flag silently dropped.
+    ['an unknown flag with no command word', ['--nope'], /^"cause --nope is not a flag of treadle$/m],
+  ]
+
+  for (const [what, argv, cause] of lines) {
+    it(`names ${what} and points at the flag table that lists them`, async () => {
+      const refused = await cli(argv)
+      assert.equal(refused.code, 2, `${refused.out}${refused.err}`)
+      assert.match(refused.err, cause)
+      assert.doesNotMatch(refused.err, PARSER_PROSE, 'no third-party message reaches the surface')
+      assert.match(refused.err, /^fix treadle help( \w+)?$/m, 'the remedy is the command that prints the flags')
+      // A `cause` is a marked scalar; the parser's three-line message arrived as a counted
+      // block instead, which is a different line kind for the same key.
+      assert.doesNotMatch(refused.err, /^\|cause /m)
+    })
+  }
+})
+
+describe('an aggregate says what it aggregates, and a heading with no value prints none', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('names the completed-points counter for the points it sums, not for the items', async () => {
+    const listed = await cli(['backlog'])
+    assert.equal(listed.code, 0, listed.err)
+    assert.match(listed.out, /^done_points \d+$/m)
+    // `done` was the key, and beside a row whose STATE cell reads `done` it was read as a
+    // count of finished items. No key on this surface may be read that way again.
+    assert.doesNotMatch(listed.out, /^done \d+$/m)
+  })
+
+  it('drops the absent workspace from a heading that has none', async () => {
+    const version = await cli(['version', '--out', 'human'])
+    assert.equal(version.code, 0, version.err)
+    assert.equal(version.out.split('\n')[0], 'version')
+
+    const listed = await cli(['backlog', '--out', 'human'])
+    assert.match(listed.out, /^backlog {2}\S+$/m, 'a command that opened a workspace still names it')
   })
 })

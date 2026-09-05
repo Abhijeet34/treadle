@@ -181,7 +181,7 @@ function split(line: string, arity: number): readonly string[] {
 describe('right-to-left content is confined to its own field in the human rendering', () => {
   const RTL = 'تسجيل الدخول'
   const result: ResultObject = {
-    schema: 'backlog/1', ok: true, code: 'OK', command: 'backlog', workspace: 'w',
+    schema: 'backlog/2', ok: true, code: 'OK', command: 'backlog', workspace: 'w',
     effect: 'read', txn: null, changed: null,
     data: {
       sort: 'priority,filed,id',
