@@ -60,12 +60,12 @@
   },
   "devDependencies": {
     "@anthropic-ai/tokenizer": "0.0.4",
-    "@commitlint/cli": "^20.1.0",
-    "@commitlint/config-conventional": "^20.0.0",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
     "@types/node": "^24.7.0",
     "esbuild": "^0.28.2",
     "gpt-tokenizer": "4.0.0",
-    "typescript": "^5.9.3"
+    "typescript": "^7.0.2"
   },
   "publishConfig": {
     "access": "public"

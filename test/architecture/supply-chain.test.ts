@@ -28,6 +28,7 @@ const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8'
   bin?: Record<string, string>
   files?: readonly string[]
   engines?: { node?: string }
+  devDependencies?: Record<string, string>
 }
 
 function tracked(file: string): boolean {
@@ -197,6 +198,17 @@ describe('the published package is the bundle and nothing else', () => {
     assert.ok(check, 'ci.yml must declare a check job')
     assert.match(check!.text, new RegExp(`node: \\["${floor.replaceAll('.', '\\.')}", `),
       `ci.yml's check matrix must have ${floor} as its first leg`)
+  })
+
+  it('@types/node describes the floor rather than a newer runtime', () => {
+    // A fourth place names a Node version, and it is the one nothing else catches. tsc reads
+    // @types/node whichever runtime runs it, so declarations a major above the floor accept an
+    // API that is absent at 24.15 and CI fails only where a test happens to execute that line.
+    // The order is fixed: engines.node moves first and the bump follows it.
+    const floorMajor = (manifest.engines?.node ?? '').replace(/^>=/, '').split('.')[0]
+    const declared = manifest.devDependencies?.['@types/node'] ?? ''
+    assert.equal(declared.replace(/^[\^~]/, '').split('.')[0], floorMajor,
+      `@types/node is ${declared} while engines.node floors at ${floorMajor}.x`)
   })
 })
 

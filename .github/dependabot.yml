@@ -33,6 +33,13 @@ updates:
     commit-message:
       prefix: "chore"
       include: scope
+    ignore:
+      # @types/node's major says which Node the code is allowed to call, and
+      # test/architecture/supply-chain.test.ts holds it to engines.node's floor. A major here
+      # ahead of that floor lets tsc accept an API absent at 24.15, which only fails later and
+      # only where a test runs that line. Raising the floor is what releases this.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     groups:
       # esbuild is separated from the rest of the toolchain because it is the one development
       # dependency whose output ships: it produces the bytes in dist/treadle.js, so its
