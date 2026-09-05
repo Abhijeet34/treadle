@@ -559,6 +559,8 @@ First index build with the index deleted: 14032 ms. Re-index after a hand edit o
 
 Bytes are the gate and tokens are advisory, per DR8. The budgets are the interface specification's section A.3, adjusted upward by four bytes for every occurrence of the binary name, because A.3 was stated against a three-character name.
 The reference column is quoted from the prior-art axes table and was never re-derived here.
+The explain row was re-derived by executing runA3 in bench/axes/a3-output.ts against the current golden results with the real tokenizers from bench/tokens.ts.
+Only the explain row moved because that axis is a pure function of the golden results and explain is the only golden whose output this change alters.
 
 | Artefact | Bytes | Budget | Within | claude | o200k | cl100k | B/token claude | Reference | Against reference |
 |---|---|---|---|---|---|---|---|---|---|
