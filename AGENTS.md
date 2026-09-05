@@ -156,10 +156,14 @@ Before hand-checking any of these, run the suite: it already checks them.
   clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
-  filesystem (`test/security/f1-f7-no-execution.test.ts`,
-  `test/security/f11-adapter-write-safety.test.ts`). Those two findings closed by absence
-  rather than by a guard, so the test is the whole of the control; the walker all three
-  tree-wide rules share is `test/helpers/src-scan.ts`.
+  filesystem. `test/security/f1-f7-no-execution.test.ts` and
+  `test/security/f11-adapter-write-safety.test.ts` hold this as an architecture rule over
+  source text and the command inventory; `test/security/f1-no-execution-at-runtime.test.ts`
+  holds the same claim for F1 at runtime, tripping every entry point Node has for running a
+  program or a string against every command in the inventory. Findings closed by absence
+  rather than by a guard have the test as the whole of the control; the walker all three
+  tree-wide source-text rules share (this one, F11's, and layering's above) is
+  `test/helpers/src-scan.ts`.
 - Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
   Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
 - Zero runtime dependencies. The same test fails if `dependencies` gains an entry.

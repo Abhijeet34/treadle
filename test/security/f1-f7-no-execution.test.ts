@@ -6,8 +6,12 @@
 //
 // A finding closed by absence needs a test more than one closed by a fix does: a fix is
 // visible in the diff that made it, while an absence is undone by any later commit that adds
-// an import nobody reads twice. The rule is that nothing under src/ can start a process or
-// evaluate a string, and nothing under src/ reads a hook setting.
+// an import nobody reads twice. The rule this file holds is an architecture rule, over
+// source text: no module under src/ names an executing module in an import specifier, no
+// module under src/ contains an eval-shaped call, and no module under src/ names a hook
+// setting. That proves the rule was followed, not that nothing executes at runtime; the
+// runtime claim is `f1-no-execution-at-runtime.test.ts`, which traps every entry point Node
+// has for running a program or a string and drives every command with the traps live.
 //
 // What this does not cover: a generator that writes an executable for something else to run.
 // That is F11, in f11-adapter-write-safety.test.ts.
@@ -38,7 +42,7 @@ const HOOK_SETTING = /\bhooks?\b/i
 
 const SCANNED = sources(SRC)
 
-describe('the tool executes nothing, which is what closes F1 and F7', () => {
+describe('no source file under src/ names anything that executes, which is what closes F1 and F7', () => {
   it('has sources to judge, so a pass is not vacuous', () => {
     assert.ok(SCANNED.length >= 20, `found ${SCANNED.length} sources under src/`)
   })
@@ -54,17 +58,17 @@ describe('the tool executes nothing, which is what closes F1 and F7', () => {
     const rel = path.relative(ROOT, file)
     const text = codeOnly(readFileSync(file, 'utf8'))
 
-    it(`${rel} imports nothing that can start a process`, () => {
+    it(`${rel} names no executing module in an import specifier`, () => {
       for (const spec of specifiersOf(file)) {
         const bare = spec.startsWith('node:') ? spec.slice('node:'.length) : spec
         assert.ok(
           !EXECUTING_MODULES.includes(bare),
-          `${rel} imports ${spec}: ADR-0012 refuses the hook contract, so nothing under src/ runs a program`,
+          `${rel} imports ${spec}: ADR-0012 refuses the hook contract, so no source file under src/ may name it`,
         )
       }
     })
 
-    it(`${rel} evaluates no string and reads no hook setting`, () => {
+    it(`${rel} contains no eval-shaped call and names no hook setting`, () => {
       for (const [pattern, what] of EVALUATING) {
         assert.ok(!pattern.test(text), `${rel} matches ${pattern}: it ${what}`)
       }

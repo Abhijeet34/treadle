@@ -8,6 +8,12 @@
 // same reason F1 does, by having nothing to attack, and this file is the tripwire that fires
 // the day it gains something. Its failure message carries the five rules ADR-0012 states, so
 // whoever trips it is told the contract rather than sent looking for it.
+//
+// This is an architecture rule read over source text and the command inventory, not a
+// runtime claim: it proves the writer allowlist and the command list hold today, the way
+// `f1-f7-no-execution.test.ts` proves F1 and F7's import rule. F1's matching runtime claim,
+// that nothing under src/ actually executes a program, is `f1-no-execution-at-runtime.test.ts`;
+// F11 has no runtime counterpart because there is no generator to drive.
 
 import assert from 'node:assert/strict'
 import path from 'node:path'

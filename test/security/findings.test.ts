@@ -38,7 +38,7 @@ type Finding = {
 
 /** The thirteen findings of `wmcli-threat-model-t5`, in the audit's own order. */
 const FINDINGS: readonly Finding[] = [
-  { id: 'F1', title: 'a committed workspace file names a hook executable, run with no consent gate', test: 'security/f1-f7-no-execution.test.ts', record: 'docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md' },
+  { id: 'F1', title: 'a committed workspace file names a hook executable, run with no consent gate', test: 'security/f1-no-execution-at-runtime.test.ts', record: 'docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md' },
   { id: 'F2', title: 'a multi-line description forges lines in the agent output stream', test: 'security/f2-newline-forging.test.ts' },
   { id: 'F3', title: 'a column appended after a space-bearing one corrupts the row split', test: 'security/f3-column-split.test.ts' },
   { id: 'F4', title: 'CSV export is quoted but not formula-guarded', waitingOn: 'export, which is specified and not built' },

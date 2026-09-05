@@ -71,6 +71,7 @@ There is none, and that is a decision rather than a gap.
 
 DR6 designed a hook as an external executable named in a committed `workspace.md` and run on every mutation, which is code execution driven by the content of a repository you cloned.
 [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses that contract for v1, keeps the event-sink seam, and states what would reopen it.
-`test/security/f1-f7-no-execution.test.ts` holds the refusal: nothing under `src/` may import a module that starts a process, evaluate a string, or read a setting named `hooks`.
+`test/security/f1-f7-no-execution.test.ts` holds the refusal as an architecture rule: nothing under `src/` may import a module that starts a process, evaluate a string, or read a setting named `hooks`.
+`test/security/f1-no-execution-at-runtime.test.ts` holds the same refusal as a runtime claim, tripping every entry point Node has for running a program or a string and driving every command with the traps live.
 
 In-process plugins were already excluded for a separate reason: a plugin that can call into the store bypasses the invariants a hook could not.

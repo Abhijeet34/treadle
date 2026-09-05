@@ -46,8 +46,9 @@ The rule that decides it is already written down, that an interface with one imp
 `HOOK_REFUSED` and `HOOK_FAILED` stay out of the closed exit-code set, where [ADR-0005](0005-output-and-exit-code-contract.md) already put them, and exit 3 means a guard refused.
 DR5's reservation is untouched: the codes stay reserved and unproduced, which is what makes a later hooks feature additive rather than breaking.
 
-`test/security/f1-f7-no-execution.test.ts` is the enforcement.
-Nothing under `src/` may import `child_process`, `worker_threads`, `vm`, `inspector` or `repl`, evaluate a string, or read a setting named `hooks`.
+Two files hold the enforcement, because absence needs both an architecture rule and a runtime check.
+`test/security/f1-f7-no-execution.test.ts` holds the architecture rule: nothing under `src/` may import `child_process`, `worker_threads`, `vm`, `inspector` or `repl` in an import specifier, evaluate a string, or read a setting named `hooks`.
+`test/security/f1-no-execution-at-runtime.test.ts` holds the runtime claim a specifier scan cannot make: every entry point Node has for running a program or a string is replaced with one that records the attempt and throws, and every command in the inventory is driven against a real workspace with the traps live.
 A finding closed by absence needs a test more than one closed by a fix does, because an absence is undone by any later commit that adds an import nobody reads twice.
 
 The backlog story `hooks` is cancelled with the resolution `wont_do`, naming this record, so the tool's own backlog says the same thing this file does.
