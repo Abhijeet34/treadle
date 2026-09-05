@@ -165,7 +165,10 @@ export const humanRenderer: Renderer = {
     const quiet = options.quiet === true
     const lines: string[] = []
     if (!quiet) {
-      const head = [result.command, result.workspace]
+      // `version` and `help` answer without opening a workspace and carry `-` for one, which
+      // the agent envelope needs as a positional field and a heading does not: `version  -`
+      // reads as a heading whose value is missing rather than as one that has none.
+      const head = [result.command, ...(result.workspace === '-' ? [] : [result.workspace])]
       if (result.effect === 'mutate') head.push(`${result.changed ?? 0} changed`, `txn ${result.txn ?? '-'}`)
       lines.push(head.join('  '))
     }

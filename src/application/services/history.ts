@@ -11,6 +11,11 @@
 // string, so the actor is that column. Everything to its left is projected through `cell`,
 // because an event file is a committed file a hand edit can reach and a value carrying a
 // space would shift every field after it.
+//
+// `what` names the fields an event moved and, where the event recorded both sides safely,
+// the values it moved them between. The names alone left "when did this reach in_review,
+// and who moved it there" unanswerable from any read surface: `show` has the current state,
+// `explain` has `since` and `from_event`, and this column had the word `state`.
 
 import { isKnownField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
@@ -67,23 +72,67 @@ function overridden(event: StoreEvent): readonly string[] {
  */
 const FIELD_OF_OP: Readonly<Record<string, string>> = { 'item.evidence.add': 'evidence' }
 
+/**
+ * The longest value a move may print per side. An audited value is a state, an instant, a
+ * severity or a slug, so this is generous for every one of them while keeping five moved
+ * fields inside one cell; a longer value falls back to its field name.
+ */
+const MAX_VALUE = 40
+
+/** A stored snapshot as a plain field map, or `undefined` when the event carries none. */
+function snapshot(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
+
+/**
+ * One side of a move as it prints, or `undefined` when it cannot print. `-` is the
+ * snapshot's own marker for a field that was not set, and it prints as an empty side:
+ * `reviewer=->abhijeet` reads as a move from nothing, where the two glyphs of `-` and `->`
+ * would collide into `-->`.
+ */
+function side(value: unknown): string | undefined {
+  if (value === '-') return ''
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_VALUE) return undefined
+  return /\s/.test(value) ? undefined : value
+}
+
+/**
+ * One moved field as `field=from->to`, or its name alone when the event did not record both
+ * sides safely. A creation has no `before`, so its fields moved from nothing in particular
+ * and their values are the ones `show` prints today; a value carrying a space, an unbounded
+ * prose length or the `N chars` the log records in place of prose has no side to print.
+ */
+function move(
+  field: string,
+  before: Record<string, unknown> | undefined,
+  after: Record<string, unknown> | undefined,
+): string {
+  if (before === undefined || after === undefined) return field
+  const from = side(before[field])
+  const to = side(after[field])
+  return from === undefined || to === undefined ? field : `${field}=${from}->${to}`
+}
+
 /** The item fields one event moved, in the order the event recorded them. */
 function movedBy(event: StoreEvent): readonly string[] {
   const named = FIELD_OF_OP[event.op]
   if (named !== undefined) return [named]
-  const snapshot = event.after ?? event.before
-  if (typeof snapshot !== 'object' || snapshot === null || Array.isArray(snapshot)) return []
-  const keys = Object.keys(snapshot as Record<string, unknown>)
+  const before = snapshot(event.before)
+  const after = snapshot(event.after)
+  const source = after ?? before
+  if (source === undefined) return []
+  const keys = Object.keys(source)
   const known = keys.filter((key) => isKnownField(key))
+  const moves = known.map((key) => move(key, before, after))
   // A key this build does not know is counted rather than printed: it is text from a file
   // that no dictionary bounds, and the count is the part a reader can act on.
-  return known.length === keys.length ? known : [...known, `+${keys.length - known.length}`]
+  return known.length === keys.length ? moves : [...moves, `+${keys.length - known.length}`]
 }
 
 /**
  * What one event recorded: the fields it moved, then the two facts that are not fields.
- * Field names rather than values, because a value may carry a space and because the values
- * are the record `show` already prints and the divergence `doctor` H20 already compares.
  * The cell is bounded like every other, and a name dropped to stay inside it is counted.
  */
 function whatOf(event: StoreEvent): string {
