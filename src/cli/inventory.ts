@@ -65,9 +65,10 @@ export const COMMANDS: readonly Command[] = [
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: true,
-    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--fields <list>] [--limit <n>]'],
+    usage: ['treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>] [--fields <list>] [--limit <n>]'],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
+      ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
     ],
   },
@@ -77,10 +78,14 @@ export const COMMANDS: readonly Command[] = [
     columns: false,
     usage: [
       'treadle transition <id> <target> [--reason <text>] [--until <instant>]',
+      'treadle transition <id> cancelled --resolution <r> --reason <text>',
+      'treadle transition <id> ready --outcome <failed|yielded> --reason <text>',
       'treadle transition <id> <target> --override <guard> --reason <text>',
     ],
     examples: [
       ['treadle transition sso-saml in_progress', 'start work; refused if a guard on that edge fails'],
+      ['treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
+      ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
       ['treadle transition sso-saml in_progress --preview', 'which store and which guards, evaluating none of them'],
     ],

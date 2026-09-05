@@ -27,9 +27,18 @@ const FIELD_ORDER = [
   'type', 'state', 'filed_at', 'version',
   'priority', 'points', 'hours_estimate', 'parent_id',
   'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
-  'hold_reason', 'hold_until', 'held_from',
-  'target_date', 'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
+  'hold_reason', 'hold_until', 'held_from', 'resolution', 'due',
+  'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
 ] as const
+
+/**
+ * A field this tool renamed, and the key it is read as now. This is the whole migration for
+ * the epic-only `target_date` becoming the common `due` (report 3.3): a stored record is
+ * read under the new key and the next write to it renders the new key, so no file is
+ * rewritten to change a name. A retired key is never carried into `extra`, which is what
+ * would otherwise leave one record saying the same date twice under two names.
+ */
+const RETIRED_FIELDS: ReadonlyMap<string, string> = new Map([['target_date', 'due']])
 
 /** The H2 sections DR3 rule 4 names, in render order. */
 const SECTION_FIELD: readonly (readonly [string, string])[] = [
@@ -86,6 +95,11 @@ export function decodeItem(record: ParsedRecord): StoreResult<WorkItem> {
   draft['title'] = record.title
 
   for (const [key, value] of record.fields) {
+    const renamed = RETIRED_FIELDS.get(key)
+    if (renamed !== undefined) {
+      if (!record.fields.has(renamed)) draft[renamed] = value
+      continue
+    }
     if (!isKnownField(key) || key === 'extra' || key === 'id' || key === 'title') {
       extra.set(key, value)
       continue
@@ -167,7 +181,7 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
   const carried = new Map<string, string>()
   if (base !== undefined) {
     for (const [key, value] of base.fields) {
-      if (!isKnownField(key) && !fields.has(key)) carried.set(key, value)
+      if (!isKnownField(key) && !fields.has(key) && !RETIRED_FIELDS.has(key)) carried.set(key, value)
     }
   }
   for (const [key, value] of item.extra ?? new Map<string, string>()) carried.set(key, value)

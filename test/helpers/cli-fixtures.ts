@@ -90,6 +90,8 @@ export async function aDemoWorkspace(): Promise<Demo> {
     for (const target of seed.to ?? []) {
       const moved = await transition(targetFor(store, 'apply'), fixedClock(seed.filed), ids, {
         id: seed.id, target: target as 'ready', reason: 'fixture', actor: ACTOR,
+        // T6: cancel names a resolution from the closed set, so the fixture names one too.
+        ...(target === 'cancelled' ? { resolution: 'wont_do' as const } : {}),
       })
       if (!moved.ok) throw new Error(`${seed.id} -> ${target}: ${String(moved.data['cause'])}`)
     }
@@ -124,12 +126,12 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       filters: [{ field: 'state', value: 'ready' }],
       columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'sso-saml',
     }))
-    golden.set('show', await showItem(demo.store, 'auth-refresh'))
+    golden.set('show', await showItem(demo.store, clock, 'auth-refresh'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
     golden.set('explain', await explain(demo.store, 'sso-saml'))
     golden.set('help', topLevelHelp('acme-platform'))
     golden.set('help-command', commandHelp('transition', 'acme-platform') as ResultObject)
-    golden.set('not-found', await showItem(demo.store, 'sso-saml-typo'))
+    golden.set('not-found', await showItem(demo.store, clock, 'sso-saml-typo'))
     golden.set('transition-dry-run', await transition(targetFor(demo.store, 'dry-run'), clock, ids, {
       id: 'csv-export', target: 'in_progress', actor: ACTOR,
     }))
@@ -149,6 +151,17 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       type: 'task', title: 'Add a health endpoint', id: 'health-endpoint',
       fields: { points: '1', priority: '4' }, actor: ACTOR,
     }))
+    // A second status, taken last so it moves none of the figures above. The workspace has
+    // no missed date until this item exists, so without it the `overdue` scalar and the
+    // `health` block reach no renderer and no schema check.
+    await fileItem(targetFor(demo.store, 'apply'), fixedClock('2026-08-20T09:00:00Z'), ids, {
+      type: 'task', title: 'Rotate the signing key', id: 'key-rotate',
+      fields: { priority: '2', due: '2026-08-28T09:00:00Z' }, actor: ACTOR,
+    })
+    golden.set('status-overdue', await status(demo.store, clock))
+    // The same store read before that date passes, which is the one pair whose difference
+    // is the date alone rather than the date and an extra item.
+    golden.set('status-not-yet-overdue', await status(demo.store, fixedClock('2026-08-27T09:00:00Z')))
     return golden
   } finally {
     await demo.dispose()

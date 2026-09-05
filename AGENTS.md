@@ -154,6 +154,13 @@ A record boundary is a line, so it cannot be made unreformattable; it is made lo
 `damagedHeadingAt` resynchronises on a heading a hand edit reshaped, and the discriminator is a record's four mandatory field lines (`type`, `state`, `filed_at`, `version`), which is the redundancy the format already carried.
 `test/store/record-boundary.test.ts` holds the property over generated documents: every id an undamaged file served is, after damage, either still served or named by a finding.
 
+## Where a terminal nuance goes, and where a derived flag goes
+
+Neither is a state.
+When the next word for "how work ended" arrives, it is a value in a closed set on an existing edge, not an eighth state: `resolution` on `cancel` and `outcome` on `release` are both `T6`, and `docs/architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md` prices what a state would have cost instead.
+When a fact can be computed from a stored field and the clock, it is derived on read beside the field, never written: `overdue` sits next to `blocked` in that respect, and `src/domain/dates.ts` is where both it and its `H17` finding live.
+A field nothing reads is decoration, so a new one lands with the reads that act on it in the same change.
+
 ## CI runner platforms
 
 If this project runs GitHub Actions, a pull request runs Linux runners only.

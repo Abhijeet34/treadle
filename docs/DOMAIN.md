@@ -44,6 +44,7 @@ The set is closed.
 | `T3` | `on_hold` restores only the state it was held from |
 | `T4` | A transition or an override that records a reason was given none |
 | `T5` | An override names a guard the edge does not evaluate, or one that cannot be overridden |
+| `T6` | An edge that records a closed-set value was given none, one outside the set, or one it does not own |
 | `R1` | An item cannot relate to itself |
 | `R2` | The edge would close a cycle in a directional relation kind |
 | `R3` | The relation traversal hit its depth ceiling |
@@ -68,12 +69,15 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 
 | Type | Required at creation | Fields the type owns beyond the common set |
 |---|---|---|
-| `epic` | `outcome` | `outcome`, `target_date` |
+| `epic` | `outcome` | `outcome` |
 | `story` | none | `acceptance_criteria` |
 | `task` | none | none |
 | `bug` | `severity`, `repro_steps`, `found_in` | `severity`, `repro_steps`, `expected`, `actual`, `found_in`, `fix_confirmed` |
 | `spike` | `question`, `timebox_hours` | `question`, `timebox_hours`, `findings` |
 | `chore` | none | none |
+
+Two of the common fields are conditional rather than free.
+`due` is an optional instant on every type, and `resolution` is legal only while the state is `cancelled`; a record carrying one in any other state is `V4`.
 
 `requiredAtCreation(type)` returns the first column and `fieldsOf(type)` returns the common set plus the second.
 `validateWorkItem(item, { now, pointScale })` checks both, plus every field's own validation from the field dictionary.
@@ -88,7 +92,16 @@ Seven states: `draft`, `ready`, `in_progress`, `in_review`, `done`, `on_hold`, `
 Blocked is not one of them.
 It is derived from the relation graph and shown beside the state, never in place of it.
 
-`TRANSITION_TABLE` holds the twenty-two edges the model draws.
+`TRANSITION_TABLE` holds twenty-three edges: the twenty-two the model draws, and `release`.
+
+`release` runs from `in_progress` back to `ready`, requires a reason, and evaluates no guard.
+It is the exit an attempt that ended without the work being done had nowhere to record: a hold leaves `next`, which ranks `ready` only, and a cancel leaves the board.
+The item returns to the queue and the event carries `outcome`, one of `failed` or `yielded`.
+
+Two edges record a value from a closed set, and `T6` is the one rule over both.
+`cancel` requires a `resolution` from `wont_do`, `duplicate`, `superseded`, `cannot_reproduce`, `rejected`, and stores it on the record; `release` requires an `outcome` from `failed`, `yielded`, and stores it only in the event.
+Every other edge refuses either.
+[architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md](architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md) carries why this is not four new states.
 `evaluateTransition(context, request)` returns one of three outcomes.
 
 - `already` when the request names the state the item is already in. Nothing is written and no event is produced.
@@ -118,6 +131,16 @@ Progress is `null` rather than a division by zero when nothing in the subtree is
 
 `findHierarchyCycle(graph)` is the load-time check, returning the path that closes the cycle.
 `MAX_HIERARCHY_DEPTH` is 64, and every traversal carries a visited set and that ceiling.
+
+## Dates
+
+`due` is the only date a person sets on a work item, and nothing in this layer writes it.
+`isOverdue(item, now)` is true when `due` has passed and the state is not terminal, and `daysOverdue(item, now)` is the whole days past it, clamped to `MAX_OVERDUE_DAYS`, which is 30.
+A terminal item is never overdue: the date said when the work was wanted and the work has stopped.
+The clock is an argument, as everywhere in this layer.
+
+`healthFindings(items, now)` returns `H17` for every overdue item assigned to nobody, in id order, each naming the rule, the record and the instant it saw.
+A due date nobody owns is a date nothing acts on, which is the whole reason the field is worth its bytes.
 
 ## Relations
 

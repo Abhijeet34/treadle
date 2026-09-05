@@ -25,9 +25,26 @@ export function isTerminal(state: WorkItemState | undefined): boolean {
 
 export const TRANSITIONS = [
   'groom', 'ungroom', 'start', 'submit', 'finish', 'rework', 'accept', 'reopen',
-  'hold', 'resume', 'cancel', 'revive',
+  'hold', 'resume', 'cancel', 'release', 'revive',
 ] as const
 export type TransitionName = (typeof TRANSITIONS)[number]
+
+/**
+ * Why a cancelled item stopped. A state says where an item may go next and a resolution
+ * says why it went nowhere, which is the separation that lets the captain's "rejected" be
+ * recorded without an eighth state and the eight edges one would need.
+ */
+export const RESOLUTIONS = [
+  'wont_do', 'duplicate', 'superseded', 'cannot_reproduce', 'rejected',
+] as const
+export type Resolution = (typeof RESOLUTIONS)[number]
+
+/**
+ * How one attempt ended when the item went back to the queue. It is a fact about the
+ * attempt rather than about the item, so it lives in the event and never on the record.
+ */
+export const ATTEMPT_OUTCOMES = ['failed', 'yielded'] as const
+export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number]
 
 export const GUARD_IDS = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'] as const
 export type GuardId = (typeof GUARD_IDS)[number]
@@ -71,6 +88,9 @@ export type WorkItem = {
   readonly labels?: readonly string[]
   readonly sprint_id?: string
 
+  /** An optional date the work is wanted by. `overdue` is derived from it; see dates.ts. */
+  readonly due?: Instant
+
   readonly hold_reason?: string
   readonly hold_until?: Instant
   /**
@@ -80,8 +100,10 @@ export type WorkItem = {
    */
   readonly held_from?: WorkItemState
 
+  /** Set by `cancel` and cleared by `revive`, and refused in every other state. */
+  readonly resolution?: Resolution
+
   readonly outcome?: string
-  readonly target_date?: Instant
   readonly acceptance_criteria?: readonly AcceptanceCriterion[]
   readonly severity?: BugSeverity
   readonly repro_steps?: string

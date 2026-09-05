@@ -120,7 +120,13 @@ export async function createWorkspace(
       })}`,
     )
     await writeFileAtomic(path.join(root, '.gitignore'), `${INDEX_DIR}/\n${LOCK_FILE}\n`)
-    await writeFileAtomic(path.join(root, '.gitattributes'), `${EVENTS_DIR}/*.jsonl merge=union\n`)
+    // `linguist-generated` collapses the log in a forge's diff view by default. It is 7.7
+    // times the record bytes per mutation and no reviewer reads it line by line, so the
+    // review surface becomes the shard while the log stays committed and authoritative.
+    await writeFileAtomic(
+      path.join(root, '.gitattributes'),
+      `${EVENTS_DIR}/*.jsonl merge=union linguist-generated=true\n`,
+    )
   } catch (error) {
     const errno = error as NodeJS.ErrnoException
     return storeFail(

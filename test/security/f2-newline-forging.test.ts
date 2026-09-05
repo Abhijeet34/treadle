@@ -38,7 +38,7 @@ describe('F2: a multi-line description cannot forge a line in the agent stream',
       fields: { description: FORGING }, actor: ACTOR,
     })
     assert.equal(filed.ok, true, 'the store accepts a description with newlines, which is the premise')
-    const shown = await showItem(demo.store, 'forge-probe', 'desc')
+    const shown = await showItem(demo.store, fixedClock('2026-09-04T09:30:00Z'), 'forge-probe', 'desc')
     assert.equal(shown.ok, true)
     rendered = agentRenderer.render(shown, { fieldLimit: null })
   })

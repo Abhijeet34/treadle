@@ -121,7 +121,7 @@ It pushes nothing and never touches the real repository, which is why it is a sc
 
 Eight scenarios, all passing on 2026-09-05, re-run after this branch rebased onto #7: the signed annotated tag the release path accepts, five it refuses (lightweight, unsigned, wrong version, off the released branch, no bundle built), the publication interlock refusing a publish, and the hotfix path branched from the released tag, landed and tagged again.
 
-```
+```text
 drill: 8 passed, 0 failed
 ```
 

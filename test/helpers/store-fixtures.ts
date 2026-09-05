@@ -11,6 +11,7 @@ import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
+  RESOLUTIONS,
   WORK_ITEM_TYPES,
   type AcceptanceCriterion,
   type WorkItem,
@@ -135,15 +136,13 @@ export class Gen {
     if (this.chance(0.3)) base['reporter'] = this.safeLine(1, 30)
     if (this.chance(0.3)) base['component'] = this.safeLine(1, 30)
     if (this.chance(0.4)) base['sprint_id'] = this.slug()
+    if (this.chance(0.4)) base['due'] = this.instant()
     if (this.chance(0.4)) {
       const labels = new Set<string>()
       for (let i = 0; i < this.int(1, 3); i += 1) labels.add(this.slug())
       base['labels'] = [...labels]
     }
-    if (type === 'epic') {
-      base['outcome'] = this.safeBody()
-      if (this.chance(0.5)) base['target_date'] = this.instant()
-    }
+    if (type === 'epic') base['outcome'] = this.safeBody()
     if (type === 'story' && this.chance(0.7)) base['acceptance_criteria'] = this.criteria()
     if (type === 'bug') {
       base['severity'] = this.pick(BUG_SEVERITIES)
@@ -158,7 +157,12 @@ export class Gen {
       base['timebox_hours'] = this.int(1, 80)
       if (this.chance(0.5)) base['findings'] = this.safeBody()
     }
-    return { ...(base as unknown as WorkItem), ...overrides }
+    const item = { ...(base as unknown as WorkItem), ...overrides }
+    // A resolution is legal only on a cancelled record, so it is generated only there;
+    // `validateWorkItem` refuses the pair, which is exactly what the round trip asserts.
+    return item.state === 'cancelled' && item.resolution === undefined && this.chance(0.7)
+      ? { ...item, resolution: this.pick(RESOLUTIONS) }
+      : item
   }
 }
 

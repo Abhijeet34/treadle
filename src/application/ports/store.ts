@@ -70,6 +70,8 @@ export type StoreEvent = {
   readonly guards?: unknown
   /** Why the move was made, on the edges T4 requires one and on every override. */
   readonly reason?: string
+  /** How one attempt ended, on the `release` edge that puts the item back in the queue. */
+  readonly outcome?: string
   readonly cmd?: string
   readonly txn: string
 }
