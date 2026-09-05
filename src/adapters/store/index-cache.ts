@@ -61,6 +61,38 @@ create table if not exists findings (
 create index if not exists findings_file on findings(file);
 `
 
+/** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
+const WAL_DEADLINE_MS = 2_000
+
+/** Synchronous, because `#open` is, and the alternative is a busy loop burning a core. */
+function pause(ms: number): void {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms)
+}
+
+/**
+ * Switches the database to WAL, retrying while another process is doing the same thing.
+ *
+ * The busy timeout is not enough on its own here. Promoting to the exclusive lock this
+ * pragma needs, while already holding a shared one and another connection holds a reserved
+ * one, is the case SQLite refuses to wait on, because waiting could deadlock: the busy
+ * handler is bypassed and `SQLITE_BUSY` is immediate. Only the run that creates the index is
+ * exposed, since the pragma is a no-op once the file is in WAL, so a bounded retry closes
+ * what the timeout cannot. Past the deadline the error is raised and the command boundary
+ * turns it into an error object rather than a stack trace.
+ */
+function enterWal(db: DatabaseSync): void {
+  const until = Date.now() + WAL_DEADLINE_MS
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      db.exec('pragma journal_mode = wal')
+      return
+    } catch (error) {
+      if (Date.now() >= until) throw error
+      pause(Math.min(25, attempt * 2))
+    }
+  }
+}
+
 export class IndexCache {
   readonly #file: string
   #db: DatabaseSync | undefined
@@ -88,7 +120,7 @@ export class IndexCache {
     // Armed second, that switch had nothing to wait with and raised SQLITE_BUSY the moment
     // two commands opened a fresh index together.
     db.exec('pragma busy_timeout = 5000')
-    db.exec('pragma journal_mode = wal')
+    enterWal(db)
     db.exec('pragma synchronous = normal')
     db.exec(SCHEMA)
     this.#db = db

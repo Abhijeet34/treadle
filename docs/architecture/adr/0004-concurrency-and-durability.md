@@ -56,8 +56,15 @@ The ordering is the whole rule.
 Switching a database that is not yet in WAL takes an exclusive lock, and every run that creates the index passes through that state, so a timeout armed after the switch has nothing to wait with and the switch raises `SQLITE_BUSY` on the first contended open.
 That is not a rare shape: `.index/` is gitignored, so every fresh clone and every deliberate deletion of the cache puts a workspace back into it.
 
-`test/cli/index-contention.test.ts` holds it deterministically rather than by repetition.
-A child process creates the index in the default journal mode and holds a write lock on it for a stated interval, which is the same state the window produces, and the command under test is then run through the published entry point in its own process.
+Arming the timeout is necessary and not sufficient, because the switch has a second failure mode with a different mechanism.
+Promoting to the exclusive lock while already holding a shared one, when another connection holds a reserved one, is the case SQLite refuses to wait on at all: waiting there could deadlock, so the busy handler is bypassed and `SQLITE_BUSY` is immediate.
+The switch is therefore retried against a two second deadline, which is generous against a window measured in milliseconds and is only ever entered by a run that creates the index, since the pragma is a no-op once the file is in WAL.
+Past the deadline the error is raised and the command boundary turns it into an error object.
+
+`test/cli/index-contention.test.ts` holds both states deterministically rather than reaching them by repetition.
+A child process creates the index in the default journal mode and holds a write lock on it for a stated interval, and the lock class selects which failure the command under test meets: `exclusive` is the one the timeout covers, `immediate` takes the reserved lock that bypasses it.
+The command is then run through the published entry point in its own process.
+Each mechanism is load-bearing and measured to be: against the pre-fix tree both cases fail, with the timeout armed first and no retry the exclusive case passes and the immediate one fails, and with both the two pass.
 
 ### Atomic write, and finding F9
 

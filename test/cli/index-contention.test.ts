@@ -44,36 +44,46 @@ async function treadle(cwd: string, argv: readonly string[]): Promise<Ran> {
   }
 }
 
+/**
+ * Both lock classes, because the store needs two different mechanisms to survive them.
+ * `exclusive` is what the busy timeout covers once it is armed ahead of the journal-mode
+ * switch. `immediate` holds a reserved lock, which is the promotion SQLite refuses to wait
+ * on at all, so the timeout is bypassed and only a bounded retry closes it.
+ */
+const LOCKS = ['exclusive', 'immediate'] as const
+
 describe('a command whose index is held by another process', () => {
-  it('waits for the lock rather than crashing, and its write lands', async () => {
-    const demo = await aDemoWorkspace()
-    try {
-      await demo.store.close()
-      await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
+  for (const lock of LOCKS) {
+    it(`waits out a holder that took the ${lock} lock, and its write lands`, async () => {
+      const demo = await aDemoWorkspace()
+      try {
+        await demo.store.close()
+        await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
 
-      const holder = spawn(
-        process.execPath,
-        [HOLDER, path.join(demo.root, '.index', 'index.sqlite'), String(HOLD_MS)],
-        { stdio: ['ignore', 'pipe', 'inherit'] },
-      )
-      await new Promise<void>((resolve) => { holder.stdout.once('data', () => { resolve() }) })
-      // Subscribed before the command runs, because a holder that has already exited by the
-      // time a listener is attached never emits `exit` again and the wait would never end.
-      const released = new Promise<void>((resolve) => { holder.once('exit', () => { resolve() }) })
+        const holder = spawn(
+          process.execPath,
+          [HOLDER, path.join(demo.root, '.index', 'index.sqlite'), String(HOLD_MS), lock],
+          { stdio: ['ignore', 'pipe', 'inherit'] },
+        )
+        await new Promise<void>((resolve) => { holder.stdout.once('data', () => { resolve() }) })
+        // Subscribed before the command runs, because a holder that has already exited by
+        // the time a listener is attached never emits `exit` again and the wait never ends.
+        const released = new Promise<void>((resolve) => { holder.once('exit', () => { resolve() }) })
 
-      const moved = await treadle(demo.root, ['transition', 'metrics-p95', 'ready'])
-      await released
+        const moved = await treadle(demo.root, ['transition', 'metrics-p95', 'ready'])
+        await released
 
-      assert.doesNotMatch(moved.err, /^\s+at /m, `a stack trace reached stderr:\n${moved.err}`)
-      assert.equal(moved.code, 0, `exit ${moved.code}, stderr:\n${moved.err}`)
-      assert.match(moved.out, /^ok transition /)
+        assert.doesNotMatch(moved.err, /^\s+at /m, `a stack trace reached stderr:\n${moved.err}`)
+        assert.equal(moved.code, 0, `exit ${moved.code}, stderr:\n${moved.err}`)
+        assert.match(moved.out, /^ok transition /)
 
-      const shown = await treadle(demo.root, ['show', 'metrics-p95'])
-      assert.match(shown.out, /^state ready$/m, 'the write the command reported was not applied')
-    } finally {
-      await demo.dispose()
-    }
-  })
+        const shown = await treadle(demo.root, ['show', 'metrics-p95'])
+        assert.match(shown.out, /^state ready$/m, 'the write the command reported was not applied')
+      } finally {
+        await demo.dispose()
+      }
+    })
+  }
 })
 
 describe('an exception that reaches the command boundary', () => {
