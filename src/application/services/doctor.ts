@@ -25,12 +25,12 @@ export const DOCTOR_SHAPE: ResultShape = {
   properties: [
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'checked', type: 'integer' },
+    { kind: 'scalar', key: 'clean', type: 'string' },
     {
       kind: 'block',
       key: 'findings',
       columns: [{ name: 'rule' }, { name: 'id' }, { name: 'where' }, { name: 'detail', text: true }],
     },
-    { kind: 'scalar', key: 'clean', type: 'string' },
   ],
 }
 
@@ -159,8 +159,8 @@ export async function doctor(store: Store): Promise<ResultObject> {
   const data: Record<string, Value> = {
     store: view.value.identity.path ?? workspace,
     checked: view.value.items.length,
-    findings: block,
   }
   if (rows.length === 0) data['clean'] = `checked ${view.value.items.length} items and ${events.value.length} events`
+  data['findings'] = block
   return okResult(DOCTOR_SHAPE, { workspace, data })
 }

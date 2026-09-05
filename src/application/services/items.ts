@@ -93,11 +93,6 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'text', key: 'title', whole: true },
     { kind: 'text', key: 'desc' },
     { kind: 'scalar', key: 'sev', type: 'string' },
-    {
-      kind: 'block',
-      key: 'evidence',
-      columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
-    },
     // Everything below reached no read surface at all until the field sweep, so it is
     // appended rather than placed: STABILITY's output-schema rule makes a field added at the
     // end of the property order a non-breaking change and a reordering a breaking one, and
@@ -121,6 +116,11 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'text', key: 'expected' },
     { kind: 'text', key: 'actual' },
     { kind: 'text', key: 'findings' },
+    {
+      kind: 'block',
+      key: 'evidence',
+      columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
+    },
   ],
 }
 
@@ -132,7 +132,6 @@ export const BACKLOG_SHAPE: ResultShape = {
   properties: [
     { kind: 'scalar', key: 'filter', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
-    { kind: 'block', key: 'items', columns: ITEM_COLUMNS },
     { kind: 'scalar', key: 'points', type: 'integer' },
     { kind: 'scalar', key: 'done', type: 'integer' },
     { kind: 'scalar', key: 'none', type: 'string' },
@@ -142,6 +141,7 @@ export const BACKLOG_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'more', type: 'integer' },
     { kind: 'scalar', key: 'page', type: 'string' },
+    { kind: 'block', key: 'items', columns: ITEM_COLUMNS },
   ],
 }
 
@@ -321,7 +321,6 @@ export async function showItem(
     state: item.state,
     filed: item.filed_at,
     v: item.version,
-    title: item.title,
   }
   if (item.points !== undefined) data['pts'] = item.points
   if (item.priority !== undefined) data['pri'] = item.priority
@@ -334,19 +333,9 @@ export async function showItem(
   if (overdue > 0) data['overdue'] = overdue
   if (item.resolution !== undefined) data['resolution'] = item.resolution
   if (item.assignee !== undefined) data['assignee'] = item.assignee
+  data['title'] = item.title
   if (item.description !== undefined) data['desc'] = item.description
   if (item.severity !== undefined) data['sev'] = item.severity
-  const evidence = item.evidence ?? []
-  if (evidence.length > 0) {
-    data['evidence'] = {
-      columns: columnsOf(SHOW_SHAPE, 'evidence'),
-      shown: evidence.length,
-      total: evidence.length,
-      rows: evidence.map((pointer): Row => ({
-        kind: pointer.kind, ref: pointer.ref, label: pointer.label ?? null,
-      })),
-    }
-  }
 
   // The rest of the field dictionary, in the shape's own appended order. Each was stored on
   // every write and printed by nothing, which is the defect class the sweep in
@@ -373,6 +362,18 @@ export async function showItem(
   if (item.expected !== undefined) data['expected'] = item.expected
   if (item.actual !== undefined) data['actual'] = item.actual
   if (item.findings !== undefined) data['findings'] = item.findings
+
+  const evidence = item.evidence ?? []
+  if (evidence.length > 0) {
+    data['evidence'] = {
+      columns: columnsOf(SHOW_SHAPE, 'evidence'),
+      shown: evidence.length,
+      total: evidence.length,
+      rows: evidence.map((pointer): Row => ({
+        kind: pointer.kind, ref: pointer.ref, label: pointer.label ?? null,
+      })),
+    }
+  }
 
   if (field === undefined) return okResult(SHOW_SHAPE, { workspace, data })
   // Either spelling reaches the same key, and the refusal offers both back: a caller who read
@@ -493,7 +494,6 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   }
   // A sort and an aggregate over nothing are noise; the `none` line is the answer there.
   if (page.length > 0) data['sort'] = 'priority,filed,id'
-  data['items'] = block
   if (page.length > 0) {
     data['points'] = page.reduce((sum, item) => sum + (item.points ?? 0), 0)
     data['done'] = page
@@ -517,6 +517,7 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
     const next = matched[from + page.length]
     if (next !== undefined) data['page'] = `treadle backlog --cursor ${next.id}`
   }
+  data['items'] = block
   return okResult(BACKLOG_SHAPE, { workspace, data })
 }
 
@@ -536,7 +537,7 @@ function absence(
 ): Readonly<Record<string, Value>> {
   const item = view.byId.get(id)
   if (item === undefined) {
-    return { absent: id, store: view.identity.path ?? view.identity.id, clause: `unknown searched ${view.items.length}` }
+    return { absent: id, clause: `unknown searched ${view.items.length}`, store: view.identity.path ?? view.identity.id }
   }
   for (const filter of filters) {
     const got = fieldOf(item, filter.field)

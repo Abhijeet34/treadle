@@ -19,7 +19,6 @@ export const INIT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'created', type: 'string' },
     { kind: 'scalar', key: 'actor', type: 'string' },
     { kind: 'scalar', key: 'schema', type: 'integer' },
-    { kind: 'block', key: 'files', columns: [{ name: 'name' }, { name: 'note', text: true }] },
     { kind: 'scalar', key: 'not_created', type: 'string' },
     { kind: 'list', key: 'next' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
@@ -27,6 +26,7 @@ export const INIT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },
+    { kind: 'block', key: 'files', columns: [{ name: 'name' }, { name: 'note', text: true }] },
   ],
 }
 
@@ -69,9 +69,9 @@ export function initResult(input: InitInput): ResultObject {
     created: input.path,
     actor: input.actor,
     schema: input.schema,
-    files,
     not_created: 'nothing outside this directory: no shell profile, no editor config, no agent config',
     next: NEXT_STEPS,
+    files,
   }
   return okResult(INIT_SHAPE, { workspace: input.workspace, txn: input.txn, changed: 1, data })
 }

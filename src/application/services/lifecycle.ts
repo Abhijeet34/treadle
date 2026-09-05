@@ -146,8 +146,9 @@ export async function transition(
 
   if (outcome.outcome === 'already') {
     const at = await entered(store, item)
-    const data: Record<string, Value> = { already: item.id, state: outcome.state, v: String(item.version) }
+    const data: Record<string, Value> = { already: item.id, state: outcome.state }
     if (at !== undefined) data['since'] = at.at
+    data['v'] = String(item.version)
     return okResult(TRANSITION_SHAPE, { workspace, txn: null, changed: 0, data })
   }
 

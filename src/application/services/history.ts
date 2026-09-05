@@ -27,14 +27,14 @@ export const HISTORY_SHAPE: ResultShape = {
   properties: [
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
+    { kind: 'scalar', key: 'none', type: 'string' },
+    { kind: 'scalar', key: 'more', type: 'integer' },
+    { kind: 'scalar', key: 'page', type: 'string' },
     {
       kind: 'block',
       key: 'events',
       columns: [{ name: 'at' }, { name: 'kind' }, { name: 'op' }, { name: 'what' }, { name: 'by', text: true }],
     },
-    { kind: 'scalar', key: 'none', type: 'string' },
-    { kind: 'scalar', key: 'more', type: 'integer' },
-    { kind: 'scalar', key: 'page', type: 'string' },
   ],
 }
 
@@ -142,7 +142,6 @@ export async function history(
   }
 
   const data: Record<string, Value> = { item: id, sort: 'at desc' }
-  data['events'] = block
   if (ordered.length === 0) data['none'] = `${id} has no recorded change`
 
   const remaining = ordered.length - (from + page.length)
@@ -151,5 +150,6 @@ export async function history(
     const following = ordered[from + page.length]
     if (following !== undefined) data['page'] = `treadle history ${id} --cursor ${following.id}`
   }
+  data['events'] = block
   return okResult(HISTORY_SHAPE, { workspace, data })
 }

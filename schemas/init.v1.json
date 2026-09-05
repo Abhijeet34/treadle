@@ -83,6 +83,48 @@
             "null"
           ]
         },
+        "not_created": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dry_run": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "preview": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "would_exit": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "files": {
           "type": "object",
           "additionalProperties": false,
@@ -139,48 +181,6 @@
               "name": "note",
               "trust": "data"
             }
-          ]
-        },
-        "not_created": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "next": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
-        },
-        "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "would_exit": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "store": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "note": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

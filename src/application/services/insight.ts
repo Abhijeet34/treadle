@@ -71,17 +71,17 @@ export const NEXT_SHAPE: ResultShape = {
   summary: 'Rank what to pick up, and print the components and weights that produced the order.',
   properties: [
     { kind: 'scalar', key: 'weights', type: 'string' },
-    {
-      kind: 'block',
-      key: 'next',
-      columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'parts' }, { name: 'title', text: true }],
-    },
     { kind: 'scalar', key: 'none', type: 'string' },
     { kind: 'scalar', key: 'absent', type: 'string' },
     { kind: 'scalar', key: 'clause', type: 'string' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'more', type: 'integer' },
     { kind: 'scalar', key: 'page', type: 'string' },
+    {
+      kind: 'block',
+      key: 'next',
+      columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'parts' }, { name: 'title', text: true }],
+    },
   ],
 }
 
@@ -100,6 +100,9 @@ export const EXPLAIN_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'blocked', type: 'string' },
     { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'parent', type: 'string' },
+    { kind: 'scalar', key: 'blocks', type: 'string' },
+    { kind: 'scalar', key: 'sev', type: 'string' },
+    { kind: 'text', key: 'by' },
     {
       kind: 'block',
       key: 'gates',
@@ -110,14 +113,11 @@ export const EXPLAIN_SHAPE: ResultShape = {
       key: 'moves',
       columns: [{ name: 'to' }, { name: 'guards' }],
     },
-    { kind: 'scalar', key: 'blocks', type: 'string' },
-    { kind: 'scalar', key: 'sev', type: 'string' },
     {
       kind: 'block',
       key: 'findings',
       columns: [{ name: 'rule' }, { name: 'detail', text: true }],
     },
-    { kind: 'text', key: 'by' },
   ],
 }
 
@@ -130,17 +130,17 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'items', type: 'integer' },
     { kind: 'scalar', key: 'points', type: 'integer' },
-    { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'scalar', key: 'findings', type: 'integer' },
     { kind: 'scalar', key: 'overdue', type: 'integer' },
+    { kind: 'scalar', key: 'absent_features', type: 'string' },
+    { kind: 'scalar', key: 'defects', type: 'string' },
+    { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
     {
       kind: 'block',
       key: 'next',
       columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'title', text: true }],
     },
-    { kind: 'scalar', key: 'absent_features', type: 'string' },
-    { kind: 'scalar', key: 'defects', type: 'string' },
   ],
 }
 
@@ -217,24 +217,17 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   const asg = request.forActor === undefined ? 0 : weights.asg
   const data: Record<string, Value> = {
     weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg} due ${weights.due} sev ${weights.sev}`,
-    next: block,
   }
   if (ranked.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
-  }
-  const remaining = ranked.length - (from + page.length)
-  if (remaining > 0) {
-    data['more'] = remaining
-    const following = ranked[from + page.length]
-    if (following !== undefined) data['page'] = `treadle next --cursor ${following.item.id}`
   }
   if (request.explainAbsence !== undefined) {
     const id = request.explainAbsence
     const item = view.value.byId.get(id)
     data['absent'] = id
     if (item === undefined) {
-      data['store'] = view.value.identity.path ?? workspace
       data['clause'] = `unknown searched ${view.value.items.length}`
+      data['store'] = view.value.identity.path ?? workspace
     } else if (item.state !== 'ready') {
       data['clause'] = `state want ready got ${item.state}`
     } else if (!page.some((scored) => scored.item.id === id)) {
@@ -243,6 +236,13 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
       data['clause'] = 'none; it is in the list'
     }
   }
+  const remaining = ranked.length - (from + page.length)
+  if (remaining > 0) {
+    data['more'] = remaining
+    const following = ranked[from + page.length]
+    if (following !== undefined) data['page'] = `treadle next --cursor ${following.item.id}`
+  }
+  data['next'] = block
   return okResult(NEXT_SHAPE, { workspace, data })
 }
 
@@ -323,11 +323,12 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['blocked'] = blockers.length === 0 ? 'no' : `yes ${blockers.join(',')}`
   if (item.sprint_id !== undefined) data['sprint'] = item.sprint_id
   if (item.parent_id !== undefined) data['parent'] = item.parent_id
-  data['gates'] = gates
-  data['moves'] = moves
   const blocking = blockedByThis(view.value, id)
   data['blocks'] = blocking.length === 0 ? '-' : blocking.join(',')
   if (item.severity !== undefined) data['sev'] = item.severity
+  if (at !== undefined) data['by'] = at.by
+  data['gates'] = gates
+  data['moves'] = moves
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
   const audit = auditItem(item, log)
@@ -339,7 +340,6 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
       rows: audit.map((finding): Row => ({ rule: finding.rule, detail: finding.detail })),
     }
   }
-  if (at !== undefined) data['by'] = at.by
   return okResult(EXPLAIN_SHAPE, { workspace, data })
 }
 
@@ -378,16 +378,18 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       store: view.value.identity.path ?? workspace,
       items: view.value.items.length,
       points: view.value.items.reduce((sum, item) => sum + (item.points ?? 0), 0),
+      findings: findings.ok ? findings.value.length : 0,
+      // Both lines are absent when there is nothing to say, which is what keeps the
+      // orientation call the same 440 bytes it was for a workspace that misses no dates.
+      ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
+      absent_features: 'sprint board impediment relation',
+      ...(defects === undefined ? {} : { defects }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
         shown: states.length,
         total: states.length,
         rows: states.map(([state, n]): Row => ({ state, n })),
       },
-      findings: findings.ok ? findings.value.length : 0,
-      // Both lines are absent when there is nothing to say, which is what keeps the
-      // orientation call the same 440 bytes it was for a workspace that misses no dates.
-      ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
       ...(health.length === 0 ? {} : {
         health: {
           columns: columnsOf(STATUS_SHAPE, 'health'),
@@ -407,8 +409,6 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
           title: scored.item.title,
         })),
       },
-      absent_features: 'sprint board impediment relation',
-      ...(defects === undefined ? {} : { defects }),
     },
   })
 }

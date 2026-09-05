@@ -65,6 +65,42 @@
             "null"
           ]
         },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "more": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "next": {
           "type": "object",
           "additionalProperties": false,
@@ -130,42 +166,6 @@
               "name": "title",
               "trust": "data"
             }
-          ]
-        },
-        "none": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "absent": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "clause": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "store": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "more": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "page": {
-          "type": [
-            "string",
-            "null"
           ]
         }
       }

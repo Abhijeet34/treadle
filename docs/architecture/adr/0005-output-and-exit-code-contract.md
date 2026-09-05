@@ -95,6 +95,13 @@ The rule is the whole layout answer for a scalar after a table: a blank line, no
 A block with no rows also drops its column header, because the `<key> <shown> of <total>` line above it already states the count and a header with nothing under it is a stranded label; `agent` already drops its own `#` header the same way for an empty block.
 `test/render/human-layout.test.ts` holds both halves: the invariant that no non-block property renders inside a block's group, and a byte snapshot of every golden object at 60, 80 and 200 cells.
 
+**And the projection puts the blocks last.**
+The group rule is a layout answer, and layout was never the whole defect: `findings` after the `states` table and `points` after `items` are facts about the workspace that had been declared inside another fact's neighbourhood, so a blank line was the most the renderer could do without reordering facts the other two renderings state in the same order.
+Every shape now declares its scalars, lists and text under the root heading and its blocks after them, which is the shape `explain` already had and the reason it always read cleanly.
+The services build their result objects in that same order, because `json` renders the object's own keys rather than walking the shape, and an order the three do not share is a fact that moves when the rendering changes.
+`test/render/conformance.test.ts` holds both halves of that.
+The group rule stays and is unchanged: a scalar may still legitimately follow a block in a shape written later, and the blank line is still what a renderer owes it.
+
 `test/render/conformance.test.ts` feeds every command's golden result object to all three and asserts the grammar invariants over every artefact.
 A fourth renderer, `test/render/recorder.ts`, records the object and emits nothing; the same suite renders a `structuredClone` of each object and asserts byte-identical output, and renders again after changing the process's cwd and environment.
 That pair is the proof: what the recorder saw is the whole of what the three had.

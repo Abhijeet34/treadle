@@ -81,6 +81,12 @@
           "type": "string",
           "x-trust": "data"
         },
+        "example": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
         "commands": {
           "type": "object",
           "additionalProperties": false,
@@ -205,12 +211,6 @@
               "trust": "data"
             }
           ]
-        },
-        "example": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
         }
       }
     }

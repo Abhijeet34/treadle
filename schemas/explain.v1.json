@@ -111,6 +111,22 @@
             "null"
           ]
         },
+        "blocks": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sev": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "by": {
+          "type": "string",
+          "x-trust": "data"
+        },
         "gates": {
           "type": "object",
           "additionalProperties": false,
@@ -232,18 +248,6 @@
             }
           ]
         },
-        "blocks": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "sev": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "findings": {
           "type": "object",
           "additionalProperties": false,
@@ -301,10 +305,6 @@
               "trust": "data"
             }
           ]
-        },
-        "by": {
-          "type": "string",
-          "x-trust": "data"
         }
       }
     }
