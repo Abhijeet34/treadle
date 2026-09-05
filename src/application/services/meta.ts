@@ -16,6 +16,8 @@ export const HELP_SHAPE: ResultShape = {
     { kind: 'list', key: 'usage' },
     { kind: 'text', key: 'about', whole: true },
     { kind: 'list', key: 'example' },
+    /** `<status> <meaning>`, on the one command whose answer is a verdict rather than a record. */
+    { kind: 'list', key: 'exit' },
     {
       kind: 'block',
       key: 'commands',

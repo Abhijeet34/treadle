@@ -31,7 +31,8 @@
         "CONFLICT",
         "NOT_FOUND",
         "STORE_UNAVAILABLE",
-        "INTERNAL"
+        "INTERNAL",
+        "INTEGRITY"
       ]
     },
     "command": {

@@ -46,7 +46,10 @@ Not breaking:
 
 - Adding a new error code for a condition that previously exited 1 as an internal error.
 
-The mapping is: `0` success including an idempotent no-op, `2` invalid input, `3` a guard refused, `4` a stale-version conflict, `5` not found, `6` the store is unavailable, `1` anything else, `130` interrupted.
+The mapping is: `0` success including an idempotent no-op, `2` invalid input, `3` a guard refused, `4` a stale-version conflict, `5` not found, `6` the store is unavailable, `7` the stored files carry something no write path would have accepted, `1` anything else, `130` interrupted.
+
+`7` is the one status a command can exit while still printing its answer on stdout: `doctor` answers with the findings table and exits `7` when the table is not empty.
+Every other command exits `7` as a refusal, because a store that holds a record it cannot serve cannot give a whole answer; the refusal names the file, the line and the reason of the first such record.
 
 ### The output schema
 

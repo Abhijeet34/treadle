@@ -31,7 +31,8 @@
         "CONFLICT",
         "NOT_FOUND",
         "STORE_UNAVAILABLE",
-        "INTERNAL"
+        "INTERNAL",
+        "INTEGRITY"
       ]
     },
     "command": {
@@ -82,6 +83,12 @@
           "x-trust": "data"
         },
         "example": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "exit": {
           "type": "array",
           "items": {
             "type": "string"

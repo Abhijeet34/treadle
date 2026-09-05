@@ -128,7 +128,7 @@ export function auditWorkspace(
 }
 
 export async function doctor(store: Store): Promise<ResultObject> {
-  const view = await readWorkspace(store)
+  const view = await readWorkspace(store, { partial: true })
   if (!view.ok) return storeRefusal('doctor', 'read', view.error, undefined)
   const workspace = view.value.identity.id
 
@@ -156,11 +156,17 @@ export async function doctor(store: Store): Promise<ResultObject> {
     })),
   }
 
+  const items = view.value.items.length
+  const logged = events.value.length
   const data: Record<string, Value> = {
     store: view.value.identity.path ?? workspace,
-    checked: view.value.items.length,
+    checked: items,
   }
-  if (rows.length === 0) data['clean'] = `checked ${view.value.items.length} items and ${events.value.length} events`
+  if (rows.length === 0) {
+    data['clean'] = `checked ${items} ${items === 1 ? 'item' : 'items'} and ${logged} ${logged === 1 ? 'event' : 'events'}`
+  }
   data['findings'] = block
-  return okResult(DOCTOR_SHAPE, { workspace, data })
+  // The table is the answer and the exit status is the verdict: a script or a CI job reads
+  // "is my store intact" from the status alone, and a person reads the rows.
+  return okResult(DOCTOR_SHAPE, { workspace, data, ...(rows.length === 0 ? {} : { code: 'INTEGRITY' }) })
 }

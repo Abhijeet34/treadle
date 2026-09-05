@@ -10,7 +10,7 @@
 import { shapeFor } from '../../application/shapes.ts'
 import { isBlock, type ColumnSpec, type ResultObject, type Value } from '../../application/result.ts'
 import type { Renderer, RenderOptions } from './index.ts'
-import { displayWidth, truncateToWidth } from './width.ts'
+import { displayWidth, splitToWidth, truncateToWidth } from './width.ts'
 
 /**
  * Right-to-left content reorders the cells around it, so a correct table looks wrong. A
@@ -92,14 +92,19 @@ function table(
  * broken at the last segment boundary that fits and continued with a two-space indent.
  * Applied once over everything the renderer composed, rather than at each site that builds
  * a line, because a rule applied per site is a rule with an exception waiting in it.
+ *
+ * A word longer than the room a continuation line has, a 200 character title with no space
+ * in it or a long URL, is cut at that room before the wrap runs: the rule is about cells,
+ * and a break at spaces alone held it only for text that happened to contain some.
  */
 function fitLine(line: string, width: number): readonly string[] {
   if (displayWidth(line) <= width) return [line]
   const lead = line.length - line.trimStart().length
   const indent = ' '.repeat(lead + 2)
+  const room = width - indent.length
   const out: string[] = []
   let current = ' '.repeat(lead)
-  for (const word of line.trimStart().split(' ')) {
+  for (const word of line.trimStart().split(' ').flatMap((piece) => splitToWidth(piece, room))) {
     const candidate = current.trimEnd().length === 0 ? `${current}${word}` : `${current} ${word}`
     if (displayWidth(candidate) > width && current.trim().length > 0) {
       out.push(current)

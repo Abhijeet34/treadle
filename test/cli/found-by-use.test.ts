@@ -278,47 +278,60 @@ describe('the write path and the read path agree about a field\'s name', () => {
   })
 })
 
-describe('S3: a duplicate id refuses the write rather than serving the first match', () => {
+describe('S3: a duplicate id refuses every answer rather than serving the first match', () => {
   let demo: Demo
+  const copy = [
+    '',
+    '# queue-drain: Drain the dead letter queue on deploy, the copy',
+    '',
+    'type: task',
+    'state: draft',
+    'filed_at: 2026-09-04T08:00:00Z',
+    'version: 1',
+    '',
+  ].join('\n')
 
   before(async () => {
     demo = await aDemoWorkspace()
     const shard = path.join(demo.root, 'items', '2026-09.md')
-    const copy = [
-      '',
-      '# queue-drain: Drain the dead letter queue on deploy, the copy',
-      '',
-      'type: task',
-      'state: draft',
-      'filed_at: 2026-09-04T08:00:00Z',
-      'version: 1',
-      '',
-    ].join('\n')
     await writeFile(shard, `${await readFile(shard, 'utf8')}${copy}`)
   })
   after(async () => { await demo.dispose() })
 
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
 
-  it('reports the finding, and refuses to write either copy', async () => {
+  it('refuses a write to the copied id, and the write leaves the shard untouched', async () => {
     const shard = path.join(demo.root, 'items', '2026-09.md')
     const before = await readFile(shard, 'utf8')
 
-    const state = await cli(['status'])
-    assert.match(state.out, /^findings [1-9]/m, 'the index still quarantines the copy')
-
     const moved = await cli(['transition', 'queue-drain', 'ready'])
-    assert.equal(moved.code, 4, `expected a conflict, got ${moved.code}: ${moved.out}${moved.err}`)
-    assert.match(moved.err, /^err CONFLICT /)
+    assert.equal(moved.code, 7, `expected an integrity refusal, got ${moved.code}: ${moved.out}${moved.err}`)
+    assert.match(moved.err, /^err INTEGRITY /)
     assert.match(moved.err, /^rule S3$/m)
-    assert.match(moved.err, /queue-drain/)
+    assert.match(moved.err, /^entity queue-drain$/m)
+    assert.match(moved.err, /queue-drain names 2 records in this file/)
 
     assert.equal(await readFile(shard, 'utf8'), before, 'a refused write leaves the shard untouched')
   })
 
-  it('leaves every other record writable, so one bad id does not stop the workspace', async () => {
+  // The first fix left every other record writable, and that was the hole: a gate on
+  // another item reads its children from the set the copy is missing from, and a new id is
+  // chosen against that same set. The store still writes every other record, which
+  // test/store/duplicate-id.test.ts holds; the command surface refuses until the copy is gone.
+  it('refuses every other command too, until the copy is removed, and then serves them all', async () => {
+    const shard = path.join(demo.root, 'items', '2026-09.md')
+    const refused = await cli(['transition', 'i18n-dates', 'ready'])
+    assert.equal(refused.code, 7, refused.out)
+    assert.match(refused.err, /^fix treadle doctor$/m)
+
+    const text = await readFile(shard, 'utf8')
+    assert.ok(text.endsWith(copy), 'the fixture no longer ends with the copy this case removes')
+    await writeFile(shard, text.slice(0, -copy.length))
+
     const moved = await cli(['transition', 'i18n-dates', 'ready'])
     assert.equal(moved.code, 0, moved.err)
+    const clean = await cli(['doctor'])
+    assert.equal(clean.code, 0, clean.out)
   })
 })
 

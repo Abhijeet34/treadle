@@ -66,6 +66,29 @@ export function displayWidth(value: string): number {
 }
 
 /**
+ * `value` cut into pieces of at most `cells` each, at cluster boundaries, for a word that has
+ * no space to break at. An empty value is one empty piece, so a caller splitting on spaces
+ * keeps the run of spaces it split.
+ */
+export function splitToWidth(value: string, cells: number): readonly string[] {
+  const out: string[] = []
+  let piece = ''
+  let width = 0
+  for (const { segment } of SEGMENTER.segment(value)) {
+    const next = clusterWidth(segment)
+    if (width + next > cells && piece.length > 0) {
+      out.push(piece)
+      piece = ''
+      width = 0
+    }
+    piece += segment
+    width += next
+  }
+  if (piece.length > 0 || out.length === 0) out.push(piece)
+  return out
+}
+
+/**
  * The longest prefix of whole clusters that fits, then an ellipsis, padded to exactly
  * `cells`. The pad matters: cutting before a wide character leaves an odd cell, and without
  * it the column after this one shifts by one.

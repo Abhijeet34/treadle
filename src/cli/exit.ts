@@ -13,6 +13,7 @@ export const EXIT_OF: Readonly<Record<ResultCode, number>> = {
   CONFLICT: 4,
   NOT_FOUND: 5,
   STORE_UNAVAILABLE: 6,
+  INTEGRITY: 7,
 }
 
 /** Interrupted by SIGINT, after the lock is released. */

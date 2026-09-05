@@ -23,7 +23,7 @@ describe('exit status is a function of the result object', () => {
     assert.equal(EXIT_OF.OK, 0)
     const refusals = RESULT_CODES.filter((code) => code !== 'OK')
     for (const code of refusals) assert.notEqual(EXIT_OF[code], 0, `${code} exits 0`)
-    assert.deepEqual([...new Set(refusals.map((code) => EXIT_OF[code]))].sort(), [1, 2, 3, 4, 5, 6])
+    assert.deepEqual([...new Set(refusals.map((code) => EXIT_OF[code]))].sort(), [1, 2, 3, 4, 5, 6, 7])
   })
 
   it('reads the code and nothing else, so two commands with one code exit alike', () => {

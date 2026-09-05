@@ -38,6 +38,12 @@ export type Command = {
   readonly columns: boolean
   readonly usage: readonly string[]
   readonly examples: readonly (readonly [string, string])[]
+  /**
+   * Exit statuses that carry a verdict rather than a failure, each with its meaning. Every
+   * command exits by the one table in `exit.ts`; only a command whose answer is itself a
+   * verdict has anything to add here.
+   */
+  readonly exits?: readonly (readonly [number, string])[]
 }
 
 export const COMMANDS: readonly Command[] = [
@@ -130,6 +136,10 @@ export const COMMANDS: readonly Command[] = [
     columns: false,
     usage: ['treadle doctor'],
     examples: [['treadle doctor', 'what the files say that no write path would have accepted']],
+    exits: [
+      [0, 'clean: every stored record is served and the audit flagged nothing'],
+      [7, 'the findings table is not empty; a record is held and not served, or the audit flagged one'],
+    ],
   },
   {
     name: 'next', shape: NEXT_SHAPE, effect: 'read', record: 'list',

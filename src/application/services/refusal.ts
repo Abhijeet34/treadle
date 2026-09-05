@@ -10,7 +10,7 @@ import type { StoreError } from '../ports/store.ts'
 const CODE_OF: Readonly<Record<string, ResultCode>> = {
   VALIDATION: 'VALIDATION',
   GUARD_REFUSED: 'GUARD_REFUSED',
-  INTEGRITY: 'STORE_UNAVAILABLE',
+  INTEGRITY: 'INTEGRITY',
   CONFLICT: 'CONFLICT',
   SCHEMA_NEWER: 'STORE_UNAVAILABLE',
   SCHEMA_OLDER: 'STORE_UNAVAILABLE',
@@ -22,6 +22,7 @@ function fixesFor(code: ResultCode, error: StoreError): readonly string[] {
   const entity = error.entities[0]
   if (code === 'CONFLICT' && entity !== undefined) return [`treadle show ${entity}`]
   if (code === 'STORE_UNAVAILABLE') return ['treadle init', 'treadle status']
+  if (code === 'INTEGRITY') return ['treadle doctor']
   return []
 }
 
