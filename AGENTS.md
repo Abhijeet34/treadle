@@ -345,6 +345,16 @@ The load-time hierarchy cycle check (finding F8) is cached the same way, as a ve
 `meta` table, and any transaction that moves an item row reports what it moved. If you add a
 path that writes item rows, it goes through `replaceRecordFile` or the verdict goes stale.
 
+A finding is cached the same way, under the fingerprint of the file it came from, and it
+refuses every read after it, so only the pass that read a file whole may record a duplicate.
+The event-file append is a partial read: it may add rows, and on a moved base or a clashing
+line it hands the file back with nothing written and the whole pass decides. Two loops of
+`set` and `show` in separate processes once recorded one false `S14` per line and locked the
+workspace until `.index/` was deleted by hand; `doctor` now opens the store with `rederive`,
+which forgets every fingerprint and keeps every row, so the fix line every integrity refusal
+prints is the recovery, and deleting `.index/` by hand is never the answer because the
+transaction journal lives there. ADR-0020 argues it.
+
 ## Measuring a performance change here
 
 Take the before and the after under the same conditions or do not take them. This machine is

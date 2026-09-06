@@ -32,6 +32,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) | An impediment is a work-item type that blocks through the relation graph, required at creation to say what would clear it, resolved by reaching `done` with nothing unlinked |
 | [ADR-0018](0018-the-board-is-a-projection.md) | The board is the backlog grouped by live state and scoped to the open sprint, stores nothing, sorts blocked work first, and leaves `G3` and `G4` disarmed |
 | [ADR-0019](0019-no-harness-specific-instruction-file.md) | No tracked file at the repository root may be one a single agent harness loads by itself, and the test that says so is kept by the guard ADR-0013 already put outside the branch |
+| [ADR-0020](0020-a-finding-is-decided-by-a-whole-read.md) | A finding is a verdict on the files cached like any row, only the pass that read a file whole may decide a duplicate, an append that meets one hands the file back, and `doctor` re-derives the index so the fix line every refusal prints is the recovery |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.

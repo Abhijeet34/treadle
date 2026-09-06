@@ -88,6 +88,13 @@ const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, INDEX_DIR, JOURNAL_D
 export type ShardedStoreOptions = {
   readonly lockTimeoutMs?: number
   readonly onWaiting?: AcquireOptions['onWaiting']
+  /**
+   * Forget every fingerprint before the first refresh, so every answer this store gives is
+   * re-derived from the files rather than served from what the index held. `doctor` opens
+   * with it: its answer is a verdict on the files, and a verdict served from a cache that
+   * disagreed with them once locked a workspace with no printed way back (ADR-0020).
+   */
+  readonly rederive?: boolean
 }
 
 type Journal = {
@@ -166,6 +173,8 @@ export class ShardedStore implements Store {
   readonly #root: string
   readonly #index: IndexCache
   readonly #options: ShardedStoreOptions
+  /** Set from `rederive`, and spent by the first refresh. */
+  #rederive: boolean
   #cycleFindings: readonly Finding[] = []
   /**
    * Shards the refresh inside `apply` re-parsed, for the write that follows it under the
@@ -178,6 +187,7 @@ export class ShardedStore implements Store {
     this.#root = root
     this.#index = new IndexCache(path.join(root, INDEX_DIR))
     this.#options = options
+    this.#rederive = options.rederive === true
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
@@ -401,8 +411,13 @@ export class ShardedStore implements Store {
    * Two files clashing both ways settle on the second pass; the bound is a guard, not a budget.
    */
   async #refreshIndex(keepParses: ReadonlySet<string>): Promise<StoreResult<undefined>> {
+    // A re-derivation forgets the fingerprints and keeps the rows, so a command running
+    // beside it still answers from whole files; the names are carried into the pass because
+    // a file that has gone is otherwise only noticed by a fingerprint it no longer has.
+    const forgotten = this.#rederive ? this.#index.forgetFingerprints() : NO_FILES
+    this.#rederive = false
     for (let pass = 0; pass < 3; pass += 1) {
-      const again = await this.#refreshPass(keepParses)
+      const again = await this.#refreshPass(keepParses, forgotten)
       if (!again.ok) return again
       if (!again.value) break
     }
@@ -410,7 +425,7 @@ export class ShardedStore implements Store {
     return storeOk(undefined)
   }
 
-  async #refreshPass(keepParses: ReadonlySet<string>): Promise<StoreResult<boolean>> {
+  async #refreshPass(keepParses: ReadonlySet<string>, forgotten: ReadonlySet<string>): Promise<StoreResult<boolean>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
     let invalidated = false
@@ -435,7 +450,7 @@ export class ShardedStore implements Store {
       invalidated ||= outcome.value
     }
 
-    for (const file of known.keys()) if (!seen.has(file)) invalidated ||= this.#index.dropFile(file)
+    for (const file of [...known.keys(), ...forgotten]) if (!seen.has(file)) invalidated ||= this.#index.dropFile(file)
     return storeOk(invalidated)
   }
 
@@ -577,11 +592,13 @@ export class ShardedStore implements Store {
       ], false).invalidated)
     }
     const whole = await readFile(full)
-    return storeOk(this.#index.replaceEventFile(
+    const outcome = this.#index.replaceEventFile(
       file,
       { size, mtime, hash: hashOf(whole), lines: read.value.lines },
-      read.value.events, read.value.at, read.value.findings, appendOnly,
-    ).invalidated)
+      read.value.events, read.value.at, read.value.findings, appendOnly, appendOnly ? from : undefined,
+    )
+    if (outcome.wholePass === true) return this.#indexEventFile(file, full, size, mtime, undefined)
+    return storeOk(outcome.invalidated)
   }
 
   async #prefixUnchanged(full: string, previous: Fingerprint): Promise<boolean> {
