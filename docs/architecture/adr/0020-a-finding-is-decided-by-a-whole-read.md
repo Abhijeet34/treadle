@@ -114,9 +114,10 @@ Cheaper on a clean store, and it misses the case where the index holds rows for 
 - `ReindexOutcome.wholePass` replaces the handed-back patch's `stale`: an append is handed back for a moved base or a clashing line, and nothing was written either way.
 - `ShardedStoreOptions.rederive` and `IndexCache.forgetFingerprints()` exist for one caller, `doctor`, through `openWorkspace` in `src/cli/main.ts`.
 - An append that meets a repeat the tail really carries costs one whole pass over that month's log, once, and the next append is a tail again.
-- `doctor` re-reads every file whole on every run.
-  At 50,000 items over 24 shards and 500,000 events that is [[FILL: measured doctor wall time before and after, on the bench corpus]].
-  No benchmark axis calls `doctor`, so no budget moves.
+- `doctor` re-reads every file whole on every run, and that is its cost.
+  On the bench corpus at 50,000 items, 25 MiB of shards and 87 MiB of log over 500,241 event lines, index warm, `doctor` took 6.4 s and 6.2 s on `9888781` and 23.9 s and 31.8 s here, on a shared machine at a 1-minute load of 24 to 40.
+  The audit itself is unchanged; the difference is the whole re-read, most of it the event files dropped and reloaded.
+  No benchmark axis calls `doctor`, so no budget moves, and no other command pays anything.
 - A workspace locked by an index that disagrees with its files is recovered by running the fix line the refusal prints, and `test/cli/doctor-recovery.test.ts` follows only that line.
 
 ## Departures from the design record
