@@ -66,18 +66,22 @@ describe('the README names the command surface the inventory carries', () => {
   it('lists every command in the sentence that says what bin/treadle.js runs', () => {
     const sentence = README.split('\n').find((line) => line.startsWith('`bin/treadle.js` runs'))
     assert.ok(sentence !== undefined, 'README has no sentence beginning "`bin/treadle.js` runs"')
-    assert.deepEqual(commandsIn(sentence), INVENTORY)
-    assert.equal(spelled(sentence, 'commands'), INVENTORY.length)
+    assert.deepEqual(commandsIn(sentence), INVENTORY,
+      "the README's `bin/treadle.js` runs sentence backticks a different set of commands than src/cli/inventory.ts declares; edit the sentence to the inventory")
+    assert.equal(spelled(sentence, 'commands'), INVENTORY.length,
+      `the README's \`bin/treadle.js\` runs sentence spells a command count the inventory does not have; src/cli/inventory.ts declares ${INVENTORY.length}`)
   })
 
   it('lists every command in the Status row that calls them implemented', () => {
     const row = README.split('\n').find((line) => line.startsWith('| Commands: `init`'))
     assert.ok(row !== undefined, 'README has no Status row beginning "| Commands: `init`"')
-    assert.deepEqual(commandsIn(row), INVENTORY)
+    assert.deepEqual(commandsIn(row), INVENTORY,
+      "the README's Status row backticks a different set of commands than src/cli/inventory.ts declares; edit the row to the inventory")
   })
 
   it('spells the number of work-item types the domain declares', () => {
-    assert.equal(spelled(README, 'work-item types'), WORK_ITEM_TYPES.length)
+    assert.equal(spelled(README, 'work-item types'), WORK_ITEM_TYPES.length,
+      `the README spells a work-item type count src/domain does not have; WORK_ITEM_TYPES declares ${WORK_ITEM_TYPES.length}`)
   })
 })
 
@@ -98,12 +102,14 @@ describe("the README's figures for treadle's own backlog are what .work holds", 
   const section = README.slice(README.indexOf("## treadle's own backlog"))
 
   it('states the number of items the workspace holds', () => {
-    assert.equal(spelled(section, 'items'), total)
+    assert.equal(spelled(section, 'items'), total,
+      `the README's "treadle's own backlog" section spells an item count .work does not hold; the records under .work/items carry ${total}`)
   })
 
   for (const state of ['done', 'ready', 'draft', 'cancelled']) {
     it(`states how many items are ${state}, the same in every sentence that says so`, () => {
-      assert.equal(spelled(section, `(?:(?:that )?(?:is|are)|in) \`${state}\``), states.get(state) ?? 0)
+      assert.equal(spelled(section, `(?:(?:that )?(?:is|are)|in) \`${state}\``), states.get(state) ?? 0,
+        `the README's "treadle's own backlog" section spells a ${state} count .work does not hold; the records under .work/items carry ${states.get(state) ?? 0}`)
     })
   }
 })
@@ -164,7 +170,8 @@ describe('the decision records name the rule ids the code raises', () => {
       const id = row[1]
       if (id !== undefined && (row[2] ?? '').includes('`doctor`')) documented.add(id)
     }
-    assert.deepEqual([...documented].sort(), [...raised].sort())
+    assert.deepEqual([...documented].sort(), [...raised].sort(),
+      "docs/architecture/adr/README.md's rule table and the `rule: 'H<n>'` ids in src/application/services/doctor.ts name different findings; add the row or drop it")
   })
 })
 
@@ -178,8 +185,11 @@ describe('the verification table counts what the suites actually drive', () => {
     const entries = /(\d+) network entry points/.exec(row)?.[1]
     assert.ok(commands !== undefined, 'the row names no command count')
     assert.ok(entries !== undefined, 'the row names no network entry-point count')
-    assert.equal(Number(commands), COMMANDS.length)
-    assert.equal(Number(entries), (read('test/security/no-egress.test.ts').match(/^ {2}trap\(/gm) ?? []).length)
+    assert.equal(Number(commands), COMMANDS.length,
+      `docs/VERIFICATION.md's "No network egress" row names a command count the inventory does not have; src/cli/inventory.ts declares ${COMMANDS.length}`)
+    const traps = (read('test/security/no-egress.test.ts').match(/^ {2}trap\(/gm) ?? []).length
+    assert.equal(Number(entries), traps,
+      `docs/VERIFICATION.md's "No network egress" row names an entry-point count the suite does not trap; test/security/no-egress.test.ts traps ${traps}`)
   })
 })
 
@@ -191,7 +201,8 @@ describe('every document states one runtime floor and one bundle budget', () => 
     it(`${file} names Node.js ${floor} as the floor`, () => {
       const stated = [...read(file).matchAll(/Node\.js (\d+\.\d+)/g)].map((match) => match[1])
       assert.ok(stated.length > 0, `${file} states no Node.js version`)
-      assert.deepEqual([...new Set(stated)], [floor])
+      assert.deepEqual([...new Set(stated)], [floor],
+        `${file} names a Node.js version other than package.json's floor of ${floor}; raise engines.node first, then every document that quotes it`)
     })
   }
 
