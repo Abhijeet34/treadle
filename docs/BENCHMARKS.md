@@ -1081,6 +1081,65 @@ Six places needed knowledge the tool did not give it.
 5. **`--contract`, `--no-color`, `--ascii` and `--log-values` are accepted and documented nowhere.** `treadle --contract` prints the line grammar, which is the one thing an agent most needs first, and no help output mentions it.
 6. **The word "gate" reaches no command.** The top-level table's 15 summaries never use it; the gate verdicts live in `explain`, whose summary is "Say why one item is where it is". A caller told to gate an item guesses, and learns from the first `GUARD_REFUSED`, whose `fix` line names `explain`.
 
+## Two runs at once, and what isolation cost
+
+The corpus path was one shared mutable directory, `/tmp/treadle-bench`.
+Two workers benchmarking at the same time lost the lock to each other partway through generating the 50,000-item corpus, and one recovered by setting a private `TREADLE_BENCH_DIR`.
+The recovery is the tell: the isolation already existed and was a thing a person had to remember.
+
+A crash is not the failure mode that matters here.
+Every axis mutates the corpus it measures, so a run that reads a store another process is halfway through writing does not stop.
+It reports numbers that look exactly like the ones above, taken from a corpus that was never in the state this file describes, and every performance decision made from them rests on nothing.
+
+A run now measures its own clone of a content-addressed cache entry that nothing writes to after publication, keyed on the run id and the pid.
+The pid is load-bearing rather than belt-and-braces: the two simultaneous runs below both carry the run id `211900793z`, because they started inside the same millisecond, and the run id alone would have put them back in one directory.
+
+### What it cost
+
+Run A generated all four corpora; runs B and C were started at the same instant against the same base and generated nothing.
+All three ran at `a418b88`, before #48 landed.
+
+| Scale | Generated, run A, 1-minute load 24.43 | Cloned, runs B and C concurrent, 1-minute load 15.37 to 26.62 |
+|---|---|---|
+| 100 | 444 ms | 51 ms, 50 ms |
+| 1,000 | 685 ms | 246 ms, 247 ms |
+| 10,000 | 4,037 ms | 431 ms, 432 ms |
+| 50,000 | 37,832 ms | 1,092 ms, 1,106 ms |
+
+A run pays about 1.1 s per 50,000-item corpus instead of the 37.8 s regenerating one costs, which is 2.9%, and it pays that only because `fs.cp` with `COPYFILE_FICLONE` is a copy-on-write clone on this filesystem.
+Both runs completed with `exit 0` and disjoint roots, `run-211900793z-52747` and `run-211900793z-52755`.
+On a filesystem without copy-on-write the clone is a byte copy and the trade changes; `cloneMs` is reported per corpus in `bench/results/bench.json` so the figure is read rather than assumed.
+
+### The one check that survives content addressing
+
+A cache entry is named by a hash of the corpus spec together with the source of `bench/corpus.ts` and `src/adapters/store/`, and it is published by renaming a private staging directory into place.
+Staleness, a wrong generator version and a corpus truncated by a killed process are all unreachable through that path rather than detected on it: the name encodes the identity, and a half-written corpus never occupies the name at all.
+Checksumming 430 MB per run to find states the layout forbids buys nothing.
+
+Rebasing this work onto #48, which changed `sharded-store.ts`, demonstrated the version half of that on its own.
+The 1,000-item entry was `ws-1000-3692f517f902` before the rebase; the first run afterwards generated `ws-1000-75a56540877c` in 741 ms and left the old entry alone.
+A corpus written through an older store is still on disk and is no longer reachable, which is the difference between invalidating a cache and mutating one.
+
+What it does not cover is a generation that ran to completion short.
+The readback every corpus already performs now compares the store's item count against the spec and stops the run when they differ, which costs one integer comparison on a list the run had already built.
+Detection earns its place exactly where the design cannot make the failure unreachable, and nowhere else.
+
+### The figures this held, re-measured
+
+`next` and `doctor` at 50,000 items on a clone, with the instrument the interleaved table above used: one cold process per sample, seven samples, the child's own `performance.now()` around the operation and `process.resourceUsage().maxRSS`.
+1-minute load 27.26 at the start and 19.41 at the end, against the 4.34 to 4.54 the recorded figures were taken at.
+
+| Operation | Recorded | On a clone | Recorded peak RSS | On a clone |
+|---|---|---|---|---|
+| `next` | 396.4 ms | 408.9 ms | 171,392 KiB | 171,248 KiB |
+| `doctor` | 3,416.8 ms | 3,500.5 ms | 335,584 KiB | 334,160 KiB |
+
+Axis A1 reported zero crashed writers at 5, 24, 60 and 200 parallel processes, durability 1.0, with no lock file and no temporary file left behind.
+At 200 writers under a 1-minute load of 24.43, 21 of them were refused rather than crashing, naming `LOCK_TIMEOUT S11` and `LOCK_LOST S16`, and all 179 that reported success were on disk.
+The generator's maximum event-loop gap over the 50,000-item corpus, sampled on a 50 ms timer, was 1,651 ms at `fab1904` under a 1-minute load of 16.07, and 1,216 ms at `a418b88` under a load of 26.62.
+Both sit near the 1.4 s #48 holds the generator to and neither approaches the 10.3 s that preceded it, but the two differ by less than the load and the generation time between them differ, so this sampler measures the ceiling rather than attributing it.
+`test/store/bulk-heartbeat.test.ts` is what holds that change; this figure only shows the rig did not undo it.
+
 ## The run
 
 ## treadle benchmark run 2026-09-05T12-08-34-931Z

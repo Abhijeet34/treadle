@@ -433,6 +433,10 @@ async function generateInto(root: string, spec: CorpusSpec): Promise<Generated> 
  * A cache entry is built under a private staging name and moved into place with one
  * `rename`, so a half-written corpus never occupies the path a reader looks up, and a process
  * killed mid-generation leaves staging litter rather than a plausible short corpus.
+ *
+ * Ceiling: nothing prunes the cache, so each generator version orphans the entries it
+ * supersedes, about 354 MB for a full set of four. Reaping one automatically would race a run
+ * cloning it; bench/README.md carries the reasoning and the manual remedy.
  */
 export async function acquireCorpus(
   cacheDir: string, runDir: string, spec: CorpusSpec, rebuild: boolean,

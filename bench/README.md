@@ -44,6 +44,14 @@ copy-on-write clone on APFS, btrfs and xfs and a byte copy elsewhere; `cloneMs` 
 `bench/results/bench.json` reports what it actually cost, next to the `generatedMs` it
 replaced. The run removes its own directory when it finishes and leaves the cache behind.
 
+Nothing prunes the cache. Every change to the generator or to the store adapter orphans the
+entries it supersedes, and a full set of four is about 354 MB, so the ceiling is that many
+megabytes per generator version until the directory is removed. Deleting a superseded entry
+automatically is the thing not done here on purpose: another run may be cloning it at that
+moment, and a reaper racing a reader is the failure this layout exists to remove. Remove the
+whole base when it is in the way, with `rm -rf /tmp/treadle-bench`, and the next run rebuilds
+what it needs.
+
 One check survives all of that, because none of the above covers a generation that completed
 short. The readback every corpus already performs now compares the store's item count against
 the spec and stops the run when they differ. Comparing two numbers the run has in hand is
