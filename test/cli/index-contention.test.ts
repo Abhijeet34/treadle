@@ -15,12 +15,13 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { rm, writeFile } from 'node:fs/promises'
+import { readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { describe, it } from 'node:test'
 
+import { BUSY_TIMEOUT_MS } from '../../src/adapters/store/index-cache.ts'
 import { EXIT_OF } from '../../src/cli/exit.ts'
 import { aDemoWorkspace } from '../helpers/cli-fixtures.ts'
 import { runCli } from '../helpers/cli-run.ts'
@@ -84,6 +85,53 @@ describe('a command whose index is held by another process', () => {
       }
     })
   }
+})
+
+describe('an index another process holds past the busy timeout', () => {
+  // Axis A1 on a two-core runner: 200 writers re-indexing one file after every landed write
+  // held the index's write lock past the busy timeout, and `begin immediate` raised
+  // `database is locked` out of the refresh as a Node stack trace. Ten of 289 writers died
+  // that way in one run. A busy index is a lock not acquired within its bound, which is a
+  // refusal the store already has a rule for, and nothing may have been written under it.
+  it('refuses with S11 and writes nothing, rather than dying with a stack trace', async () => {
+    const demo = await aDemoWorkspace()
+    try {
+      await demo.store.close()
+      // A shard whose fingerprint moved, so the refresh has a file to re-index and must
+      // take the write lock the holder is sitting on.
+      const shard = path.join(demo.root, 'items', '2026-09.md')
+      await writeFile(shard, `${await readFile(shard, 'utf8')}\n`, 'utf8')
+
+      // Held far longer than the timeout and killed once the command has answered, rather
+      // than held for the timeout plus a margin: on a loaded machine the command took longer
+      // than the margin to reach the index, met no holder, and the test measured the load.
+      const holder = spawn(
+        process.execPath,
+        [HOLDER, path.join(demo.root, '.index', 'index.sqlite'), String(BUSY_TIMEOUT_MS * 20), 'immediate'],
+        { stdio: ['ignore', 'pipe', 'inherit'] },
+      )
+      await new Promise<void>((resolve) => { holder.stdout.once('data', () => { resolve() }) })
+      const released = new Promise<void>((resolve) => { holder.once('exit', () => { resolve() }) })
+
+      const filed = await treadle(demo.root, ['file', 'task', 'Filed against a held index', '--id', 'held-index'])
+      holder.kill()
+      await released
+
+      assert.doesNotMatch(filed.err, /^\s+at /m, `a stack trace reached stderr:\n${filed.err}`)
+      assert.equal(filed.code, EXIT_OF.STORE_UNAVAILABLE, `exit ${filed.code}, stderr:\n${filed.err}`)
+      assert.match(filed.err, /^err STORE_UNAVAILABLE /)
+      assert.match(filed.err, /^rule S11$/m)
+      assert.match(filed.err, /index .* busy for \d+ ms/, 'the refusal names the index and the wait')
+      assert.equal(filed.out, '')
+
+      const shown = await treadle(demo.root, ['show', 'held-index'])
+      assert.equal(shown.code, EXIT_OF.NOT_FOUND, 'a refused write left nothing behind')
+      const retried = await treadle(demo.root, ['file', 'task', 'Filed once the index is free', '--id', 'held-index'])
+      assert.equal(retried.code, 0, `the retry the refusal asks for: ${retried.err}`)
+    } finally {
+      await demo.dispose()
+    }
+  })
 })
 
 describe('an exception that reaches the command boundary', () => {

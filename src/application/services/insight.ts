@@ -32,7 +32,7 @@ import {
   readyVerdict,
   type WorkspaceView,
 } from './context.ts'
-import { auditItem } from './doctor.ts'
+import { auditItem, auditRelationsOf } from './doctor.ts'
 import { notFound } from './items.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -162,6 +162,9 @@ export function scoreOf(
 ): Score {
   const priority = item.priority === undefined ? 0 : 6 - item.priority
   const age = ageDays(item.filed_at, now)
+  // `d` is the number of active items this one directly blocks: finishing it frees that
+  // many. A blocker's own severity is `v` on its own row, and the depth below it is not
+  // counted because a chain is freed one link at a time.
   const dependents = blockedByThis(view, item.id).length
   const sprint = item.sprint_id === undefined ? 0 : 1
   const match = forActor !== undefined && item.assignee === forActor ? 1 : 0
@@ -177,11 +180,16 @@ export function scoreOf(
   }
 }
 
+/**
+ * What to pick up is what can be started. A ready item with an active blocker is refused
+ * by G2 at `start`, so ranking it first sends the caller into a refusal; it is left out and
+ * `--explain-absence` names the blockers.
+ */
 export function rank(
   view: WorkspaceView, now: string, weights: Weights, forActor: string | undefined,
 ): readonly Score[] {
   return view.items
-    .filter((item) => item.state === 'ready')
+    .filter((item) => item.state === 'ready' && activeBlockers(view, item.id).length === 0)
     .map((item) => scoreOf(view, item, now, weights, forActor))
     .sort((a, b) => (a.score === b.score ? (a.item.id < b.item.id ? -1 : 1) : b.score - a.score))
 }
@@ -232,6 +240,8 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
       data['store'] = view.value.identity.path ?? workspace
     } else if (item.state !== 'ready') {
       data['clause'] = `state want ready got ${item.state}`
+    } else if (activeBlockers(view.value, id).length > 0) {
+      data['clause'] = `blocked by ${activeBlockers(view.value, id).join(',')}`
     } else if (!page.some((scored) => scored.item.id === id)) {
       data['clause'] = `rank want ${from + 1}..${from + request.limit} got ${ranked.findIndex((s) => s.item.id === id) + 1}`
     } else {
@@ -341,7 +351,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['moves'] = moves
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
-  const audit = auditItem(item, log)
+  const audit = [...auditItem(item, log), ...auditRelationsOf(new Set(view.value.byId.keys()), item)]
   if (audit.length > 0) {
     data['findings'] = {
       columns: columnsOf(EXPLAIN_SHAPE, 'findings'),
@@ -392,7 +402,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // Both lines are absent when there is nothing to say, which is what keeps the
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
-      absent_features: 'sprint board impediment relation',
+      absent_features: 'sprint board impediment',
       ...(defects === undefined ? {} : { defects }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),

@@ -18,6 +18,7 @@ import {
   findParentCycle,
   type BugSeverity,
   type Resolution,
+  type StoredRelation,
   type WorkItem,
   type WorkItemState,
   type WorkItemSummary,
@@ -51,7 +52,7 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
+import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
@@ -351,6 +352,15 @@ export class ShardedStore implements Store {
     try {
       return await this.#refreshIndex(keepParses)
     } catch (error) {
+      // A busy index is a lock not acquired within its bound, and the refresh runs before
+      // any file is written, so the caller can retry with nothing to undo.
+      if (error instanceof IndexBusy) {
+        return storeFail(
+          'LOCK_TIMEOUT', 'S11',
+          `the index at ${error.path} was busy for ${error.waitedMs} ms while another process wrote it; nothing was written, so retry`,
+          [this.#root],
+        )
+      }
       if (!(error instanceof IndexUnavailable)) throw error
       return storeFail(
         'STORE_UNAVAILABLE', 'S13',
@@ -866,6 +876,7 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
     resolution: item.resolution ?? null,
     due: item.due ?? null,
     severity: item.severity ?? null,
+    relations: item.relations === undefined ? null : JSON.stringify(item.relations),
     source,
   }
 }
@@ -890,6 +901,7 @@ export function summaryOf(row: SummaryRow, intern: (value: string) => string = (
     ...(row.resolution === null ? {} : { resolution: intern(row.resolution) as Resolution }),
     ...(row.due === null ? {} : { due: row.due }),
     ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),
+    ...(row.relations === null ? {} : { relations: JSON.parse(row.relations) as readonly StoredRelation[] }),
   }
 }
 

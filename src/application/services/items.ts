@@ -5,6 +5,7 @@
 import {
   canonicalField,
   daysOverdue,
+  relationsOf,
   shortField,
   validateWorkItem,
   type AcceptanceCriterion,
@@ -129,6 +130,14 @@ export const SHOW_SHAPE: ResultShape = {
       kind: 'block',
       key: 'criteria',
       columns: [{ name: 'n' }, { name: 'tick' }, { name: 'text', text: true }],
+    },
+    // Every edge this item is on: a stored edge under its own kind, and one stored on the
+    // other record under the inverse (`blocked_by`, `duplicated_by`), so a reader sees
+    // both directions and can tell from the name which record holds the edge.
+    {
+      kind: 'block',
+      key: 'relations',
+      columns: [{ name: 'kind' }, { name: 'other' }],
     },
   ],
 }
@@ -423,6 +432,16 @@ export async function showItem(
       rows: evidence.map((pointer): Row => ({
         kind: pointer.kind, ref: pointer.ref, label: pointer.label ?? null,
       })),
+    }
+  }
+
+  const relations = relationsOf(view.value.relations, item.id)
+  if (relations.length > 0) {
+    data['relations'] = {
+      columns: columnsOf(SHOW_SHAPE, 'relations'),
+      shown: relations.length,
+      total: relations.length,
+      rows: relations.map((relation): Row => ({ kind: relation.kind, other: relation.other })),
     }
   }
 

@@ -10,9 +10,11 @@
 
 import { fail, ok, type Result } from './errors.ts'
 import {
+  RELATION_KINDS,
   isTerminal,
   type ItemId,
   type RelationKind,
+  type WorkItem,
   type WorkItemState,
 } from './types.ts'
 
@@ -30,6 +32,24 @@ const INVERSES: Readonly<Record<RelationKind, string>> = {
 
 /** relates_to is the model's only symmetric kind, so a cycle in it means nothing. */
 const SYMMETRIC: ReadonlySet<RelationKind> = new Set<RelationKind>(['relates_to'])
+
+/**
+ * The kinds `relation add` writes: the two that carry a rule and the one that says a caller
+ * meant "see also" rather than `blocks`. The other three stay in the closed set the file
+ * format reads, so a record carrying one still serves, and gain a writer with a decision
+ * rather than by default; ADR-0015 carries why three and not six.
+ */
+export const LINKABLE_KINDS: readonly RelationKind[] = ['blocks', 'duplicates', 'relates_to']
+
+/**
+ * A caller's spelling of a kind, or `undefined`. The command line takes `relates-to` as the
+ * capability contract spells it and `relates_to` as every other closed-set value here is
+ * spelled, and both name the one stored kind.
+ */
+export function linkableKindOf(spelling: string): RelationKind | undefined {
+  const kind = spelling.replaceAll('-', '_')
+  return LINKABLE_KINDS.find((linkable) => linkable === kind)
+}
 
 export function inverseOf(kind: RelationKind): string {
   return INVERSES[kind]
@@ -57,6 +77,23 @@ export type RelationView = {
 
 export function emptyRelationGraph(): RelationGraph {
   return { relations: [] }
+}
+
+/**
+ * The graph a set of records carries. This is the load path, so it refuses nothing: a
+ * hand-edited cycle is `findRelationCycle`'s to report and an edge to a missing record is
+ * the caller's finding. A symmetric edge a file spells the other way round is the same edge.
+ */
+export function relationGraphFrom(items: Iterable<WorkItem>): RelationGraph {
+  const relations: Relation[] = []
+  for (const item of items) {
+    for (const stored of item.relations ?? []) {
+      if (!(RELATION_KINDS as readonly string[]).includes(stored.kind)) continue
+      const edge = normalise({ kind: stored.kind, source: item.id, target: stored.target })
+      if (!relations.some((r) => same(r, edge))) relations.push(edge)
+    }
+  }
+  return { relations }
 }
 
 /** A symmetric edge is stored once, in id order, so the two spellings are one edge. */
@@ -104,12 +141,23 @@ export function addRelation(
   relation: Relation,
 ): Result<{ readonly graph: RelationGraph; readonly added: boolean }> {
   if (relation.source === relation.target) {
-    return fail('GUARD_REFUSED', 'R1', `an item cannot ${relation.kind} itself (${relation.source})`, [relation.source])
+    return fail('GUARD_REFUSED', 'R1', `an item cannot be related to itself: ${relation.source} ${relation.kind} ${relation.source}`, [relation.source])
   }
 
   const edge = normalise(relation)
   if (graph.relations.some((r) => same(r, edge))) {
     return ok({ graph, added: false })
+  }
+
+  // A copy has one original. Two `duplicates` edges out of one item would say it is a copy
+  // of two things, and the second is almost always the first spelled against the wrong id.
+  if (edge.kind === 'duplicates') {
+    const already = outgoing(graph, 'duplicates', edge.source)[0]
+    if (already !== undefined) {
+      return fail('GUARD_REFUSED', 'R4',
+        `${edge.source} already duplicates ${already}, and an item is a duplicate of one thing`,
+        [edge.source, already])
+    }
   }
 
   if (!isSymmetric(edge.kind)) {
@@ -121,7 +169,7 @@ export function addRelation(
     }
     if (closing !== undefined) {
       return fail('GUARD_REFUSED', 'R2',
-        `${edge.source} ${edge.kind} ${edge.target} closes a cycle through ${[...closing, edge.source].join(' -> ')}`,
+        `${edge.source} ${edge.kind} ${edge.target} closes a cycle through ${[edge.source, ...closing].join(' -> ')}`,
         [edge.source, edge.target])
     }
   }
@@ -171,6 +219,10 @@ export function relationsOf(graph: RelationGraph, id: ItemId): readonly Relation
  * The blockers that are still active. An item is blocked while at least one of these
  * exists, or while an open impediment names it; impediments are the caller's to add,
  * because the impediment entity is not in this layer yet.
+ *
+ * A blocker the caller cannot find is not active: it cannot be finished or cancelled, so
+ * counting it would hold the item forever on a record a hand edit removed. `doctor` names
+ * the dangling edge instead.
  */
 export function blockersOf(
   graph: RelationGraph,
@@ -178,7 +230,11 @@ export function blockersOf(
   id: ItemId,
 ): readonly ItemId[] {
   return graph.relations
-    .filter((r) => r.kind === 'blocks' && r.target === id && !isTerminal(stateOf(r.source)))
+    .filter((r) => {
+      if (r.kind !== 'blocks' || r.target !== id) return false
+      const state = stateOf(r.source)
+      return state !== undefined && !isTerminal(state)
+    })
     .map((r) => r.source)
 }
 

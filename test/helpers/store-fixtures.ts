@@ -11,9 +11,11 @@ import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
+  RELATION_KINDS,
   RESOLUTIONS,
   WORK_ITEM_TYPES,
   type AcceptanceCriterion,
+  type StoredRelation,
   type WorkItem,
   type WorkItemType,
 } from '../../src/domain/index.ts'
@@ -141,6 +143,17 @@ export class Gen {
       const labels = new Set<string>()
       for (let i = 0; i < this.int(1, 3); i += 1) labels.add(this.slug())
       base['labels'] = [...labels]
+    }
+    if (this.chance(0.3)) {
+      // Targets need not exist for a round trip; the edge is a section on this record alone.
+      const edges = new Map<string, StoredRelation>()
+      for (let i = 0; i < this.int(1, 3); i += 1) {
+        const target = this.slug()
+        if (target === base['id']) continue
+        const kind = this.pick(RELATION_KINDS)
+        edges.set(`${kind} ${target}`, { kind, target })
+      }
+      if (edges.size > 0) base['relations'] = [...edges.values()]
     }
     if (type === 'epic') base['outcome'] = this.safeBody()
     if (type === 'story' && this.chance(0.7)) base['acceptance_criteria'] = this.criteria()

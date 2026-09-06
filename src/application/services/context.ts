@@ -3,17 +3,16 @@
 // domain layer takes derived facts as arguments, so this file is where they are derived:
 // the hierarchy graph, the gate contexts, the blocker lists and the transition context.
 //
-// The relation graph is empty here, and deliberately: no command that writes a relation is
-// built yet, so nothing in the store can carry one. When `link` lands it fills this in and
-// every guard that reads blockers starts biting, with no change above this file.
+// The relation graph is read off the records' own `relations` sections, so every guard and
+// gate rule that reads blockers is fed from the one stored direction of each edge.
 
 import {
   DEFAULT_DONE_GATE,
   DEFAULT_READY_GATE,
   blockersOf,
-  emptyRelationGraph,
   evaluateGate,
   hierarchyFrom,
+  relationGraphFrom,
   type Gate,
   type GateChild,
   type GateContext,
@@ -112,7 +111,7 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
       items: items.value,
       byId: new Map(items.value.map((item) => [item.id, item])),
       hierarchy: hierarchyFrom(items.value),
-      relations: emptyRelationGraph(),
+      relations: relationGraphFrom(items.value),
     },
   }
 }

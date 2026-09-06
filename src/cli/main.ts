@@ -18,6 +18,7 @@ import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } fro
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
 import { explain, next, status } from '../application/services/insight.ts'
+import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { transition } from '../application/services/lifecycle.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
@@ -408,6 +409,17 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return addEvidence(target, systemClock, randomIds, {
       id: entity, kind, ref, ...(label === undefined ? {} : { label }), actor,
     })
+  }
+
+  if (command === 'relation') {
+    const [verb, entity, kind, other] = operands
+    if (verb === undefined || !(RELATION_VERBS as readonly string[]).includes(verb)) {
+      return validation('relation', `relation takes one of ${RELATION_VERBS.join(', ')}, not ${verb ?? 'nothing'}`, ['treadle help relation'])
+    }
+    if (entity === undefined || kind === undefined || other === undefined) {
+      return validation('relation', `relation ${verb} needs an id, a kind and the other id`, ['treadle help relation'])
+    }
+    return relate(target, systemClock, randomIds, { verb: verb as RelationVerb, id: entity, kind, other, actor })
   }
 
   if (command === 'transition') {

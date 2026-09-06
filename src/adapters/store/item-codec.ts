@@ -12,6 +12,8 @@ import {
   type AcceptanceCriterion,
   type EvidenceKind,
   type EvidencePointer,
+  type RelationKind,
+  type StoredRelation,
   type WorkItem,
 } from '../../domain/index.ts'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
@@ -60,6 +62,7 @@ const SECTION_FIELD: readonly (readonly [string, string])[] = [
   ['Actual', 'actual'],
   ['Findings', 'findings'],
   ['Evidence', 'evidence'],
+  ['Relations', 'relations'],
 ]
 
 const SECTION_BY_NAME = new Map(SECTION_FIELD)
@@ -71,6 +74,8 @@ const TICKED = /^- \[([ x])\] (.+)$/
  * class excludes the space that separates it from the label, so nothing can backtrack.
  */
 const EVIDENCE_LINE = /^- ([a-z]{2,10}) ([^ ]{1,200})(?: (.{1,120}))?$/
+/** One stored edge per line, `- <kind> <id>`; the dictionary decides whether the kind is one. */
+const RELATION_LINE = /^- ([a-z_]{2,20}) ([a-z0-9][a-z0-9-]{1,62}[a-z0-9])$/
 
 function refuse<T>(rule: string, reason: string, id: string): StoreResult<T> {
   return storeFail('VALIDATION', rule, reason, [id])
@@ -115,6 +120,23 @@ function evidenceFrom(body: string, id: string): StoreResult<readonly EvidencePo
 
 function evidenceTo(entries: readonly EvidencePointer[]): string {
   return entries.map((e) => `- ${e.kind} ${e.ref}${e.label === undefined ? '' : ` ${e.label}`}`).join('\n')
+}
+
+function relationsFrom(body: string, id: string): StoreResult<readonly StoredRelation[]> {
+  const out: StoredRelation[] = []
+  for (const line of body.split('\n')) {
+    if (line.length === 0) continue
+    const match = RELATION_LINE.exec(line)
+    if (match === null) {
+      return refuse('S1', `${id}: relation line "${line}" is not "- <kind> <id>"`, id)
+    }
+    out.push({ kind: match[1] as RelationKind, target: match[2] as string })
+  }
+  return storeOk(out)
+}
+
+function relationsTo(entries: readonly StoredRelation[]): string {
+  return entries.map((r) => `- ${r.kind} ${r.target}`).join('\n')
 }
 
 /**
@@ -173,6 +195,12 @@ export function decodeItem(record: ParsedRecord): StoreResult<WorkItem> {
       const evidence = evidenceFrom(section.body, record.id)
       if (!evidence.ok) return evidence
       draft[field] = evidence.value
+      continue
+    }
+    if (field === 'relations') {
+      const relations = relationsFrom(section.body, record.id)
+      if (!relations.ok) return relations
+      draft[field] = relations.value
       continue
     }
     draft[field] = section.body
@@ -237,7 +265,9 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
       ? criteriaTo(value as readonly AcceptanceCriterion[])
       : field === 'evidence'
         ? evidenceTo(value as readonly EvidencePointer[])
-        : (value as string)
+        : field === 'relations'
+          ? relationsTo(value as readonly StoredRelation[])
+          : (value as string)
     const bad = unwritableBodyLine(body)
     if (bad !== undefined) {
       return refuse('S1', `${item.id}: ${field} has the line "${bad}", and a body line may not start with # at column 0`, item.id)

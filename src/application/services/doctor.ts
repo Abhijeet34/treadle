@@ -18,7 +18,14 @@
 // is not a finding: a record removed by hand is a legitimate edit under D1, and the event
 // reaches no read surface.
 
-import { MAX_DESCRIPTION, type ItemId, type WorkItem } from '../../domain/index.ts'
+import {
+  MAX_DESCRIPTION,
+  findRelationCycle,
+  relationGraphFrom,
+  type ItemId,
+  type RelationGraph,
+  type WorkItem,
+} from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { hasReviewStep } from './context.ts'
@@ -155,6 +162,38 @@ export function auditItem(
 }
 
 /**
+ * The edges one record stores whose other end the store does not hold (H24). A record
+ * removed by hand is a legitimate edit under D1, so the edge is a finding rather than a
+ * refusal: it counts for nothing on any read, because a blocker nobody can finish would
+ * otherwise hold the item forever, and the detail names the command that drops it.
+ */
+export function auditRelationsOf(known: ReadonlySet<ItemId>, item: Pick<WorkItem, 'id' | 'relations'>): readonly DoctorFinding[] {
+  return (item.relations ?? [])
+    .filter((relation) => !known.has(relation.target))
+    .map((relation): DoctorFinding => ({
+      rule: 'H24',
+      id: item.id,
+      where: 'relations',
+      detail: `${relation.kind} ${relation.target} names an item the store does not hold, so the edge counts for nothing; treadle relation remove ${item.id} ${relation.kind} ${relation.target} drops it`,
+    }))
+}
+
+/**
+ * A `blocks` cycle the files carry (H25). `relation add` refuses one at write time (R2) and
+ * cannot see one a hand edit or a merge put in; every item on it is blocked by itself.
+ */
+function storedBlockingCycle(graph: RelationGraph): readonly DoctorFinding[] {
+  const path = findRelationCycle(graph, 'blocks')
+  if (path === undefined) return []
+  return [{
+    rule: 'H25',
+    id: path[0] as string,
+    where: 'relations',
+    detail: `blocks closes a cycle through ${path.join(' -> ')}, which no write path records; every item on it waits on itself`,
+  }]
+}
+
+/**
  * One pass over the log, then one pass over each item's own slice of it. `auditItem` filters
  * by entity itself, so handing every item the whole log made this O(items x events): measured
  * on the bench corpora, `doctor` took 375 ms at 100 items and 1,000 events, 1,338 ms at 1,000
@@ -170,7 +209,14 @@ export function auditWorkspace(
     if (bucket === undefined) byEntity.set(event.entity, [event])
     else bucket.push(event)
   }
-  return items.flatMap((item) => auditItem(item, byEntity.get(item.id) ?? []))
+  const known = new Set(items.map((item) => item.id))
+  return [
+    ...items.flatMap((item) => [
+      ...auditItem(item, byEntity.get(item.id) ?? []),
+      ...auditRelationsOf(known, item),
+    ]),
+    ...storedBlockingCycle(relationGraphFrom(items)),
+  ]
 }
 
 export async function doctor(store: Store): Promise<ResultObject> {

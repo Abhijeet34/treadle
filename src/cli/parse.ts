@@ -85,6 +85,7 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     reason: { type: 'string' },
   },
   evidence: {},
+  relation: {},
   doctor: {},
   next: { for: { type: 'string' } },
   explain: {},

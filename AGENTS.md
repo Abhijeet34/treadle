@@ -279,6 +279,13 @@ event that recorded it (`H20`) and an event dated before its item was filed (`H2
 naming an item the store does not hold is not a finding, because a record removed by hand is
 a legitimate edit and the event reaches no read surface.
 
+## Where a relation lives, and what is derived from it
+
+An edge between two items is stored once, as a `## Relations` section on its source record: the blocker for `blocks`, the copy for `duplicates`, the lower id for `relates_to`.
+Everything else is derived on read from that one direction: `show`'s inverse rows (`blocked_by`), `explain`'s `blocked` and `blocks` lines, the `dep` component of `next`, and guards `G2`, `G7` and `DOR3`.
+`src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
+If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
+
 ## Where a record's identity and its boundary are decided
 
 One place each, and both are in `src/adapters/store/grammar.ts`.

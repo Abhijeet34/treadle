@@ -28,7 +28,7 @@ describe('every source file carries its SPDX identifier', () => {
   })
 
   for (const file of covered) {
-    it(file, () => {
+    it(`${file} carries the SPDX line near the top`, () => {
       // First 400 bytes: the line belongs at the top, not buried at the bottom.
       const head = readFileSync(path.join(ROOT, file), 'utf8').slice(0, 400)
       assert.ok(head.includes(SPDX), `${file} needs a "${SPDX}" comment near the top`)
