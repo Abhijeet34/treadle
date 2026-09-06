@@ -56,6 +56,11 @@ The ordering is the whole rule.
 Switching a database that is not yet in WAL takes an exclusive lock, and every run that creates the index passes through that state, so a timeout armed after the switch has nothing to wait with and the switch raises `SQLITE_BUSY` on the first contended open.
 That is not a rare shape: `.index/` is gitignored, so every fresh clone and every deliberate deletion of the cache puts a workspace back into it.
 
+The timeout has a bound and an outcome, and both were measured after the ordering was.
+It is `BUSY_TIMEOUT_MS`, one second inside the lock's stale window, because the wait blocks the event loop and a holder queued on the index sends no heartbeat: a wait as long as the window let a waiter reclaim the lock from a holder that was merely queued.
+When the wait runs out, `begin immediate` raises `SQLITE_BUSY`, and the store reports it as `S11`, a lock not acquired within its bound, rather than letting it escape: on a two-core runner 200 writers re-indexing one file after every landed write held the index past the timeout, and ten of 289 died with a stack trace and reported nothing.
+Every index write runs inside the refresh, which runs before any file is written, so the refusal is honest when it says nothing was written.
+
 Arming the timeout is necessary and not sufficient, because the switch has a second failure mode with a different mechanism.
 Promoting to the exclusive lock while already holding a shared one, when another connection holds a reserved one, is the case SQLite refuses to wait on at all: waiting there could deadlock, so the busy handler is bypassed and `SQLITE_BUSY` is immediate.
 The switch is therefore retried against a two second deadline, which is generous against a window measured in milliseconds and is only ever entered by a run that creates the index, since the pragma is a no-op once the file is in WAL.

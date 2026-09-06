@@ -17,6 +17,7 @@ import path from 'node:path'
 import type { EventQuery, Finding, ItemQuery, StoreEvent } from '../../application/ports/store.ts'
 import { DIR_MODE } from './atomic.ts'
 import { eventFrom, eventRest } from './event-log.ts'
+import { STALE_MS } from './lock.ts'
 
 /**
  * What one file's re-index leaves the caller to act on: the cross-file duplicates it refused,
@@ -147,6 +148,22 @@ export type HierarchyDirty = {
  * refusal naming the path; a stack trace here read as "file is not a database" with the
  * remedy `treadle version`.
  */
+/**
+ * The index's write lock was held by another process for longer than `BUSY_TIMEOUT_MS`.
+ * The store turns it into the `S11` refusal a lock not acquired within its bound already
+ * has; it is not `IndexUnavailable`, because nothing about the index is wrong.
+ */
+export class IndexBusy extends Error {
+  readonly path: string
+  readonly waitedMs: number
+
+  constructor(path: string, cause: unknown) {
+    super(cause instanceof Error ? cause.message : String(cause))
+    this.path = path
+    this.waitedMs = BUSY_TIMEOUT_MS
+  }
+}
+
 export class IndexUnavailable extends Error {
   readonly path: string
 
@@ -163,6 +180,17 @@ function indexFiles(file: string): readonly string[] {
 
 /** Bounded wait for the journal-mode switch. The window it covers is milliseconds wide. */
 const WAL_DEADLINE_MS = 2_000
+
+/**
+ * How long a connection waits on another process's write lock. `busy_timeout` blocks the
+ * event loop, so a lock holder waiting here sends no heartbeat: the wait has to end inside
+ * the advisory lock's stale window or the holder forfeits its lock to a waiter while it is
+ * still queued on the index. Past this the wait is a refusal, `IndexBusy`, never a throw.
+ */
+export const BUSY_TIMEOUT_MS = STALE_MS - 1_000
+
+/** SQLite's SQLITE_BUSY, which is what `busy_timeout` raises once its wait has run out. */
+const SQLITE_BUSY = 5
 
 /** Synchronous, because `#open` is, and the alternative is a busy loop burning a core. */
 function pause(ms: number): void {
@@ -231,6 +259,21 @@ export class IndexCache {
     return this.#db
   }
 
+  /**
+   * Every write transaction opens here. Two hundred writers re-indexing one file after each
+   * landed write held this lock past the busy timeout on a two-core runner, and the raise
+   * escaped the refresh as a stack trace: ten of 289 writers died reporting nothing.
+   */
+  #begin(db: DatabaseSync): void {
+    try {
+      db.exec('begin immediate')
+    } catch (error) {
+      const code = (error as { errcode?: unknown }).errcode
+      if (code === SQLITE_BUSY) throw new IndexBusy(this.#file, error)
+      throw error
+    }
+  }
+
   #openFresh(): DatabaseSync {
     const db = new DatabaseSync(this.#file)
     // The busy timeout is armed before anything that can meet another process's lock, and
@@ -238,7 +281,7 @@ export class IndexCache {
     // database that is not yet in WAL, which is every database on the run that creates it.
     // Armed second, that switch had nothing to wait with and raised SQLITE_BUSY the moment
     // two commands opened a fresh index together.
-    db.exec('pragma busy_timeout = 5000')
+    db.exec(`pragma busy_timeout = ${BUSY_TIMEOUT_MS}`)
     enterWal(db)
     db.exec('pragma synchronous = normal')
     db.exec(META_SCHEMA)
@@ -281,7 +324,7 @@ export class IndexCache {
     const clashes: { finding: Finding; against: string }[] = []
     const moved: string[] = []
     let changed = false
-    db.exec('begin immediate')
+    this.#begin(db)
     try {
       const previous = new Map<string, { line: number; source: string; parent: string | null }>()
       for (const row of db.prepare('select id, line, source, parent from items where file = ?').all(file) as unknown as readonly { id: string; line: number; source: string; parent: string | null }[]) {
@@ -397,7 +440,7 @@ export class IndexCache {
   ): ReindexOutcome {
     const db = this.#open()
     const clashes: { finding: Finding; against: string }[] = []
-    db.exec('begin immediate')
+    this.#begin(db)
     try {
       if (!append) this.#dropRows(file)
       const insert = db.prepare(`insert into events
@@ -436,7 +479,7 @@ export class IndexCache {
 
   dropFile(file: string): boolean {
     const db = this.#open()
-    db.exec('begin immediate')
+    this.#begin(db)
     try {
       this.#dropRows(file)
       db.prepare('delete from files where path = ?').run(file)
@@ -533,7 +576,7 @@ export class IndexCache {
   /** Writes the verdict and clears the dirty marker it accounts for, as one transaction. */
   setHierarchyVerdict(value: string): void {
     const db = this.#open()
-    db.exec('begin immediate')
+    this.#begin(db)
     try {
       db.prepare('insert or replace into meta (key, value) values (?, ?)').run(HIERARCHY_KEY, value)
       db.prepare('delete from meta where key = ?').run(HIERARCHY_DIRTY_KEY)

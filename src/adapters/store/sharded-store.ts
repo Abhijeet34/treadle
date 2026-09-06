@@ -52,7 +52,7 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
+import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
@@ -352,6 +352,15 @@ export class ShardedStore implements Store {
     try {
       return await this.#refreshIndex(keepParses)
     } catch (error) {
+      // A busy index is a lock not acquired within its bound, and the refresh runs before
+      // any file is written, so the caller can retry with nothing to undo.
+      if (error instanceof IndexBusy) {
+        return storeFail(
+          'LOCK_TIMEOUT', 'S11',
+          `the index at ${error.path} was busy for ${error.waitedMs} ms while another process wrote it; nothing was written, so retry`,
+          [this.#root],
+        )
+      }
       if (!(error instanceof IndexUnavailable)) throw error
       return storeFail(
         'STORE_UNAVAILABLE', 'S13',
