@@ -1,7 +1,10 @@
 # SPDX-License-Identifier: Apache-2.0
 # Every job a merge depends on lives in this one file, because the `checks` aggregate at the
-# bottom can only `needs:` jobs in its own workflow, and .github/rulesets/main.json requires
-# exactly that one context. Jobs here can be added or renamed without touching the ruleset.
+# bottom can only `needs:` jobs in its own workflow. The ruleset requires that one context and
+# one other, `tests kept`, which is named there rather than reached through the aggregate
+# because a branch that deleted it from this file would otherwise leave `checks` green with
+# the guard gone (ADR-0013). Every other job here can be added or renamed without touching
+# .github/rulesets/main.json; renaming `tests-kept` cannot.
 #
 # A pull request runs Linux runners only. GitHub bills a macOS minute at about 10x a Linux one
 # and a Windows minute at about 1.67x, against the same allowance, so a three-platform matrix
@@ -195,13 +198,44 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE" "$HEAD"
 
+  # The one job named in .github/rulesets/main.json beside `checks`, and it is named there
+  # because of what it checks. A branch that deletes this job from this file would leave
+  # `checks` green with the guard gone, which is the failure the guard exists to stop; a
+  # required context the branch cannot write is what closes that. ADR-0013 carries the
+  # argument, and renaming this job means editing the ruleset in the same change.
+  #
+  # No `npm ci`: the script calls git and nothing else, and Node runs it from source.
+  tests-kept:
+    name: tests kept
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history, because the comparison is against the merge base, and a shallow
+          # clone has no commit in common with the base branch to find.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # The two SHAs go through the environment rather than into the script text, so no
+      # workflow expansion is ever interpolated into a shell command.
+      - name: No test main has may disappear without a Removes-test trailer
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/check-tests-kept.ts "$BASE" "$HEAD"
+
   # The single required context. Everything above reaches the branch ruleset through this job
   # and nowhere else, so `if: always()` is load-bearing: without it a failed dependency would
   # leave this job skipped, and a skipped required check is not a failing one.
   checks:
     name: checks
     if: always()
-    needs: [check, audit, codeql, actionlint, dependency-review, commits]
+    needs: [check, audit, codeql, actionlint, dependency-review, commits, tests-kept]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -211,9 +245,9 @@ jobs:
         run: |
           set -euo pipefail
           echo "results: $RESULTS"
-          # 'skipped' is accepted only because two jobs above skip themselves off a pull
-          # request: dependency-review and commits. No job here `needs:` another, so nothing
-          # else produces it.
+          # 'skipped' is accepted only because three jobs above skip themselves off a pull
+          # request: dependency-review, commits and tests-kept. No job here `needs:` another,
+          # so nothing else produces it.
           for result in $RESULTS; do
             case "$result" in
               success|skipped) ;;
