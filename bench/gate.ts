@@ -114,6 +114,11 @@ export type GateReport = {
   readonly tolerancePercent: number
   readonly toleranceWhy: string
   readonly derivedFrom: Budgets['derivedFrom']
+  /** Whether a timing row can fail a build, and the reason, carried once rather than on each
+   *  of the twenty rows it applies to: the same paragraph repeated per row was 37% of the
+   *  bytes of the report the bench workflow posts as its job summary. */
+  readonly timingEnforced: boolean
+  readonly timingWhy: string
   readonly rows: readonly GateRow[]
   readonly passed: number
   readonly failed: number
@@ -221,7 +226,7 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
         'ms',
         {
           enforced: budgets.timing.enforced,
-          note: `n=${measurement.wall.n}, ${measurement.opsTotal} store operations${budgets.timing.enforced ? '' : `; not build-blocking: ${budgets.timing.why ?? ''}`}`,
+          note: `n=${measurement.wall.n}, ${measurement.opsTotal} store operations${budgets.timing.enforced ? '' : '; not build-blocking, for the reason above the table'}`,
         },
       ))
     }
@@ -322,6 +327,8 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
     tolerancePercent: budgets.tolerancePercent,
     toleranceWhy: budgets.toleranceWhy,
     derivedFrom: budgets.derivedFrom,
+    timingEnforced: budgets.timing.enforced,
+    timingWhy: budgets.timing.why ?? '',
     rows,
     passed: rows.filter((r) => r.status === 'pass').length,
     failed: rows.filter((r) => r.status === 'fail').length,
