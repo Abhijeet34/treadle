@@ -2,7 +2,8 @@
 
 This file is the entry point for any agent or harness working in this repository, and there is no vendor-specific companion to read instead.
 treadle's interface to an agent is its output contract and its schemas, so nothing here is addressed to one tool.
-If your harness looks for a file under another name, point it at this one.
+If your harness looks for a file under another name, point it at this one, and do not add that name to the repository root.
+`test/architecture/harness-instruction-files.test.ts` refuses one, ADR-0019 argues the rule and the closed list of names, and `CLAUDE.md` is the reason both exist: added by the scaffold, deliberately removed, then returned by a rebase conflict with nothing watching.
 
 It is the project's committed home for project-intrinsic agent knowledge: build, test, release, architecture, and sharp-edge notes that should travel with the code.
 
@@ -198,6 +199,10 @@ Before hand-checking any of these, run the suite: it already checks them.
   `test/helpers/src-scan.ts`.
 - Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
   Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
+- No tracked file at the repository root is one a single agent harness loads by itself
+  (`test/architecture/harness-instruction-files.test.ts`). The list of names is closed and in
+  that file; ADR-0019 says why that list rather than a broader one, and why the rule needs no
+  CI job of its own: `tests kept` already refuses a branch that drops the test's titles.
 - Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
 - `.npmrc` keeps `ignore-scripts=true`, the lockfile stays committed, every workflow installs
   the tree with `npm ci`, `bin`/`files`/`bench/package-facts.ts` all name `dist/treadle.js`,

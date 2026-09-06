@@ -1070,7 +1070,7 @@ A row holds when the object is on the expected stream, the other stream is empty
 | doctor | doctor/1, exit 0 | error/1, exit 6, STORE_UNAVAILABLE | yes |
 | next | next/1, exit 0 | error/1, exit 6, STORE_UNAVAILABLE | yes |
 | explain | explain/1, exit 0 | error/1, exit 5, NOT_FOUND | yes |
-| status | status/1, exit 0 | error/1, exit 6, STORE_UNAVAILABLE | yes |
+| status | status/2, exit 0 | error/1, exit 6, STORE_UNAVAILABLE | yes |
 | help | help/1, exit 0 | error/1, exit 2, VALIDATION | yes |
 | version | version/1, exit 0 | no object, exit 2, no code | **no**: failure no result object was written to the expected stream |
 

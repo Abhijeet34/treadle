@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "status.v1.json",
-  "title": "status/1",
+  "$id": "status.v2.json",
+  "title": "status/2",
   "description": "Orient a caller in the workspace in one call.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "status/1"
+      "const": "status/2"
     },
     "ok": {
       "type": "boolean"
@@ -87,12 +87,6 @@
         "overdue": {
           "type": [
             "integer",
-            "null"
-          ]
-        },
-        "absent_features": {
-          "type": [
-            "string",
             "null"
           ]
         },
