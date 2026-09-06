@@ -102,7 +102,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
-| `doctor`: five findings over records and the event log; the rest wait on entities that do not exist yet | Partly implemented |
+| `doctor`: seven findings over records, the event log and the relation graph; the rest wait on entities that do not exist yet | Partly implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; inside budget, enforced by the build in CI |
