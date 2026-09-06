@@ -118,9 +118,14 @@ switch (op) {
     }
     const txn = `txn-bench-${process.pid}`
     const next: WorkItemState = found.state === 'ready' ? 'draft' : 'ready'
+    // Leaving `on_hold` clears the two fields that state owns, exactly as the transition
+    // service does. Without it the probe landed on an on_hold record 20 times out of 20 and
+    // the whole mutation column was V4 refusals, which the gate then reported as NOT
+    // MEASURED rather than as a pass.
+    const { hold_reason: _reason, held_from: _from, ...rest } = found
     const applied = unwrap(await store.apply({
       txn,
-      writes: [{ item: { ...found, state: next }, ifVersion: found.version }],
+      writes: [{ item: { ...rest, state: next }, ifVersion: found.version }],
       events: [event(found.id, 'transition', txn)],
     }))
     ops = applied.writes.length
