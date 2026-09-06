@@ -222,7 +222,7 @@ export async function history(
   const workspace = view.value.identity.id
   // An id names an item or a sprint; the log is keyed by entity and the rows read the same.
   if (view.value.byId.get(id) === undefined && view.value.sprintById.get(id) === undefined) {
-    return notFound('history', workspace, view.value, id)
+    return notFound('history', 'read', workspace, view.value, id)
   }
 
   const events = await store.events({ entity: id })

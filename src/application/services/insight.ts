@@ -30,6 +30,7 @@ import {
   blockedByThis,
   blockedByThisIndex,
   doneVerdict,
+  hasReviewStep,
   readWorkspace,
   wholeItem,
   readyVerdict,
@@ -334,7 +335,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   const whole = await wholeItem(store, view.value, id)
   if (!whole.ok) return storeRefusal('explain', 'read', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('explain', workspace, view.value, id)
+  if (item === undefined) return notFound('explain', 'read', workspace, view.value, id)
 
   const blockers = activeBlockers(view.value, id)
   const ready = readyVerdict(view.value, item)
@@ -356,7 +357,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     })),
   }
 
-  const targets = legalTargetsFrom(item)
+  const targets = legalTargetsFrom(item, hasReviewStep(item.type))
   const moves: Block = {
     columns: columnsOf(EXPLAIN_SHAPE, 'moves'),
     shown: targets.length,

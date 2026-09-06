@@ -134,10 +134,18 @@ function specFor(item: WorkItem, to: WorkItemState): TransitionSpec | undefined 
     && (spec.name !== 'resume' || to === item.held_from))
 }
 
-/** The states this particular item may move to now, resume resolved against held_from. */
-export function legalTargetsFrom(item: WorkItem): readonly WorkItemState[] {
+/**
+ * The states this particular item may move to now, resume resolved against held_from and the
+ * `in_progress` exit resolved against the type's review step. Reading the table without the
+ * review step listed both exits from `in_progress` for every item, so `explain` on a task named
+ * `in_review`, which G5 then refused, and on a story named `done`, which G5 refused the same way.
+ */
+export function legalTargetsFrom(item: WorkItem, reviewStep: boolean): readonly WorkItemState[] {
   return TRANSITION_TABLE
-    .filter((spec) => spec.from === item.state && (spec.name !== 'resume' || spec.to === item.held_from))
+    .filter((spec) => spec.from === item.state
+      && (spec.name !== 'resume' || spec.to === item.held_from)
+      && (spec.name !== 'submit' || reviewStep)
+      && (spec.name !== 'finish' || !reviewStep))
     .map((spec) => spec.to)
 }
 

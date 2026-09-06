@@ -209,7 +209,7 @@ async function itemsNamed(
   for (const id of ids) {
     const whole = await wholeItem(store, view, id)
     if (!whole.ok) return storeRefusal('sprint', 'mutate', whole.error, view.identity.id)
-    if (whole.value === undefined) return notFound('sprint', view.identity.id, view, id)
+    if (whole.value === undefined) return notFound('sprint', 'mutate', view.identity.id, view, id)
     items.push(whole.value)
   }
   return items

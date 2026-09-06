@@ -83,7 +83,7 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 See [Status](#status) for the line between implemented and specified-only.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never enter a sprint.
-- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly.
+- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story, a bug and an epic pass through `in_review` on the way to `done`; a task, a spike, a chore and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
 - **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest.
 - **A board that stores nothing.** `board` is the backlog grouped by state, scoped to the open sprint unless told otherwise, with a blocked row first in its column and its blocker named beside it; it takes every filter `backlog` takes and caps each column at `--limit` with the column's total beside the cap.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change.

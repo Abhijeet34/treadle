@@ -99,7 +99,7 @@ export async function markItem(
   const whole = await wholeItem(store, view.value, request.id)
   if (!whole.ok) return storeRefusal('mark', 'mutate', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('mark', workspace, view.value, request.id)
+  if (item === undefined) return notFound('mark', 'mutate', workspace, view.value, request.id)
 
   // Severity is a field of a bug and an impediment only, so the line offered names the one
   // this type carries: `--severity` on a task was refused as printed.
@@ -203,7 +203,7 @@ export async function addEvidence(
   const whole = await wholeItem(store, view.value, request.id)
   if (!whole.ok) return storeRefusal('evidence', 'mutate', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('evidence', workspace, view.value, request.id)
+  if (item === undefined) return notFound('evidence', 'mutate', workspace, view.value, request.id)
 
   if (!(EVIDENCE_KINDS as readonly string[]).includes(request.kind)) {
     return refusal('evidence', workspace, 'C1', item.id,

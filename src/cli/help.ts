@@ -3,6 +3,8 @@
 // top-level page and every command page read the same table the schemas are generated from,
 // so a command whose contract changes cannot keep a help page that describes the old one.
 
+import { RENDERINGS } from '../adapters/render/index.ts'
+import { CONTRACT } from '../adapters/render/grammar.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type Row } from '../application/result.ts'
 import { HELP_SHAPE } from '../application/services/meta.ts'
 import { COMMANDS, GLOBAL_FLAGS, commandNamed, verdictFor, type Command } from './inventory.ts'
@@ -15,22 +17,31 @@ const VERDICT_NOTE: Readonly<Record<string, string>> = {
 }
 
 /**
- * Verdict `A` is one verdict for four different reasons, and the general note is true of
- * only one of them: `--yes` is ignored here because the command asks nothing, not because
- * it is about presentation. A note that says the wrong reason is worse than a terse one,
- * because a caller reads it as the rule and then predicts the next command wrong.
+ * The note a flag earns when its verdict letter is true for a reason the general note does not
+ * give. `A` is one letter for four different reasons, and the general note is true of only one
+ * of them: `--yes` is ignored here because the command asks nothing, not because it is about
+ * presentation. A note that says the wrong reason is worse than a terse one, because a caller
+ * reads it as the rule and then predicts the next command wrong. Three `S` flags need the same
+ * treatment for the opposite reason: what they support is not this command's answer, and a
+ * caller who has never seen the flag learns nothing from "it changes what this command shows".
+ *
+ * Keyed by flag and verdict together, because a flag that is `A` on one command is `S` on
+ * another and only the `A` reading needs the specific sentence.
  */
-const IGNORED_BECAUSE: Readonly<Record<string, string>> = {
-  '--yes': 'accepted and ignored: this command has no confirmation to answer',
-  '--no-input': 'accepted and ignored: this command has no confirmation to suppress',
-  '--dry-run': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
-  '--preview': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
-  '--actor': 'accepted and ignored: this command records no event, so no actor is attributed',
+const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
+  '--yes A': 'accepted and ignored: this command has no confirmation to answer',
+  '--no-input A': 'accepted and ignored: this command has no confirmation to suppress',
+  '--dry-run A': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
+  '--preview A': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
+  '--actor A': 'accepted and ignored: this command records no event, so no actor is attributed',
+  '--contract S': `supported: it prints the ${CONTRACT} line grammar and runs no command`,
+  '--out S': `supported: it selects the rendering, one of ${RENDERINGS.join(', ')}`,
+  '--ascii S': 'supported: it writes the human rendering truncation mark as three dots, not an ellipsis',
+  '--log-values S': 'supported: it lets -vvv print field values, reported by name and size without it',
 }
 
 function noteFor(flag: string, verdict: string): string {
-  if (verdict === 'A') return IGNORED_BECAUSE[flag] ?? VERDICT_NOTE['A'] ?? ''
-  return VERDICT_NOTE[verdict] ?? ''
+  return SPECIFIC_NOTE[`${flag} ${verdict}`] ?? VERDICT_NOTE[verdict] ?? ''
 }
 
 function commandRows(): readonly Row[] {

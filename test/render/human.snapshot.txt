@@ -353,10 +353,9 @@ gates  3 of 10
   done  DOD4  fail     treadle set sso-saml acceptance_cr…
   done  DOD7  fail     treadle evidence add sso-saml <kin…
 
-moves  5 of 5
+moves  4 of 4
   TO         GUARDS
   in_review  G5
-  done       G5,G6
   on_hold    -
   cancelled  G7
   ready      -
@@ -381,10 +380,9 @@ gates  3 of 10
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
-moves  5 of 5
+moves  4 of 4
   TO         GUARDS
   in_review  G5
-  done       G5,G6
   on_hold    -
   cancelled  G7
   ready      -
@@ -409,10 +407,9 @@ gates  3 of 10
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
-moves  5 of 5
+moves  4 of 4
   TO         GUARDS
   in_review  G5
-  done       G5,G6
   on_hold    -
   cancelled  G7
   ready      -
@@ -603,6 +600,9 @@ help  acme-platform
     that edge evaluated.
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
+  example  treadle transition sso-saml in_review # submit
+    for review; a story, a bug and an epic have a review
+    step and no other type does
   example  treadle transition sso-saml cancelled
     --resolution rejected --reason "the reviewer refused it
     outright" # stop the item and say which of the five
@@ -617,14 +617,17 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --preview
     # which store and which guards, evaluating none of them
 
-flags  17 of 17
+flags  20 of 20
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what …
   --version          N        another scope: passing it h…
-  --out              S        supported: it changes what …
+  --contract         S        supported: it prints the ag…
+  --out              S        supported: it selects the r…
   --quiet            S        supported: it changes what …
   --verbose          S        supported: it changes what …
+  --log-values       S        supported: it lets -vvv pri…
   --color            A        accepted and ignored: it on…
+  --ascii            S        supported: it writes the hu…
   --workspace        S        supported: it changes what …
   --dry-run          S        supported: it changes what …
   --preview          S        supported: it changes what …
@@ -651,6 +654,8 @@ help  acme-platform
     evaluated.
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
+  example  treadle transition sso-saml in_review # submit for review; a story, a
+    bug and an epic have a review step and no other type does
   example  treadle transition sso-saml cancelled --resolution rejected --reason
     "the reviewer refused it outright" # stop the item and say which of the five
     reasons it stopped for
@@ -662,14 +667,17 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --preview # which store and
     which guards, evaluating none of them
 
-flags  17 of 17
+flags  20 of 20
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or…
   --version          N        another scope: passing it here is a validation …
-  --out              S        supported: it changes what this command does or…
+  --contract         S        supported: it prints the agent/1 line grammar a…
+  --out              S        supported: it selects the rendering, one of hum…
   --quiet            S        supported: it changes what this command does or…
   --verbose          S        supported: it changes what this command does or…
+  --log-values       S        supported: it lets -vvv print field values, rep…
   --color            A        accepted and ignored: it only changes presentat…
+  --ascii            S        supported: it writes the human rendering trunca…
   --workspace        S        supported: it changes what this command does or…
   --dry-run          S        supported: it changes what this command does or…
   --preview          S        supported: it changes what this command does or…
@@ -693,19 +701,23 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on that edge evaluated.
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadle transition sso-saml in_review # submit for review; a story, a bug and an epic have a review step and no other type does
   example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
   example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
   example  treadle transition sso-saml in_progress --preview # which store and which guards, evaluating none of them
 
-flags  17 of 17
+flags  20 of 20
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or shows
   --version          N        another scope: passing it here is a validation error naming the correct form
-  --out              S        supported: it changes what this command does or shows
+  --contract         S        supported: it prints the agent/1 line grammar and runs no command
+  --out              S        supported: it selects the rendering, one of human, agent, json
   --quiet            S        supported: it changes what this command does or shows
   --verbose          S        supported: it changes what this command does or shows
+  --log-values       S        supported: it lets -vvv print field values, reported by name and size without it
   --color            A        accepted and ignored: it only changes presentation, and here there is nothing to present
+  --ascii            S        supported: it writes the human rendering truncation mark as three dots, not an ellipsis
   --workspace        S        supported: it changes what this command does or shows
   --dry-run          S        supported: it changes what this command does or shows
   --preview          S        supported: it changes what this command does or shows

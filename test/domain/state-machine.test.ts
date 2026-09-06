@@ -118,7 +118,14 @@ describe('every state-by-target pair, legal and illegal', () => {
 describe('legalTargetsFrom agrees with the oracle', () => {
   for (const from of WORK_ITEM_STATES) {
     it(`lists the legal targets of ${from}`, () => {
-      assert.deepEqual([...legalTargetsFrom(subject(from))].sort(), Object.keys(LEGAL[from]).sort())
+      // The table's edge set is the oracle, and G5 then decides which of the two `in_progress`
+      // exits this item's type actually has. Reading the table without it listed both for every
+      // item, so `explain` on a task named `in_review` and on a story named `done`, each of
+      // which `transition` then refused with G5.
+      const reviews = Object.keys(LEGAL[from]).filter((to) => !(from === 'in_progress' && to === 'done'))
+      const straight = Object.keys(LEGAL[from]).filter((to) => to !== 'in_review')
+      assert.deepEqual([...legalTargetsFrom(subject(from), true)].sort(), reviews.sort())
+      assert.deepEqual([...legalTargetsFrom(subject(from), false)].sort(), straight.sort())
     })
   }
 })

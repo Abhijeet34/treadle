@@ -122,7 +122,7 @@ export async function transition(
   const whole = await wholeItem(store, view.value, request.id)
   if (!whole.ok) return storeRefusal('transition', 'mutate', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('transition', workspace, view.value, request.id)
+  if (item === undefined) return notFound('transition', 'mutate', workspace, view.value, request.id)
 
   const context = transitionContextFor(view.value, item)
 
