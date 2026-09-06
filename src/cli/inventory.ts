@@ -128,6 +128,7 @@ export const COMMANDS: readonly Command[] = [
     ],
     examples: [
       ['treadle transition sso-saml in_progress', 'start work; refused if a guard on that edge fails'],
+      ['treadle transition sso-saml in_review', 'submit for review; a story, a bug and an epic have a review step and no other type does'],
       ['treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
       ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
@@ -278,9 +279,9 @@ export function commandNamed(name: string): Command | undefined {
 export type Verdict = 'S' | 'A' | 'N' | 'X'
 
 export const GLOBAL_FLAGS = [
-  '--help', '--version', '--out', '--quiet', '--verbose', '--color', '--workspace',
-  '--dry-run', '--preview', '--yes', '--no-input', '--actor', '--width', '--fields',
-  '--limit', '--cursor', '--explain-absence',
+  '--help', '--version', '--contract', '--out', '--quiet', '--verbose', '--log-values',
+  '--color', '--ascii', '--workspace', '--dry-run', '--preview', '--yes', '--no-input',
+  '--actor', '--width', '--fields', '--limit', '--cursor', '--explain-absence',
 ] as const
 export type GlobalFlag = (typeof GLOBAL_FLAGS)[number]
 
@@ -291,7 +292,19 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     case '--out': return command.record === 'none' ? 'N' : 'S'
     case '--quiet': return 'S'
     case '--verbose': return 'S'
+    // `--contract` replaces the command's output with the line grammar, exactly as `--help`
+    // replaces it with the help page, so it is supported wherever `--help` is. It was the
+    // worst of the four flags this table did not carry: it is what an agent reads before it
+    // can parse anything else, and AGENTS.md, a contributing file, was its only home.
+    case '--contract': return 'S'
+    // `--log-values` is not presentation. `-vvv` reports every field by name and size, and
+    // this is the opt-in that puts the values themselves on stderr, where a CI job and an
+    // agent transcript keep them; a caller cannot weigh that disclosure against an unnamed flag.
+    case '--log-values': return 'S'
     case '--color': return 'A'
+    // `--ascii` reaches the human rendering's truncation mark and nothing else, so it is
+    // supported rather than ignored: the answer is the same, the bytes are not.
+    case '--ascii': return 'S'
     case '--width': return 'A'
     // Only a command that can prompt has anything to suppress. `init` is the one with a
     // confirmation class today; interface B.5's severe class lands with `undo`.

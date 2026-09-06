@@ -108,7 +108,7 @@ export async function setFields(
   const whole = await wholeItem(store, view.value, request.id)
   if (!whole.ok) return storeRefusal('set', 'mutate', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('set', workspace, view.value, request.id)
+  if (item === undefined) return notFound('set', 'mutate', workspace, view.value, request.id)
 
   if (request.assignments.length === 0) {
     return refusal(workspace, 'C1', item.id,

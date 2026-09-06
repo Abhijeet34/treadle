@@ -15,6 +15,7 @@
 import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
+import { hasReviewStep } from '../../src/application/services/context.ts'
 import { legalTargetsFrom, type WorkItem, type WorkItemState } from '../../src/domain/index.ts'
 import { random } from '../../test/helpers/store-fixtures.ts'
 import { crossCheck, dataOf, openSurface, type CrossCheck } from './surface.ts'
@@ -40,12 +41,16 @@ type LogEvent = {
   readonly after?: { readonly state?: string }
 }
 
-/** The targets the table allows this item right now, resume resolved against held_from. */
+/**
+ * The targets the table allows this item right now, resume resolved against held_from and the
+ * `in_progress` exit against the type's review step, so the walk stops spending an attempt on
+ * the one exit G5 refuses outright for that type.
+ */
 function targetsFor(item: Tracked): readonly WorkItemState[] {
   return legalTargetsFrom({
     state: item.state,
     ...(item.heldFrom === undefined ? {} : { held_from: item.heldFrom }),
-  } as WorkItem)
+  } as WorkItem, hasReviewStep(item.type))
 }
 
 function argsFor(item: Tracked, to: WorkItemState): readonly string[] {

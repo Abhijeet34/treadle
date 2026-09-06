@@ -269,6 +269,13 @@ Before hand-checking any of these, run the suite: it already checks them.
   `src/cli/parse.ts` re-derives every flag fault from the option table `help <command>`
   prints, and the suite in `test/cli/found-by-use.test.ts` asserts the parser's own byte
   sequences are absent. A dependency that formats a message is a message to rewrite.
+- The parser's option table and the help page's flag matrix are one set, not two.
+  `GLOBAL_OPTIONS` in `src/cli/parse.ts` decides what is accepted and `GLOBAL_FLAGS` in
+  `src/cli/inventory.ts` decides what `help <command>` prints, and the two drifted apart
+  four times: `--contract`, `--ascii`, `--no-color` and `--log-values` were all accepted and
+  named by no page, and `--contract` is the line grammar an agent needs before it can parse
+  anything else. `test/cli/found-by-use.test.ts` now holds both directions, so a flag added
+  to one table and not the other fails rather than shipping findable only by guessing.
 - Every remedy a gate rule emits is a command line, and `test/domain/gate-remedies.test.ts`
   holds that: each `GateCheck` kind declares the command that performs its remedy, or a
   reason it has none. A remedy that reads as advice is the defect that left a bug filed

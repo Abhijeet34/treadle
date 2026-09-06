@@ -11,7 +11,8 @@ import { DatabaseSync } from 'node:sqlite'
 import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
-import { COMMAND_OPTIONS } from '../../src/cli/parse.ts'
+import { COMMAND_OPTIONS, GLOBAL_OPTIONS } from '../../src/cli/parse.ts'
+import { COMMANDS } from '../../src/cli/inventory.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
 /** 69 bytes, which is the length that first showed `show` cutting a title at 64 cells. */
@@ -612,6 +613,91 @@ describe('the defects a caller found on its first walk through the tool', () => 
   })
 })
 
+describe('what the tool says about itself', () => {
+  let demo: Demo
+
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  /** The `to` column of `explain`'s moves block, which is the list a caller picks a move from. */
+  const movesOf = (out: string): readonly string[] =>
+    out.split('\n').slice(out.split('\n').findIndex((line) => line.startsWith('#to guards')) + 1)
+      .filter((line) => /^[a-z_]+ /.test(line))
+      .map((line) => line.split(' ')[0] as string)
+
+  it('offers a task no move to in_review, which G5 refuses on every task', async () => {
+    // `explain`'s own summary is "what each legal next move needs", and it read the transition
+    // table without the item's type, so every in-progress item was offered both exits from
+    // `in_progress` and one of the two was refused the moment it was taken.
+    const explained = await cli(['explain', 'log-redact'])
+    assert.equal(explained.code, 0, explained.err)
+    assert.match(explained.out, /^type task$/m)
+    assert.match(explained.out, /^state in_progress$/m)
+    const moves = movesOf(explained.out)
+    assert.ok(moves.includes('done'), `a task's exit from in_progress is done: ${moves.join(', ')}`)
+    assert.ok(!moves.includes('in_review'), `in_review is offered but G5 refuses it: ${moves.join(', ')}`)
+
+    const refused = await cli(['transition', 'log-redact', 'in_review'])
+    assert.equal(refused.code, 3)
+    assert.match(refused.err, /^guard G5$/m)
+  })
+
+  it('offers a story no move straight to done, which G5 refuses the same way', async () => {
+    const explained = await cli(['explain', 'sso-saml'])
+    assert.equal(explained.code, 0, explained.err)
+    assert.match(explained.out, /^type story$/m)
+    assert.match(explained.out, /^state in_progress$/m)
+    const moves = movesOf(explained.out)
+    assert.ok(moves.includes('in_review'), `a story's exit from in_progress is in_review: ${moves.join(', ')}`)
+    assert.ok(!moves.includes('done'), `done is offered but G5 refuses it: ${moves.join(', ')}`)
+
+    const refused = await cli(['transition', 'sso-saml', 'done'])
+    assert.equal(refused.code, 3)
+    assert.match(refused.err, /^guard G5$/m)
+  })
+
+  it('names the three types that have a review step, before a refusal has to teach it', async () => {
+    // The review-step set is `story`, `bug` and `epic`, and it appeared in no help page, no
+    // `--contract` line and no README sentence: a cold agent learned it by being refused.
+    const help = await cli(['help', 'transition'])
+    assert.equal(help.code, 0, help.err)
+    assert.match(help.out, /^example treadle transition .*a story, a bug and an epic have a review step/m)
+  })
+
+  it('declares a NOT_FOUND from a mutating command a mutation, not a read', async () => {
+    // `notFound` hard-coded `effect: 'read'`, so every NOT_FOUND from `transition`, `set`,
+    // `mark`, `evidence`, `relation` and `sprint` said it was a read. R6 makes the effect a
+    // declaration rather than an inference, and an agent deciding whether a failed call may
+    // have written anything reads this one field.
+    const lines: readonly (readonly [string, readonly string[]])[] = [
+      ['transition', ['transition', 'nope', 'done']],
+      ['set', ['set', 'nope', 'priority=2']],
+      ['mark', ['mark', 'nope', '--priority', '2', '--reason', 'a reason for the change']],
+      ['evidence', ['evidence', 'add', 'nope', 'run', '8813']],
+      ['relation', ['relation', 'add', 'nope', 'blocks', 'sso-saml']],
+      ['sprint', ['sprint', 'commit', 'sprint-31', 'nope']],
+    ]
+    for (const [command, argv] of lines) {
+      const refused = await cli([...argv, '--out', 'json'])
+      const object = JSON.parse(refused.err) as { code: string; command: string; effect: string }
+      assert.equal(object.code, 'NOT_FOUND', `${command}: ${refused.err}`)
+      assert.equal(object.command, command)
+      assert.equal(object.effect, 'mutate', `${command} declares its NOT_FOUND a ${object.effect}`)
+    }
+  })
+
+  it('still declares a NOT_FOUND from a read a read', async () => {
+    for (const argv of [['show', 'nope'], ['explain', 'nope'], ['history', 'nope']]) {
+      const refused = await cli([...argv, '--out', 'json'])
+      const object = JSON.parse(refused.err) as { code: string; effect: string }
+      assert.equal(object.code, 'NOT_FOUND', refused.err)
+      assert.equal(object.effect, 'read')
+    }
+  })
+})
+
 describe('help names every flag the parser accepts', () => {
   let demo: Demo
 
@@ -619,6 +705,37 @@ describe('help names every flag the parser accepts', () => {
   after(async () => { await demo.dispose() })
 
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('names each global flag on every command page, so none is found only by guessing', async () => {
+    // `--contract`, `--ascii`, `--no-color` and `--log-values` were accepted by the global
+    // option table and named by no help page at all. `--contract` was the worst of the four:
+    // it prints the line grammar an agent reads before it can parse any other output, and
+    // AGENTS.md, a contributing file rather than a surface the tool exposes, was its only home.
+    const missing: string[] = []
+    for (const command of COMMANDS) {
+      const help = await cli(['help', command.name])
+      assert.equal(help.code, 0, help.err)
+      for (const flag of Object.keys(GLOBAL_OPTIONS)) {
+        if (!new RegExp(`^--${flag} [SANX] `, 'm').test(help.out)) missing.push(`${command.name} --${flag}`)
+      }
+    }
+    assert.deepEqual(missing, [], `help does not name: ${missing.join(', ')}`)
+  })
+
+  it('states what --out accepts on the page, not only inside the refusal for guessing wrong', async () => {
+    const help = await cli(['help', 'backlog'])
+    assert.match(help.out, /^--out S .*human, agent, json/m)
+  })
+
+  it('refuses --no-color by name, rather than accepting a second spelling of nothing', async () => {
+    // No renderer has ever read a colour flag. `--color` is the one documented knob and is
+    // declared `A` for exactly that reason; `--no-color` was a second spelling of the same
+    // nothing that no help page named, so it is gone rather than documented.
+    const refused = await cli(['status', '--no-color'])
+    assert.equal(refused.code, 2)
+    assert.match(refused.err, /--no-color is not a flag of status/)
+    assert.match(refused.err, /^fix treadle help status$/m)
+  })
 
   it('has a usage line for each command flag, so a caller finds one by asking', async () => {
     // `file` accepted --id, --desc, --assignee, --label, --sprint and --parent, and `backlog`

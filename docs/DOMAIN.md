@@ -35,7 +35,7 @@ The set is closed.
 | `G2` | The item is not blocked |
 | `G3` | The target column's work-in-progress limit is not exceeded |
 | `G4` | The item is in the active sprint, or on the board |
-| `G5` | The type's review step decides whether `submit` or `finish` is the legal exit from `in_progress` |
+| `G5` | The type's review step decides whether `submit` or `finish` is the legal exit from `in_progress`; `story`, `bug` and `epic` have one |
 | `G6` | The done gate passes |
 | `G7` | Nothing active is blocked by this one |
 | `G8` | An epic reaches `done` only once every child is done or cancelled |
@@ -83,6 +83,10 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `spike` | `question`, `timebox_hours` | `question`, `timebox_hours`, `findings` |
 | `chore` | none | none |
 | `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
+
+A `story`, a `bug` and an `epic` have a review step, and no other type does.
+That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike`, a `chore` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
+`treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
 `proposed_resolution` is required because raising one obliges the raiser to say what would clear it; [architecture/adr/0017-an-impediment-is-a-type-that-blocks.md](architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) carries the four decisions around it.

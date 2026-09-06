@@ -88,7 +88,7 @@ export async function relate(
   if (!view.ok) return storeRefusal('relation', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
   const source = view.value.byId.get(request.id)
-  if (source === undefined) return notFound('relation', workspace, view.value, request.id)
+  if (source === undefined) return notFound('relation', 'mutate', workspace, view.value, request.id)
   const kind = linkableKindOf(request.kind)
   if (kind === undefined) {
     return errorResult({
@@ -102,7 +102,7 @@ export async function relate(
   // it. A remove takes any id, because dropping an edge to a record a hand edit removed is
   // the remedy doctor's H24 names.
   if (request.verb === 'add' && view.value.byId.get(request.other) === undefined) {
-    return notFound('relation', workspace, view.value, request.other)
+    return notFound('relation', 'mutate', workspace, view.value, request.other)
   }
 
   const asked: Relation = { kind, source: source.id, target: request.other }
@@ -133,7 +133,7 @@ export async function relate(
       .filter((id) => id !== edge.source)
       .flatMap((id) => { const item = view.value.byId.get(id); return item === undefined ? [] : [{ id, version: item.version }] })
     const holder = await record(edge.source)
-    if (holder === undefined) return notFound('relation', workspace, view.value, edge.source)
+    if (holder === undefined) return notFound('relation', 'mutate', workspace, view.value, edge.source)
     written = { ...holder, relations: [...(holder.relations ?? []), { kind: edge.kind, target: edge.target }] }
   } else {
     const removed = removeRelation(view.value.relations, asked)
@@ -146,7 +146,7 @@ export async function relate(
     }
     edge = { kind, source: holder.item.id, target: holder.entry.target }
     const whole = await record(holder.item.id)
-    if (whole === undefined) return notFound('relation', workspace, view.value, holder.item.id)
+    if (whole === undefined) return notFound('relation', 'mutate', workspace, view.value, holder.item.id)
     const kept = (whole.relations ?? []).filter((stored) => stored.kind !== holder.entry.kind || stored.target !== holder.entry.target)
     written = kept.length === 0
       ? Object.fromEntries(Object.entries(whole).filter(([key]) => key !== 'relations')) as unknown as WorkItem

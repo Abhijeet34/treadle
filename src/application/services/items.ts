@@ -26,6 +26,7 @@ import {
   okResult,
   type Block,
   type ColumnSpec,
+  type Effect,
   type ResultObject,
   type ResultShape,
   type Row,
@@ -469,7 +470,7 @@ export async function showItem(
   const whole = await wholeItem(store, view.value, id)
   if (!whole.ok) return storeRefusal('show', 'read', whole.error, workspace)
   const item = whole.value
-  if (item === undefined) return notFound('show', workspace, view.value, id)
+  if (item === undefined) return notFound('show', 'read', workspace, view.value, id)
 
   const data: Record<string, Value> = {
     item: item.id,
@@ -772,13 +773,18 @@ function editDistance(a: string, b: string): number {
  * checking, because `readWorkspace` has already refused any view over a store that holds a
  * record it does not serve: an ambiguous or quarantined id never reaches a lookup, so a miss
  * here is a genuine absence and not the silent first-match wearing a different hat.
+ *
+ * The effect is the caller's, not this function's. Hard-coding `read` here made every
+ * `NOT_FOUND` from `transition`, `set`, `mark`, `evidence`, `relation` and `sprint` declare
+ * itself a read, which is exactly the inference R6 exists to forbid; a caller deciding whether
+ * a failed call may have written anything reads this field.
  */
 export function notFound(
-  command: string, workspace: string, view: WorkspaceView, id: ItemId,
+  command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
   const held = view.items.length
   return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect: 'read', entity: id,
+    code: 'NOT_FOUND', command, workspace, effect, entity: id,
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
     near: nearIds(view.byId.keys(), id),
     fix: ['treadle backlog'],

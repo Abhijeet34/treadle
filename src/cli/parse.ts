@@ -20,7 +20,13 @@ import { GLOBAL_FLAGS, commandNamed, verdictFor, type GlobalFlag } from './inven
 
 type OptionConfig = NonNullable<ParseArgsConfig['options']>
 
-const GLOBAL_OPTIONS: OptionConfig = {
+/**
+ * The flags every command takes. Exported so a test can hold the rule that `help <command>`
+ * names every one of them: `--contract`, `--ascii`, `--no-color` and `--log-values` were
+ * accepted by this table and printed by no help page, and `--contract` is the grammar an
+ * agent needs before it can parse anything else.
+ */
+export const GLOBAL_OPTIONS: OptionConfig = {
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'V' },
   contract: { type: 'boolean' },
@@ -28,7 +34,6 @@ const GLOBAL_OPTIONS: OptionConfig = {
   quiet: { type: 'boolean', short: 'q' },
   verbose: { type: 'boolean', short: 'v', multiple: true },
   color: { type: 'string' },
-  'no-color': { type: 'boolean' },
   ascii: { type: 'boolean' },
   workspace: { type: 'string' },
   'dry-run': { type: 'boolean' },
@@ -247,9 +252,10 @@ function flagRefusal(
 }
 
 /**
- * The global flags `emit` in main.ts reads to render a result, and nothing else. `--color`
- * and `--no-color` are parsed and read by no renderer, so naming them here would promise a
- * refusal something no other path delivers either.
+ * The global flags `emit` in main.ts reads to render a result, and nothing else. `--color` is
+ * parsed and read by no renderer, so naming it here would promise a refusal something no other
+ * path delivers either. `--no-color` was a second spelling of that same nothing, accepted by
+ * the table and named by no help page; it is gone, and `--color` is the one documented knob.
  */
 const PRESENTATION = ['out', 'width', 'quiet', 'ascii'] as const
 
