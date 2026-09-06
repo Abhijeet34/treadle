@@ -75,8 +75,9 @@ export type Corpus = {
   readonly openSprint: string
   /**
    * What a close would have recorded against what the store accepted. `carried` is one
-   * field line and the ceiling is MAX_FIELD_VALUE_BYTES, so a sprint past about 810 open
-   * items cannot record its own carry-over.
+   * field line bounded at MAX_FIELD_VALUE_BYTES, so a sprint past a few hundred open items
+   * cannot record its own carry-over; `fitting` below measures the line rather than
+   * estimating it, and docs/BENCHMARKS.md carries the figure that measurement produced.
    */
   readonly carryOver: { readonly largestWanted: number; readonly largestStored: number; readonly sprintsTruncated: number }
   readonly impediments: number

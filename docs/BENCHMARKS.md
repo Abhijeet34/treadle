@@ -353,10 +353,11 @@ The budget is armed on the same reasoning #4's was, and `test/store/record-bound
 A5 is still `PARTIAL` rather than `MET` for the other half of its target: 1 of 206 damaged stores produced a refusal that names the file rather than the record, when a single byte was changed on line 1 and the file stopped being a record file this tool wrote.
 That refusal is correct and loud; it is the granularity that misses.
 
-**Still open: a refusal the parser raises ignores `--out json`.**
+**Closed: a refusal the parser raises ignored `--out json`.**
 
-Axis A12 found this and reports it as a miss rather than fixing it.
-`src/cli/main.ts:205` renders a parse-level refusal with `emit(env, result, {})`, an empty flag set, so the rendering the caller asked for is dropped and the default one is used instead.
+This page previously reported it as open, and that report is now out of date rather than wrong: it was true of the tree that produced the earlier appendix.
+Axis A12 found it and reported it as a miss rather than fixing it, because a benchmark that quietly repairs what it measures is measuring something else.
+`src/cli/main.ts:205` rendered a parse-level refusal with `emit(env, result, {})`, an empty flag set, so the rendering the caller asked for was dropped and the default one was used instead.
 
 ```text
 $ treadle version --fields id --out json
@@ -366,11 +367,15 @@ rule C1
 ```
 
 Three parse-level refusals were probed and all three ignored the flag: a flag refused for a command, a flag refused for a different command, and an unknown command.
-Every refusal raised past the parser renders as asked, which is why 25 of the 26 invocations hold and the failure is narrow rather than general.
-It matters because the caller who most needs the machine-readable form is the one that got the invocation wrong.
+Every refusal raised past the parser rendered as asked, which is why 25 of the 26 invocations held and the failure was narrow rather than general.
+It mattered because the caller who most needs the machine-readable form is the one that got the invocation wrong.
 
-No defect was fixed by this branch.
-A benchmark that quietly repairs what it measures is measuring something else, and the value of that rule is visible in the first two: the rig found them, another worker fixed each, and the rig then verified both without either side taking the other's word for it.
+Commit `e4e2cb5` closed it by reading the presentation flags leniently off the line the parser refused, before the refusal is rendered, so every path goes through `emit` rather than three of them bypassing it.
+The same fix covers the runtime-floor refusal in `checkRuntime`, which used to write two raw lines to stderr rather than a result object at all.
+The patch was recovered from `48c3e0d`, written by the worker who found this on axis A12, told it was out of scope for that task, and dropped rather than kept; recovering it from the object database cost less than writing it twice.
+Its `PRESENTATION` list named `--color` and `--no-color` as well, which no renderer under `src/` reads, so the recovered version keeps only the four flags `emit` reads: `out`, `width`, `quiet` and `ascii`.
+Measured here: `treadle version --fields id --out json`, `treadle nosuchverb --out json` and the runtime-floor refusal under Node 22 all now render as the `error/1` object the caller asked for, under `--out human` as well as `--out json`.
+"The axis table re-derived after the four capabilities landed" carries A12 moving from MISSED to MET on this and the six previously unmeasured commands together.
 
 ## What is not measured, and what unblocks it
 
