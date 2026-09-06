@@ -23,7 +23,7 @@ import {
   type WorkItemState,
   type WorkItemType,
 } from '../src/domain/index.ts'
-import { ShardedStore, createWorkspace } from '../src/adapters/store/index.ts'
+import { MAX_FIELD_VALUE_BYTES, ShardedStore, createWorkspace } from '../src/adapters/store/index.ts'
 import type { StoreEvent } from '../src/application/ports/store.ts'
 
 /**
@@ -73,6 +73,12 @@ export type Corpus = {
   readonly readyMatches: number
   readonly sprintsWritten: number
   readonly openSprint: string
+  /**
+   * What a close would have recorded against what the store accepted. `carried` is one
+   * field line and the ceiling is MAX_FIELD_VALUE_BYTES, so a sprint past about 810 open
+   * items cannot record its own carry-over.
+   */
+  readonly carryOver: { readonly largestWanted: number; readonly largestStored: number; readonly sprintsTruncated: number }
   readonly impediments: number
   readonly relations: { readonly total: number; readonly blocks: number; readonly duplicates: number; readonly relates_to: number }
   /** The longest `blocks` chain the generator laid down, which is what the cycle check walks. */
@@ -212,6 +218,13 @@ function sprintsFor(months: readonly string[], items: readonly WorkItem[]): read
   return months.map((month, index): Sprint => {
     const id = `sprint-${index}`
     const closed = index !== openIndex
+    // Two limits the store found here rather than the other way round. An empty list is an
+    // absent field, so a sprint whose members all finished writes no `carried` line at all.
+    // And `carried` is a single-line field, bounded at MAX_FIELD_VALUE_BYTES: at 50,000 items
+    // over 24 sprints a close carries about 1,250 ids and the ceiling holds about 810, so a
+    // sprint that large cannot record its own carry-over. The corpus writes what fits and
+    // docs/BENCHMARKS.md carries the finding.
+    const carried = fitting(members.get(id) ?? [])
     return {
       id,
       title: `Sprint over ${month}`,
@@ -223,9 +236,22 @@ function sprintsFor(months: readonly string[], items: readonly WorkItem[]): read
       goal: `land the work filed in ${month}`,
       // A close records the items still open as carried, and that list is the half of a
       // committed set the store holds rather than derives, so the corpus writes it.
-      ...(closed ? { closed_at: `${lastDay(month)}T23:59:59Z`, carried: members.get(id) ?? [] } : {}),
+      ...(closed ? { closed_at: `${lastDay(month)}T23:59:59Z`, ...(carried.length === 0 ? {} : { carried }) } : {}),
     }
   })
+}
+
+/** As many ids as the store will accept on one field line, in order, with room for the key. */
+function fitting(ids: readonly ItemId[]): readonly ItemId[] {
+  const kept: ItemId[] = []
+  let bytes = 'carried '.length
+  for (const id of ids) {
+    const next = id.length + (kept.length === 0 ? 0 : 1)
+    if (bytes + next > MAX_FIELD_VALUE_BYTES) break
+    kept.push(id)
+    bytes += next
+  }
+  return kept
 }
 
 /**
@@ -401,6 +427,7 @@ export async function buildCorpus(dir: string, spec: CorpusSpec, reuse: boolean)
     // Read back from the store rather than taken from the generator, for the reason every
     // other count here is: a reused corpus never ran the generator at all.
     sprintsWritten: sprints.value.length,
+    carryOver: carryOverOf(all.value, sprints.value),
     openSprint: sprints.value.find((sprint) => sprint.state === 'open')?.id ?? 'NOT MEASURED: no open sprint',
     impediments: all.value.filter((item) => item.type === 'impediment').length,
     relations: relationTally(all.value),
@@ -417,6 +444,30 @@ export async function buildCorpus(dir: string, spec: CorpusSpec, reuse: boolean)
     generatedMs: generated?.ms,
     reused,
   }
+}
+
+/**
+ * The carry-over each closed sprint would record against the length the store served back,
+ * both read off the store so a reused corpus reports the same figures as a fresh one.
+ */
+function carryOverOf(items: readonly WorkItem[], sprints: readonly Sprint[]): Corpus['carryOver'] {
+  const open = new Map<string, number>()
+  for (const item of items) {
+    if (item.sprint_id === undefined || isTerminal(item.state)) continue
+    open.set(item.sprint_id, (open.get(item.sprint_id) ?? 0) + 1)
+  }
+  let largestWanted = 0
+  let largestStored = 0
+  let sprintsTruncated = 0
+  for (const sprint of sprints) {
+    if (sprint.state !== 'closed') continue
+    const wanted = open.get(sprint.id) ?? 0
+    const stored = sprint.carried?.length ?? 0
+    largestWanted = Math.max(largestWanted, wanted)
+    largestStored = Math.max(largestStored, stored)
+    if (stored < wanted) sprintsTruncated += 1
+  }
+  return { largestWanted, largestStored, sprintsTruncated }
 }
 
 /** The edges the store actually holds, counted off the records rather than off the plan. */

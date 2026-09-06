@@ -119,9 +119,9 @@ export function toMarkdown(report: RunReport): string {
   push('')
   push('Each corpus also carries the shapes the four new capabilities added, because a corpus with none of them priced nothing that reads the relation graph and every command reads it.')
   push('')
-  push('| Items in store | Sprints | Open sprint | Impediments | Relations | blocks | duplicates | relates_to |', '|---|---|---|---|---|---|---|---|')
+  push('| Items in store | Sprints | Open sprint | Impediments | Relations | blocks | duplicates | relates_to | Largest carry-over, wanted/stored |', '|---|---|---|---|---|---|---|---|---|')
   for (const c of report.corpora) {
-    push(`| ${c.itemsInStore} | ${c.sprintsWritten} | ${c.openSprint} | ${c.impediments} | ${c.relations.total} | ${c.relations.blocks} | ${c.relations.duplicates} | ${c.relations.relates_to} |`)
+    push(`| ${c.itemsInStore} | ${c.sprintsWritten} | ${c.openSprint} | ${c.impediments} | ${c.relations.total} | ${c.relations.blocks} | ${c.relations.duplicates} | ${c.relations.relates_to} | ${c.carryOver.largestWanted}/${c.carryOver.largestStored}${c.carryOver.sprintsTruncated === 0 ? '' : `, ${c.carryOver.sprintsTruncated} truncated`} |`)
   }
   push('')
 
