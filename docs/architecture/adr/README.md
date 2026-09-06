@@ -11,6 +11,7 @@ ADR-0016 carries the next free number for the same reason, and ADR-0017 carries 
 ADR-0018 is the fourth of them, the board.
 ADR-0019 belongs to no design record either: like ADR-0013 it answers an incident in this repository's own history, so it carries the next free number.
 ADR-0021 carries the next free number for ADR-0014's reason: it reshapes two commands the design never priced, found the first time the corpus carried a relation graph.
+ADR-0022 carries the next free number because it answers one audit's findings across four of the records above rather than belonging to any one of them.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -35,6 +36,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0019](0019-no-harness-specific-instruction-file.md) | No tracked file at the repository root may be one a single agent harness loads by itself, and the test that says so is kept by the guard ADR-0013 already put outside the branch |
 | [ADR-0020](0020-a-finding-is-decided-by-a-whole-read.md) | A finding is a verdict on the files cached like any row, only the pass that read a file whole may decide a duplicate, an append that meets one hands the file back, and `doctor` re-derives the index so the fix line every refusal prints is the recovery |
 | [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md) | `doctor` is fed one record and one event at a time through two streaming reads on the store seam, `next` ranks off one index over the graph, and both are gated as a ratio to the read every command performs |
+| [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) | A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -76,7 +78,9 @@ the done gate. ADR-0010 argues `H17` and ADR-0011 `H18` to `H21`; `H23` is the l
 half of `H20`, added when a hand-written event line was found answering `explain`. ADR-0015
 argues `H24` and `H25`, which need the whole relation graph beside the record, and `H26`
 came with ADR-0016, for a `sprint_id` written before sprints were records. ADR-0017 argues
-`H27`, which needs only the impediment's own record.
+`H27`, which needs only the impediment's own record, and ADR-0022 narrows it to an
+impediment past `draft`, because `file` lands one in `draft` and the finding used to fire
+between the two commands the tool prescribes.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -90,7 +94,7 @@ came with ADR-0016, for a `sprint_id` written before sprints were records. ADR-0
 | `H24` | `doctor`, `explain` | A stored relation names an item the store does not hold, so it counts for nothing on any read |
 | `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
 | `H26` | `doctor`, `explain` | An item's `sprint_id` names no sprint record, which no write path produces since ADR-0016 |
-| `H27` | `doctor`, `explain` | An open impediment blocks nothing, so it is raised against no work |
+| `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
 
 ## The CLI's rule ids
 

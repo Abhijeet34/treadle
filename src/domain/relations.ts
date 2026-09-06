@@ -163,15 +163,31 @@ function reach(adjacency: Adjacency, from: ItemId, to: ItemId): Reach {
   return { outcome: 'none', read: [...seen] }
 }
 
+/**
+ * One edge, refused or added. `stateOf` is the same reader `blockersOf` takes, and it is
+ * here for `R5`: a `blocks` edge out of a done or cancelled item is inert on every read, so
+ * accepting one wrote a record that said the target was blocked while every surface said
+ * `blocked no`. The edges a resolved impediment still carries were written while it was
+ * live, which is why this refuses the write and never the stored edge.
+ */
 export function addRelation(
   graph: RelationGraph,
   relation: Relation,
+  stateOf: (id: ItemId) => WorkItemState | undefined,
 ): Result<{ readonly graph: RelationGraph; readonly added: boolean; readonly read: readonly ItemId[] }> {
   if (relation.source === relation.target) {
     return fail('GUARD_REFUSED', 'R1', `an item cannot be related to itself: ${relation.source} ${relation.kind} ${relation.source}`, [relation.source])
   }
 
   const edge = normalise(relation)
+  if (edge.kind === 'blocks') {
+    const state = stateOf(edge.source)
+    if (isTerminal(state)) {
+      return fail('GUARD_REFUSED', 'R5',
+        `${edge.source} is ${state as string}, and finished work blocks nothing: this edge would leave ${edge.target} reading blocked no`,
+        [edge.source, edge.target])
+    }
+  }
   if (graph.relations.some((r) => same(r, edge))) {
     return ok({ graph, added: false, read: [] })
   }

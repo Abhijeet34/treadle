@@ -63,18 +63,38 @@ describe('raising an impediment', () => {
   })
 
   it('is H27 on doctor and on explain while it blocks nothing, with the line that raises it against work', async () => {
+    // `cert-expired` is filed and blocks nothing, and that is not a finding: `file` lands an
+    // impediment in `draft`, `help file` then prescribes `relation add`, and the finding used
+    // to fire between the two lines the tool itself prescribes (ADR-0022).
+    assert.equal((await cli(['doctor'])).code, 0, 'a draft impediment raised against nothing is a record still being written')
+    // Past `draft` it is raised, and DOR9 refuses to groom one that holds nothing up, so
+    // raise-groom-unlink is the sequence that now reaches the finding.
+    const filed = await cli(['file', 'impediment', 'Vault unreachable', '--id', 'vault-down', '--set', 'severity=S2', '--set', 'proposed_resolution=the platform team restores the vault'])
+    assert.equal(filed.code, 0, filed.err)
+    assert.equal((await cli(['relation', 'add', 'vault-down', 'blocks', 'audit-log'])).code, 0)
+    assert.equal((await cli(['transition', 'vault-down', 'ready'])).code, 0)
+    assert.equal((await cli(['relation', 'remove', 'vault-down', 'blocks', 'audit-log'])).code, 0)
     const audit = await cli(['doctor'])
     assert.equal(audit.code, 7)
-    assert.match(audit.out, /^H27 cert-expired relations the impediment is draft and blocks nothing, so it is raised against no work; treadle relation add cert-expired blocks <id> names what it holds up$/m)
-    assert.match((await cli(['explain', 'cert-expired'])).out, /^H27 the impediment is draft and blocks nothing/m)
+    assert.match(audit.out, /^H27 vault-down relations the impediment is ready and blocks nothing, so it is raised against no work; treadle relation add vault-down blocks <id> names what it holds up$/m)
+    assert.match((await cli(['explain', 'vault-down'])).out, /^H27 the impediment is ready and blocks nothing/m)
+    assert.equal((await cli(['transition', 'vault-down', 'cancelled', '--resolution', 'rejected', '--reason', 'raised in error'])).code, 0)
+  })
+
+  it('refuses to groom one that holds nothing up, which is DOR9 on the ready gate', async () => {
+    const refused = await cli(['transition', 'cert-expired', 'ready'])
+    assert.equal(refused.code, 3)
+    assert.equal(line(refused, 'guard'), 'guard G1')
+    assert.match(refused.err, /the ready gate fails: DOR9/)
+    assert.match(refused.err, /^fix treadle relation add cert-expired blocks <id>$/m)
   })
 
   it('stops being H27 once it blocks something, and a resolved one blocking nothing is not a finding', async () => {
     assert.equal((await cli(['relation', 'add', 'cert-expired', 'blocks', 'audit-log'])).code, 0)
     assert.equal((await cli(['doctor'])).code, 0)
-    const cancelled = await cli(['file', 'impediment', 'Withdrawn', '--id', 'withdrawn', '--set', 'severity=S4', '--set', 'proposed_resolution=nothing; it was raised in error'])
-    assert.equal(cancelled.code, 0, cancelled.err)
-    assert.equal((await cli(['doctor'])).code, 7)
+    const drafted = await cli(['file', 'impediment', 'Withdrawn', '--id', 'withdrawn', '--set', 'severity=S4', '--set', 'proposed_resolution=nothing; it was raised in error'])
+    assert.equal(drafted.code, 0, drafted.err)
+    assert.equal((await cli(['doctor'])).code, 0, 'a draft impediment blocking nothing is not yet raised')
     assert.equal((await cli(['transition', 'withdrawn', 'cancelled', '--resolution', 'rejected', '--reason', 'raised in error'])).code, 0)
     assert.equal((await cli(['doctor'])).code, 0, 'a cancelled impediment is history, not a complaint')
   })
@@ -251,8 +271,10 @@ describe('nesting and the graph an impediment joins', () => {
 
   it('may carry a sprint, because resolving one is work someone commits to', async () => {
     // sec-review blocks vendor-hold above, so it, and not vendor-hold, still passes its own
-    // ready gate here; the point proven is that an impediment may be committed at all.
+    // ready gate here; the point proven is that an impediment may be committed at all. It is
+    // groomed first because a sprint takes work that has been groomed (I4).
     assert.equal((await cli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'])).code, 0)
+    assert.equal((await cli(['transition', 'sec-review', 'ready'])).code, 0)
     const committed = await cli(['sprint', 'commit', 'sprint-31', 'sec-review'])
     assert.equal(committed.code, 0, committed.err)
     assert.equal(line(await cli(['show', 'sec-review']), 'sprint'), 'sprint sprint-31')

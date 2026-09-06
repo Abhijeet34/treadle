@@ -27,12 +27,19 @@ import { NOW, errorOf, item, unwrap } from '../helpers/fixtures.ts'
 
 function graphOf(...edges: readonly (readonly [string, RelationKind, string])[]): RelationGraph {
   return edges.reduce(
-    (g, [source, kind, target]) => unwrap(addRelation(g, { kind, source, target })).graph,
+    (g, [source, kind, target]) => unwrap(addRelation(g, { kind, source, target }, live)).graph,
     emptyRelationGraph(),
   )
 }
 
 const states = (entries: Record<string, WorkItemState>) => (id: string) => entries[id]
+
+/**
+ * The state reader `addRelation` takes for `R5`. These graphs are built from bare ids with
+ * no records behind them, and an id the store does not hold is not terminal, so every edge
+ * below is written as if its source were live; the `R5` suite passes a real table instead.
+ */
+const live = (): WorkItemState | undefined => undefined
 
 describe('the relation kinds', () => {
   it('is exactly the six the model names', () => {
@@ -60,22 +67,22 @@ describe('the relation kinds', () => {
 describe('writing a relation', () => {
   it('refuses a self relation for every kind', () => {
     for (const kind of RELATION_KINDS) {
-      const error = errorOf(addRelation(emptyRelationGraph(), { kind, source: 'a-1', target: 'a-1' }))
+      const error = errorOf(addRelation(emptyRelationGraph(), { kind, source: 'a-1', target: 'a-1' }, live))
       assert.equal(error.rule, 'R1', `${kind} self relation must be refused`)
     }
   })
 
   it('is idempotent: writing the same edge twice adds nothing the second time', () => {
-    const first = unwrap(addRelation(emptyRelationGraph(), { kind: 'blocks', source: 'a-1', target: 'b-1' }))
+    const first = unwrap(addRelation(emptyRelationGraph(), { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
     assert.equal(first.added, true)
-    const second = unwrap(addRelation(first.graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }))
+    const second = unwrap(addRelation(first.graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
     assert.equal(second.added, false)
     assert.equal(second.graph.relations.length, 1)
   })
 
   it('treats relates_to as symmetric, so both spellings are the same edge', () => {
     const graph = graphOf(['a-1', 'relates_to', 'b-1'])
-    const again = unwrap(addRelation(graph, { kind: 'relates_to', source: 'b-1', target: 'a-1' }))
+    const again = unwrap(addRelation(graph, { kind: 'relates_to', source: 'b-1', target: 'a-1' }, live))
     assert.equal(again.added, false)
     assert.equal(again.graph.relations.length, 1)
   })
@@ -111,7 +118,7 @@ describe('the kinds a caller may write', () => {
 describe('a duplicate has one original', () => {
   it('refuses a second duplicates edge out of one item, naming the first original', () => {
     const graph = graphOf(['copy-1', 'duplicates', 'orig-1'])
-    const error = errorOf(addRelation(graph, { kind: 'duplicates', source: 'copy-1', target: 'orig-2' }))
+    const error = errorOf(addRelation(graph, { kind: 'duplicates', source: 'copy-1', target: 'orig-2' }, live))
     assert.equal(error.code, 'GUARD_REFUSED')
     assert.equal(error.rule, 'R4')
     assert.ok(error.message.includes('orig-1'), error.message)
@@ -120,7 +127,7 @@ describe('a duplicate has one original', () => {
 
   it('lets one original have many copies', () => {
     const graph = graphOf(['copy-1', 'duplicates', 'orig-1'])
-    unwrap(addRelation(graph, { kind: 'duplicates', source: 'copy-2', target: 'orig-1' }))
+    unwrap(addRelation(graph, { kind: 'duplicates', source: 'copy-2', target: 'orig-1' }, live))
   })
 })
 
@@ -173,7 +180,7 @@ describe('the stored field\'s own validation', () => {
 describe('cycle detection on write', () => {
   it('refuses a two-item blocking cycle and names the path from the edge being written', () => {
     const graph = graphOf(['a-1', 'blocks', 'b-1'])
-    const error = errorOf(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'a-1' }))
+    const error = errorOf(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'a-1' }, live))
     assert.equal(error.code, 'GUARD_REFUSED')
     assert.equal(error.rule, 'R2')
     assert.ok(error.message.endsWith('through b-1 -> a-1 -> b-1'), error.message)
@@ -181,19 +188,19 @@ describe('cycle detection on write', () => {
 
   it('refuses a longer blocking cycle', () => {
     const graph = graphOf(['a-1', 'blocks', 'b-1'], ['b-1', 'blocks', 'c-1'])
-    assert.equal(errorOf(addRelation(graph, { kind: 'blocks', source: 'c-1', target: 'a-1' })).rule, 'R2')
+    assert.equal(errorOf(addRelation(graph, { kind: 'blocks', source: 'c-1', target: 'a-1' }, live)).rule, 'R2')
   })
 
   it('checks each kind on its own graph, so a blocks edge does not close a duplicates cycle', () => {
     const graph = graphOf(['a-1', 'blocks', 'b-1'])
-    unwrap(addRelation(graph, { kind: 'duplicates', source: 'b-1', target: 'a-1' }))
+    unwrap(addRelation(graph, { kind: 'duplicates', source: 'b-1', target: 'a-1' }, live))
   })
 
   it('refuses a cycle in every directional kind', () => {
     for (const kind of RELATION_KINDS.filter((k) => k !== 'relates_to')) {
       const graph = graphOf(['a-1', kind, 'b-1'])
       assert.equal(
-        errorOf(addRelation(graph, { kind, source: 'b-1', target: 'a-1' })).rule,
+        errorOf(addRelation(graph, { kind, source: 'b-1', target: 'a-1' }, live)).rule,
         'R2',
         `${kind} must refuse a cycle`,
       )
@@ -202,7 +209,7 @@ describe('cycle detection on write', () => {
 
   it('does not check the symmetric kind, where a cycle has no meaning', () => {
     const graph = graphOf(['a-1', 'relates_to', 'b-1'], ['b-1', 'relates_to', 'c-1'])
-    unwrap(addRelation(graph, { kind: 'relates_to', source: 'c-1', target: 'a-1' }))
+    unwrap(addRelation(graph, { kind: 'relates_to', source: 'c-1', target: 'a-1' }, live))
   })
 
   it('finds a hand-edited cycle on load, which write-time detection cannot see', () => {
@@ -226,7 +233,7 @@ describe('cycle detection on write', () => {
     }))
     const deep: RelationGraph = { relations }
     const last = `n-${String(relations.length).padStart(4, '0')}`
-    const error = errorOf(addRelation(deep, { kind: 'blocks', source: last, target: 'n-0000' }))
+    const error = errorOf(addRelation(deep, { kind: 'blocks', source: last, target: 'n-0000' }, live))
     // Either the cycle or the ceiling refuses it; both are named refusals, never a crash.
     assert.ok(['R2', 'R3'].includes(error.rule ?? ''), `rule was ${error.rule}`)
   })
@@ -267,7 +274,7 @@ describe('the cost of a cycle check, and the read set it reports', () => {
     assert.ok(finder.passes() <= 2, `findRelationCycle walked the list ${finder.passes()} times`)
 
     const writer = counted(layered(6, 8))
-    unwrap(addRelation(writer.graph, { kind: 'blocks', source: 'top', target: 'l0-0' }))
+    unwrap(addRelation(writer.graph, { kind: 'blocks', source: 'top', target: 'l0-0' }, live))
     assert.ok(writer.passes() <= 3, `addRelation walked the list ${writer.passes()} times`)
   })
 
@@ -286,11 +293,11 @@ describe('the cost of a cycle check, and the read set it reports', () => {
 
   it('reports every record whose edges decided the write, so the store can refuse if one moved', () => {
     const graph = graphOf(['b-1', 'blocks', 'c-1'], ['c-1', 'blocks', 'd-1'], ['x-1', 'blocks', 'y-1'])
-    const added = unwrap(addRelation(graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }))
+    const added = unwrap(addRelation(graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
     assert.deepEqual([...added.read].sort(), ['b-1', 'c-1', 'd-1'], 'the nodes reachable from the target, and nothing off that path')
-    const symmetric = unwrap(addRelation(graph, { kind: 'relates_to', source: 'a-1', target: 'b-1' }))
+    const symmetric = unwrap(addRelation(graph, { kind: 'relates_to', source: 'a-1', target: 'b-1' }, live))
     assert.deepEqual(symmetric.read, [], 'a symmetric edge reads nothing')
-    const again = unwrap(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'c-1' }))
+    const again = unwrap(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'c-1' }, live))
     assert.deepEqual(again.read, [], 'an edge already stored decides nothing')
   })
 })

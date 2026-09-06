@@ -137,6 +137,24 @@ export async function wholeItem(store: Store, view: WorkspaceView, id: ItemId): 
   return store.get(id)
 }
 
+/**
+ * The committed items nobody has groomed. A sprint takes them, because planning one with
+ * work that is not refined yet is ordinary and `file --sprint` files in `draft` by
+ * construction; what the tool owed the reader is this list. `next` ranks `ready` only, so
+ * these are exactly the committed items it will not suggest, and a team reading `3 committed,
+ * 1 done` could not tell that one of the three was not workable at all. ADR-0022 argues it.
+ */
+export function notGroomed(items: readonly WorkItemSummary[]): readonly ItemId[] {
+  return items.filter((item) => item.state === 'draft').map((item) => item.id).sort()
+}
+
+/** The sentence a command that commits work prints when some of what it committed is draft. */
+export function notGroomedNote(ids: readonly ItemId[]): string {
+  const first = ids[0] as ItemId
+  const subject = ids.length === 1 ? `${first} is` : `${ids.join(',')} are`
+  return `${subject} draft, and next ranks ready work; treadle transition ${first} ready`
+}
+
 export function activeBlockers(view: WorkspaceView, id: ItemId): readonly ItemId[] {
   return blockersOf(view.relations, (other) => view.byId.get(other)?.state, id)
 }
@@ -208,12 +226,20 @@ export function openImpedimentsOf(view: WorkspaceView, id: ItemId): readonly Ite
   return activeBlockers(view, id).filter((blocker) => view.byId.get(blocker)?.type === 'impediment')
 }
 
+/** The original an item is a copy of, when the store holds it; DOR10's input. */
+function duplicateOf(view: WorkspaceView, item: WorkItem): GateItem | undefined {
+  const edge = (item.relations ?? []).find((relation) => relation.kind === 'duplicates')
+  return edge === undefined ? undefined : gateItems(view, [edge.target])[0]
+}
+
 export function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
+  const original = duplicateOf(view, item)
   return {
     item,
     blockers: gateItems(view, activeBlockers(view, item.id)),
     children: childrenGates(view, item.id),
     reviewStep: hasReviewStep(item.type),
+    ...(original === undefined ? {} : { duplicateOf: original }),
   }
 }
 

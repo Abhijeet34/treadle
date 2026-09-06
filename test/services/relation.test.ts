@@ -168,13 +168,17 @@ describe('the guards and the ranking that read blockers', () => {
 
   it('says so when the blocker is already terminal, because that edge blocks nothing', async () => {
     const inert = await cli(['relation', 'add', 'legacy-oauth', 'blocks', 'docs-quickstart'])
-    assert.equal(inert.code, 0, inert.err)
-    assert.equal(line(inert, 'note'), 'note legacy-oauth is cancelled, so this edge blocks nothing while it stays cancelled')
+    assert.equal(inert.code, 3, inert.err)
+    assert.equal(line(inert, 'rule'), 'rule R5')
+    assert.equal(
+      line(inert, '"cause'),
+      '"cause legacy-oauth is cancelled, and finished work blocks nothing: this edge would leave docs-quickstart reading blocked no',
+    )
     const target = await cli(['explain', 'docs-quickstart'])
     assert.equal(line(target, 'blocked'), 'blocked no')
     const live = await cli(['relation', 'add', 'metrics-p95', 'blocks', 'docs-quickstart'])
     assert.equal(live.code, 0, live.err)
-    assert.equal(line(live, 'note'), undefined, 'an active blocker earns no note')
+    assert.equal(line(live, 'note'), undefined, 'a live blocker is written with nothing to warn about')
   })
 
   it('G7 refuses cancelling a blocker while something waits on it, and a cancelled blocker frees the item', async () => {
@@ -187,6 +191,55 @@ describe('the guards and the ranking that read blockers', () => {
     // The edge stays on the record: it is the fact that was decided, and show still lists it.
     assert.ok(lines(await cli(['show', 'avatar-crop'])).includes('blocked_by webhook-retry'))
     assert.equal((await cli(['transition', 'avatar-crop', 'in_progress'])).code, 0)
+  })
+})
+
+// `duplicates` fed `R4` and `show` and nothing else, so a copy could be groomed, started and
+// committed to a sprint beside its original. It carries one rule now, and it is the ready gate,
+// because all three of those surfaces read the same verdict (ADR-0022).
+describe('a copy is not separate work, which is DOR10 on the ready gate', () => {
+  let demo: Demo
+  before(async () => {
+    demo = await aDemoWorkspace()
+    // Two draft tasks whose records are otherwise complete, so DOR10 is the only rule failing.
+    assert.equal((await runCli(['relation', 'add', 'metrics-p95', 'duplicates', 'i18n-dates'], { cwd: demo.root })).code, 0)
+  })
+  after(async () => { await demo.dispose() })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('refuses to groom the copy, naming the original and the resolution that closes it', async () => {
+    const refused = await cli(['transition', 'metrics-p95', 'ready'])
+    assert.equal(refused.code, 3)
+    assert.equal(line(refused, 'guard'), 'guard G1')
+    assert.equal(line(refused, '"cause'), '"cause the ready gate fails: DOR10')
+    assert.match(refused.err, /^fix treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
+    const why = await cli(['explain', 'metrics-p95'])
+    assert.match(why.out, /^ready DOR10 fail treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
+  })
+
+  it('refuses to commit the copy to a sprint, because the commit reads that same gate', async () => {
+    assert.equal((await cli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'])).code, 0)
+    const refused = await cli(['sprint', 'commit', 'sprint-31', 'metrics-p95'])
+    assert.equal(refused.code, 3)
+    assert.equal(line(refused, 'rule'), 'rule I4')
+    assert.match(refused.err, /DOR10 it duplicates i18n-dates, and a copy is not separate work/)
+  })
+
+  it('leaves the original alone, and lets the copy through once the edge is dropped', async () => {
+    assert.equal((await cli(['transition', 'i18n-dates', 'ready'])).code, 0, 'the original is ordinary work')
+    assert.equal((await cli(['relation', 'remove', 'metrics-p95', 'duplicates', 'i18n-dates'])).code, 0)
+    const groomed = await cli(['transition', 'metrics-p95', 'ready'])
+    assert.equal(groomed.code, 0, groomed.err)
+  })
+
+  it('says nothing about a copy that is already finished, because the remedy is a move it cannot make', async () => {
+    for (const target of ['in_progress', 'done']) {
+      assert.equal((await cli(['transition', 'metrics-p95', target])).code, 0)
+    }
+    assert.equal((await cli(['relation', 'add', 'metrics-p95', 'duplicates', 'i18n-dates'])).code, 0)
+    const why = await cli(['explain', 'metrics-p95'])
+    assert.equal(why.code, 0, why.err)
+    assert.doesNotMatch(why.out, /DOR10 fail/, 'finished work is history under this rule')
   })
 })
 

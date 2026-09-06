@@ -31,6 +31,7 @@ import {
   blockedByThisIndex,
   doneVerdict,
   hasReviewStep,
+  notGroomed,
   readWorkspace,
   wholeItem,
   readyVerdict,
@@ -149,6 +150,9 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'findings', type: 'integer' },
     { kind: 'scalar', key: 'overdue', type: 'integer' },
     { kind: 'scalar', key: 'defects', type: 'string' },
+    // Last of the non-block properties, which is as late as the renderer's blocks-last rule
+    // allows and moves nothing already declared.
+    { kind: 'scalar', key: 'not_ready', type: 'string' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
     {
@@ -436,8 +440,12 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   const ranked = rank(view.value, now, DEFAULT_WEIGHTS, undefined).slice(0, 3)
   const overdue = view.value.items.filter((item) => isOverdue(item, now))
   const health = healthFindings(view.value.items, now)
-  const sprintRows = view.value.sprints.filter((sprint) => sprint.state === 'open').map((sprint): Row => {
-    const committed = committedTo(view.value, sprint)
+  // `committedTo` is a scan of every item, so the open sprints' sets are taken once and both
+  // the rows and the not-ready line are read off them.
+  const running = view.value.sprints
+    .filter((sprint) => sprint.state === 'open')
+    .map((sprint) => ({ sprint, committed: committedTo(view.value, sprint) }))
+  const sprintRows = running.map(({ sprint, committed }): Row => {
     const done = committed.filter((item) => item.state === 'done')
     const at = dayOfSprint(sprint, now)
     return {
@@ -448,6 +456,10 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       title: sprint.title,
     }
   })
+  // The `items` column above is a tally, and a tally cannot say which of the committed items
+  // this call's own `next` block will never offer. The ids are the answer, and the line is
+  // absent when there are none, as `overdue` and `defects` are (ADR-0022).
+  const ungroomed = notGroomed(running.flatMap((entry) => entry.committed))
   return okResult(STATUS_SHAPE, {
     workspace,
     data: {
@@ -459,6 +471,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
       ...(defects === undefined ? {} : { defects }),
+      ...(ungroomed.length === 0 ? {} : { not_ready: ungroomed.join(',') }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
         shown: states.length,

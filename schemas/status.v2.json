@@ -96,6 +96,12 @@
             "null"
           ]
         },
+        "not_ready": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "states": {
           "type": "object",
           "additionalProperties": false,

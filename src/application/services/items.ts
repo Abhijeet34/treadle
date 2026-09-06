@@ -35,7 +35,7 @@ import {
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
+import { notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -111,6 +111,8 @@ export const FILE_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },
+    // Last, which STABILITY's output-schema rule makes a non-breaking addition.
+    { kind: 'scalar', key: 'not_ready', type: 'string' },
   ],
 }
 
@@ -361,6 +363,8 @@ export async function fileItem(
   // `--sprint` at creation is a commit, and it is held to the commit's rules: the sprint
   // exists and is open, and the item is ready to be worked. Before sprints were records the
   // flag stored any string, which is the one narrowing this change makes to the surface.
+  // A record filed here is `draft`, which those rules admit, so this is also where the tool
+  // says that `next` will not rank it yet (ADR-0022); the note is set after the write.
   if (item.sprint_id !== undefined) {
     const sprint = view.value.sprintById.get(item.sprint_id)
     if (sprint === undefined) {
@@ -395,6 +399,10 @@ export async function fileItem(
     state: 'draft',
     title: request.title,
     set: changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`),
+  }
+  if (item.sprint_id !== undefined) {
+    data['not_ready'] = id
+    data['note'] = notGroomedNote([id])
   }
 
   if (mode === 'preview') {
@@ -778,15 +786,28 @@ function editDistance(a: string, b: string): number {
  * `NOT_FOUND` from `transition`, `set`, `mark`, `evidence`, `relation` and `sprint` declare
  * itself a read, which is exactly the inference R6 exists to forbid; a caller deciding whether
  * a failed call may have written anything reads this field.
+ *
+ * A sprint is a record with an id, and this used to search items alone, so `show sprint-31`
+ * and `explain sprint-31` told a caller the id named nothing while `history sprint-31`
+ * answered from it. The sprint ids are searched too now: an exact one is a refusal that
+ * names the read that works, and a near one reaches the `near` list, so a mistyped sprint id
+ * gets the same two-step correction a mistyped item id gets.
  */
 export function notFound(
   command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
+  if (view.sprintById.has(id)) {
+    return errorResult({
+      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
+      cause: `${id} is a sprint here, not an item, and ${command} reads items`,
+      fix: [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`],
+    })
+  }
   const held = view.items.length
   return errorResult({
     code: 'NOT_FOUND', command, workspace, effect, entity: id,
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
-    near: nearIds(view.byId.keys(), id),
+    near: nearIds([...view.byId.keys(), ...view.sprintById.keys()], id),
     fix: ['treadle backlog'],
   })
 }

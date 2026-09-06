@@ -49,6 +49,7 @@ What the type adds is `DOD2`, fed for the first time: the active blockers of an 
 An impediment in any open state whose record carries no `blocks` edge is doctor finding `H27`, on `doctor` and on `explain` of the impediment, and its detail names `treadle relation add <id> blocks <id>` as the line that raises it against something.
 The contract's words were "explain should say so plainly", and a finding is how this tool says something plainly: it needs no new result key and it carries its own remedy.
 A resolved or cancelled impediment that blocks nothing is history and is not reported.
+ADR-0022 later narrowed `H27` off a `draft` impediment as well, once `DOR9` could refuse the same fact at grooming instead.
 
 ### Resolving one changes nothing on disk, and the work it held becomes workable
 
@@ -113,7 +114,7 @@ Refused above: a write to a second record on every resolution, and a reopened im
 
 ### A `--blocks <id>` flag on `file`
 
-Raising an impediment is two commands, `file` and `relation add`, and between them `doctor` reports `H27`.
+Raising an impediment is two commands, `file` and `relation add`, and between them `doctor` once reported `H27` until ADR-0022 narrowed the finding off a `draft` impediment.
 One command would be kinder, and it was not done because `relation.ts` is the one writer of the `relations` field (ADR-0015) and a second writer inside `file` is the shape that rule exists to refuse.
 It reopens when the two-command shape is measured to cost something a caller notices.
 
