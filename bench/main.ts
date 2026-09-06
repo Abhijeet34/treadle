@@ -147,6 +147,8 @@ async function main(): Promise<void> {
       months: config.months,
       seed: config.seed,
       lastMonth: config.lastMonth,
+      relationsPerHundredItems: config.relationsPerHundredItems,
+      impedimentsPerHundredItems: config.impedimentsPerHundredItems,
     }, flags.reuseCorpus))
   }
 

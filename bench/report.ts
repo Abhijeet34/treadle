@@ -117,10 +117,17 @@ export function toMarkdown(report: RunReport): string {
     push(`| ${c.itemsInStore} | ${c.months.length} | ${c.largestMonth}: ${c.largestMonthItems} records, ${bytes(c.largestMonthBytes)} | ${c.readyMatches} | ${bytes(c.bytes.items)} | ${bytes(c.bytes.events)} | ${bytes(c.bytes.index)} | ${c.reused ? 'reused from cache' : `${((c.generatedMs ?? 0) / 1000).toFixed(1)} s`} |`)
   }
   push('')
+  push('Each corpus also carries the shapes the four new capabilities added, because a corpus with none of them priced nothing that reads the relation graph and every command reads it.')
+  push('')
+  push('| Items in store | Sprints | Open sprint | Impediments | Relations | blocks | duplicates | relates_to |', '|---|---|---|---|---|---|---|---|')
+  for (const c of report.corpora) {
+    push(`| ${c.itemsInStore} | ${c.sprintsWritten} | ${c.openSprint} | ${c.impediments} | ${c.relations.total} | ${c.relations.blocks} | ${c.relations.duplicates} | ${c.relations.relates_to} |`)
+  }
+  push('')
 
   push('## Latency, one cold process per sample', '')
   push('`net p95` is the wall p95 with the spawn floor removed. `in-process p95` excludes Node startup and module loading entirely, which is the form axis A4 targets.')
-  push('These are store operations rather than commands: the timed children call the store directly so a millisecond is not mostly argument parsing. The command surface is measured by axes A2, A6, A7, A8, A10 and A12 below, which score behaviour rather than time.')
+  push('`identity`, `get`, `list`, `create` and `transition` are store operations: the timed children call the store directly so a millisecond is not mostly argument parsing. `workspace` is the read every command performs, and `board`, `next` and `doctor` are the three commands whose cost is not the store\'s; none of the eight renders. What a caller gets back is scored by axes A2, A6, A7, A8, A10 and A12 below, which weigh behaviour rather than time.')
   push('')
   for (const scale of report.latency) {
     push(`### ${scale.items} items, ${scale.shards} shards, largest shard ${scale.largestShardRecords} records`, '')
@@ -128,6 +135,9 @@ export function toMarkdown(report: RunReport): string {
     for (const [op, m] of Object.entries(scale.operations)) push(measurementRow(op, m))
     push('')
     push(`First index build with the index deleted: ${typeof scale.firstIndexBuildMs === 'number' ? `${scale.firstIndexBuildMs} ms` : scale.firstIndexBuildMs}. Re-index after a hand edit of the largest shard: ${typeof scale.reindexAfterHandEditMs === 'number' ? `${scale.reindexAfterHandEditMs} ms` : scale.reindexAfterHandEditMs}. Both in-process, one sample each.`)
+    push(typeof scale.relationCycle === 'string'
+      ? `Load-time relation check: ${scale.relationCycle}.`
+      : `Load-time relation check over ${scale.relationCycle.edges} edges, one sample, in-process: ${scale.relationCycle.buildMs} ms to build the graph and ${scale.relationCycle.findMs} ms to walk it for a cycle in \`blocks\`, which found ${scale.relationCycle.cycle}. The build is paid by every command; the walk is paid by \`doctor\`.`)
     push('')
   }
 

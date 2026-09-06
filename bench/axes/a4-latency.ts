@@ -6,10 +6,16 @@
 // spawn floor is measured with the same launcher and subtracted, so the net column is the
 // program's cost rather than the shell's.
 //
-// Four of the six operations are store calls and the label says so. `workspace` is the
-// application layer's own `readWorkspace`, the unbounded read every command performs, and it
-// is here because the memory budgets are weighed over the worst of these rows: a `list`
-// bounded at 50 rows prices none of what a backlog at 50,000 items actually holds.
+// Four of the operations are store calls and the label says so. The other four sit at the
+// application seam, and are here because the memory budgets are weighed over the worst of
+// these rows: a `list` bounded at 50 rows prices none of what a backlog at 50,000 items
+// actually holds. `workspace` is `readWorkspace`, the unbounded read every command performs;
+// `board --all`, `next` and `doctor` are the three commands that pay something on top of it,
+// and each was unmeasured until a corpus with relations in it existed to measure them on.
+//
+// `relationCycle` is not a latency row. It is the load-time relation check taken apart into
+// the graph build and the cycle walk, once per scale, because both are superlinear in the
+// edge count and a total would hide which half.
 
 import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -32,9 +38,18 @@ export type ScaleRow = {
   readonly firstIndexBuildMs: number | string
   /** DR8 row: re-index after a hand edit of the largest shard. */
   readonly reindexAfterHandEditMs: number | string
+  /** The load-time relation check, split into building the graph and walking it. */
+  readonly relationCycle: RelationCycleRow | string
 }
 
-export const READ_OPS = ['identity', 'get', 'list', 'workspace'] as const
+export type RelationCycleRow = {
+  readonly edges: number
+  readonly buildMs: number
+  readonly findMs: number
+  readonly cycle: string
+}
+
+export const READ_OPS = ['identity', 'get', 'list', 'workspace', 'board', 'next', 'doctor'] as const
 export const WRITE_OPS = ['create', 'transition'] as const
 
 export async function runA4(
@@ -73,6 +88,7 @@ export async function runA4(
       samples += m.wall.n
     }
 
+    const cycle = relationCycle(corpus)
     const reindex = await reindexAfterHandEdit(corpus)
     rows.push({
       items: corpus.itemsInStore,
@@ -80,6 +96,7 @@ export async function runA4(
       largestShardRecords: corpus.largestMonthItems,
       readyMatches: corpus.readyMatches,
       operations: operationsHere,
+      relationCycle: cycle,
       // Order matters: the hand edit is priced against a warm index, and dropping the index
       // for the first-build figure has to come after everything that needs a warm one.
       reindexAfterHandEditMs: reindex,
@@ -110,6 +127,26 @@ export async function runA4(
       samples,
       detail: { note: 'store operations run from TypeScript source under Node type stripping, not the bundle the release path ships; see the floors table for the gap' },
     },
+  }
+}
+
+/**
+ * The load-time relation check over the corpus's own graph, taken once because it is a size
+ * and not a latency: `relationGraphFrom` scans the edges it has already accepted for each new
+ * one, and `findRelationCycle` runs a walk per edge whose every step filters the whole edge
+ * list, so both are superlinear in the edge count and neither drifts run to run the way a
+ * wall time does.
+ */
+function relationCycle(corpus: Corpus): RelationCycleRow | string {
+  const sample = launchOnce(process.execPath, [OP, corpus.root, 'cycle'], { samples: 1 })
+  if (sample.failure !== undefined) return `NOT MEASURED: ${sample.failure}`
+  const detail = sample.report?.detail as Record<string, unknown> | undefined
+  if (detail === undefined) return 'NOT MEASURED: the cycle child reported no detail'
+  return {
+    edges: Number(detail['edges'] ?? -1),
+    buildMs: Number(detail['buildMs'] ?? -1),
+    findMs: Number(detail['findMs'] ?? -1),
+    cycle: String(detail['cycle'] ?? 'NOT MEASURED'),
   }
 }
 
