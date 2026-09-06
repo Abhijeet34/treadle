@@ -40,12 +40,18 @@ function cases(empty: string, occupied: string): readonly Case[] {
     { verb: 'file', success: ['file', 'task', 'A12 filed a task', '--id', 'a12-filed'], failure: ['file', 'bug', 'A12 filed a bug with no severity'], why: 'a bug with none of the fields its type requires' },
     { verb: 'show', success: ['show', 'a12-seed'], failure: ['show', 'a12-absent'], why: 'an id no record carries' },
     { verb: 'backlog', success: ['backlog'], failure: ['backlog', '--fields', 'nosuch'], why: 'a column the list does not have' },
+    { verb: 'board', success: ['board', '--all'], failure: ['board', '--all', '--sprint', 'a12-sprint'], why: 'two scopes that ask different questions' },
     { verb: 'transition', success: ['transition', 'a12-seed', 'ready'], failure: ['transition', 'a12-seed', 'done', '--reason', 'a12 attempted it'], why: 'a state no edge reaches from this one' },
+    { verb: 'set', success: ['set', 'a12-seed', 'reviewer=dana'], failure: ['set', 'a12-seed', 'state=done'], why: 'a field another command owns' },
     { verb: 'mark', success: ['mark', 'a12-seed', '--priority', '2', '--reason', 'a12 raised it'], failure: ['mark', 'a12-seed', '--severity', 'S9', '--reason', 'a12 tried it'], why: 'a severity outside the closed set' },
     { verb: 'evidence', success: ['evidence', 'add', 'a12-seed', 'run', '8813', '664 pass'], failure: ['evidence', 'add', 'a12-seed', 'bogus', '8813'], why: 'an evidence kind outside the closed set' },
+    { verb: 'relation', success: ['relation', 'add', 'a12-seed', 'relates-to', 'a12-filed'], failure: ['relation', 'add', 'a12-seed', 'caused-by', 'a12-filed'], why: 'one of the three kinds the domain declares and the command does not write' },
+    { verb: 'sprint', success: ['sprint', 'open', 'A12 the sprint', '--id', 'a12-sprint', '--start', '2026-09-01', '--end', '2026-09-14'], failure: ['sprint', 'open', 'A12 the backwards sprint', '--id', 'a12-backwards', '--start', '2026-09-14', '--end', '2026-09-01'], why: 'a sprint that ends before it starts' },
+    { verb: 'sprints', success: ['sprints'], failure: ['sprints', 'a12-absent'], why: 'an id no sprint carries' },
     { verb: 'doctor', success: ['doctor'], failure: ['doctor', '--workspace', ABSENT], why: 'a workspace path that is not one' },
     { verb: 'next', success: ['next'], failure: ['next', '--workspace', ABSENT], why: 'a workspace path that is not one' },
     { verb: 'explain', success: ['explain', 'a12-seed'], failure: ['explain', 'a12-absent'], why: 'an id no record carries' },
+    { verb: 'history', success: ['history', 'a12-seed'], failure: ['history', 'a12-absent'], why: 'an id no record carries' },
     { verb: 'status', success: ['status'], failure: ['status', '--workspace', ABSENT], why: 'a workspace path that is not one' },
     { verb: 'help', success: ['help', 'transition'], failure: ['help', 'nosuchverb'], why: 'a topic that is not a command' },
     { verb: 'version', success: ['version'], failure: ['version', '--fields', 'id'], why: 'a flag the verb refuses rather than ignores' },
@@ -112,7 +118,12 @@ export async function runA12(): Promise<{ readonly axis: AxisResult; readonly ro
   const notJson = parseLevel.filter((row) => !row.rendered.startsWith('json'))
   const held = rows.filter((row) => row.holds)
   const verbs = new Set(rows.map((row) => row.verb))
-  const met = held.length === rows.length && verbs.size === COMMANDS.length
+  // A command the table forgot is invisible in a pass rate over the rows the table has, and
+  // it stays invisible for as long as nobody adds it: `board`, `set`, `relation`, `sprint`,
+  // `sprints` and `history` shipped and no axis called one of them. So the gap is named,
+  // rather than folded into a verdict that was already MISSED for a different reason.
+  const unreached = COMMANDS.map((command) => command.name).filter((name) => !verbs.has(name))
+  const met = held.length === rows.length && unreached.length === 0
 
   return {
     rows,
@@ -127,12 +138,13 @@ export async function runA12(): Promise<{ readonly axis: AxisResult; readonly ro
       verdict: met ? 'MET' : 'MISSED',
       observed: met
         ? `${held.length} of ${rows.length} invocations held the contract across ${verbs.size} verbs: every success object on stdout with exit 0 and an empty stderr, every failure object on stderr with a non-zero exit and an empty stdout, and every object valid against the schema this repository ships for it`
-        : `${held.length} of ${rows.length} invocations held the contract across ${verbs.size} verbs; ${rows.filter((row) => !row.holds).map((row) => `${row.verb} ${row.path}`).join(', ')} did not, and ${notJson.length} of ${parseLevel.length} probed parse-level refusals ignored --out json because src/cli/main.ts raises them before the rendering is chosen`,
+        : `${held.length} of ${rows.length} invocations held the contract across ${verbs.size} verbs; ${rows.filter((row) => !row.holds).map((row) => `${row.verb} ${row.path}`).join(', ') || 'none'} did not, ${notJson.length} of ${parseLevel.length} probed parse-level refusals ignored --out json, and ${unreached.length === 0 ? 'every command in the inventory was driven' : `${unreached.length} of the ${COMMANDS.length} commands in the inventory were never driven: ${unreached.join(', ')}`}`,
       operations: surface.calls(),
       samples: rows.length,
       detail: {
         rows,
         verbsInInventory: COMMANDS.length,
+        unreachedByThisAxis: unreached,
         schemasSeen: [...new Set(rows.map((row) => row.schema))].sort(),
         exitStatusesSeen: [...new Set(rows.map((row) => row.exit))].sort((a, b) => a - b),
         parseLevelRefusals: parseLevel,
