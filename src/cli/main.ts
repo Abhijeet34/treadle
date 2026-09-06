@@ -37,10 +37,10 @@ import { RENDERINGS, isRendering, type Rendering, type Renderer } from '../adapt
 import { targetFor } from '../adapters/target.ts'
 import { WORKSPACE_DIR, WorkspaceUnreadable, initWorkspace, resolveStore } from '../adapters/workspace.ts'
 import { Diagnostics, type Level } from './diagnostics.ts'
-import { EXIT_OF, exitFor } from './exit.ts'
+import { exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
 import { commandNamed } from './inventory.ts'
-import { FILTER_FLAGS, parse, type FilterFlag } from './parse.ts'
+import { FILTER_FLAGS, parse, presentationFlags, type FilterFlag } from './parse.ts'
 import { checkRuntime } from './runtime.ts'
 
 // The one place the product's version is written. release-please rewrites this line on a
@@ -172,7 +172,7 @@ export async function run(env: Environment): Promise<number> {
     return await execute(env)
   } catch (error) {
     const parsed = parse(env.argv)
-    const flags = parsed.ok ? parsed.value.flags : {}
+    const flags = parsed.ok ? parsed.value.flags : presentationFlags(env.argv)
     const command = parsed.ok ? parsed.value.command : undefined
     return emit(env, internal(command, error), flags)
   }
@@ -198,16 +198,21 @@ function internal(command: string | undefined, error: unknown): ResultObject {
 }
 
 async function execute(env: Environment): Promise<number> {
+  // Both refusals below are raised before the flags are read, so the rendering the caller
+  // asked for is read on its own: a refusal is a result object like any other (R2), and the
+  // one thing it may not do is arrive in a format the caller did not ask for.
   const runtime = checkRuntime(env.nodeVersion)
   if (!runtime.ok) {
-    env.streams.err(`err STORE_UNAVAILABLE -\ncause ${runtime.cause}\n`)
-    return EXIT_OF.STORE_UNAVAILABLE
+    const result = errorResult({
+      code: 'STORE_UNAVAILABLE', command: 'treadle', workspace: '-', effect: 'read', cause: runtime.cause,
+    })
+    return emit(env, result, presentationFlags(env.argv))
   }
 
   const parsed = parse(env.argv)
   if (!parsed.ok) {
     const result = validation(env.argv[0] ?? 'treadle', parsed.cause, parsed.fix)
-    return emit(env, result, {})
+    return emit(env, result, presentationFlags(env.argv))
   }
   const { command, operands, flags, filterOrder } = parsed.value
 
