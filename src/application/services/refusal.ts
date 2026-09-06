@@ -19,10 +19,18 @@ const CODE_OF: Readonly<Record<string, ResultCode>> = {
   STORE_UNAVAILABLE: 'STORE_UNAVAILABLE',
 }
 
+/**
+ * Every store refusal here arrives after the workspace opened, so `treadle init` is never a
+ * remedy: it answered `already` under a stuck lock and told a person to initialise what they
+ * were standing in. A file at a schema this tool does not write is dated against the tool by
+ * `version`, which is the one command that runs whatever the store holds; a lock that timed
+ * out or was lost is retried, and `status` is the read that says the store is back.
+ */
 function fixesFor(code: ResultCode, error: StoreError): readonly string[] {
   const entity = error.entities[0]
   if (code === 'CONFLICT' && entity !== undefined) return [`treadle show ${entity}`]
-  if (code === 'STORE_UNAVAILABLE') return ['treadle init', 'treadle status']
+  if (error.code === 'SCHEMA_NEWER' || error.code === 'SCHEMA_OLDER') return ['treadle version']
+  if (code === 'STORE_UNAVAILABLE') return ['treadle status']
   if (code === 'INTEGRITY') return ['treadle doctor']
   return []
 }

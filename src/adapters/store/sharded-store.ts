@@ -813,7 +813,7 @@ export class ShardedStore implements Store {
     if (parsed.schema < SCHEMA) {
       return storeFail(
         'SCHEMA_OLDER', 'S9',
-        `${file} is schema ${parsed.schema} and this tool writes ${SCHEMA}; run migrate before writing to it`,
+        `${file} is schema ${parsed.schema} and this tool writes ${SCHEMA}; a file at an older schema is read as it is and not written to, and no command here rewrites it yet`,
         [file], { file: parsed.schema, tool: SCHEMA },
       )
     }

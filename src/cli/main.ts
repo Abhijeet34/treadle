@@ -14,11 +14,11 @@ import { errorResult, okResult, type ResultObject } from '../application/result.
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { setFields } from '../application/services/editing.ts'
-import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
+import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
 import { DEFAULT_BOARD_COLUMNS, board } from '../application/services/board.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
-import { explain, next, status } from '../application/services/insight.ts'
+import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { transition } from '../application/services/lifecycle.ts'
 import { closeSprint, commitItems, openSprint, reopenSprint, sprints, uncommitItems } from '../application/services/sprints.ts'
@@ -293,9 +293,14 @@ async function execute(env: Environment): Promise<number> {
   // other command prints names it as the fix, so it has to be the way back (ADR-0020).
   const opened = await openWorkspace(root, command === 'doctor' ? { rederive: true } : {})
   if (!opened.ok) {
+    // A workspace file that is missing is `init`'s to write. One at a schema this build does
+    // not read is not: `init` answers `already` there, so the line offered is the one that
+    // dates the tool against the file. The other refusals carry their own instruction in the
+    // cause, and no command line stands in for it.
+    const fix = opened.error.rule === 'S1' ? ['treadle init'] : opened.error.rule === 'S8' ? ['treadle version'] : []
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read',
-      rule: opened.error.rule, cause: opened.error.message, fix: ['treadle init'],
+      rule: opened.error.rule, cause: opened.error.message, ...(fix.length === 0 ? {} : { fix }),
     }), flags)
   }
 
@@ -334,7 +339,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return backlog(store, {
       filters: filtersOf(flags, input.filterOrder),
       columns,
-      limit: positiveInt(flag(flags, 'limit'), 9),
+      limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),
       ...(cursor === undefined ? {} : { cursor }),
       ...(absence === undefined ? {} : { explainAbsence: absence }),
     })
@@ -345,7 +350,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return board(store, systemClock, {
       filters: filtersOf(flags, input.filterOrder),
       columns: fieldsOf(flags, DEFAULT_BOARD_COLUMNS),
-      limit: positiveInt(flag(flags, 'limit'), 9),
+      limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),
       all: flags['all'] === true,
       ...(absence === undefined ? {} : { explainAbsence: absence }),
     })
@@ -358,7 +363,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     const absence = flag(flags, 'explain-absence')
     const cursor = flag(flags, 'cursor')
     return next(store, systemClock, {
-      limit: positiveInt(flag(flags, 'limit'), 3),
+      limit: positiveInt(flag(flags, 'limit'), DEFAULT_NEXT_LIMIT),
       ...(cursor === undefined ? {} : { cursor }),
       ...(forActor === undefined ? {} : { forActor }),
       ...(absence === undefined ? {} : { explainAbsence: absence }),
@@ -378,7 +383,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     if (id === undefined) return validation('history', 'history needs the id of one item', ['treadle backlog'])
     const cursor = flag(flags, 'cursor')
     return history(store, id, {
-      limit: positiveInt(flag(flags, 'limit'), 9),
+      limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),
       ...(cursor === undefined ? {} : { cursor }),
     })
   }

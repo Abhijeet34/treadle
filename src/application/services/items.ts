@@ -6,7 +6,10 @@ import {
   canonicalField,
   daysOverdue,
   evaluateCommit,
+  placeholderOf,
   relationsOf,
+  requiredAtCreation,
+  shellWord,
   shortField,
   validateWorkItem,
   type AcceptanceCriterion,
@@ -52,6 +55,41 @@ export const ITEM_COLUMNS: readonly ColumnSpec[] = [
  * cell on a non-bug row, which is what `pts` already costs an unestimated one.
  */
 export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'pts', 'sev', 'title'] as const
+
+/** The page size every list defaults to; `next` has its own, smaller one. */
+export const DEFAULT_LIMIT = 9
+
+type CarriedFlag = readonly [name: string, value: string | true | undefined]
+
+/**
+ * A command line the reader runs as printed, carrying every flag that shaped this answer.
+ * A `page` line built from the command word and the cursor alone walked a different list
+ * than the page it followed: `backlog --state draft --limit 2` printed a cursor whose page
+ * was six unfiltered rows. An absent flag is one the caller left at its default, so it is
+ * left off here too and the line stays the caller's own; a value is one the tool matched or
+ * validated, quoted where a shell would split it.
+ */
+export function invocation(command: string, operands: readonly string[], flags: readonly CarriedFlag[]): string {
+  const words = [`treadle ${command}`, ...operands.map(shellWord)]
+  for (const [name, value] of flags) {
+    if (value === undefined) continue
+    words.push(`--${name}`)
+    if (value !== true) words.push(shellWord(value))
+  }
+  return words.join(' ')
+}
+
+/** The filter, column and limit flags a list was asked with, for the line that continues it. */
+export function listFlags(
+  filters: readonly Filter[], columns: readonly string[], defaults: readonly string[], limit: number,
+): readonly CarriedFlag[] {
+  const chosen = columns.length === defaults.length && columns.every((name, at) => name === defaults[at])
+  return [
+    ...filters.map((filter): CarriedFlag => [filter.field, filter.value]),
+    ['fields', chosen ? undefined : columns.join(',')],
+    ['limit', limit === DEFAULT_LIMIT ? undefined : String(limit)],
+  ]
+}
 
 export const FILE_SHAPE: ResultShape = {
   command: 'file',
@@ -321,9 +359,15 @@ export async function fileItem(
     }
     const outcome = evaluateCommit({ sprint, item: { ...item, sprint_id: undefined }, current: undefined, readyGate: readyVerdict(view.value, item) })
     if (outcome.outcome === 'refused') {
+      // Nothing was filed, so the commit's own fixes, which name the item, would each exit
+      // NOT_FOUND. The line offered files it without the sprint, with the fields its type
+      // cannot be filed without, and the commit is the second line once it is ready.
+      const required = requiredAtCreation(request.type).map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
       return errorResult({
         code: 'GUARD_REFUSED', command: 'file', workspace, effect: 'mutate',
-        rule: outcome.error.rule ?? 'I4', entity: id, cause: outcome.error.message, fix: outcome.fix,
+        rule: outcome.error.rule ?? 'I4', entity: id,
+        cause: `${outcome.error.message}; nothing was filed, so file it without --sprint and commit it once it is ready`,
+        fix: [`treadle file ${request.type} "<title>"${required}`, `treadle sprint commit ${sprint.id} <id>`],
       })
     }
   }
@@ -611,9 +655,11 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   const refused = columnRefusal('backlog', workspace, request.columns, ITEM_COLUMNS)
   if (refused !== undefined) return refused
 
+  const line = (cursor?: string): string =>
+    invocation('backlog', [], [...listFlags(request.filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
   const matched = view.value.items.filter((item) => matches(item, request.filters)).sort(backlogOrder)
   const from = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
-  if (from < 0) return unknownCursor('backlog', workspace, request.cursor as string, request.cursor as string, 'treadle backlog')
+  if (from < 0) return unknownCursor('backlog', workspace, request.cursor as string, request.cursor as string, line())
   const page = matched.slice(from, from + request.limit)
   const block: Block = {
     columns: columnsFor(request.columns),
@@ -652,7 +698,7 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   if (remaining > 0) {
     data['more'] = remaining
     const next = matched[from + page.length]
-    if (next !== undefined) data['page'] = `treadle backlog --cursor ${next.id}`
+    if (next !== undefined) data['page'] = line(next.id)
   }
   data['items'] = block
   return okResult(BACKLOG_SHAPE, { workspace, data })

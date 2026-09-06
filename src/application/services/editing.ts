@@ -21,6 +21,7 @@ import {
   fieldsOf,
   isKnownField,
   validateWorkItem,
+  withArticle,
   writerOf,
   type ItemId,
   type WorkItem,
@@ -70,6 +71,11 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
 
 /** Why this field cannot be written here, or `undefined`. */
 function unsettable(field: string, item: WorkItem): { readonly cause: string; readonly fix: readonly string[] } | undefined {
+  // Whether the type has the field is decided before which command writes it: `severity`
+  // on a task used to be answered with the `mark --severity` line, which a task refuses too.
+  if (isKnownField(field) && !fieldsOf(item.type).includes(field)) {
+    return { cause: `${field} is not a field of ${withArticle(item.type)}`, fix: [`treadle show ${item.id}`] }
+  }
   const writer = writerOf(field)
   if (writer.kind === 'command') {
     const usage = writer.usage.replaceAll('<id>', item.id)
@@ -78,14 +84,14 @@ function unsettable(field: string, item: WorkItem): { readonly cause: string; re
   if (writer.kind === 'none') {
     return { cause: `${field} is not set here; ${writer.why}`, fix: [`treadle show ${item.id}`] }
   }
+  // The cause names the fields this item's type takes, because the first three of the whole
+  // dictionary alphabetically began with one a task has not got.
   if (!isKnownField(field)) {
+    const takes = fieldsOf(item.type).filter((name) => writerOf(name).kind === 'set')
     return {
-      cause: `${field} is not a field of any work item`,
-      fix: [`treadle set ${item.id} ${SETTABLE_FIELDS.slice(0, 3).join('=<value> ')}=<value>`],
+      cause: `${field} is not a field of any work item; set writes ${takes.join(', ')} on ${withArticle(item.type)}`,
+      fix: [`treadle set ${item.id} <field>=<value>`],
     }
-  }
-  if (!fieldsOf(item.type).includes(field)) {
-    return { cause: `${field} is not a field of a ${item.type}`, fix: [`treadle show ${item.id}`] }
   }
   return undefined
 }

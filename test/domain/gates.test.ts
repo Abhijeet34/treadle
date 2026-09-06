@@ -13,7 +13,7 @@ import {
   validateGate,
 } from '../../src/domain/index.ts'
 import type { Gate } from '../../src/domain/index.ts'
-import { child, errorOf, gateContext, item, unwrap } from '../helpers/fixtures.ts'
+import { errorOf, gateContext, item, neighbour, unwrap } from '../helpers/fixtures.ts'
 
 function failed(verdict: ReturnType<typeof evaluateGate>): readonly string[] {
   return verdict.rules.filter((r) => !r.pass).map((r) => r.rule)
@@ -67,7 +67,7 @@ describe('the default ready gate', () => {
   })
 
   it('fails any item with an active blocker', () => {
-    const verdict = evaluateGate(DEFAULT_READY_GATE, gateContext(item('task'), { blockers: ['auth-refresh'] }))
+    const verdict = evaluateGate(DEFAULT_READY_GATE, gateContext(item('task'), { blockers: [neighbour('auth-refresh')] }))
     assert.deepEqual(failed(verdict), ['DOR3'])
     assert.ok(verdict.rules.find((r) => r.rule === 'DOR3')?.reason?.includes('auth-refresh'))
   })
@@ -82,12 +82,12 @@ describe('the default ready gate', () => {
     assert.deepEqual(failed(bare), ['DOR8'])
     const withTask = evaluateGate(
       DEFAULT_READY_GATE,
-      gateContext(item('epic'), { children: [child('t-1', 'task', 'draft')] }),
+      gateContext(item('epic'), { children: [neighbour('t-1', 'task', 'draft')] }),
     )
     assert.deepEqual(failed(withTask), ['DOR8'], 'a task child is not a story child')
     const withStory = evaluateGate(
       DEFAULT_READY_GATE,
-      gateContext(item('epic'), { children: [child('s-1', 'story', 'draft')] }),
+      gateContext(item('epic'), { children: [neighbour('s-1', 'story', 'draft')] }),
     )
     assert.equal(withStory.pass, true)
   })
@@ -132,11 +132,11 @@ describe('the default done gate', () => {
 
   it('fails an item with an open child, and passes when every child is closed', () => {
     const open = gateContext(item('epic'), {
-      children: [child('s-1', 'story', 'done'), child('s-2', 'story', 'in_progress')],
+      children: [neighbour('s-1', 'story', 'done'), neighbour('s-2', 'story', 'in_progress')],
     })
     assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, open)), ['DOD1'])
     const closed = gateContext(item('epic'), {
-      children: [child('s-1', 'story', 'done'), child('s-2', 'story', 'cancelled')],
+      children: [neighbour('s-1', 'story', 'done'), neighbour('s-2', 'story', 'cancelled')],
     })
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, closed).pass, true)
   })
@@ -164,11 +164,11 @@ describe('the default done gate', () => {
   })
 
   it('fails an item with an open impediment', () => {
-    const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task'), { openImpediments: ['cert-expired', 'vendor-hold'] }))
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task'), { blockers: [neighbour('cert-expired', 'impediment'), neighbour('vendor-hold', 'impediment', 'ready')] }))
     assert.deepEqual(failed(verdict), ['DOD2'])
     const rule = verdict.rules.find((r) => r.rule === 'DOD2')
     assert.equal(rule?.reason, 'cert-expired, vendor-hold are still open against the item')
-    assert.equal(rule?.remedy, 'treadle transition cert-expired done', 'resolving the impediment is the remedy')
+    assert.equal(rule?.remedy, 'treadle transition cert-expired ready', 'the remedy is the next move toward resolving the impediment from where it stands, not the destination')
   })
 
   it('requires a reviewer only when the type has a review step, and never the assignee', () => {

@@ -170,8 +170,8 @@ describe('streams and renderings, end to end', () => {
 
   it('pages a ranked list with --cursor, which is what makes --limit honest there', async () => {
     const first = await runCli(['next', '--limit', '2'], { cwd })
-    assert.match(first.out, /^page treadle next --cursor (\S+)$/m)
-    const cursor = /^page treadle next --cursor (\S+)$/m.exec(first.out)?.[1] as string
+    assert.match(first.out, /^page treadle next --limit 2 --cursor (\S+)$/m, 'the page line carries the limit it was asked with')
+    const cursor = /^page treadle next --limit 2 --cursor (\S+)$/m.exec(first.out)?.[1] as string
     const second = await runCli(['next', '--limit', '2', '--cursor', cursor], { cwd })
     assert.match(second.out, new RegExp(`^${cursor} `, 'm'))
     // The first row is the line after the column header, found rather than counted: the

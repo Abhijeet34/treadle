@@ -14,8 +14,8 @@ import {
   hierarchyFrom,
   relationGraphFrom,
   type Gate,
-  type GateChild,
   type GateContext,
+  type GateItem,
   type GateVerdict,
   type HierarchyGraph,
   type ItemId,
@@ -23,7 +23,6 @@ import {
   type Sprint,
   type TransitionContext,
   type WorkItem,
-  type WorkItemState,
   type WorkItemSummary,
   type WorkItemType,
 } from '../../domain/index.ts'
@@ -173,14 +172,19 @@ export function blockedByThis(view: WorkspaceView, id: ItemId): readonly ItemId[
     })
 }
 
-function childrenGates(view: WorkspaceView, id: ItemId): readonly GateChild[] {
-  return (view.hierarchy.childrenOf.get(id) ?? []).flatMap((child) => {
-    const item = view.byId.get(child)
-    return item === undefined ? [] : [{ id: item.id, type: item.type, state: item.state }]
+/** What a gate rule or a guard is told about a neighbour: enough to name its next move. */
+function gateItems(view: WorkspaceView, ids: readonly ItemId[]): readonly GateItem[] {
+  return ids.flatMap((id) => {
+    const item = view.byId.get(id)
+    return item === undefined ? [] : [{ id: item.id, type: item.type, state: item.state, reviewStep: hasReviewStep(item.type) }]
   })
 }
 
-/** The active blockers of `id` that are impediments, which is what DOD2 reads. */
+function childrenGates(view: WorkspaceView, id: ItemId): readonly GateItem[] {
+  return gateItems(view, view.hierarchy.childrenOf.get(id) ?? [])
+}
+
+/** The active blockers of `id` that are impediments, whose proposed resolution a refusal reads back. */
 export function openImpedimentsOf(view: WorkspaceView, id: ItemId): readonly ItemId[] {
   return activeBlockers(view, id).filter((blocker) => view.byId.get(blocker)?.type === 'impediment')
 }
@@ -188,10 +192,9 @@ export function openImpedimentsOf(view: WorkspaceView, id: ItemId): readonly Ite
 export function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
   return {
     item,
-    blockers: activeBlockers(view, item.id),
+    blockers: gateItems(view, activeBlockers(view, item.id)),
     children: childrenGates(view, item.id),
     reviewStep: hasReviewStep(item.type),
-    openImpediments: openImpedimentsOf(view, item.id),
   }
 }
 
@@ -203,11 +206,8 @@ export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = DE
   return evaluateGate(gate, gateContextFor(view, item))
 }
 
-export function openChildrenOf(view: WorkspaceView, id: ItemId): readonly ItemId[] {
-  return (view.hierarchy.childrenOf.get(id) ?? []).filter((child) => {
-    const state: WorkItemState | undefined = view.byId.get(child)?.state
-    return state !== undefined && state !== 'done' && state !== 'cancelled'
-  })
+export function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
+  return childrenGates(view, id).filter((child) => child.state !== 'done' && child.state !== 'cancelled')
 }
 
 export function transitionContextFor(view: WorkspaceView, item: WorkItem): TransitionContext {
@@ -215,7 +215,7 @@ export function transitionContextFor(view: WorkspaceView, item: WorkItem): Trans
     item,
     readyGate: readyVerdict(view, item),
     doneGate: doneVerdict(view, item),
-    blockers: activeBlockers(view, item.id),
+    blockers: gateItems(view, activeBlockers(view, item.id)),
     // The board is a projection that stores nothing (ADR-0018): there is no column to be
     // over, so `column` stays absent and G3 passes, and no membership to lack, so G4's "on
     // the board" is true of every item and the guard stays disarmed. Arming either takes a

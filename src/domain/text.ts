@@ -105,3 +105,12 @@ export function isSafeText(value: string, mode: TextMode = 'line'): boolean {
 export function withArticle(noun: string): string {
   return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`
 }
+
+/**
+ * A value as one word of a command line the reader runs as printed. A token of letters,
+ * digits and the punctuation every shell leaves alone stays bare; anything else is
+ * single-quoted, the one POSIX quoting under which nothing but the quote itself escapes.
+ */
+export function shellWord(value: string): string {
+  return /^[A-Za-z0-9_.,:@%+=/-]+$/.test(value) ? value : `'${value.replaceAll("'", "'\\''")}'`
+}

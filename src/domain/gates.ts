@@ -7,8 +7,16 @@
 
 import { fail, ok, type Result } from './errors.ts'
 import { withArticle } from './text.ts'
-import { fieldsOf, isKnownField, requiredAtCreation, writeCommand, writerOf } from './fields.ts'
-import { isTerminal, type ItemId, type WorkItem, type WorkItemState, type WorkItemType } from './types.ts'
+import { fieldsOf, isKnownField, placeholderOf, requiredAtCreation, writeCommand, writerOf } from './fields.ts'
+import { advance } from './state-machine.ts'
+import {
+  isTerminal,
+  type GateItem,
+  type GateRuleVerdict,
+  type GateVerdict,
+  type WorkItem,
+  type WorkItemType,
+} from './types.ts'
 
 export type GateCheck =
   | { readonly kind: 'field_present'; readonly field: string }
@@ -37,35 +45,14 @@ export type Gate = {
   readonly rules: readonly GateRule[]
 }
 
-export type GateChild = {
-  readonly id: ItemId
-  readonly type: WorkItemType
-  readonly state: WorkItemState
-}
 
 export type GateContext = {
   readonly item: WorkItem
-  /** Active blockers, derived from the relation graph by the caller. */
-  readonly blockers: readonly ItemId[]
-  readonly children: readonly GateChild[]
+  /** Active blockers, derived from the relation graph by the caller; DOD2 reads the impediments among them. */
+  readonly blockers: readonly GateItem[]
+  readonly children: readonly GateItem[]
   /** Whether this type has a review step in this workspace (guard G5's setting). */
   readonly reviewStep: boolean
-  /** The active blockers of type `impediment`, a subset of `blockers`, which DOD2 reads. */
-  readonly openImpediments: readonly ItemId[]
-}
-
-export type GateRuleVerdict = {
-  readonly rule: string
-  readonly sentence: string
-  readonly pass: boolean
-  readonly reason?: string
-  readonly remedy?: string
-}
-
-export type GateVerdict = {
-  readonly gate: string
-  readonly pass: boolean
-  readonly rules: readonly GateRuleVerdict[]
 }
 
 export const DEFAULT_READY_GATE: Gate = {
@@ -156,17 +143,19 @@ function run(check: GateCheck, context: GateContext): Outcome {
       // rule fails again on what is left, which is `set`'s and groups into one line.
       const first = missing[0] as string
       return missing.every((f) => writerOf(f).kind === 'set')
-        ? no(reason, `treadle set ${item.id} ${missing.map((f) => `${f}=<value>`).join(' ')}`)
-        : no(reason, writeCommand(first, item.id, '<value>'))
+        ? no(reason, `treadle set ${item.id} ${missing.map((f) => `${f}=${placeholderOf(f)}`).join(' ')}`)
+        : no(reason, writeCommand(first, item.id, placeholderOf(first)))
     }
     case 'estimate_set':
       return typeof item.points === 'number'
         ? PASS
         : no('points are not set', writeCommand('points', item.id, '<n>'))
-    case 'no_active_blocker':
-      return context.blockers.length === 0
+    case 'no_active_blocker': {
+      const first = context.blockers[0]
+      return first === undefined
         ? PASS
-        : no(`blocked by ${context.blockers.join(', ')}`, `treadle transition ${context.blockers[0]} done`)
+        : no(`blocked by ${context.blockers.map((b) => b.id).join(', ')}`, advance(first))
+    }
     case 'parent_present':
       return item.parent_id === undefined
         ? no('the item has no parent', writeCommand('parent_id', item.id, '<id>'))
@@ -182,22 +171,26 @@ function run(check: GateCheck, context: GateContext): Outcome {
         )
     }
     case 'no_open_child': {
-      const open = context.children.filter((c) => !isTerminal(c.state)).map((c) => c.id)
-      return open.length === 0
+      const open = context.children.filter((c) => !isTerminal(c.state))
+      const first = open[0]
+      return first === undefined
         ? PASS
-        : no(`${open.join(', ')} are still open`, `treadle transition ${open[0]} done`)
+        : no(`${open.map((c) => c.id).join(', ')} are still open`, advance(first))
     }
-    // An impediment is resolved by reaching `done`, so the remedy is the same command DOR3
+    // An impediment is resolved by reaching `done`, so the remedy is the same move DOR3
     // names for any blocker; the rule is kept beside it because it fails on the done gate,
     // where DOR3 is not evaluated: an impediment raised against work in progress holds the
     // work from finishing until it is resolved.
-    case 'no_open_impediment':
-      return context.openImpediments.length === 0
+    case 'no_open_impediment': {
+      const open = context.blockers.filter((b) => b.type === 'impediment')
+      const first = open[0]
+      return first === undefined
         ? PASS
         : no(
-          `${context.openImpediments.join(', ')} ${context.openImpediments.length === 1 ? 'is' : 'are'} still open against the item`,
-          `treadle transition ${context.openImpediments[0]} done`,
+          `${open.map((b) => b.id).join(', ')} ${open.length === 1 ? 'is' : 'are'} still open against the item`,
+          advance(first),
         )
+    }
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
       const reviewer = writeCommand('reviewer', item.id, '<name>')

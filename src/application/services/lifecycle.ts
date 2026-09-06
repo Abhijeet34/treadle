@@ -7,9 +7,11 @@
 // cheap "am I pointing at the right thing" check can never be mistaken for a guard check.
 
 import {
+  OVERRIDABLE_GUARDS,
   TRANSITION_TABLE,
   evaluateTransition,
   isTerminal,
+  overrideCommand,
   validateWorkItem,
   type AttemptOutcome,
   type GuardId,
@@ -163,7 +165,7 @@ export async function transition(
       rule: outcome.error.rule ?? 'T1',
       entity: `item ${item.id}`,
       cause: outcome.error.message,
-      fix: fixesFor(item, request, failed, context, openImpedimentsOf(view.value, item.id)),
+      fix: fixesFor(item, request, outcome.guards, context, openImpedimentsOf(view.value, item.id)),
     }
     return errorResult(failed === undefined ? input : { ...input, guard: failed.guard })
   }
@@ -234,31 +236,42 @@ function guardsOnEdge(item: WorkItem, target: WorkItemState | 'resume'): readonl
   return item.type === 'epic' && to === 'done' ? [...spec.guards, 'G8'] : spec.guards
 }
 
-/** Remediations for a refused edge, most likely first, each runnable and each bounded. */
+/**
+ * Remediations for a refused edge, each runnable from where the item stands and each bounded.
+ * They are the first failed guard's: the cause names every guard that failed, and the fix
+ * list names the next move, which is what a remedy is here. A story leaving in_progress for
+ * done fails G5 and G6 together; the line is the submit, and the accept that follows is
+ * refused with the done gate's own lines if they still fail.
+ */
 function fixesFor(
-  item: WorkItem, request: TransitionRequestInput, failed: GuardResult | undefined,
+  item: WorkItem, request: TransitionRequestInput, guards: readonly GuardResult[],
   context: TransitionContext, impediments: readonly ItemId[],
 ): readonly string[] {
-  const fixes: string[] = [`treadle explain ${item.id}`]
+  const failed = guards.find((guard) => !guard.pass)
   const target = request.target === 'resume' ? item.held_from : request.target
-  if (failed !== undefined && ['G2', 'G3', 'G7'].includes(failed.guard) && target !== undefined) {
-    fixes.unshift(`treadle transition ${item.id} ${target} --override ${failed.guard} --reason "<why>"`)
-  }
-  // A gate guard's own reason names rule ids, and the rules' remedies are command lines
-  // (test/domain/gate-remedies.test.ts holds that), so a refusal on G1 or G6 hands them over
-  // rather than sending the caller through `explain` to read the same lines: a story blocked
-  // by an impediment is refused at `ready` with `treadle transition <impediment> done`.
-  const gate = failed?.guard === 'G1' ? context.readyGate : failed?.guard === 'G6' ? context.doneGate : undefined
-  if (gate !== undefined) {
-    const remedies = gate.rules.flatMap((rule) => (rule.pass || rule.remedy === undefined ? [] : [rule.remedy]))
-    fixes.unshift(...new Set(remedies))
-  }
+  const fixes: string[] = []
   // A blocker that is an impediment carries what would clear it, and the refusal that names
   // the blocker is where a caller wants that read back; the field is the one line `show`
   // cuts at 64 cells, so the fix asks for it whole.
   if (failed?.guard === 'G2') {
-    fixes.unshift(...impediments.map((id) => `treadle show ${id} --field proposed_resolution`))
+    fixes.push(...impediments.map((id) => `treadle show ${id} --field proposed_resolution`))
   }
+  // A gate guard's own reason names rule ids, and the rules' remedies are command lines
+  // (test/domain/gate-remedies.test.ts holds that), so a refusal on G1 or G6 hands all of
+  // them over rather than sending the caller through `explain` to read the same lines.
+  const gate = failed?.guard === 'G1' ? context.readyGate : failed?.guard === 'G6' ? context.doneGate : undefined
+  if (gate !== undefined) {
+    fixes.push(...gate.rules.flatMap((rule) => (rule.pass || rule.remedy === undefined ? [] : [rule.remedy])))
+  } else if (failed?.remedy !== undefined) {
+    fixes.push(failed.remedy)
+  }
+  // The override is the second answer on the three guards that take one, after the line that
+  // clears the guard: the same blocked item is remedied the same way at `ready` and at
+  // `in_progress`, and only the second edge offers the override as well.
+  if (failed !== undefined && OVERRIDABLE_GUARDS.includes(failed.guard) && target !== undefined) {
+    fixes.push(overrideCommand(item.id, target, failed.guard, request.resolution))
+  }
+  fixes.push(`treadle explain ${item.id}`)
   if (target !== undefined && isTerminal(target)) fixes.push(`treadle show ${item.id}`)
-  return fixes
+  return [...new Set(fixes)]
 }

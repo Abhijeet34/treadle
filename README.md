@@ -69,7 +69,7 @@ Nothing in `src/domain` reads the filesystem, the clock, a random source, or the
 import { DEFAULT_READY_GATE, evaluateGate, evaluateTransition } from './src/domain/index.ts'
 
 const verdict = evaluateGate(DEFAULT_READY_GATE, {
-  item: story, blockers: [], children: [], reviewStep: false, openImpediments: [],
+  item: story, blockers: [], children: [], reviewStep: false,
 })
 // verdict.rules -> one pass/fail per rule, each with the reason and what would satisfy it
 

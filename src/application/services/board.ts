@@ -14,7 +14,7 @@ import { errorResult, okResult, type Block, type ColumnSpec, type ResultObject, 
 import type { Clock } from '../ports/clock.ts'
 import type { Store } from '../ports/store.ts'
 import { activeBlockerIndex, readWorkspace, type WorkspaceView } from './context.ts'
-import { ITEM_COLUMNS, absence, backlogOrder, columnRefusal, matches, narrowestClause, rowFor, type Filter } from './items.ts'
+import { ITEM_COLUMNS, absence, backlogOrder, columnRefusal, invocation, listFlags, matches, narrowestClause, rowFor, type Filter } from './items.ts'
 import { storeRefusal } from './refusal.ts'
 import { noSprint } from './sprints.ts'
 
@@ -142,7 +142,11 @@ export async function board(store: Store, clock: Clock, request: BoardRequest): 
   const data: Record<string, Value> = {
     scope: scope.kind === 'workspace' ? 'workspace' : scopeLine(view.value, scope.id, clock.now()),
   }
-  if (scope.kind === 'sprint' && scope.defaulted) data['whole'] = 'treadle board --all'
+  // The whole workspace under the same filters, columns and cap: `board --type task` offered a
+  // `whole` line that showed every type.
+  if (scope.kind === 'sprint' && scope.defaulted) {
+    data['whole'] = invocation('board', [], [...listFlags(request.filters, request.columns, DEFAULT_BOARD_COLUMNS, request.limit), ['all', true]])
+  }
   if (request.filters.length > 0) {
     data['filter'] = request.filters.map((filter) => `${filter.field} ${filter.value}`).join(' ')
   }

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict'
 import type {
   DomainError,
   GateContext,
+  GateItem,
   GateVerdict,
   Instant,
   Result,
@@ -103,11 +104,14 @@ export function gateContext(subject: WorkItem, over: Partial<GateContext> = {}):
     blockers: [],
     children: [],
     reviewStep: false,
-    openImpediments: [],
     ...over,
   }
 }
 
-export function child(id: string, type: WorkItemType, state: WorkItemState): GateContext['children'][number] {
-  return { id, type, state }
+/** The review-step types, as the application layer states them; a fixture is not the place to import that. */
+const REVIEWED: readonly WorkItemType[] = ['story', 'bug', 'epic']
+
+/** A blocker or a child as a gate rule or a guard sees it, in draft unless said otherwise. */
+export function neighbour(id: string, type: WorkItemType = 'task', state: WorkItemState = 'draft'): GateItem {
+  return { id, type, state, reviewStep: REVIEWED.includes(type) }
 }

@@ -19,7 +19,7 @@ import {
   type Sprint,
   type WorkItem,
 } from '../../src/domain/index.ts'
-import { errorOf, item, unwrap } from '../helpers/fixtures.ts'
+import { errorOf, item, neighbour, unwrap } from '../helpers/fixtures.ts'
 
 const OPEN: Sprint = {
   id: 'sprint-31', title: 'Sprint 31', state: 'open', filed_at: '2026-09-06T09:00:00Z', version: 1,
@@ -29,7 +29,7 @@ const CLOSED: Sprint = { ...OPEN, id: 'sprint-30', state: 'closed', closed_at: '
 
 function readyGate(subject: WorkItem, blockers: readonly string[] = []): GateVerdict {
   return evaluateGate(DEFAULT_READY_GATE, {
-    item: subject, blockers, children: [], reviewStep: false, openImpediments: [],
+    item: subject, blockers: blockers.map((id) => neighbour(id)), children: [], reviewStep: false,
   })
 }
 

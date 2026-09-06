@@ -148,7 +148,11 @@ describe('the guards and the ranking that read blockers', () => {
     assert.equal(refused.code, 3)
     assert.equal(line(refused, 'guard'), 'guard G2')
     assert.match(refused.err, /avatar-crop is blocked by webhook-retry/)
-    assert.equal(line(refused, 'fix'), 'fix treadle transition avatar-crop in_progress --override G2 --reason "<why>"')
+    assert.deepEqual(lines(refused).filter((entry) => entry.startsWith('fix ')), [
+      'fix treadle transition webhook-retry in_progress',
+      'fix treadle transition avatar-crop in_progress --override G2 --reason "<why>"',
+      'fix treadle explain avatar-crop',
+    ])
     const dry = await cli(['transition', 'avatar-crop', 'in_progress', '--override', 'G2', '--reason', 'the blocker is cosmetic', '--dry-run'])
     assert.equal(dry.code, 0, dry.err)
     assert.match(dry.out, /G2 pass\/overridden/)
