@@ -301,7 +301,7 @@ FAIL  the what column of history has one convention
 check-tests-kept: 772 tests at 3bce1ca4, ... 32 removed without a Removes-test trailer
 ```
 
-Every test declaration in this repository is read and compared, and the run prints how many it could not read: `0 titles not literal and not compared` on 2026-09-07, at 983 declarations against 969 at the merge base.
+Every test declaration in this repository is read and compared, and the run prints how many it could not read: `0 titles not literal and not compared` on 2026-09-07, at 1,001 declarations against 987 at the merge base.
 A title built from a template literal is compared in a canonical form with each interpolation reduced to `${}`, so the per-file `it` in `test/architecture/license-header.test.ts` is one comparable title rather than an uncompared one; that was the single exception this section used to name, and it is closed.
 The count is the run's own, not this file's, which is the point of printing it.
 
