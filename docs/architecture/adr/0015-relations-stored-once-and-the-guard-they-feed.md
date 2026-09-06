@@ -81,6 +81,15 @@ It is not blocked depth, because a chain is freed one link at a time and the nex
 An item with an active blocker is left out of `next`, because `G2` would refuse the start the list invites, and `next --explain-absence <id>` names the blockers as `blocked by <ids>`.
 `status`'s three-row preview reads the same ranking.
 
+### A cycle two commands close between them is refused at the store
+
+`R2` reads the graph before the lock is taken, and the store's compare-and-set covered only the record written.
+Two processes adding `a blocks b` and `b blocks a` at the same instant each saw an empty graph, each wrote a different record at the version it had read, and both landed: every item on the cycle was then blocked by itself, with only `doctor`'s `H25` saying so.
+The added edge's own record is not what the decision depended on; the records whose edges the check walked are.
+`addRelation` now returns that read set, the transaction carries it as `reads`, and the store refuses with `S10` if one of them moved between the read and the lock, which is the same token the written record already answered to.
+The check itself, and the load-time finder `H25` reads, walk an adjacency map rather than filtering the relation list once per node: `doctor` over 200 records carrying 3,600 `blocks` edges took 12.3 s and takes 0.5 s, and the finder is linear rather than bounded by the write-time ceiling, so a hand-edited cycle longer than 64 is a finding rather than a miss.
+Re-running the whole check under the lock was priced and refused: it needs the whole-workspace read a second time on every `relation add`, where the read set is a version lookup per node the check touched.
+
 ### `status` no longer lists `relation` as absent
 
 `absent_features` is `sprint board impediment`.
@@ -116,6 +125,8 @@ A record that names a missing id would be quarantined, which hides the whole rec
 - `show <id>` gains a `relations` block, appended after `criteria`, listing stored edges under their kind and edges other records hold against this one under the inverse.
 - `history` prints a relation write as `relation=<kind>:<other>`, under the `what` convention, for both the add and the remove.
 - `G2`, `G7` and `DOR3` fire for the first time on a workspace that has used the command.
+- `StoreTransaction` gains an optional `reads` list, and `S10` covers a record the decision read as well as the one written.
+- A `blocks` edge added from a `done` or `cancelled` item succeeds with a `note` saying it blocks nothing while the source stays terminal.
 
 ## Departures from the design record
 

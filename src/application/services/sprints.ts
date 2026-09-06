@@ -87,10 +87,10 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
 }
 
 /** The one refusal for a sprint id nothing here carries, with the nearest sprint ids beside it. */
-function noSprint(command: string, workspace: string, view: WorkspaceView, id: string): ResultObject {
+export function noSprint(command: string, effect: 'read' | 'mutate', workspace: string, view: WorkspaceView, id: string): ResultObject {
   const held = view.sprints.length
   return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect: command === 'sprints' ? 'read' : 'mutate', rule: 'I5', entity: id,
+    code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
     cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
     near: nearIds(view.sprintById.keys(), id),
     fix: ['treadle sprints'],
@@ -159,6 +159,11 @@ export async function openSprint(
   const id = request.id ?? slugFor(request.title, 'sprint', taken)
   if (view.value.sprintById.has(id)) {
     return refusal(workspace, 'I5', id, `${id} is already a sprint here`, [`treadle sprints ${id}`, 'treadle sprint open "<title>" --id <slug>'])
+  }
+  // The log is keyed by entity id alone, so a sprint and an item sharing one would share
+  // a `history`; an id names one thing here, whichever file it lives in.
+  if (view.value.byId.has(id)) {
+    return refusal(workspace, 'I5', id, `${id} is an item here, and an id names one thing: a sprint cannot share an item's id`, [`treadle show ${id}`, 'treadle sprint open "<title>" --id <slug>'])
   }
   const sprint: Sprint = {
     id, title: request.title, state: 'open', filed_at: now, version: 1,
@@ -248,7 +253,7 @@ export async function commitItems(
   if (!view.ok) return storeRefusal('sprint', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
   const sprint = view.value.sprintById.get(request.sprint)
-  if (sprint === undefined) return noSprint('sprint', workspace, view.value, request.sprint)
+  if (sprint === undefined) return noSprint('sprint', 'mutate', workspace, view.value, request.sprint)
   if (request.items.length === 0) {
     return refusal(workspace, 'C1', sprint.id, 'sprint commit names the sprint and then one or more item ids, and no item was given', [`treadle sprint commit ${sprint.id} <id>`])
   }
@@ -341,7 +346,7 @@ async function moveSprint(
   if (!view.ok) return storeRefusal('sprint', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
   const sprint = view.value.sprintById.get(request.sprint)
-  if (sprint === undefined) return noSprint('sprint', workspace, view.value, request.sprint)
+  if (sprint === undefined) return noSprint('sprint', 'mutate', workspace, view.value, request.sprint)
   if (sprint.state === to) {
     return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
   }
@@ -410,7 +415,7 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   }
 
   const sprint = view.value.sprintById.get(id)
-  if (sprint === undefined) return noSprint('sprints', workspace, view.value, id)
+  if (sprint === undefined) return noSprint('sprints', 'read', workspace, view.value, id)
   const committed = committedTo(view.value, sprint)
   const tally = tallyOf(committed)
   const data: Record<string, Value> = {

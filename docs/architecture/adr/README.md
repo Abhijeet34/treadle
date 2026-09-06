@@ -51,7 +51,7 @@ The set is closed.
 | `S7` | An event line exceeds its byte or JSON-nesting ceiling |
 | `S8` | The file's schema is newer than this tool's |
 | `S9` | The file's schema is older than this tool's and the operation writes |
-| `S10` | A compare-and-set found a different stored version |
+| `S10` | A compare-and-set found a different stored version, on the record written or on one the write's decision read |
 | `S11` | The lock was not acquired within the caller's bound |
 | `S12` | The stored hierarchy closes a cycle |
 | `S13` | A store file could not be created, read or written, and the filesystem said why |

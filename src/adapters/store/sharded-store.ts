@@ -664,6 +664,21 @@ export class ShardedStore implements Store {
     const applied: AppliedWrite[] = []
     const findings = this.#index.findings()
 
+    // The read set is checked against the index, which the refresh under this lock has
+    // just brought level with the files, so a record another process moved between the
+    // caller's read and this lock is seen here at its new version.
+    for (const read of transaction.reads ?? []) {
+      const actual = this.#index.versionOf(read.id)
+      if (actual === read.version) continue
+      return storeFail(
+        'CONFLICT', 'S10',
+        actual === undefined
+          ? `${read.id} left the store after the write was decided against it at version ${read.version}`
+          : `${read.id} is at version ${actual} and the write was decided against version ${read.version}; retry so the decision reads what is there now`,
+        [read.id], { expected: read.version, ...(actual === undefined ? {} : { actual }) },
+      )
+    }
+
     for (const write of transaction.writes) {
       const file = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
       const shard = shards.get(file) ?? await this.#readShard(file)

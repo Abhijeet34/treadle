@@ -276,7 +276,16 @@ export async function fileItem(
   const workspace = view.value.identity.id
 
   const now = clock.now()
-  const id = request.id ?? slugFor(request.title, request.type, new Set(view.value.byId.keys()))
+  const id = request.id ?? slugFor(request.title, request.type, new Set([...view.value.byId.keys(), ...view.value.sprintById.keys()]))
+  // The same rule `sprint open` holds from its side: an id names one thing, and the log
+  // that `history` reads is keyed by id alone.
+  if (view.value.sprintById.has(id)) {
+    return errorResult({
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      cause: `${id} is a sprint here, and an id names one thing: an item cannot share a sprint's id`,
+      fix: [`treadle sprints ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
+    })
+  }
   const draft: Record<string, unknown> = {
     id, type: request.type, state: 'draft', title: request.title, filed_at: now, version: 1,
   }

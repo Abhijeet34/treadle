@@ -53,6 +53,7 @@ With no flag the board is the one open sprint, `scope <id> <state> day n/m` says
 The alternative, the whole workspace by default, shows a team its history mixed with its current work, and `next` already weights membership of an open sprint for the same reason.
 
 `--sprint <id>` is the backlog's own filter, so a closed sprint's board is what still points at it and `sprints <id>` carries what moved on; the two are the same set until the carry-over is committed onward, which is what ADR-0016 asks a team to do.
+An id that names no sprint record and that no item's `sprint_id` carries is not a scope with a history to show, so it is `NOT_FOUND` `I5`, the same refusal `sprints <id>` gives, with the near ids beside it, rather than five empty columns; `noSprint` in `sprints.ts` is exported for this and reused rather than answered twice.
 `--all` is the whole workspace even while a sprint runs.
 `--all` with `--sprint` is refused with `C1` because the two ask different questions.
 Two open sprints are refused with `C1` too, naming both and `--all` as the ways out: a tool that picked one would be guessing which team the caller is on.

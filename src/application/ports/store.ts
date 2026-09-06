@@ -98,6 +98,18 @@ export type ItemWrite = {
   readonly ifVersion?: number
 }
 
+/**
+ * One record a write's decision read without changing. A guard that walks other records,
+ * such as the relation cycle check, names every record it read and the version it read it
+ * at; the store refuses the write with `S10` if any of them moved, so two writes that each
+ * passed the guard against the other's absence cannot both land. The written record itself
+ * is covered by its own `ifVersion` and need not be named again.
+ */
+export type ItemRead = {
+  readonly id: ItemId
+  readonly version: number
+}
+
 /** One sprint write, under the same compare-and-set rule as an item's. */
 export type SprintWrite = {
   readonly sprint: Sprint
@@ -109,6 +121,8 @@ export type StoreTransaction = {
   readonly writes: readonly ItemWrite[]
   /** Sprint records, which live in one file beside the shards and land in the same journal. */
   readonly sprints?: readonly SprintWrite[]
+  /** Records the decision depended on, refused as `S10` if one moved; see `ItemRead`. */
+  readonly reads?: readonly ItemRead[]
   readonly events: readonly StoreEvent[]
 }
 

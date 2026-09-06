@@ -6,6 +6,8 @@
 // out of it printed, two open sprints refused, and a cap per column with the total beside it.
 
 import assert from 'node:assert/strict'
+import { readFile, writeFile } from 'node:fs/promises'
+import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
 import { displayWidth } from '../../src/adapters/render/width.ts'
@@ -184,6 +186,28 @@ describe('the board at the command surface', () => {
     const human = await cli(['board', '--out', 'human'])
     assert.match(human.out, /^  scope  sprint-31 open day -?\d+\/12$/m)
     assert.match(human.out, /^  whole  treadle board --all$/m)
+  })
+
+  it('refuses a --sprint that is no record and that nothing points at, with the near ids, and still serves one a record points at', async () => {
+    const typo = await cli(['board', '--sprint', 'sprint-13', '--out', 'agent'])
+    assert.equal(typo.code, 5, typo.out)
+    assert.match(typo.err, /^rule I5$/m)
+    assert.match(typo.err, /^near sprint-31$/m)
+
+    // A value no sprint record carries but some item still does is doctor's H26, and the
+    // board over it is the way to see where that work sits.
+    const shard = path.join(demo.root, 'items', '2026-09.md')
+    const before = await readFile(shard, 'utf8')
+    assert.ok(before.includes('sprint_id: sprint-31'), 'the fixture committed an item in this shard')
+    await writeFile(shard, before.replace('sprint_id: sprint-31', 'sprint_id: sprint-old'), 'utf8')
+    try {
+      const leftover = await cli(['board', '--sprint', 'sprint-old', '--out', 'agent'])
+      assert.equal(leftover.code, 0, leftover.err)
+      assert.match(leftover.out, /^scope sprint-old$/m)
+      assert.equal(blocks(leftover.out).reduce((sum, [, , total]) => sum + (total as number), 0), 1)
+    } finally {
+      await writeFile(shard, before, 'utf8')
+    }
   })
 
   it('refuses to choose between two open sprints, naming each and the whole workspace as the ways out', async () => {

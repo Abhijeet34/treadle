@@ -162,6 +162,17 @@ describe('the guards and the ranking that read blockers', () => {
     assert.equal(line(why, 'clause'), 'clause blocked by webhook-retry')
   })
 
+  it('says so when the blocker is already terminal, because that edge blocks nothing', async () => {
+    const inert = await cli(['relation', 'add', 'legacy-oauth', 'blocks', 'docs-quickstart'])
+    assert.equal(inert.code, 0, inert.err)
+    assert.equal(line(inert, 'note'), 'note legacy-oauth is cancelled, so this edge blocks nothing while it stays cancelled')
+    const target = await cli(['explain', 'docs-quickstart'])
+    assert.equal(line(target, 'blocked'), 'blocked no')
+    const live = await cli(['relation', 'add', 'metrics-p95', 'blocks', 'docs-quickstart'])
+    assert.equal(live.code, 0, live.err)
+    assert.equal(line(live, 'note'), undefined, 'an active blocker earns no note')
+  })
+
   it('G7 refuses cancelling a blocker while something waits on it, and a cancelled blocker frees the item', async () => {
     const refused = await cli(['transition', 'webhook-retry', 'cancelled', '--resolution', 'wont_do', '--reason', 'dropped'])
     assert.equal(refused.code, 3)

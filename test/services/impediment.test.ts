@@ -38,6 +38,13 @@ describe('raising an impediment', () => {
     assert.match(unweighed.err, /needs severity at creation/)
   })
 
+  it('is refused with a proposed resolution made of whitespace, which names nothing', async () => {
+    const blank = await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', 'severity=S1', '--set', 'proposed_resolution=   '])
+    assert.equal(blank.code, 2, blank.out)
+    assert.equal(line(blank, 'rule'), 'rule V4')
+    assert.match(blank.err, /^"cause proposed_resolution is only whitespace/m)
+  })
+
   it('files with both, echoing them, and the file event carries the severity', async () => {
     const raised = await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', 'severity=S1', '--set', `proposed_resolution=${RESOLUTION}`])
     assert.equal(raised.code, 0, raised.err)
