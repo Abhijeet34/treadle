@@ -8,14 +8,46 @@ bench:gate` measures it and fails on a regression.
 ```text
 npm run bench                       # every scale in bench.config.json, writes bench/results/
 npm run bench -- --scales 100,1000  # a fast pass while iterating
-npm run bench -- --reuse-corpus     # skip generation; only valid if no earlier run mutated it
+npm run bench -- --rebuild-corpus   # generate privately, ignoring the shared cache
 npm run bench -- --write-budgets    # re-derive bench/budgets.json from this run
 npm run bench:gate                  # exit 1 on a regression past the stated tolerance
 ```
 
 Parameters that decide what a figure means live in `bench.config.json`, not in a flag list:
 the seed, the scales, the sample count per scale, the parallel-writer counts and the size of
-the malformed-input corpus. `TREADLE_BENCH_DIR` overrides where corpora are written.
+the malformed-input corpus. `TREADLE_BENCH_DIR` overrides the base the rig works under.
+
+## Two runs at once
+
+Every axis mutates the corpus it measures: A1 writes records through parallel processes, A5
+edits shard lines, A4 deletes the index. Two runs sharing one corpus root therefore do not
+collide loudly. They agree on numbers taken from a store neither of them was ever in, and
+`docs/BENCHMARKS.md` publishes those as measured fact.
+
+So a run never measures a corpus another run can reach. Under the base directory:
+
+| Path | What it is |
+|---|---|
+| `cache/ws-<items>-<fingerprint>` | a corpus nothing writes to after it is published |
+| `run-<runId>-<pid>/ws-<items>` | this run's own copy, and the only thing it measures |
+
+The fingerprint is a hash of the corpus spec together with the source of `bench/corpus.ts`
+and `src/adapters/store/`, which is everything that decides the bytes. A corpus written by an
+older generator cannot be found at the path a newer run looks up, so reuse needs no staleness
+check. An entry is generated under a private staging name and moved into place with one
+`rename`, so a process killed mid-generation leaves staging litter rather than a short corpus
+at a path a reader trusts, and two runs racing for the same entry resolve without a lock:
+whoever renames first owns it and the loser discards its own work.
+
+Generation stays paid once. The per-run copy is `fs.cp` with `COPYFILE_FICLONE`, which is a
+copy-on-write clone on APFS, btrfs and xfs and a byte copy elsewhere; `cloneMs` in
+`bench/results/bench.json` reports what it actually cost, next to the `generatedMs` it
+replaced. The run removes its own directory when it finishes and leaves the cache behind.
+
+One check survives all of that, because none of the above covers a generation that completed
+short. The readback every corpus already performs now compares the store's item count against
+the spec and stops the run when they differ. Comparing two numbers the run has in hand is
+free, and it turns the dangerous failure into the safe one.
 
 ## What it measures, and what it cannot
 
