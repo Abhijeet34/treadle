@@ -27,6 +27,7 @@ import { history } from '../../src/application/services/history.ts'
 import { fileItem } from '../../src/application/services/items.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import { addEvidence, markItem } from '../../src/application/services/marking.ts'
+import { relate } from '../../src/application/services/relation.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 
@@ -79,6 +80,13 @@ async function aLogCarryingEveryOp(): Promise<Rig> {
   must(await addEvidence(apply, clock, ids, {
     id: ID, kind: 'run', ref: '8813', label: '664 pass', actor: ACTOR,
   }), 'evidence')
+  must(await fileItem(apply, clock, ids, {
+    type: 'task', title: 'Reconcile the ledger', id: 'reconcile-ledger', fields: {}, actor: ACTOR,
+  }), 'file the other end')
+  for (const verb of ['add', 'remove'] as const) {
+    must(await relate(apply, clock, ids, { verb, id: ID, kind: 'blocks', other: 'reconcile-ledger', actor: ACTOR }), `relation ${verb}`)
+  }
+  must(await relate(apply, clock, ids, { verb: 'add', id: ID, kind: 'relates-to', other: 'reconcile-ledger', actor: ACTOR }), 'relation add')
   for (const target of ['ready', 'in_progress', 'in_review'] as const) {
     must(await transition(apply, clock, ids, { id: ID, target, reason: 'fixture', actor: ACTOR }), target)
   }
@@ -109,7 +117,9 @@ describe('the what column of history has one convention', () => {
   after(async () => { await rig.dispose() })
 
   it('covers every op this build writes, so the rule is not asserted over one shape', () => {
-    assert.deepEqual([...new Set(ops)].sort(), ['item.evidence.add', 'item.file', 'item.mark', 'item.set', 'item.transition'])
+    assert.deepEqual([...new Set(ops)].sort(), [
+      'item.evidence.add', 'item.file', 'item.mark', 'item.relation.add', 'item.relation.remove', 'item.set', 'item.transition',
+    ])
   })
 
   it('writes every part as name=value or name=from->to, and never a bare name', (t) => {
@@ -137,6 +147,12 @@ describe('the what column of history has one convention', () => {
 
   it('names the kind an evidence pointer carries, and its ref where the ref fits a cell', () => {
     assert.equal(cells[ops.indexOf('item.evidence.add')], 'evidence=run:8813')
+  })
+
+  it('names the kind and the other end of a relation, whether it was added or removed', () => {
+    // Newest first: the symmetric add, the remove, then the first add.
+    const relations = ops.flatMap((op, at) => (op.startsWith('item.relation.') ? [cells[at]] : []))
+    assert.deepEqual(relations, ['relation=relates_to:reconcile-ledger', 'relation=blocks:reconcile-ledger', 'relation=blocks:reconcile-ledger'])
   })
 
   it('keeps the shapes that already read correctly', () => {

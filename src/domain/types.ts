@@ -52,6 +52,15 @@ export const RELATION_KINDS = [
 ] as const
 export type RelationKind = (typeof RELATION_KINDS)[number]
 
+/**
+ * One edge as a record stores it: the kind and the other end, on the source item alone.
+ * The inverse is derived on read and never written, so one truth has one place.
+ */
+export type StoredRelation = {
+  readonly kind: RelationKind
+  readonly target: ItemId
+}
+
 export const BUG_SEVERITIES = ['S1', 'S2', 'S3', 'S4'] as const
 export type BugSeverity = (typeof BUG_SEVERITIES)[number]
 
@@ -96,6 +105,8 @@ export type AcceptanceCriterion = {
 export const SUMMARY_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'priority', 'points', 'parent_id', 'assignee', 'sprint_id', 'resolution', 'due', 'severity',
+  // The relation graph is read off every item on every read, so the edges are a scan field.
+  'relations',
 ] as const
 
 export type WorkItemSummary = Pick<WorkItem, (typeof SUMMARY_FIELDS)[number]>
@@ -128,6 +139,8 @@ export type WorkItem = {
   readonly sprint_id?: string
   /** Bounded pointers at artefacts a third party can open, appended and never edited. */
   readonly evidence?: readonly EvidencePointer[]
+  /** Typed edges to other items, stored on this record only; relations.ts derives the rest. */
+  readonly relations?: readonly StoredRelation[]
 
   /** An optional date the work is wanted by. `overdue` is derived from it; see dates.ts. */
   readonly due?: Instant

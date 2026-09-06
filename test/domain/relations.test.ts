@@ -6,7 +6,9 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
+  LINKABLE_KINDS,
   MAX_RELATION_DEPTH,
+  MAX_RELATION_ENTRIES,
   RELATION_KINDS,
   addRelation,
   blockersOf,
@@ -14,11 +16,14 @@ import {
   findRelationCycle,
   inverseOf,
   isBlocked,
+  linkableKindOf,
+  relationGraphFrom,
   relationsOf,
   removeRelation,
+  validateWorkItem,
 } from '../../src/domain/index.ts'
 import type { RelationGraph, RelationKind, WorkItemState } from '../../src/domain/index.ts'
-import { errorOf, unwrap } from '../helpers/fixtures.ts'
+import { NOW, errorOf, item, unwrap } from '../helpers/fixtures.ts'
 
 function graphOf(...edges: readonly (readonly [string, RelationKind, string])[]): RelationGraph {
   return edges.reduce(
@@ -89,13 +94,89 @@ describe('writing a relation', () => {
   })
 })
 
+describe('the kinds a caller may write', () => {
+  it('is the three the capability contract names, out of the six the file format reads', () => {
+    assert.deepEqual([...LINKABLE_KINDS], ['blocks', 'duplicates', 'relates_to'])
+  })
+
+  it('takes the contract spelling and the closed-set spelling of the symmetric kind as one kind', () => {
+    assert.equal(linkableKindOf('relates-to'), 'relates_to')
+    assert.equal(linkableKindOf('relates_to'), 'relates_to')
+    assert.equal(linkableKindOf('blocks'), 'blocks')
+    assert.equal(linkableKindOf('caused_by'), undefined)
+    assert.equal(linkableKindOf('blocked_by'), undefined)
+  })
+})
+
+describe('a duplicate has one original', () => {
+  it('refuses a second duplicates edge out of one item, naming the first original', () => {
+    const graph = graphOf(['copy-1', 'duplicates', 'orig-1'])
+    const error = errorOf(addRelation(graph, { kind: 'duplicates', source: 'copy-1', target: 'orig-2' }))
+    assert.equal(error.code, 'GUARD_REFUSED')
+    assert.equal(error.rule, 'R4')
+    assert.ok(error.message.includes('orig-1'), error.message)
+    assert.deepEqual(error.entities, ['copy-1', 'orig-1'])
+  })
+
+  it('lets one original have many copies', () => {
+    const graph = graphOf(['copy-1', 'duplicates', 'orig-1'])
+    unwrap(addRelation(graph, { kind: 'duplicates', source: 'copy-2', target: 'orig-1' }))
+  })
+})
+
+describe('the graph a set of records carries', () => {
+  it('reads a stored edge off its source record and nothing off the target', () => {
+    const graph = relationGraphFrom([
+      item('task', { id: 'a-1', relations: [{ kind: 'blocks', target: 'b-1' }] }),
+      item('task', { id: 'b-1' }),
+    ])
+    assert.deepEqual(graph.relations, [{ kind: 'blocks', source: 'a-1', target: 'b-1' }])
+  })
+
+  it('reads a symmetric edge a file spells from the higher id as the one edge', () => {
+    const graph = relationGraphFrom([
+      item('task', { id: 'b-1', relations: [{ kind: 'relates_to', target: 'a-1' }] }),
+      item('task', { id: 'a-1', relations: [{ kind: 'relates_to', target: 'b-1' }] }),
+    ])
+    assert.deepEqual(graph.relations, [{ kind: 'relates_to', source: 'a-1', target: 'b-1' }])
+  })
+
+  it('refuses nothing, because it is the load path: a stored cycle is the load-time finder\'s', () => {
+    const graph = relationGraphFrom([
+      item('task', { id: 'a-1', relations: [{ kind: 'blocks', target: 'b-1' }] }),
+      item('task', { id: 'b-1', relations: [{ kind: 'blocks', target: 'a-1' }] }),
+    ])
+    assert.equal(graph.relations.length, 2)
+    assert.ok(findRelationCycle(graph, 'blocks') !== undefined)
+  })
+})
+
+describe('the stored field\'s own validation', () => {
+  it('refuses a self edge and a repeated edge on one record, which need no other record to see', () => {
+    assert.equal(
+      errorOf(validateWorkItem(item('task', { id: 'a-1', relations: [{ kind: 'blocks', target: 'a-1' }] }), { now: NOW })).rule,
+      'V4',
+    )
+    const twice = [{ kind: 'blocks' as const, target: 'b-1' }, { kind: 'blocks' as const, target: 'b-1' }]
+    assert.equal(errorOf(validateWorkItem(item('task', { id: 'a-1', relations: twice }), { now: NOW })).rule, 'V4')
+  })
+
+  it('bounds the list, naming the limit', () => {
+    const relations = Array.from({ length: MAX_RELATION_ENTRIES + 1 }, (_, i) => ({ kind: 'blocks' as const, target: `t-${String(i).padStart(3, '0')}` }))
+    const error = errorOf(validateWorkItem(item('task', { id: 'a-1', relations }), { now: NOW }))
+    assert.equal(error.rule, 'V4')
+    assert.ok(error.message.includes(String(MAX_RELATION_ENTRIES)), error.message)
+    unwrap(validateWorkItem(item('task', { id: 'a-1', relations: relations.slice(1) }), { now: NOW }))
+  })
+})
+
 describe('cycle detection on write', () => {
-  it('refuses a two-item blocking cycle and names the path', () => {
+  it('refuses a two-item blocking cycle and names the path from the edge being written', () => {
     const graph = graphOf(['a-1', 'blocks', 'b-1'])
     const error = errorOf(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'a-1' }))
     assert.equal(error.code, 'GUARD_REFUSED')
     assert.equal(error.rule, 'R2')
-    assert.ok(error.message.includes('a-1') && error.message.includes('b-1'), error.message)
+    assert.ok(error.message.endsWith('through b-1 -> a-1 -> b-1'), error.message)
   })
 
   it('refuses a longer blocking cycle', () => {
@@ -167,6 +248,11 @@ describe('the derived blocked flag', () => {
     })
     assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), ['auth-refresh'])
     assert.equal(isBlocked(graph, stateOf, 'sso-saml'), true)
+  })
+
+  it('treats a blocker the caller cannot find as inactive, so a record removed by hand holds nothing forever', () => {
+    const stateOf = states({ 'legacy-oauth': 'ready', 'sso-saml': 'ready' })
+    assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), ['legacy-oauth'])
   })
 
   it('treats a cancelled blocker as inactive', () => {

@@ -17,6 +17,7 @@ import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
 import { history } from '../../src/application/services/history.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
+import { relate } from '../../src/application/services/relation.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -172,6 +173,13 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('set', await setFields(targetFor(demo.store, 'apply'), clock, ids, {
       id: 'health-endpoint', assignments: ['assignee=kim', 'component=platform'], actor: ACTOR,
     }))
+    // Taken last, between two draft items, so neither `next` nor any figure above moves: the
+    // `explain` over the blocked end is the line that was `blocked no` on every item before.
+    golden.set('relation', await relate(targetFor(demo.store, 'apply'), clock, ids, {
+      verb: 'add', id: 'queue-drain', kind: 'blocks', other: 'theme-dark', actor: ACTOR,
+    }))
+    golden.set('explain-blocked', await explain(demo.store, 'theme-dark'))
+    golden.set('show-relations', await showItem(demo.store, clock, 'queue-drain'))
     return golden
   } finally {
     await demo.dispose()

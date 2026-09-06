@@ -18,6 +18,7 @@ import {
   findParentCycle,
   type BugSeverity,
   type Resolution,
+  type StoredRelation,
   type WorkItem,
   type WorkItemState,
   type WorkItemSummary,
@@ -866,6 +867,7 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
     resolution: item.resolution ?? null,
     due: item.due ?? null,
     severity: item.severity ?? null,
+    relations: item.relations === undefined ? null : JSON.stringify(item.relations),
     source,
   }
 }
@@ -890,6 +892,7 @@ export function summaryOf(row: SummaryRow, intern: (value: string) => string = (
     ...(row.resolution === null ? {} : { resolution: intern(row.resolution) as Resolution }),
     ...(row.due === null ? {} : { due: row.due }),
     ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),
+    ...(row.relations === null ? {} : { relations: JSON.parse(row.relations) as readonly StoredRelation[] }),
   }
 }
 

@@ -11,11 +11,13 @@ import {
   DEFAULT_POINT_SCALE,
   EVIDENCE_KINDS,
   FOUND_IN_STAGES,
+  RELATION_KINDS,
   RESOLUTIONS,
   WORK_ITEM_STATES,
   WORK_ITEM_TYPES,
   type EvidencePointer,
   type Instant,
+  type StoredRelation,
   type WorkItem,
   type WorkItemType,
 } from './types.ts'
@@ -33,12 +35,17 @@ export const MAX_REASON = 500
 export const MAX_EVIDENCE_ENTRIES = 20
 export const MAX_EVIDENCE_REF = 200
 export const MAX_EVIDENCE_LABEL = 120
+/**
+ * Edges stored on one record. `blocks` sits on the blocker, so this is how many items one
+ * item may hold up; an item past it is a workstream rather than an item.
+ */
+export const MAX_RELATION_ENTRIES = 50
 
 export const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'description', 'priority', 'points', 'hours_estimate', 'parent_id',
   'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due', 'evidence',
-  'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
+  'relations', 'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
 ] as const
 
 const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
@@ -136,6 +143,7 @@ const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
   severity: { kind: 'command', usage: 'treadle mark <id> --severity <S1-S4> --reason "<why>"' },
   priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
   evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
+  relations: { kind: 'command', usage: 'treadle relation add <id> <kind> <other>' },
   resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
   hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
   hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant>' },
@@ -322,6 +330,32 @@ const CHECKS: Readonly<Record<string, Check>> = {
     return undefined
   },
 
+  // The two checks a record can fail on its own: a self edge and a repeated edge. Whether
+  // the other end exists, and whether `blocks` closes a cycle, need the whole workspace and
+  // are `relation add`'s refusals on write and `doctor`'s findings on load.
+  relations: (value, item) => {
+    if (!Array.isArray(value)) return 'relations must be a list of kind and target pairs'
+    const entries = value as readonly unknown[]
+    if (entries.length > MAX_RELATION_ENTRIES) {
+      return `relations carries ${entries.length} entries and the limit is ${MAX_RELATION_ENTRIES}`
+    }
+    const seen = new Set<string>()
+    for (const entry of entries) {
+      if (typeof entry !== 'object' || entry === null) return 'each relation is a kind and a target'
+      const relation = entry as Partial<StoredRelation>
+      if (typeof relation.kind !== 'string' || !(RELATION_KINDS as readonly string[]).includes(relation.kind)) {
+        return `a relation kind must be one of ${RELATION_KINDS.join(', ')}`
+      }
+      if (typeof relation.target !== 'string' || !SLUG.test(relation.target)) {
+        return 'a relation target must be a slug of 3 to 64 lowercase letters, digits and hyphens'
+      }
+      if (relation.target === item.id) return `${item.id} cannot ${relation.kind} itself`
+      const edge = `${relation.kind} ${relation.target}`
+      if (seen.has(edge)) return `the relation ${edge} is stored twice on ${item.id}`
+      seen.add(edge)
+    }
+    return undefined
+  },
   hold_reason: line('hold_reason', MAX_REASON),
   hold_until: (value, _item, options) => {
     if (!isInstant(value)) return 'hold_until must be an RFC 3339 instant in UTC'

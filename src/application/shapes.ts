@@ -11,6 +11,7 @@ import { TRANSITION_SHAPE } from './services/lifecycle.ts'
 import { SET_SHAPE } from './services/editing.ts'
 import { EVIDENCE_SHAPE, MARK_SHAPE } from './services/marking.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from './services/insight.ts'
+import { RELATION_SHAPE } from './services/relation.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from './services/meta.ts'
 import { INIT_SHAPE } from './services/workspace.ts'
 
@@ -26,6 +27,7 @@ export const SHAPES: readonly ResultShape[] = [
   INIT_SHAPE,
   MARK_SHAPE,
   NEXT_SHAPE,
+  RELATION_SHAPE,
   SET_SHAPE,
   SHOW_SHAPE,
   STATUS_SHAPE,

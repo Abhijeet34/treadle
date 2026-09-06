@@ -98,6 +98,15 @@ const VALUE_OF_OP: Readonly<Record<string, {
       return ref === UNKNOWN ? kind : `${kind}:${ref}`
     },
   },
+  // An add records the edge in `after` and a remove in `before`; the op column says which.
+  'item.relation.add': { field: 'relation', of: edgeOf },
+  'item.relation.remove': { field: 'relation', of: edgeOf },
+}
+
+function edgeOf(snapshot: Readonly<Record<string, unknown>>): string {
+  const kind = side(snapshot['kind'], 'kind')
+  const other = side(snapshot['other'], 'other')
+  return other === UNKNOWN ? kind : `${kind}:${other}`
 }
 
 /**
@@ -161,7 +170,8 @@ function movedBy(event: StoreEvent): readonly string[] {
   const after = snapshot(event.after)
   const named = VALUE_OF_OP[event.op]
   if (named !== undefined) {
-    return [`${named.field}=${after === undefined ? UNKNOWN : named.of(after)}`]
+    const value = after ?? before
+    return [`${named.field}=${value === undefined ? UNKNOWN : named.of(value)}`]
   }
   const source = after ?? before
   if (source === undefined) return []

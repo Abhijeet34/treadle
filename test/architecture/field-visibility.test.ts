@@ -51,6 +51,7 @@ import { history } from '../../src/application/services/history.ts'
 import { explain } from '../../src/application/services/insight.ts'
 import { fileItem } from '../../src/application/services/items.ts'
 import { addEvidence, markItem } from '../../src/application/services/marking.ts'
+import { relate } from '../../src/application/services/relation.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import { makeEvent, type Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -88,6 +89,7 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   sprint_id: readable('show:sprint'),
   due: readable('show:due'),
   evidence: readable('show:evidence'),
+  relations: readable('show:relations', 'the stored edges under their own kind, and the edges other records store against this one under the inverse kind'),
   hold_reason: readable('show:hold'),
   hold_until: readable('show:hold_until'),
   held_from: readable('show:held_from'),
@@ -203,8 +205,8 @@ type Rig = {
  * The items are filed through the real use cases, so a field that no write path can set is
  * a finding here rather than a fixture the suite writes by hand; `extra` is the exception
  * and is applied to the store directly, because by construction only a newer writer produces
- * one, and the overridden guard is appended for the same reason: all three overridable
- * guards read a relation graph or a board, and neither exists in this build.
+ * one, and the overridden guard is appended so the bug's log carries one without a second
+ * item filed only to block it.
  */
 async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   const parent = await mkdtemp(path.join(tmpdir(), 'treadle-fields-'))
@@ -251,6 +253,10 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
     findings: 'the gateway retries twice already',
   })
   await file('task', 'Rotate the payment signing key', 'every-held', { points: '2' })
+  const linked = await relate(apply, clock, ids, {
+    verb: 'add', id: 'every-held', kind: 'blocks', other: 'every-story', actor: ACTOR,
+  })
+  if (!linked.ok) throw new Error(String(linked.data['cause']))
   await move('every-held', 'ready')
   await move('every-held', 'on_hold', { until: '2026-10-15T09:00:00Z' })
   await file('chore', 'Remove OAuth 1 support', 'every-stopped', {})

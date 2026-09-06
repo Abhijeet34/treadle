@@ -15,6 +15,7 @@ import { HISTORY_SHAPE } from '../application/services/history.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from '../application/services/insight.ts'
 import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
+import { RELATION_SHAPE } from '../application/services/relation.ts'
 import { TRANSITION_SHAPE } from '../application/services/lifecycle.ts'
 import { INIT_SHAPE } from '../application/services/workspace.ts'
 
@@ -139,6 +140,20 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle evidence add checkout-500 run 8813 "664 pass"', 'point at a run; the essay goes in the artefact, not here'],
       ['treadle evidence add checkout-500 pr https://example.test/pr/42', 'a pointer needs no label'],
+    ],
+  },
+  {
+    name: 'relation', shape: RELATION_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: [
+      'treadle relation add <id> <blocks|duplicates|relates-to> <other>',
+      'treadle relation remove <id> <kind> <other>',
+    ],
+    examples: [
+      ['treadle relation add auth-refresh blocks sso-saml', 'sso-saml cannot start until auth-refresh is done; explain shows both sides'],
+      ['treadle relation add login-cta-2 duplicates login-cta', 'the first id is the copy; a copy of two things is refused'],
+      ['treadle relation add audit-log relates-to gdpr-export', 'see also, with no rule attached, so blocks stops being used for it'],
     ],
   },
   {
