@@ -41,6 +41,11 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
 
+A record is never rewritten when a later one overtakes part of it, because the argument it made is the thing worth reading and a rewritten record is a record of nothing.
+What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands.
+ADR-0002, ADR-0003, ADR-0004 and ADR-0006 carry that line today, each having reasoned from the absence of an entity, a command or a layer that has since been built, and ADR-0005's own hook-code bullet was the first to be marked this way.
+A record with no such line has not been overtaken, which is the claim the line exists to make checkable.
+
 ## The store's rule ids
 
 A store error names a rule so a caller looks it up instead of parsing the sentence, the same contract the domain core uses in [../../DOMAIN.md](../../DOMAIN.md).

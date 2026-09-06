@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** the store half of DR6 of the system design record
+**Overtaken in part by:** [ADR-0016](0016-sprints.md) and [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) gave two of the three absent entities their types, and the doctor this record deferred is built
 
 ## Context
 
@@ -84,8 +85,8 @@ Nothing on the write path loses a section, because every real write goes through
 
 ## Departures from the design record
 
-- **The store serves work items and events, not every entity DR6 implies.** Sprints, impediments and ceremonies have no domain types yet. The one grammar and the one layout already cover them; a store method for them today would be an abstraction with no caller.
-- **`findings()` is on the interface.** DR6 does not name it. D1 obligation 3 requires load-time validation to report every violation with the record and the rule, and the doctor that will consume it is a later task, so the seam has to carry the findings out today or they are computed and dropped.
+- **The store serves work items and events, not every entity DR6 implies.** Sprints, impediments and ceremonies had no domain types when this was written. The one grammar and the one layout already cover them; a store method for them then would have been an abstraction with no caller. Two of the three have since arrived and the seam took them as this record expected: ADR-0016 gives the interface the sprint records, read whole and written under the same transaction, and ADR-0017 makes an impediment a work item the store already served. Ceremonies remain absent.
+- **`findings()` is on the interface.** DR6 does not name it. D1 obligation 3 requires load-time validation to report every violation with the record and the rule, and the doctor that would consume it was a later task, so the seam had to carry the findings out or they were computed and dropped. That consumer exists now: `doctor` reads them, and ADR-0020 records what a finding is allowed to decide.
 - **The overlay's base in the conformance suite is an empty sharded store, not "an empty in-memory store".** DR6 names the latter. There is no in-memory store, and inventing one to be a base would be the test-only implementation the rule forbids.
 
 ## What would reopen this

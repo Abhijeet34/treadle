@@ -184,10 +184,13 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. The five ids are in
-`docs/architecture/adr/README.md`, and ADR-0011 argues `H18` to `H21` while `H23` came with
-the event-log integrity work; `status`'s `findings` count stays
-what it always was, the store's own load-time findings.
+same audit for one item off the events it already reads. `doctor` raises nine of them and
+the whole `H` table, with the layer that raises each, is in
+`docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
+event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016 and
+`H27` with ADR-0017. `test/architecture/documented-numbers.test.ts` holds that table to what
+`doctor` actually raises. `status`'s `findings` count stays what it always was, the store's
+own load-time findings.
 
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
 table because two readers need it: `set` refuses a field another command owns, and a gate
@@ -247,7 +250,7 @@ Before hand-checking any of these, run the suite: it already checks them.
   per deliberate removal. `.github/rulesets/main.json` requires the `tests kept` context by
   name beside `checks`, because a branch that deleted the job from `ci.yml` would leave
   `checks` green with the guard gone, so renaming that job means editing the ruleset in the
-  same change. ADR-0014 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
+  same change. ADR-0013 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
   resolution or a revert is what a change needs, do not resolve a conflict by taking one side
   whole: that is the move this rule exists to catch.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs

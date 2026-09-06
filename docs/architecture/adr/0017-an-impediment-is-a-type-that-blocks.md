@@ -101,6 +101,8 @@ That is error prose and a fix list, which `docs/STABILITY.md` names as not break
 
 `absent_features` is `board`.
 
+The key itself is gone: [ADR-0018](0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
+
 ## Alternatives considered
 
 ### A `blocked` state, or a state machine of its own

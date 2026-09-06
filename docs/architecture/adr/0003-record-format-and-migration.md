@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** DR3 of the system design record, under decision D1
+**Overtaken in part by:** `migrate` is still unbuilt, so the `SCHEMA_OLDER` refusal names no rewrite; `doctor` is built, so the bullet that deferred a finding to it is a record of the state it was decided from
 
 ## Context
 
@@ -73,11 +74,11 @@ A line that matches neither form is not something a newer tool writes; it is cor
 
 - Every file's first line is `schema: <n>`, and the tool has one compiled-in number.
 - A file with a higher number is refused on read as `SCHEMA_NEWER` (`S8`) naming the file and both numbers, and every other file keeps serving. A merge that brought in one newer file disables one month, not the store.
-- A file with a lower number is readable, and a write to it is refused as `SCHEMA_OLDER` (`S9`) with `migrate` named in the message, because writing it would rewrite the whole file as a side effect of a one-record change.
+- A file with a lower number is readable, and a write to it is refused as `SCHEMA_OLDER` (`S9`), because writing it would rewrite the whole file as a side effect of a one-record change. The message says that no command here rewrites the file yet, which is the true statement while `migrate` is unbuilt; naming an unbuilt command would print a fix line that does not run, which `test/cli/runnable-lines.test.ts` refuses.
 - Adding an optional field or a section name does not bump the number. Unknown-line preservation covers that in both directions.
 - Rules 1 and 7 did not bump the number either, and the reason is worth stating because a grammar change normally would. Neither rule changes how any file this tool wrote parses: the write path has never produced a duplicated id, a duplicated section name or a heading outside `# <slug>: <title>`. What they change is the reading of a file a hand edit damaged, which had no defined meaning before and now has a quarantine. Bumping the number would make every existing workspace read-only behind a `migrate` command that is not built, to no reader's benefit.
 
-`migrate` itself is not built on this branch; the refusal that makes it necessary is, and it names the command.
+`migrate` itself is not built, on this branch or since; the refusal that makes it necessary is. It does not name the command, because a printed line names something a reader can run: the refusal says no command rewrites the file yet, and `docs/STABILITY.md` and the README's Status table are where the gap is recorded.
 
 ## Alternatives considered
 
@@ -135,7 +136,7 @@ Rather than hope no merge is ever written, every object rebuilt from a line has 
 ## Departures from the design record
 
 - **The safe-text class replaces DR3 rule 7's list.** Stated above; it is the F5 fix, and it is wider than the fix the audit proposed because `Cf` covers the tag block the audit did not reach.
-- **An unrecognised task-list marker is a named record refusal, not a doctor finding.** DR3 puts it in the doctor, which does not exist yet. Refusing by name keeps the "zero silent drops" property today, and the doctor can downgrade it to a finding when it lands.
+- **An unrecognised task-list marker is a named record refusal, not a doctor finding.** DR3 puts it in the doctor, which did not exist when this was written. Refusing by name keeps the "zero silent drops" property, and the doctor that has since landed did not downgrade it: a marker the grammar does not know is still `S1` at its line, and downgrading it now would be a new silent read of a record a person wrote by hand.
 - **A malformed line inside a record is quarantined rather than preserved.** DR3 says unknown lines are preserved, which is right for the two forms a newer tool actually writes and wrong for a line that matches nothing in the grammar. Both forms are still preserved; the third is reported.
 - **The record grammar is about 260 lines, not the 150 DR3 estimated.** The difference is the ceilings, the safe-text checks and the quarantine paths, none of which the estimate included.
 - **Rule 1 resynchronises on a damaged heading, and rule 7 exists at all.** Both are corrections to this record, not to the design.
