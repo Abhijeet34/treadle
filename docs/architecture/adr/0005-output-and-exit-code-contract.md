@@ -135,7 +135,7 @@ A mode and a store passed separately can disagree, and a `dry-run` whose store i
 ## Consequences
 
 - A command that produces a record it does not declare in its shape emits nothing for it. The shape is the contract, and forgetting to declare a property is a silent omission rather than a crash. The schema test catches a shape that no command fills; nothing catches a command that fills nothing, which is what the golden objects are for.
-- The human rendering is a generic projection with column alignment, the global width rule and the group rule below, not the bespoke layouts of interface section B. Board and chart rendering are a later task and carry their own layouts.
+- The human rendering is a generic projection with column alignment, the global width rule and the group rule below, not the bespoke layouts of interface section B. Board and chart rendering are a later task and carry their own layouts. The `board` command landed in ADR-0018 and did not change that: it renders through the same generic projection, one block per state rather than side-by-side columns, and the bespoke layouts are still the `human-layouts` story in `.work`.
 - No colour is emitted at all. Which state gets which of the eight ANSI colours is a decision the interface deliberately left open, and the property that makes deferring it safe is that colour never carries meaning of its own.
 - Byte budgets are enforced in CI and token budgets are not: a tokenizer is a package, and this repository has zero runtime dependencies. The token figures are measured outside the tree and reported with the change.
 

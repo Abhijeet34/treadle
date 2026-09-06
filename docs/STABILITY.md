@@ -11,7 +11,7 @@ So the promise here is narrower than 1.0 and larger than nothing.
 
 - **A breaking change bumps the minor version** while the major is 0. `0.4.0` may break what `0.3.0` did; `0.3.1` may not break `0.3.0`.
 - **Every breaking change is named in the release notes**, with what broke, why, and what to do instead. A release that breaks something silently is a bug in the release.
-- **The file format is exempt from the "may break" clause.** A workspace written by any released version is readable by every later version, through the migration chain. Reading always works. See [The file format](#the-file-format).
+- **The file format is exempt from the "may break" clause.** A workspace written by any released version is readable by every later version. Reading always works. See [The file format](#the-file-format).
 - **1.0 is the version at which the four contracts below stop moving without a major bump.** It ships when they have survived real use, not on a date.
 
 ## What counts as a breaking change
@@ -75,11 +75,11 @@ Every workspace file carries a `schema: <n>` first line.
 
 Breaking, and therefore never done:
 
-- Any change that makes a file written by a released version unreadable by a later one. Reading is always possible, through the migration chain the tool carries.
+- Any change that makes a file written by a released version unreadable by a later one. Reading is always possible. There is one compiled-in schema number today and no migration has been needed, so the chain a later bump would need does not exist yet.
 
 Breaking, and allowed with a minor bump plus release notes:
 
-- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is read through the migration chain, and a mutation to it is refused with a fix line naming the `migrate` command, because writing it would rewrite the whole file as a side effect of a one-record change.
+- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is still read as it stands, and a mutation to it is refused as `SCHEMA_OLDER` (`S9`) at exit `6`, because writing it would rewrite the whole file as a side effect of a one-record change. The command that would rewrite it is `migrate`, which the README's Status table records as specified and not implemented, so the refusal names no rewrite: it says that no command here rewrites the file yet, and its fix line is `treadle version`. A fix line naming a command the tool does not carry would not run as printed, which `test/cli/runnable-lines.test.ts` refuses.
 
 Not breaking:
 

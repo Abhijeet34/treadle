@@ -18,7 +18,7 @@ The `.nvmrc` names the version.
 git clone https://github.com/Abhijeet34/treadle.git
 cd treadle
 npm ci
-npm run check   # tsc --noEmit under strict, then the tests
+npm run check   # tsc --noEmit under strict, then the tests, then the bundle
 ```
 
 There is no build step for development.

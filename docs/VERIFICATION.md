@@ -23,7 +23,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A hand edit during an operation is handled | 12 trials: 6 broken records quarantined and reported as findings with the record either side still serving, 6 concurrent edits leaving a shard that still parses, 0 stores left unreadable | Proven |
 | Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
-| No network egress | 10 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
+| No network egress | 19 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.54% lines and 89.81% branches against a 90/85 gate; every one of the 7 named files over its 95/90 bar | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 0 failures, and the same test count in all 20, which is the condition `scripts/flake.ts` fails on if it moves; 50.9 s to 84.5 s each, 1,437 s in total | Proven |
 | One regression test per closed security finding | 12 closed findings, each mapped to a named test that names the finding and carries assertions, 201 assertions passing across the 12 files in one child run; 1 open finding naming the layer it waits on | Proven |
@@ -107,7 +107,7 @@ Writing those tests is what found the crash below.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
 Measured on the branch that added this section: 20 of 20 runs completed, 20 green, 0 failed, a test count that did not move across the 20, and 1,147 s in total.
-The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06.
+The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06 and 1,499 on 2026-09-07.
 That command is the number's only authority, and it is one line to run.
 What the gate asserts is zero failures and a count that does not move within a run set, which is the part a later commit cannot make false.
 Individual runs ranged from 49.8 s to 88.6 s, which is a 1.78x spread on a shared machine and is the reason the fuzzer's time bound is generous rather than tight.
@@ -301,8 +301,9 @@ FAIL  the what column of history has one convention
 check-tests-kept: 772 tests at 3bce1ca4, ... 32 removed without a Removes-test trailer
 ```
 
-772 of this repository's 773 test declarations are read and compared.
-The one that is not is `it(file, ...)` in `test/architecture/license-header.test.ts`, whose title is a variable; the `describe` around it is compared, so deleting the loop is still caught.
+Every test declaration in this repository is read and compared, and the run prints how many it could not read: `0 titles not literal and not compared` on 2026-09-07, at 1,001 declarations against 987 at the merge base.
+A title built from a template literal is compared in a canonical form with each interpolation reduced to `${}`, so the per-file `it` in `test/architecture/license-header.test.ts` is one comparable title rather than an uncompared one; that was the single exception this section used to name, and it is closed.
+The count is the run's own, not this file's, which is the point of printing it.
 
 ### What check-tests-kept does not see
 
@@ -313,8 +314,8 @@ That is the case a manifest of behaviours checked against the built binary would
 **A subtest declared as `t.test(...)` rather than at the start of a line.**
 There are none here, and a file that adds one fails the check with the file named rather than passing over it, because the gate counts the declaration-shaped calls it did not read.
 
-**A test whose title is a variable.**
-One in 773, named above.
+**A test whose title the reader cannot resolve to a literal at all.**
+It is counted and printed rather than skipped, so an uncompared declaration is a number a reader can see rather than a silence. Today that number is 0.
 
 **A branch that is not up to date with main.**
 The comparison is against the merge base, so a test main gained after the fork is not one this branch removed.
@@ -323,7 +324,7 @@ The comparison is against the merge base, so a test main gained after the fork i
 ## Running it
 
 ```bash
-npm run check      # tsc --noEmit under strict, then the whole suite
+npm run check      # tsc --noEmit under strict, the whole suite, then the bundle
 npm run coverage   # the suite under coverage, held to the per-file gate
 npm run flake      # 20 consecutive full runs, budget zero
 npm run flake -- 5 # a shorter local check

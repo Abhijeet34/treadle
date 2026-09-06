@@ -178,6 +178,7 @@ That is not hypothetical: the committed files are authoritative, so a hand edit 
 A chain that already closes a cycle above the chosen parent is refused as `INTEGRITY` with `doctor` as the fix, because the write that made it is not this one.
 
 `rollUp(graph, id)` walks the subtree and returns points, done points, progress, direct child counts and descendant counts.
+It has no caller: no command surfaces a roll-up today, and the README's Status table records that rather than leaving the function to read as a feature.
 Points are summed over every non-cancelled descendant, and a cancelled descendant is excluded together with its own subtree.
 Progress is `null` rather than a division by zero when nothing in the subtree is estimated.
 

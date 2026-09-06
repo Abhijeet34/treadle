@@ -65,7 +65,18 @@ Out of scope:
 ## What is already known
 
 The project's threat model raised thirteen findings against the design before any code existed.
-Two of them land in the code that exists today and are closed, each with a regression test:
-prototype pollution through the record field-key grammar, and unbounded traversal of a hand-edited hierarchy cycle.
-The other eleven land in layers that have not been written yet, and each one names the design location its fix belongs in.
-Reporting one of those is welcome and will be answered with which layer it is waiting on.
+Twelve are closed, each naming a regression test that was shown to fail before it passed, and `test/security/findings.test.ts` is the register that holds a finding to one.
+Three of the twelve closed by having their surface removed rather than guarded, which [docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) argues: the hook contract, the path rule that came with it, and the adapter generator.
+The one that remains open is F4, CSV formula injection, which lands with export and is not built.
+Reporting it is welcome and will be answered with that.
+
+## The supply-chain controls this project holds itself to
+
+- `.npmrc` carries `ignore-scripts=true`, so no dependency's install script runs here.
+- The lockfile is committed, and every workflow installs with `npm ci` rather than `npm install`, so a build resolves to the versions in the tree.
+- Development dependencies are the only dependencies: the published package has none at runtime, and `npm run licences` refuses one whose licence is off the allowlist.
+- Every third-party action in every workflow is pinned to a 40-character commit SHA.
+- The release path exports an SBOM and attests the tarball through GitHub's OIDC identity, with no stored registry token anywhere in this repository.
+
+`test/architecture/supply-chain.test.ts` is what holds those, and [docs/RELEASING.md](docs/RELEASING.md) carries the release path itself.
+No release has fired, so provenance at publish is asserted over the workflow and the preflight script rather than over a publish that happened; [docs/VERIFICATION.md](docs/VERIFICATION.md) says so under what is not proven.

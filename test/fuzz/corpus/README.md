@@ -3,10 +3,10 @@
 Seed inputs for `test/fuzz/fuzz.test.ts`, committed so a run is reproducible and a case
 found once is never lost.
 
-The `.md` files are record documents, one idea each: the minimal file, a CRLF file, a
-quarantine between two served records, prototype-slot field keys, sections with blank
-edges, right-to-left and astral content, a body whose lines look like structure, and a
-record sitting on every declared limit.
+The `.md` files are record documents, one idea each: the minimal file, a header with no
+record under it, a CRLF file, a quarantine between two served records, prototype-slot field
+keys, sections with blank edges, right-to-left and astral content, a body whose lines look
+like structure, and a record sitting on every declared limit.
 `values.json` is the value corpus: 75 strings the escaper has to classify.
 
 Two rules hold for anything added here.

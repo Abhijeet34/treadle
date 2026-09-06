@@ -129,7 +129,7 @@ Every figure is a cold process per sample, seven samples, both trees interleaved
 - The read every command performs did not move: `readWorkspace` at 50,000 items is 166,624 KiB before and 167,376 KiB after at the median, inside the base's own 165,568 to 169,568 spread over seven samples, and `get` is 101,312 against 101,424 KiB. The view holds the sprints whole, and a sprint record is a few lines.
 - At the command surface through the bundle, the figure the read budget is judged on, `treadle show` at 50,000 items is 129,312 KiB before and 128,832 KiB after at the median of seven interleaved cold samples (before 128,368 to 129,712, after 127,904 to 130,224), read the same way from inside the process.
 - `next`'s `spr` weight measures something: a ready item in an open sprint scores `s1`, and one in a closed sprint or in none scores `s0`.
-- `status` no longer lists `sprint` under `absent_features`.
+- `status` no longer lists `sprint` under `absent_features`. ADR-0018 later deleted that key from the `status` shape entirely, so this is a record of a field the tool no longer has.
 
 **Negative**
 

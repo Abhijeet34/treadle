@@ -184,10 +184,13 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. The five ids are in
-`docs/architecture/adr/README.md`, and ADR-0011 argues `H18` to `H21` while `H23` came with
-the event-log integrity work; `status`'s `findings` count stays
-what it always was, the store's own load-time findings.
+same audit for one item off the events it already reads. `doctor` raises nine of them and
+the whole `H` table, with the layer that raises each, is in
+`docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
+event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016 and
+`H27` with ADR-0017. `test/architecture/documented-numbers.test.ts` holds that table to what
+`doctor` actually raises. `status`'s `findings` count stays what it always was, the store's
+own load-time findings.
 
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
 table because two readers need it: `set` refuses a field another command owns, and a gate
@@ -247,7 +250,7 @@ Before hand-checking any of these, run the suite: it already checks them.
   per deliberate removal. `.github/rulesets/main.json` requires the `tests kept` context by
   name beside `checks`, because a branch that deleted the job from `ci.yml` would leave
   `checks` green with the guard gone, so renaming that job means editing the ruleset in the
-  same change. ADR-0014 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
+  same change. ADR-0013 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
   resolution or a revert is what a change needs, do not resolve a conflict by taking one side
   whole: that is the move this rule exists to catch.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
@@ -292,6 +295,16 @@ Before hand-checking any of these, run the suite: it already checks them.
   the tree alone, so it runs under `npm test`, `coverage` and `flake` and fails on the
   developer's machine before a push; `tests kept` is a CI job because its comparison needs
   main's history, which a test of the tree cannot see.
+- A number a document states about this tree is held to the tree by
+  `test/architecture/documented-numbers.test.ts`: the README's command list against the
+  inventory, its type count against `WORK_ITEM_TYPES`, its backlog figures against `.work`,
+  the `H` table in `docs/architecture/adr/README.md` against what `doctor` raises, the Node
+  floor against `engines.node`, and the bundle budget against `bench/budgets.json`. When one
+  of those moves, the fix is the sentence, not the assertion. A measurement does not go in
+  that file: a wall time, a byte count of the tree or a coverage decimal moves on a commit
+  that changed nothing about the claim, and those live in `docs/VERIFICATION.md` with the
+  date and the load they were taken at. A record a later record overtakes is marked with an
+  `**Overtaken in part by:**` line in its own header rather than rewritten.
 - No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
   each golden object twice, once from a `structuredClone` and once after moving the process's
   cwd and environment, and asserts the bytes do not move.
@@ -394,8 +407,8 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 A figure taken at the store seam is not a figure about a command. Every command goes through
 `readWorkspace`, which reads every item's summary fields off the index, indexes them by id,
 builds the hierarchy and reads the sprint records whole (tens of rows, a few lines each,
-measured at no change to the 50,000-item peak), and the six commands that act on one record
-then read that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
+measured at no change to the 50,000-item peak), and a command that acts on one record
+then reads that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
 of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
 a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
 never a read from the record text (ADR-0014). A4 times that read as the `workspace` operation

@@ -94,6 +94,8 @@ Re-running the whole check under the lock was priced and refused: it needs the w
 
 `absent_features` is `sprint board impediment`.
 
+The key itself is gone: [ADR-0018](0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
+
 ## Alternatives considered
 
 ### Storing both directions

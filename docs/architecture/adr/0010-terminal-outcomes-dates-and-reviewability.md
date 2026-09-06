@@ -82,6 +82,8 @@ Recording the failure as a resolution would put the item in `cancelled` and take
 `doctor` is specified and unbuilt, and building it to carry one finding would be a command with one caller.
 `status` already prints the `findings` count and is the orientation call, so the block goes there and `doctor` consumes the same function when it lands.
 
+`doctor` has since landed and does not consume it: it raises its own nine findings off the records, the event log, the relation graph and the impediments, and `H17` stayed with `status`, which is the only read that has the clock. The table in [README.md](README.md) says which layer raises each `H` id, and `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` raises.
+
 ## Consequences
 
 - The state machine has 23 edges and `TRANSITIONS` names thirteen.

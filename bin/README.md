@@ -7,5 +7,8 @@ the filter that keeps a runtime notice from preceding the envelope. Everything a
 to drive is `run` in `src/cli/main.ts`, which takes all of that as arguments, so the suite
 reads what a command wrote without spawning a process per assertion.
 
-It imports TypeScript directly, which Node runs by stripping types. A bundled single file
-under `dist/` is a packaging task and is not here yet; nothing is published until it is.
+It imports TypeScript directly, which Node runs by stripping types, and that is the entry
+point the suite and the README drive. It is not what a published package would run:
+`npm run build` bundles the same entry file to `dist/treadle.js`, and `bin` and `files` in
+`package.json` both name that bundle, so no source reaches the tarball. Nothing is published
+yet, and `docs/RELEASING.md` carries the three interlocks that hold it.

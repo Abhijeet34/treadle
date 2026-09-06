@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** DR2 of the system design record, under decision D1
+**Overtaken in part by:** [ADR-0016](0016-sprints.md) writes `sprints.md`, and [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) settles that `impediments.md` is never written
 
 ## Context
 
@@ -114,7 +115,7 @@ The oversized-file tests build their files with `truncate`, which is both instan
 
 - **Ceilings are checked before the read, not inside the parser.** DR2 and F8 said what to cap and not where. The stat that establishes freshness already carries the size, so the check is free there and the hostile file is never read.
 - **The index caches each record's rendered source, not only its indexed columns.** DR2 lists the columns and reports a `get by id` at 0.01 ms without saying what the row returns. Storing the source keeps `get` a single index lookup while keeping the parse honest, and it is what DR2's own "index is 0.7x the text size" measurement implies.
-- **`sprints.md`, `impediments.md` and `ceremonies/` are not written.** Those entities have no domain types yet, so a store for them would be an abstraction with no caller. The one parser and the one layout already cover them the day they exist.
+- **`sprints.md`, `impediments.md` and `ceremonies/` are not written.** Those entities had no domain types when this was written, so a store for them would have been an abstraction with no caller. The one parser and the one layout already cover them the day they exist. Two of the three have since been settled and this bullet is the record of the state they were settled from: ADR-0016 writes `sprints.md` in this grammar and this layout, and ADR-0017 makes an impediment a work-item type in the month shards, so `impediments.md` is not written and is not waiting to be. `ceremonies/` is still unwritten and still covered by the layout.
 - **No path at or below the workspace root may be a symbolic link.** DR2 says nothing about links, and POSIX would follow one. The workspace is a committed directory and git materialises a link on checkout, so a clone can carry `items -> ../../elsewhere`, and every `file` then wrote its shard outside the directory `init` promised to stay inside; measured, the write landed in the link's target with nothing refused. The root, `workspace.md`, `items`, `events`, `.index`, `.index/txn` and every shard and event file are `lstat`ed before they are read or written, and a link is refusal `S15` naming the link and its target. A workspace that lives elsewhere is named with `--workspace`, which is the one path the tool takes on trust.
 
 ## What would reopen this

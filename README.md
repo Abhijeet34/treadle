@@ -7,9 +7,9 @@ A backlog that lives in a hand-written markdown list is one the tool cannot enfo
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
-The domain core has the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
+The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs `init`, `file`, `show`, `backlog`, `transition`, `mark`, `evidence add`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version` over that store, through application services, rendered as one result object in three forms.
+`bin/treadle.js` runs nineteen commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -35,7 +35,7 @@ npm ci
 
 What a published install would carry is one file of executable code.
 `npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
-The bundle sits comfortably inside DR1's 500 KB budget, and the build fails rather than warns if it goes over.
+The budget is 512,000 bytes, recorded in `bench/budgets.json` as DR8's, and the build fails rather than warns if the bundle goes over.
 The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
 ## Quick start
@@ -48,8 +48,9 @@ node bin/treadle.js status
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite is about 31 seconds on Node 24.11.1, most of that 73 real child processes across
-the concurrency and durability suites, and 500,000 fuzzed inputs per run.
+The suite ran 1,499 tests in 110 seconds on Node 24.11.1 on 2026-09-07, on a shared machine that was loaded throughout.
+Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
+The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
 ```bash
 npm test         # node --test over test/**/*.test.ts, no build step
@@ -59,8 +60,7 @@ npm run coverage # the suite under coverage, held to a per-file gate
 npm run flake    # 20 consecutive full runs, budget zero
 ```
 
-[docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each
-figure is, and what is not proven.
+[docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each figure is, and what is not proven.
 
 The domain core is a library of pure functions.
 Nothing in `src/domain` reads the filesystem, the clock, a random source, or the process, and a test enforces that rather than a comment asking for it.
@@ -104,12 +104,13 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
+| Hierarchy roll-up: points, done points, progress and descendant counts over a subtree | Implemented in the domain core; `rollUp` has no caller, so no command surfaces it |
 | `doctor`: nine findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
 | Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
 | Ceremonies, metrics, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
-| Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; inside budget, enforced by the build in CI |
+| Build: one esbuild bundle, weighed against DR8's 512,000 bytes | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
@@ -122,9 +123,8 @@ The one that remains is CSV formula injection, which lands with export.
 
 ## treadle's own backlog
 
-`.work/` is a treadle workspace holding this project's remaining work, filed with the tool
-itself. It is the proof that the tool can manage its own backlog, and it is readable and
-reviewable as markdown without running anything:
+`.work/` is a treadle workspace holding this project's remaining work, filed with the tool itself.
+It is the proof that the tool can manage its own backlog, and it is readable and reviewable as markdown without running anything:
 
 ```bash
 treadle status                                  # where the project stands
@@ -133,9 +133,9 @@ treadle explain history                         # why one item is still in draft
 treadle backlog --state ready --explain-absence history
 ```
 
-Eight of the fifteen items are still in `draft` because they are stories with no acceptance
-criteria and the ready gate refuses them, which is the tool working rather than a gap in the
-list. `treadle explain <id>` names the rule.
+Fifteen items, of which five are `done`, three are `ready`, six are `draft` and one is `cancelled`.
+The six in `draft` are stories with no acceptance criteria, which is `DOR4` refusing them rather than a gap in the list, and `treadle explain <id>` names that rule on each.
+The five that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped: `set` writes the fields the design gave `estimate` and `assign`, and the board stores nothing, so the work-in-progress limit and the board membership guards `G3` and `G4` want moved to `workspace-config`.
 
 ## Documentation
 
@@ -148,6 +148,10 @@ list. `treadle explain <id>` names the rule.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
 - [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
+
+Every figure in this file that can be derived from the tree is held to it by `test/architecture/documented-numbers.test.ts`: the command list against the inventory, the type count against `WORK_ITEM_TYPES`, the backlog figures against `.work`, the doctor's finding ids against what `doctor` raises, the Node floor against `engines.node`, and the bundle budget against `bench/budgets.json`.
+Every number that test now checks was correct on the day it was written and went stale in silence, which is the case a habit does not catch and a test does.
+What it deliberately does not check is a measurement: a wall time, a byte count of the tree or a coverage decimal moves on a commit that changed nothing about the claim, and [docs/VERIFICATION.md](docs/VERIFICATION.md) carries those with the run they came from.
 
 ## Licence
 
