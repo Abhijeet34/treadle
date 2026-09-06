@@ -110,6 +110,9 @@ On that path the store's S5 section ceiling is the bound and a stored value over
 A bound that refuses names the field, the observed length, the limit and the difference.
 Nothing here truncates.
 
+A required text field that is only whitespace is refused at write time, because a paragraph that says nothing is not a value: `proposed_resolution is only whitespace, and a text says something or is left unset` is `V4`, checked wherever `text(name, max)` is the field's check.
+It is write-time only, the same `storedProse` distinction every narrowed bound here uses, so a value an earlier version stored is still servable.
+
 ### Evidence
 
 `EVIDENCE_KINDS` is closed: `commit`, `pr`, `run`, `test`, `file`, `url`, `report`.
