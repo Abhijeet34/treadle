@@ -302,6 +302,7 @@ That is the same shape the store had before this work, one layer up: a whole-sto
 It is not fixed here, and the reason is scope rather than difficulty.
 `WorkspaceView`'s contract is one read of the store and every derived fact off that one read, so making it lazy is a change to what the command layer promises the domain, with its own correctness surface, in a file none of the seven targets measures.
 It is the next thing to do and it is worth more than the three misses still open.
+It was done next: "The read every command performs, made a projection" below carries the measurement, and ADR-0014 the decision.
 
 ### What did not change
 
@@ -430,6 +431,7 @@ Stated plainly, because each one bounds what these numbers support.
 ## What the gate enforces
 
 `npm run bench:gate` fails on what transfers between machines: durability under parallel writers, silent drops, whole-store refusals and crashes on malformed input, the runtime dependency count, the install size, the bundle size and the per-command output budgets.
+The two peak-RSS rows are weighed over the worst of a named set of operations at the largest scale, `identity`, `get`, `list` and `workspace` for the read and `create` and `transition` for the mutation, and a member of the set with no figure makes the row `NOT MEASURED` rather than the worst of the rest, so the read budget cannot pass over a bounded `list` again.
 Demonstrated: with the budgets as committed it exits 0, and with the install-size limit tightened to 1,000 bytes it reports `FAIL: install size, unpacked = 19568 bytes, limit 1000` and exits 1.
 
 It does not fail on the per-operation timing limits.
@@ -628,12 +630,96 @@ This is left to whoever owns the store's ceilings rather than fixed here, becaus
 
 ### What gives way, in the order it gives way
 
-1. **From about 1,300 items**, the read every command performs is over DR8's 100 MiB budget. Most of that is the runtime: the timed children launch from TypeScript source, and "Peak RSS on a read" above measured the same read at 52.6 MiB through the release path's bundle against 99.2 from source. Even from that floor, 3.85 KiB per item spends the remaining headroom by about 12,600 items.
+1. **From about 1,300 items**, the read every command performs is over DR8's 100 MiB budget from source, because the runtime's own floor there is 95.9 MiB with the store adapter loaded. As a projection the read adds 1.23 KiB per item between 10,000 and 50,000 items, down from 3.85, so from the bundle's 52.6 MiB floor the headroom lasts to about 38,000 items rather than 12,600.
 2. **From about 116,000 items**, a month holds more than the 5,000 records ADR-0002 set as its own reopening condition.
 3. **At about 380,000 items**, the largest month crosses the 8 MiB shard cap. The write is accepted and every read of that workspace refuses from then on.
 4. **At about 1,000,000 items**, the whole-workspace read reaches 4 GiB at the marginal 3.85 KiB per item, which is the region of Node's default old-space limit.
 
 The wall this tool meets first is `readWorkspace`, and it is nowhere near the shard key.
+
+## The read every command performs, made a projection
+
+`readWorkspace` held every record in the store decoded, to print a few hundred bytes about one of them.
+ADR-0014 carries the decision; this section carries what was measured, in the order it was measured.
+
+### Where the memory went, before anything changed
+
+The instrument is the inspector's sampling heap profiler, `HeapProfiler.startSampling` at a 16 KiB interval with objects collected by either garbage collector included, around the read alone on the 50,021-item corpus, plus a heap snapshot after the read with a forced collection, summed by node type and constructor.
+
+The read allocated 1,072 MiB.
+`store.list` accounted for 1,050 of it: `decodeItem` 608, of which `validateWorkItem` was 340 and `parseSegment` 249, the SQLite rows 84, and the `Map` iterator's entry pairs 183.
+`validateWorkItem` built a `Set` of the type's permitted fields and two `Object.entries` arrays for every record, and `parseSegment` built a `Line` object with two substrings for every line, then joined the lines back into the source it had been handed.
+
+The view retained 103 MiB of heap over a 10 MiB baseline.
+40.0 MiB was `array:(object properties)` at 50,911 entries, 824 bytes each: the decoder built each item on `Object.create(null)`, and a null-prototype object keeps its properties in a dictionary.
+30.9 MiB was 50,173 strings of record size, the record sources, still live because every title and description the items held was a sliced string pointing into one.
+15.1 MiB was 536,775 short strings, ten per item, among them a fresh copy of `task` and `ready` for each.
+Peak RSS was 406.6 MiB: the runtime's 96 MiB floor and a heap V8 had let grow to 301.8 MiB while 103 of it was live.
+
+### Two changes, measured separately
+
+Holding every item but holding it leaner came first: sets built once per type, keys walked rather than entry pairs, an object literal for the item, the source handed to the parser rather than re-joined, the rows streamed rather than materialised, and four columns read where fourteen were.
+Allocation fell to 494 MiB and peak RSS to 298 MiB, with the view still retaining 92 MiB of decoded records, because a whole item holds its description and 50,000 descriptions are the record text.
+
+Making the view a projection came second: `store.summaries()` serves the fourteen fields a scan reads off the index's columns, three of them new, and the six commands that act on one record read that record with `wholeItem`.
+Allocation fell to 119 MiB, of which 92 is the SQLite rows, and what the view retains to 36.3 MiB: 13.4 MiB of strings, 8.5 of arrays and 6.5 of objects.
+Peak RSS is 162 to 167 MiB from source.
+
+### Before and after, interleaved
+
+One cold process per sample, seven samples per cell, the two trees alternating on every sample over clones of the same corpora, at 1-minute loads of 4.54 at the start and 3.47 at the end; peak RSS is `process.resourceUsage().maxRSS` in the child and the time is the child's own `performance.now()` around the operation.
+
+| Items | `workspace` before | `workspace` after | `get` before | `get` after |
+|---|---|---|---|---|
+| 100 | 17.0 ms, 104,240 KiB | 12.0 ms, 101,904 KiB | 7.2 ms | 7.2 ms |
+| 1,000 | 49.9 ms, 112,576 KiB | 17.4 ms, 103,584 KiB | 7.7 ms | 7.7 ms |
+| 10,000 | 287.6 ms, 201,104 KiB | 80.4 ms, 117,584 KiB | 13.2 ms | 13.6 ms |
+| 50,000 | 1,268.7 ms, 418,592 KiB | 338.8 ms, 166,944 KiB | 7.7 ms | 7.4 ms |
+
+The `get` row at 10,000 is 8.8 ms at the minimum on both trees; its median carries the re-index of the shard the previous sample's create changed, on both.
+Nothing was traded for the memory: `get` and `list` are within the run's own noise at every scale, and the read that moved got faster.
+
+| Mutation at 50,000 | Before | After |
+|---|---|---|
+| `create` | 175.1 ms, 162,560 KiB | 119.5 ms, 147,088 KiB |
+| `transition` | 177.9 ms, 163,904 KiB | 133.1 ms, 146,960 KiB |
+
+The mutation moved for a reason the read's profile did not show.
+A create after a create into the largest shard parsed that shard twice, once in the warm refresh before the lock and once in `#readShard` under it, 42.5 and 24.9 MiB of the 76 MiB it allocated.
+The parse is now kept across both, for the shards the transaction names and for the last record file any refresh read.
+
+### The same commands at the command surface
+
+The 50,000-item corpus, three samples per cell, source and bundle, at a 1-minute load of 26.31 at the start and 8.77 at the end, so read the RSS column and not the wall.
+The `show`, `backlog --limit 9`, `next --limit 3`, `status` and `history` rows land within 3 percent of one another on each tree and the first is shown.
+
+| Command | Source before | Source after | Bundle before | Bundle after |
+|---|---|---|---|---|
+| `show <id>` | 1,434.6 ms, 486,144 KiB | 531.0 ms, 202,320 KiB | 1,344.7 ms, 387,424 KiB | 421.8 ms, 129,680 KiB |
+| `backlog --limit 9` | 1,468.0 ms, 421,248 KiB | 528.9 ms, 175,600 KiB | 1,380.5 ms, 387,680 KiB | 434.7 ms, 131,088 KiB |
+| `file task ...` | 1,560.0 ms, 432,576 KiB | 618.3 ms, 203,344 KiB | 1,473.7 ms, 405,648 KiB | 562.1 ms, 168,112 KiB |
+| `doctor` | 4,929.9 ms, 1,246,496 KiB | 4,118.9 ms, 1,200,480 KiB | 4,407.8 ms, 1,212,416 KiB | 4,335.3 ms, 1,182,560 KiB |
+
+The `show` figure from source carries the re-index of the shard the previous command's `file` changed in its first sample, which is why it sits 27 MiB above `backlog`.
+`doctor` holds the 500,000 events beside every whole record and is unchanged by design; it is the one command that decodes the whole store, and its budget is a separate finding.
+
+### What is still open, and how far
+
+The read budget is 100 MiB and the rig reads 166,944 KiB, 1.63x, down from 4.09x.
+Through the bundle the same read is 129,680 to 131,168 KiB, 1.27x.
+The rig cannot meet this budget from source with any read that retains anything, because its children's floor is 95.9 MiB with the store adapter loaded; the figure that can meet it is the bundle's, and 30 MiB of view and heap slack stand between it and 100.
+Closing that is a scan in SQL, `backlog` filtering and sorting in the index and `status` counting there, so that a command that scans holds nothing; ADR-0014 says why it is not done here.
+The budget is not moved.
+
+The mutation budget is 120 MiB and the rig reads 147,088 KiB, 1.20x; `file` through the bundle reads 168,112 KiB, 1.37x, because it performs the read above and then the write.
+The mechanism is now the shard parse rather than the copies of the shard: `parseFile` allocates about 25 bytes for every byte of a 1.1 MB shard, and the next command after any write pays it once to re-index that shard, which is also why `get` at 50,000 reads 136 to 148 MiB in a sample that follows a write and 101 in one that does not.
+The next step there is a line scanner over offsets rather than `Line` objects, and it belongs beside the store's own ceilings.
+
+### A defect this measurement found
+
+`treadle doctor` on the 50,000-item corpus exited 1 with `INTERNAL: Maximum call stack size exceeded` on both trees.
+Both renderers spread a block's rows into a call's argument list, `lines.push(...table(...))` and `Math.max(...rows.map(...))`, and V8 caps an argument list near 120,000 values.
+A block is bounded by the store and not by the renderer, so the spreads are loops now, `test/render/large-block.test.ts` renders 200,000 rows through all three renderers, and the same command exits 7 with 261,913 lines of findings.
 
 ## Deep pagination, proved by counting
 

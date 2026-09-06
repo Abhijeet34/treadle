@@ -47,7 +47,7 @@ describe('F10: a value pasted into a description does not reach a verbose log', 
     assert.match(run.err, /vvv store summaries n=/)
   })
 
-  // A scan reads no prose at all since ADR-0013, so `backlog` cannot leak a description and
+  // A scan reads no prose at all since ADR-0014, so `backlog` cannot leak a description and
   // the log says so: its `read` lines carry no description field. `show` is the command
   // that reads the whole record, so it is the one that has to name the field and its size.
   it('names the field and its size, and never its content', async () => {

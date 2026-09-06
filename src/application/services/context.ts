@@ -46,7 +46,7 @@ export type WorkspaceView = {
    * the fields a scan reads. The whole record of the one item a command acts on is read by
    * `wholeItem` after this view has established that the id names one; holding every record
    * decoded put the read every command performs at 408 MiB and 1.2 s over 50,000 items, to
-   * print a few hundred bytes about one of them. ADR-0013 carries the measurement.
+   * print a few hundred bytes about one of them. ADR-0014 carries the measurement.
    */
   readonly items: readonly WorkItemSummary[]
   /**

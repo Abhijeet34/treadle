@@ -90,7 +90,7 @@ export type AcceptanceCriterion = {
  * The fields a scan over every item reads: what `backlog` filters and sorts on, what
  * `status` counts, what a gate reads of a child, what `next` scores. A view over the whole
  * workspace holds these and nothing else, and one record's prose and lists are read on
- * demand; `docs/architecture/adr/0013-the-view-is-a-projection.md` carries the measurement.
+ * demand; `docs/architecture/adr/0014-the-view-is-a-projection.md` carries the measurement.
  * Every one is a `WorkItem` field, so a whole item is a summary wherever one is asked for.
  */
 export const SUMMARY_FIELDS = [
