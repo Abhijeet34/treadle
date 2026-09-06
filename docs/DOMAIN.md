@@ -155,7 +155,7 @@ Every other edge refuses either.
 - `allowed` with the transition name, the resolved target and every guard result. A guard result carries the value it saw (`4/5` for a column limit), not merely its verdict.
 - `refused` with a `DomainError` naming the first failing rule, a message listing every failure, and the full guard list.
 
-`legalTargetsFrom(item)` lists the states this particular item may move to now, with `resume` resolved against `held_from`.
+`legalTargetsFrom(item, reviewStep)` lists the states this particular item may move to now, with `resume` resolved against `held_from` and the `in_progress` exit resolved against the type's review step (G5).
 
 `resume` is not a state.
 It restores the state the item was held from, so an `on_hold` item's only non-terminal target is that state; asking for any other is `T3`.
