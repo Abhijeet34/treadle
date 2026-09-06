@@ -10,7 +10,7 @@ Four of the six meet their target, two miss it, and the two misses are reported 
 
 Reproduce it with `npm run bench`.
 The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T12-08-34-931Z`, with its heading levels demoted one step and nothing else changed.
-Two later four-scale runs are in "The axis table re-derived at 50,000 items"; every paragraph that says "the appended run" means the one in the appendix and not those.
+Two later four-scale runs are in "The axis table re-derived at 50,000 items" and a third, taken after sprints, impediments, relations and boards landed, is in "The axis table re-derived after the four capabilities landed"; every paragraph that says "the appended run" means the one in the appendix and not those.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
 
 **One set of figures below is older than the appendix and is marked where it appears.**
@@ -108,6 +108,11 @@ The third is a timing, and the series below is what bounds it.
 | A2, every one of the 25 questions answerable with one command | 4 full, 6 partial, 15 none | 10 full, 7 partial, 8 none | 15 of 25 short of full |
 | A12, every verb with a machine-readable object on both paths | mutations only, reads refuse the flag, errors on stdout | 25 of 26 invocations hold the contract, across 13 verbs | one invocation |
 | A4, read and create below 150 ms at 50k, startup excluded | 89/90 ms at 100 items, 154/141 ms at 5k | read 292.1 ms, create 672.5 ms | 1.95x and 4.48x |
+
+**Both of those rows were re-derived on 2026-09-06 and both moved.**
+A2 reads 15 full, 8 partial, 2 none, and A12 is MET at 38 of 38 invocations across all 19 verbs.
+"The axis table re-derived after the four capabilities landed" carries both, with what changed in the product and what was stale in the axis.
+The paragraphs immediately below describe the appended run and are left as it measured them.
 
 A2's eight unanswerable questions are 7, 8, 9, 10, 15, 19, 20 and 21, and every one of them needs an entity or a metric this tree does not implement: a sprint, an impediment, a board column, a relation, or a flow metric.
 The per-question table is in the appendix under "A2, the 25 questions and how each was scored", with the command each question was put to and what a full answer would have to contain, so the scoring can be checked rather than trusted.
@@ -511,6 +516,176 @@ The work it measures is unchanged, and the difference between 109.8 and 167.8 is
 `npm run bench:gate` exits 1 on the second run, for the cold-start row.
 That row is the store-loading floor's median above `node -e`'s median, both taken in the same job, and it is the only row in the file that is a floor rather than a measurement of the product.
 It is 86.3 ms at a 1-minute load of 3.35 and 245.5 ms at 6.35, on the same code, which is the strongest single argument in this file for why the timing budgets are not armed anywhere.
+
+## The axis table re-derived after the four capabilities landed
+
+Sprints, impediments, relations and boards all shipped on 2026-09-06, so the table above was re-derived against the finished set rather than against any one of them.
+The run is `2026-09-06T12-13-38-064Z`, 873 s of wall time, four corpora regenerated in the run, 990 timed cold samples, 51 budgets: 28 pass, 0 fail, 7 open miss, 16 pending.
+
+Read the timing column against its load and nothing else.
+The 1-minute load average was 38.43 at the start and 20.51 at the end, against the 3.47 to 4.54 the committed memory figures were taken at, and the run immediately before it started at 10.18 and produced nine timing open misses where this one produced four, on the same code.
+That is the whole argument for why the timing budgets stay unarmed, and it is why the findings below are memory figures, counts and decompositions rather than wall times.
+
+### What the corpus now holds
+
+The rig built a corpus with no relation edge, no sprint record and no impediment, so nothing that reads the relation graph was ever priced.
+Every command reads it: `readWorkspace` builds the graph on every invocation.
+Worse, every item already carried a `sprint_id` pointing at no record at all, which is doctor finding `H26` once per item.
+
+| Items | Sprints | Open | Impediments | Relations | `blocks` | `duplicates` | `relates_to` | Carry-over wanted/stored |
+|---|---|---|---|---|---|---|---|---|
+| 100 | 24 | `sprint-23` | 0 | 10 | 8 | 1 | 1 | 7/7 |
+| 1,000 | 24 | `sprint-23` | 9 | 100 | 85 | 6 | 9 | 38/38 |
+| 10,000 | 24 | `sprint-23` | 96 | 1,000 | 901 | 42 | 57 | 276/276 |
+| 50,000 | 24 | `sprint-23` | 489 | 5,000 | 4,485 | 204 | 311 | **1,272/744, 23 truncated** |
+
+The last column is a product ceiling the generator found rather than the other way round.
+`carried` is one field line under `MAX_FIELD_VALUE_BYTES`, so a close that wants 1,272 item ids writes 12,648 bytes against an 8,192 byte bound and the store refuses the whole record.
+744 ids fit.
+At 50,000 items over 24 sprints every one of the 23 closed sprints wanted more than that, so **no sprint at this scale can record its own carry-over**, and `committedTo` loses the half of the committed set the store holds rather than derives.
+That is not a benchmark artefact: `sprint close` writes the same field through the same codec.
+
+Two smaller things the store refused on the way, both fixed in the generator.
+An empty `carried` list is an absent field rather than an empty line, so a closed sprint whose members all finished writes no line at all.
+And the same edge written twice on one record is a refusal, not a shrug, which the impediment pass and the chain pass reached together at `wi-002200 blocks wi-002201`.
+
+Event instants were also dated anywhere in their item's month, which put a third of them before the item was filed.
+That is finding `H23`, and it is most of what `doctor` had to say about this corpus: 5,297 findings over 1,000 items.
+They are dated on or after `filed_at` now, and the same corpus reports 241, all `H21`.
+A corpus that manufactures findings measures the reporting of them rather than the store.
+
+### The twelve axes
+
+| Axis | Verdict | Observed |
+|---|---|---|
+| A1 durability under parallel writers | MET | 5/5, 24/24, 60/60, 200/200 landed; zero refusals, zero crashes, no lock or temp file left |
+| A2 the 25 questions | MISSED | **15 full, 8 partial, 2 none**, against the reference's 4/6/15 |
+| A3 output size per command | MET | all 12 artefacts inside their A.3 budget |
+| A4 latency at scale | MISSED | `get` p95 8.3 ms, `create` p95 221.1 ms against a 150 ms target, at a 1-minute load of 38.43 |
+| A5 malformed input | MET | 206 damaged stores: 0 silent drops, 94 refusals naming the record, 108 absorbed, 4 where the edit removed the record |
+| A6 mis-target | MET | 0 mis-targets in 10 writes with no explicit target, 3 of 3 seam resolutions correct |
+| A7 audit | MET | 50 of 50 explained, 250 events replayed to the state shown, every event carries an actor |
+| A8 lifecycle | MET | 22 of 22 illegal pairs refused naming a rule id, 20 legal pairs as the table says |
+| A9 metric coverage | NOT MEASURED | nothing under `src` computes velocity, cycle time or a burndown series |
+| A10 type validation | MET | 11 of 11 refused with a rule id and nothing created |
+| A11 harness neutrality | NOT MEASURED | no adapter generator exists, ADR-0012 |
+| A12 contract | **MET** | **38 of 38 invocations hold, across all 19 verbs**; 0 of 3 parse-level refusals ignore `--out json` |
+
+A2 and A12 are the two that moved, and neither moved because the rig got kinder.
+
+### A2 was asserting four absences the product had closed, and two it closed in July
+
+Six of the 25 rows were publishing an absence that was no longer true.
+Questions 7, 8, 20 and 21 said this tree had no sprint entity, no impediment and no board.
+Questions 14 and 15 said there was no history verb, which has been false since [#21](https://github.com/Abhijeet34/treadle/pull/21), so the staleness is months old and not a consequence of one busy day.
+
+Every question is now put to a command, including the one whose answer is a refusal.
+Question 19 asks which bug a story caused, and `relation add a2-bug caused-by a2-story` exits 2 naming the three kinds the command writes.
+`caused_by` is one of the six kinds the domain declares, loads and derives an inverse for; ADR-0015 exposes a kind on an argued second caller rather than by default.
+Recording that refusal is stronger evidence than a prose claim that no command exists, and it cannot go stale the way the claim did.
+
+**A2 moves from 10 full, 7 partial, 8 none to 15 full, 8 partial, 2 none.**
+The five that reached full are 2 (`board --all` names every live item's active blockers and counts them), 7 (`sprints <id>` prints the goal), 14 and 15 (`history <id>` prints every change with its instant and its actor), and 18 (`show <id>` derives `duplicated_by` from the edge stored on the copy).
+The two that remain `none` are 19 above and 21, where the board is real and prints five columns with a count on each but nothing stores a limit to weigh them against, which is why ADR-0018 leaves guard `G3` disarmed.
+The per-question table with each command, its exit status and its verdict is in the appendix of the run this section names.
+
+A `none` is a claim that the product cannot do something, and a claim like that goes stale the moment a capability lands.
+An absence gets put to the tool, not remembered.
+
+### Six commands that no measurement reached
+
+`board`, `set`, `relation`, `sprint`, `sprints` and `history` shipped, and no axis called any of them.
+A12 already compared the verbs it drove against the inventory's length, but the shortfall was folded into a verdict that was MISSED for a different reason, so six commands were unmeasured and silent about it.
+
+Each now has a success and a failure input with a distinct refusal: a board given two scopes, a `set` of a field `transition` owns, a relation kind the domain declares and the command does not write, a sprint that ends before it starts, a sprint id no sprint carries, and a history of an id no record carries.
+A12 also names any command in the inventory it never drove, so the next one that ships without a measurement is a line in the report rather than an absence.
+**A12 moves from MISSED, 25 of 26 invocations across 13 verbs, to MET, 38 of 38 across all 19.**
+
+A pass rate over the rows a table happens to have says nothing about the rows it does not.
+
+### Every budget, and every one that moved
+
+| Budget | Recorded before | This run | Limit | Status |
+|---|---|---|---|---|
+| peak RSS, read at 50,000 | 166,944 KiB | **1,047,488 KiB** | 102,400 | open miss, and see below |
+| peak RSS, mutation at 50,000 | 147,088 / 146,960 KiB | 148,976 / 147,440 KiB | 122,880 | open miss |
+| first index build at 50,000 | 10,250 ms | 11,026 ms | 6,000 | open miss |
+| re-index after a hand edit | 100.4 ms | 96.7 ms | 135 | pass |
+| index size against the text it indexes | 1.538x | 1.54x | 1.6 | pass |
+| cold start, store layer loaded | 157.8 ms | 144.4 ms | 213 | pass |
+| install size, unpacked | 327,471 B | 392,628 B | 1,572,864 | pass |
+| bundle | 243,377 B | 281,312 B | 512,000 | pass |
+| runtime dependencies | 0 | 0 | 0 | pass |
+| A1 durability / crashes | 1 / 0 | 1 / 0 | 1 / 0 | pass |
+| A5 silent drops / whole-store refusals / crashes | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | pass |
+| output size per command | 0 over budget | 0 over budget | 0 | pass |
+
+Four moved.
+
+**The bundle and the install size moved with the four capabilities and nothing else.**
+37,935 bytes of bundle and 65,157 bytes unpacked, for a board, a sprint lifecycle, a relation graph and an impediment type.
+Both are armed and both are still 1.8x and 4.0x under their limits, so the movement shows up on every run without needing this paragraph.
+
+**The first index build moved 7.6%, from 10,250 ms to 11,026 ms**, on a figure whose own run-to-run spread on this machine was measured at 10,578 to 25,920 ms.
+The corpus now carries 24 sprint records and 5,000 relation edges that were not there before, and neither is anywhere near 776 ms of index work.
+Nothing here touched it.
+
+**Peak RSS on a read went from 166,944 KiB to 1,047,488 KiB, and the reason is not that a read got six times heavier.**
+It is that the budget is weighed over the worst of `READ_OPS`, and `doctor` is now in that set.
+`readWorkspace` itself reads 173,376 KiB in this run against 166,944 recorded, which is 3.9% on a corpus that gained 5,000 edges and 24 sprints, and is the like-for-like figure.
+
+### Where the two open memory misses stand
+
+The read miss is worse and the mutation miss is not.
+
+| Operation at 50,000 | in-process p50 | peak RSS |
+|---|---|---|
+| `identity` | 4.5 ms | 101,056 KiB |
+| `get` | 7.2 ms | 103,280 KiB |
+| `list`, bounded at 50 rows | 10.2 ms | 103,680 KiB |
+| `workspace` | 518.0 ms | 173,376 KiB |
+| `board --all` | 562.4 ms | 178,016 KiB |
+| `next` | 1,998.1 ms | 171,216 KiB |
+| `doctor` | 5,826.2 ms | **1,047,488 KiB** |
+| `create` | 121.1 ms | 148,976 KiB |
+| `transition` | 133.4 ms | 147,440 KiB |
+
+`doctor` peaks at 1,022 MiB, which is 10.2x the 100 MiB budget and 6.0x the read every command performs.
+The run decomposes where that does not come from: `board --all` builds the same relation graph, indexes it by blocked item and groups five columns, and costs 4,640 KiB over `workspace`.
+The relation graph over 5,000 edges is single-digit megabytes.
+`doctor`'s other 874,112 KiB is the pass that pairs 50,000 items with 500,000 events, and it grows the way the item count does: 106,720 KiB at 100 items, 143,776 at 1,000, 385,184 at 10,000, 1,047,488 at 50,000.
+
+The mutation miss did not move: 148,976 KiB for `create` against 147,088 recorded, a 1.3% drift on a corpus that gained relations, sprints and impediments.
+The parse that was fixed stayed fixed.
+
+Neither budget was adjusted.
+A budget nobody has met is a finding; a budget moved to fit a reading is nothing at all.
+
+### What the cycle check costs over a dense relation graph
+
+`relationGraphFrom` scans the edges it has already accepted for every new one, and `findRelationCycle` runs a walk per `blocks` edge whose every step filters the whole edge list.
+Both are taken apart here because a total would hide which half, and only one of them is `doctor`'s.
+One in-process sample per scale, on the corpus's own graph.
+
+| Edges | Graph build | Cycle walk |
+|---|---|---|
+| 10 | 0.044 ms | 0.281 ms |
+| 100 | 0.278 ms | 1.207 ms |
+| 1,000 | 7.907 ms | 66.392 ms |
+| 5,000 | 142.573 ms | 1,524.368 ms |
+
+Ten times the edges costs 28x the build and 55x the walk between 100 and 1,000.
+The corpus is acyclic on purpose, because `findRelationCycle` returns on the first cycle it finds and a corpus with one in it would measure how fast the check gives up rather than what it costs.
+
+**The build is paid by every command**, because `readWorkspace` calls it, so 143 ms of every read at 50,000 items is a duplicate scan over 5,000 edges.
+Only the 1,524 ms walk is `doctor`'s.
+
+A third path is worse than either and is not in this table.
+`rank` in `src/application/services/insight.ts` filters every item through `activeBlockers`, and each of those calls walks the whole relation list, which is 50,000 items against 5,000 edges once per command: `next` costs 1,998.1 ms against `workspace`'s 518.0 on the same read.
+`activeBlockerIndex` in `context.ts` already exists for exactly this shape and already carries the comment saying so, and `board` uses it while `next` does not.
+
+Three superlinear paths, none of them visible until a corpus had an edge in it.
+A budget over an operation nobody performs is not a measurement, and neither is a corpus without the shapes the product stores.
 
 ## Where it stops scaling, and what gives way first
 
