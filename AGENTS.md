@@ -397,8 +397,8 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 A figure taken at the store seam is not a figure about a command. Every command goes through
 `readWorkspace`, which reads every item's summary fields off the index, indexes them by id,
 builds the hierarchy and reads the sprint records whole (tens of rows, a few lines each,
-measured at no change to the 50,000-item peak), and the six commands that act on one record
-then read that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
+measured at no change to the 50,000-item peak), and a command that acts on one record
+then reads that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
 of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
 a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
 never a read from the record text (ADR-0014). A4 times that read as the `workspace` operation

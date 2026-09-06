@@ -60,7 +60,7 @@ Byte-exactness is a property, so it is tested as one rather than against three f
 
 - **A file the tool has not mutated re-renders byte for byte.** Each record keeps its original bytes and is never re-rendered, and a quarantined segment keeps its bytes too. Held over 400 generated documents, each mixing valid records, malformed segments and preamble lines, with a second assertion that every segment came back as either a record or a quarantine and none was dropped.
 - **A rendered record is a fixed point of parse and render.** Held over 1,200 generated records, comparing bytes and then comparing the recovered id, title, ordered fields and sections.
-- **A work item survives encode, render, parse and decode unchanged.** Held over 800 generated items across all six types. This is the one that catches field-level loss, which the byte properties cannot.
+- **A work item survives encode, render, parse and decode unchanged.** Held over 800 generated items across every type, the generator picking from `WORK_ITEM_TYPES` itself, so the property widened from six types to seven the day `impediment` landed rather than needing this record re-read. This is the one that catches field-level loss, which the byte properties cannot.
 
 A mutated record re-renders from its fields, with known fields in the field dictionary's order and unknown fields after them in their original relative order.
 

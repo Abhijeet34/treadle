@@ -880,7 +880,8 @@ Peak RSS was 406.6 MiB: the runtime's 96 MiB floor and a heap V8 had let grow to
 Holding every item but holding it leaner came first: sets built once per type, keys walked rather than entry pairs, an object literal for the item, the source handed to the parser rather than re-joined, the rows streamed rather than materialised, and four columns read where fourteen were.
 Allocation fell to 494 MiB and peak RSS to 298 MiB, with the view still retaining 92 MiB of decoded records, because a whole item holds its description and 50,000 descriptions are the record text.
 
-Making the view a projection came second: `store.summaries()` serves the fourteen fields a scan reads off the index's columns, three of them new, and the six commands that act on one record read that record with `wholeItem`.
+Making the view a projection came second: `store.summaries()` serves the fields a scan reads off the index's columns, three of them new at the time, and a command that acts on one record reads that record with `wholeItem`.
+`SUMMARY_FIELDS` was fourteen when this was measured and is fifteen now, and `wholeItem` had six callers and has eight; neither count was what the measurement turned on.
 Allocation fell to 119 MiB, of which 92 is the SQLite rows, and what the view retains to 36.3 MiB: 13.4 MiB of strings, 8.5 of arrays and 6.5 of objects.
 Peak RSS is 162 to 167 MiB from source.
 
