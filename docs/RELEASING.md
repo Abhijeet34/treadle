@@ -169,7 +169,7 @@ A settings script that half-applies is worse than one that refuses, because the 
 
 | File | What it sets |
 |---|---|
-| `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the single required `checks` context |
+| `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the required `checks` and `tests kept` contexts |
 | `.github/rulesets/tags.json` | Signed tags on `refs/tags/v*` that cannot be updated or deleted. The name itself is checked by the release preflight, not here: see "Why the tag ruleset does not check the tag name" |
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives, and deleting a branch once its pull request merges |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
