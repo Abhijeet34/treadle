@@ -47,6 +47,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
 | A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
 | The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
+| A pull request cannot silently remove a test that main has | The reconstructed pull request 29 resolution reports 1122 of 1122 tests passing and is refused by `check-tests-kept` naming 32 titles; over all 29 pull requests in main's history, 25 pass and 4 need 9 declarations between them, every one a title whose behaviour changed (`test/architecture/tests-kept.test.ts`) | Proven |
 
 ## What is not proven
 
@@ -260,6 +261,52 @@ Every other budgeted artefact is byte-identical.
 
 A remedy is a promise, and a remedy naming no command is a promise nothing keeps.
 
+## The revert a green suite could not see
+
+Pull request 28 landed the acceptance-criteria readback and the `what` column convention.
+Pull request 29 was rebased onto it, four service files conflicted, and the resolution took the pre-rebase file whole, deleting 28's code and 28's tests together.
+The suite passed on 1132 tests and all ten checks were green.
+
+The reconstruction is a branch off `3bce1ca` with those four service files and their tests back at their pre-28 state.
+
+```text
+$ npm test
+ℹ tests 1122
+ℹ pass 1122
+ℹ fail 0
+
+$ treadle set cart acceptance_criteria=...
+set acceptance_criteria - -> [object Object]        # main: [ ] a shopper reopens a saved cart
+$ treadle show cart --field ac
+ac 0/1                                              # main: ac 0/1, then ~criteria 1 1 and the text
+
+$ node scripts/check-tests-kept.ts 3bce1ca HEAD
+FAIL  the what column of history has one convention
+      test/services/history-convention.test.ts declares it at 3bce1ca and this branch does not
+      restore the test, or record the removal in a commit message trailer:
+        Removes-test: the what column of history has one convention
+check-tests-kept: 772 tests at 3bce1ca4, ... 32 removed without a Removes-test trailer
+```
+
+772 of this repository's 773 test declarations are read and compared.
+The one that is not is `it(file, ...)` in `test/architecture/license-header.test.ts`, whose title is a variable; the `describe` around it is compared, so deleting the loop is still caught.
+
+### What check-tests-kept does not see
+
+**A test that keeps its title and loses its body.**
+The mechanism compares names, so a resolution that empties an assertion while leaving `it('...', () => {})` standing is invisible to it.
+That is the case a manifest of behaviours checked against the built binary would answer, and [architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md](architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md) prices it.
+
+**A subtest declared as `t.test(...)` rather than at the start of a line.**
+There are none here, and a file that adds one fails the check with the file named rather than passing over it, because the gate counts the declaration-shaped calls it did not read.
+
+**A test whose title is a variable.**
+One in 773, named above.
+
+**A branch that is not up to date with main.**
+The comparison is against the merge base, so a test main gained after the fork is not one this branch removed.
+`strict_required_status_checks_policy` is what makes that safe: a branch behind main cannot merge, so the run a merge is gated on compares against main's tip.
+
 ## Running it
 
 ```bash
@@ -267,6 +314,7 @@ npm run check      # tsc --noEmit under strict, then the whole suite
 npm run coverage   # the suite under coverage, held to the per-file gate
 npm run flake      # 20 consecutive full runs, budget zero
 npm run flake -- 5 # a shorter local check
+npm run tests-kept # no test main has disappears from this branch undeclared
 ```
 
 `TREADLE_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.

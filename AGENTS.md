@@ -209,6 +209,15 @@ Before hand-checking any of these, run the suite: it already checks them.
   an API that is absent there and only a test that happens to run the line would catch it.
   Raise `engines.node` first and the bump follows; `.github/dependabot.yml` ignores the major
   until then.
+- A pull request may not remove a test the merge base has. `scripts/check-tests-kept.ts`
+  compares test titles at `merge-base(origin/main, HEAD)` against the branch head, counts a
+  rename and a `.skip` as removals, and takes one `Removes-test: <exact title>` commit trailer
+  per deliberate removal. `.github/rulesets/main.json` requires the `tests kept` context by
+  name beside `checks`, because a branch that deleted the job from `ci.yml` would leave
+  `checks` green with the guard gone, so renaming that job means editing the ruleset in the
+  same change. ADR-0013 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
+  resolution or a revert is what a change needs, do not resolve a conflict by taking one side
+  whole: that is the move this rule exists to catch.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
   `scripts/check-dco.sh` and commitlint over a pull request's commits. The trailer's name must
   match the author's name; the address may differ only for a GitHub App author, which is why a

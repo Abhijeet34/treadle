@@ -42,6 +42,27 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why.
 **Every source file carries `SPDX-License-Identifier: Apache-2.0` near the top.**
 `test/architecture/license-header.test.ts` enforces it over every tracked `.ts`, `.js`, `.sh` and `.yml` file.
 
+**A pull request may not remove a test that main already has.**
+CI reads the test titles at the merge base and at your branch, and fails on one that main runs and your branch does not.
+A test that is renamed, or turned into `.skip`, counts as removed, because a renamed title is a title main had and no longer runs.
+This exists because a rebase resolution once took four pre-rebase service files whole, deleted the tests along with the code they covered, and left a green suite over four reverted fixes.
+[docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md](docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md) argues it.
+
+Check yours before pushing:
+
+```bash
+npm run tests-kept          # against origin/main and HEAD
+```
+
+If the removal is meant, say so in the commit message with one trailer per test, naming the title exactly as the source declares it:
+
+```text
+Removes-test: carries the five components of each row, and the weights that multiplied them
+```
+
+One trailer covers one test.
+A trailer that names a title nothing in your branch removes fails too, so the declaration cannot be written ahead of the removal or left behind after it.
+
 **No em dashes.**
 Use a plain hyphen or a new sentence.
 
