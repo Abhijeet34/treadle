@@ -71,6 +71,15 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     priority: { type: 'string' },
     resolution: { type: 'string' },
   },
+  board: {
+    state: { type: 'string' },
+    type: { type: 'string' },
+    sprint: { type: 'string' },
+    assignee: { type: 'string' },
+    priority: { type: 'string' },
+    resolution: { type: 'string' },
+    all: { type: 'boolean' },
+  },
   transition: {
     reason: { type: 'string' },
     until: { type: 'string' },

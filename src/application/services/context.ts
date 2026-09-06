@@ -142,6 +142,26 @@ export function activeBlockers(view: WorkspaceView, id: ItemId): readonly ItemId
   return blockersOf(view.relations, (other) => view.byId.get(other)?.state, id)
 }
 
+/**
+ * Every blocked item to its active blockers, from one pass over the graph. `activeBlockers`
+ * above walks the whole relation list per call, which is the right cost for the one item a
+ * command acts on and a quadratic one for a read over every item; `board` is that read.
+ * An id absent here has no active blocker, and the blockers keep the graph's order, which
+ * is the order `activeBlockers` returns them in.
+ */
+export function activeBlockerIndex(view: WorkspaceView): ReadonlyMap<ItemId, readonly ItemId[]> {
+  const index = new Map<ItemId, ItemId[]>()
+  for (const relation of view.relations.relations) {
+    if (relation.kind !== 'blocks') continue
+    const state = view.byId.get(relation.source)?.state
+    if (state === undefined || state === 'done' || state === 'cancelled') continue
+    const blockers = index.get(relation.target)
+    if (blockers === undefined) index.set(relation.target, [relation.source])
+    else blockers.push(relation.source)
+  }
+  return index
+}
+
 /** Items this one blocks that are still active, which guard G7 reads. */
 export function blockedByThis(view: WorkspaceView, id: ItemId): readonly ItemId[] {
   return view.relations.relations
@@ -196,11 +216,10 @@ export function transitionContextFor(view: WorkspaceView, item: WorkItem): Trans
     readyGate: readyVerdict(view, item),
     doneGate: doneVerdict(view, item),
     blockers: activeBlockers(view, item.id),
-    // No board exists until `board` lands, and an absent column is what the domain reads as
-    // "no work-in-progress limit applies", rather than a limit of zero which would refuse.
-    // G4 reads "in the active sprint, or on the board", and only its sprint half exists; armed
-    // alone it would refuse every start in a workspace that runs no sprints, so it stays true
-    // until `board` can answer the other half (ADR-0016).
+    // The board is a projection that stores nothing (ADR-0017): there is no column to be
+    // over, so `column` stays absent and G3 passes, and no membership to lack, so G4's "on
+    // the board" is true of every item and the guard stays disarmed. Arming either takes a
+    // stored limit or a stored membership, which is `config`, specified and not built.
     iterationMember: true,
     reviewStep: hasReviewStep(item.type),
     blockedByThis: blockedByThis(view, item.id),

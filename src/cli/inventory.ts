@@ -3,12 +3,13 @@
 // agent-facing help, and for the JSON Schema of every command's result, and a test asserts
 // that the shipped schemas match what it generates.
 //
-// The flag matrix below is derived from five attributes per command rather than filled in
+// The flag matrix below is derived from six attributes per command rather than filled in
 // by hand. A cell that the rules cannot decide would be a per-command special case, and the
 // test that counts them is what proves there is none.
 
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
+import { BOARD_SHAPE } from '../application/services/board.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
 import { SET_SHAPE } from '../application/services/editing.ts'
 import { HISTORY_SHAPE } from '../application/services/history.ts'
@@ -33,6 +34,11 @@ export type Command = {
   readonly omits: boolean
   /** A query result, so a partial answer is a short one rather than a wrong one. */
   readonly pageable: boolean
+  /**
+   * `--limit` caps every list this command prints and no cursor resumes one: a board has
+   * five columns and no single order to resume from, so it takes the cap without the cursor.
+   */
+  readonly capped?: true
   readonly confirm: Confirmation
   /** True when the command needs no workspace, which decides `--workspace`. */
   readonly standalone: boolean
@@ -93,6 +99,21 @@ export const COMMANDS: readonly Command[] = [
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
+    ],
+  },
+  {
+    name: 'board', shape: BOARD_SHAPE, effect: 'read', record: 'list',
+    omits: true, pageable: false, capped: true, confirm: 'none', standalone: false,
+    columns: true,
+    usage: [
+      'treadle board [--sprint <id> | --all] [--limit <n>] [--fields <list>]',
+      'treadle board [--state <s>] [--type <t>] [--assignee <a>] [--priority <1-5>] [--resolution <r>]',
+    ],
+    examples: [
+      ['treadle board', 'the open sprint, one section per live state, blocked work first in each'],
+      ['treadle board --all', 'the whole workspace while a sprint is open'],
+      ['treadle board --sprint sprint-30', 'where a closed sprint left the work that still points at it'],
+      ['treadle board --type bug --limit 3', 'every filter backlog takes, and at most three rows per column'],
     ],
   },
   {
@@ -280,7 +301,7 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     case '--yes': return command.confirm === 'none' ? 'A' : 'S'
     case '--actor': return command.effect === 'mutate' ? 'S' : 'A'
     case '--fields': return command.columns ? 'S' : 'X'
-    case '--limit': return command.pageable ? 'S' : 'X'
+    case '--limit': return command.pageable || command.capped === true ? 'S' : 'X'
     // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
     // the tool prints itself in every `page` line, and `treadle version --cursor x` was
     // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.

@@ -523,7 +523,7 @@ function fieldOf(item: WorkItemSummary, field: Filter['field']): string | undefi
   return item.priority === undefined ? undefined : String(item.priority)
 }
 
-function matches(item: WorkItemSummary, filters: readonly Filter[]): boolean {
+export function matches(item: WorkItemSummary, filters: readonly Filter[]): boolean {
   return filters.every((filter) => fieldOf(item, filter.field) === filter.value)
 }
 
@@ -565,32 +565,42 @@ export function columnsFor(names: readonly string[]): readonly ColumnSpec[] {
   return names.map((name) => ITEM_COLUMNS.find((column) => column.name === name) ?? { name })
 }
 
+/**
+ * The two refusals a chosen column set can earn, shared by every list that takes `--fields`.
+ * C2 is a name the list does not have. C3 is F3: the row grammar splits on the first
+ * arity-1 spaces, so exactly one column may carry a value with a space in it; two of them is
+ * a set no ordering can rescue, and a row that parses into the wrong fields with no error
+ * is worse than a refusal.
+ */
+export function columnRefusal(
+  command: string, workspace: string, columns: readonly string[], known: readonly ColumnSpec[],
+): ResultObject | undefined {
+  const unknown = columns.find((name) => !known.some((column) => column.name === name))
+  if (unknown !== undefined) {
+    return errorResult({
+      code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C2',
+      cause: `${unknown} is not a column of this list; the columns are ${known.map((c) => c.name).join(', ')}`,
+      fix: [`treadle help ${command}`],
+    })
+  }
+  const free = columns.filter((name) => known.some((column) => column.name === name && column.text === true))
+  if (free.length > 1) {
+    return errorResult({
+      code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C3',
+      cause: `${free.join(' and ')} both carry free text, and a row can carry one such column; every field after the first would be read wrong`,
+      fix: [`treadle ${command} --fields ${columns.filter((name) => name !== free[0]).join(',')}`],
+    })
+  }
+  return undefined
+}
+
 export async function backlog(store: Store, request: BacklogRequest): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('backlog', 'read', view.error, undefined)
   const workspace = view.value.identity.id
 
-  const unknown = request.columns.find((name) => !ITEM_COLUMNS.some((column) => column.name === name))
-  if (unknown !== undefined) {
-    return errorResult({
-      code: 'VALIDATION', command: 'backlog', workspace, effect: 'read', rule: 'C2',
-      cause: `${unknown} is not a column of this list; the columns are ${ITEM_COLUMNS.map((c) => c.name).join(', ')}`,
-      fix: ['treadle help backlog'],
-    })
-  }
-
-  // F3: the row grammar splits on the first arity-1 spaces, so exactly one column may carry
-  // a value with a space in it. Two of them is a set no ordering can rescue, and a row that
-  // parses into the wrong fields with no error is worse than a refusal.
-  const free = request.columns.filter((name) =>
-    ITEM_COLUMNS.some((column) => column.name === name && column.text === true))
-  if (free.length > 1) {
-    return errorResult({
-      code: 'VALIDATION', command: 'backlog', workspace, effect: 'read', rule: 'C3',
-      cause: `${free.join(' and ')} both carry free text, and a row can carry one such column; every field after the first would be read wrong`,
-      fix: [`treadle backlog --fields ${request.columns.filter((name) => name !== free[0]).join(',')}`],
-    })
-  }
+  const refused = columnRefusal('backlog', workspace, request.columns, ITEM_COLUMNS)
+  if (refused !== undefined) return refused
 
   const matched = view.value.items.filter((item) => matches(item, request.filters)).sort(backlogOrder)
   const from = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
@@ -640,7 +650,7 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 }
 
 /** The clause whose own selectivity was lowest, so a caller learns which term to relax. */
-function narrowestClause(items: readonly WorkItem[], filters: readonly Filter[]): string | undefined {
+export function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Filter[]): string | undefined {
   let best: { readonly filter: Filter; readonly hits: number } | undefined
   for (const filter of filters) {
     const hits = items.filter((item) => fieldOf(item, filter.field) === filter.value).length
@@ -650,7 +660,7 @@ function narrowestClause(items: readonly WorkItem[], filters: readonly Filter[])
 }
 
 /** The first clause that excluded the id, or the store that was searched when it is nowhere. */
-function absence(
+export function absence(
   view: WorkspaceView, filters: readonly Filter[], id: ItemId,
 ): Readonly<Record<string, Value>> {
   const item = view.byId.get(id)
