@@ -6,7 +6,7 @@
 // A backlog answers "what is there"; a board answers "where is the work stuck". The second
 // question is why one column per live state is a block of its own, why an empty column is
 // still printed, and why a blocked row sorts above an unblocked one whatever its priority:
-// a column is capped, and the row a reader came for must be inside the cap. ADR-0017 argues
+// a column is capped, and the row a reader came for must be inside the cap. ADR-0018 argues
 // each of those against the alternatives.
 
 import { dayOfSprint, type ItemId, type WorkItemState, type WorkItemSummary } from '../../domain/index.ts'

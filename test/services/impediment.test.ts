@@ -87,7 +87,7 @@ describe('raising an impediment', () => {
   it('is listed under its type with its severity, and status no longer calls it absent', async () => {
     const listed = await cli(['backlog', '--type', 'impediment'])
     assert.match(listed.out, /^cert-expired impediment draft - S2 Staging certificate expired$/m)
-    assert.equal(line(await cli(['status']), 'absent_features'), 'absent_features board')
+    assert.equal(line(await cli(['status']), 'absent_features'), undefined, 'every feature the line named has landed')
   })
 })
 

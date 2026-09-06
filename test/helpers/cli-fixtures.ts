@@ -15,6 +15,7 @@ import type { ResultObject } from '../../src/application/result.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
+import { DEFAULT_BOARD_COLUMNS, board } from '../../src/application/services/board.ts'
 import { history } from '../../src/application/services/history.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
 import { relate } from '../../src/application/services/relation.ts'
@@ -181,6 +182,11 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     }))
     golden.set('explain-blocked', await explain(demo.store, 'theme-dark'))
     golden.set('show-relations', await showItem(demo.store, clock, 'queue-drain'))
+    // Over the whole workspace, since nothing is open yet: the blocked draft sorts first in
+    // its column, which is the one line a board carries that a backlog does not.
+    golden.set('board', await board(demo.store, clock, {
+      filters: [], columns: [...DEFAULT_BOARD_COLUMNS], limit: 9, all: false,
+    }))
     // A sprint, opened after every figure above so none of them gains the block `status`
     // prints for an open sprint: opened, two items committed, one finished, then closed with
     // the other recorded as carried. `sprints` is read once open and once closed.
@@ -194,6 +200,10 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       sprint: 'sprint-31', items: ['theme-dark'], actor: ACTOR,
     }))
     golden.set('status-sprint', await status(demo.store, fixedClock('2026-09-09T09:30:00Z')))
+    // The same board with no flags now scopes itself to the one open sprint and says so.
+    golden.set('board-sprint', await board(demo.store, fixedClock('2026-09-09T09:30:00Z'), {
+      filters: [], columns: [...DEFAULT_BOARD_COLUMNS], limit: 9, all: false,
+    }))
     golden.set('sprints-open', await sprints(demo.store, fixedClock('2026-09-09T09:30:00Z'), 'sprint-31'))
     for (const target of ['in_progress', 'done'] as const) {
       await transition(targetFor(demo.store, 'apply'), clock, ids, { id: 'webhook-retry', target, actor: ACTOR })

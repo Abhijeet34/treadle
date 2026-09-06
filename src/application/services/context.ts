@@ -216,7 +216,7 @@ export function transitionContextFor(view: WorkspaceView, item: WorkItem): Trans
     readyGate: readyVerdict(view, item),
     doneGate: doneVerdict(view, item),
     blockers: activeBlockers(view, item.id),
-    // The board is a projection that stores nothing (ADR-0017): there is no column to be
+    // The board is a projection that stores nothing (ADR-0018): there is no column to be
     // over, so `column` stays absent and G3 passes, and no membership to lack, so G4's "on
     // the board" is true of every item and the guard stays disarmed. Arming either takes a
     // stored limit or a stored membership, which is `config`, specified and not built.

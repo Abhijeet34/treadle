@@ -111,7 +111,7 @@ describe('a sprint from open to close, at the command surface', () => {
   it('shows the open sprints on status, and no longer lists sprint as absent', async () => {
     const status = await cli(['status'])
     assert.equal(status.code, 0, status.err)
-    assert.match(status.out, /^absent_features board$/m)
+    assert.doesNotMatch(status.out, /^absent_features/m, 'every feature it named has landed')
     assert.match(status.out, /^~sprints 2 2$/m)
     assert.match(status.out, /^#id day items pts "title$/m)
     assert.match(status.out, /^sprint-31 -?\d+\/12 0\/3 0\/10 Sprint 31$/m)

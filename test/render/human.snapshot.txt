@@ -4,7 +4,6 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -29,7 +28,6 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -54,7 +52,6 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -481,18 +478,18 @@ help  acme-platform
     description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to
     pick up
+  example  treadle board # the open sprint, one section per
+    live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
-  example  treadle set checkout-500 expected="both orders
-    are listed" actual="one is charged" # fill in what a bug
-    was filed without, which is what the ready gate reads
 
-commands  18 of 18
+commands  19 of 19
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
   show        read    no        Print the stored fields o…
   backlog     read    yes       List the items that match…
+  board       read    no        Group the live work by st…
   transition  mutate  no        Move one item to a target…
   set         mutate  no        Write one or more stored …
   mark        mutate  no        Set the severity or the p…
@@ -524,18 +521,18 @@ help  acme-platform
   example  treadle show auth-refresh --field desc # the description whole,
     rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
+  example  treadle board # the open sprint, one section per live state, blocked
+    work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
-  example  treadle set checkout-500 expected="both orders are listed"
-    actual="one is charged" # fill in what a bug was filed without, which is
-    what the ready gate reads
 
-commands  18 of 18
+commands  19 of 19
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one st…
+  board       read    no        Group the live work by state, scoped to the o…
   transition  mutate  no        Move one item to a target state, with every g…
   set         mutate  no        Write one or more stored fields of an item th…
   mark        mutate  no        Set the severity or the priority of one item,…
@@ -563,15 +560,16 @@ help  acme-platform
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
+  example  treadle board # the open sprint, one section per live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
-  example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 
-commands  18 of 18
+commands  19 of 19
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one stated order.
+  board       read    no        Group the live work by state, scoped to the open sprint, with blocked work first in every column.
   transition  mutate  no        Move one item to a target state, with every guard on that edge evaluated.
   set         mutate  no        Write one or more stored fields of an item that is already filed.
   mark        mutate  no        Set the severity or the priority of one item, with the reason and both values in the log.
@@ -945,7 +943,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -975,7 +972,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1005,7 +1001,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1034,7 +1029,6 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1059,7 +1053,6 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1084,7 +1077,6 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1277,6 +1269,144 @@ relations  1 of 1
   KIND    OTHER
   blocks  theme-dark
 
+### board @ 60
+board  acme-platform
+  scope  workspace
+  sort  blocked,priority,filed,id
+  blocked  1
+  done  1
+  cancelled  1
+
+draft  9 of 13
+  ID            TYPE   PTS  SEV  BLOCKED
+  theme-dark    story  5    -    queue-drain
+    Ship a dark theme
+  sess-timeout  bug    3    S1   -
+    Session survives a password change
+  key-rotate    task   -    -    -
+    Rotate the signing key
+  audit-log     story  8    -    -
+    Record who changed what and when
+  stale-cache   bug    2    S3   -
+    Profile cache serves a deleted avatar
+  queue-drain   task   3    -    -
+    Drain the dead letter queue on deploy
+  search-rank   spike  -    -    -
+    Which ranker do we adopt
+  bulk-import   story  8    -    -
+    Import a list of accounts from CSV
+  perm-audit    spike  -    -    -
+    Do we need row level permissions
+
+ready  5 of 5
+  ID             TYPE   PTS  SEV  BLOCKED  TITLE
+  flaky-e2e      bug    2    S2   -        Checkout suite…
+  gdpr-export    story  5    -    -        Export everyth…
+  webhook-retry  task   3    -    -        Retry a failed…
+  dep-bump       chore  1    -    -        Move the toolc…
+  avatar-crop    task   2    -    -        Crop an upload…
+
+in_progress  4 of 4
+  ID            TYPE   PTS  SEV  BLOCKED  TITLE
+  sso-saml      story  8    -    -        SAML login for …
+  log-redact    task   3    -    -        Redact tokens f…
+  auth-refresh  story  5    -    -        Refresh the acc…
+  csv-export    story  5    -    -        Export a filter…
+
+in_review  1 of 1
+  ID          TYPE   PTS  SEV  BLOCKED  TITLE
+  rate-limit  story  3    -    -        Return 429 with a…
+
+on_hold  1 of 1
+  ID            TYPE  PTS  SEV  BLOCKED  TITLE
+  onboard-copy  task  2    -    -        Rewrite the firs…
+
+### board @ 80
+board  acme-platform
+  scope  workspace
+  sort  blocked,priority,filed,id
+  blocked  1
+  done  1
+  cancelled  1
+
+draft  9 of 13
+  ID            TYPE   PTS  SEV  BLOCKED      TITLE
+  theme-dark    story  5    -    queue-drain  Ship a dark theme
+  sess-timeout  bug    3    S1   -            Session survives a password cha…
+  key-rotate    task   -    -    -            Rotate the signing key
+  audit-log     story  8    -    -            Record who changed what and when
+  stale-cache   bug    2    S3   -            Profile cache serves a deleted …
+  queue-drain   task   3    -    -            Drain the dead letter queue on …
+  search-rank   spike  -    -    -            Which ranker do we adopt
+  bulk-import   story  8    -    -            Import a list of accounts from …
+  perm-audit    spike  -    -    -            Do we need row level permissions
+
+ready  5 of 5
+  ID             TYPE   PTS  SEV  BLOCKED  TITLE
+  flaky-e2e      bug    2    S2   -        Checkout suite fails, one run in f…
+  gdpr-export    story  5    -    -        Export everything we hold on one a…
+  webhook-retry  task   3    -    -        Retry a failed webhook three times
+  dep-bump       chore  1    -    -        Move the toolchain to the current …
+  avatar-crop    task   2    -    -        Crop an uploaded avatar to a square
+
+in_progress  4 of 4
+  ID            TYPE   PTS  SEV  BLOCKED  TITLE
+  sso-saml      story  8    -    -        SAML login for enterprise tenants
+  log-redact    task   3    -    -        Redact tokens from request logs
+  auth-refresh  story  5    -    -        Refresh the access token on a 401
+  csv-export    story  5    -    -        Export a filtered list to CSV
+
+in_review  1 of 1
+  ID          TYPE   PTS  SEV  BLOCKED  TITLE
+  rate-limit  story  3    -    -        Return 429 with a retry-after header
+
+on_hold  1 of 1
+  ID            TYPE  PTS  SEV  BLOCKED  TITLE
+  onboard-copy  task  2    -    -        Rewrite the first-run text
+
+### board @ 200
+board  acme-platform
+  scope  workspace
+  sort  blocked,priority,filed,id
+  blocked  1
+  done  1
+  cancelled  1
+
+draft  9 of 13
+  ID            TYPE   PTS  SEV  BLOCKED      TITLE
+  theme-dark    story  5    -    queue-drain  Ship a dark theme
+  sess-timeout  bug    3    S1   -            Session survives a password change
+  key-rotate    task   -    -    -            Rotate the signing key
+  audit-log     story  8    -    -            Record who changed what and when
+  stale-cache   bug    2    S3   -            Profile cache serves a deleted avatar
+  queue-drain   task   3    -    -            Drain the dead letter queue on deploy
+  search-rank   spike  -    -    -            Which ranker do we adopt
+  bulk-import   story  8    -    -            Import a list of accounts from CSV
+  perm-audit    spike  -    -    -            Do we need row level permissions
+
+ready  5 of 5
+  ID             TYPE   PTS  SEV  BLOCKED  TITLE
+  flaky-e2e      bug    2    S2   -        Checkout suite fails, one run in five
+  gdpr-export    story  5    -    -        Export everything we hold on one account
+  webhook-retry  task   3    -    -        Retry a failed webhook three times
+  dep-bump       chore  1    -    -        Move the toolchain to the current release
+  avatar-crop    task   2    -    -        Crop an uploaded avatar to a square
+
+in_progress  4 of 4
+  ID            TYPE   PTS  SEV  BLOCKED  TITLE
+  sso-saml      story  8    -    -        SAML login for enterprise tenants
+  log-redact    task   3    -    -        Redact tokens from request logs
+  auth-refresh  story  5    -    -        Refresh the access token on a 401
+  csv-export    story  5    -    -        Export a filtered list to CSV
+
+in_review  1 of 1
+  ID          TYPE   PTS  SEV  BLOCKED  TITLE
+  rate-limit  story  3    -    -        Return 429 with a retry-after header
+
+on_hold  1 of 1
+  ID            TYPE  PTS  SEV  BLOCKED  TITLE
+  onboard-copy  task  2    -    -        Rewrite the first-run text
+
 ### sprint-open @ 60
 sprint  acme-platform  1 changed  txn t0906
   sprint  sprint-31
@@ -1375,7 +1505,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1409,7 +1538,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1443,7 +1571,6 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1469,6 +1596,72 @@ next  3 of 3
 sprints  1 of 1
   ID         DAY   ITEMS  PTS  TITLE
   sprint-31  3/12  0/2    0/5  Sprint 31
+
+### board-sprint @ 60
+board  acme-platform
+  scope  sprint-31 open day 3/12
+  whole  treadle board --all
+  sort  blocked,priority,filed,id
+  blocked  0
+  done  0
+  cancelled  0
+
+draft  0 of 0
+
+ready  2 of 2
+  ID             TYPE  PTS  SEV  BLOCKED  TITLE
+  webhook-retry  task  3    -    -        Retry a failed …
+  avatar-crop    task  2    -    -        Crop an uploade…
+
+in_progress  0 of 0
+
+in_review  0 of 0
+
+on_hold  0 of 0
+
+### board-sprint @ 80
+board  acme-platform
+  scope  sprint-31 open day 3/12
+  whole  treadle board --all
+  sort  blocked,priority,filed,id
+  blocked  0
+  done  0
+  cancelled  0
+
+draft  0 of 0
+
+ready  2 of 2
+  ID             TYPE  PTS  SEV  BLOCKED  TITLE
+  webhook-retry  task  3    -    -        Retry a failed webhook three times
+  avatar-crop    task  2    -    -        Crop an uploaded avatar to a square
+
+in_progress  0 of 0
+
+in_review  0 of 0
+
+on_hold  0 of 0
+
+### board-sprint @ 200
+board  acme-platform
+  scope  sprint-31 open day 3/12
+  whole  treadle board --all
+  sort  blocked,priority,filed,id
+  blocked  0
+  done  0
+  cancelled  0
+
+draft  0 of 0
+
+ready  2 of 2
+  ID             TYPE  PTS  SEV  BLOCKED  TITLE
+  webhook-retry  task  3    -    -        Retry a failed webhook three times
+  avatar-crop    task  2    -    -        Crop an uploaded avatar to a square
+
+in_progress  0 of 0
+
+in_review  0 of 0
+
+on_hold  0 of 0
 
 ### sprints-open @ 60
 sprints  acme-platform
