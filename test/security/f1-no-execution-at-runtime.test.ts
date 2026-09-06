@@ -83,6 +83,7 @@ function invocations(inside: string, elsewhere: string): ReadonlyMap<string, Inv
     ['file', ['file', 'task', 'A task filed with execution trapped']],
     ['show', ['show', 'auth-refresh']],
     ['backlog', ['backlog', '--state', 'ready']],
+    ['board', ['board', '--all']],
     ['transition', ['transition', 'sso-saml', 'in_review']],
     ['set', ['set', 'flaky-e2e', 'expected=five passes', 'fix_confirmed=true']],
     ['mark', ['mark', 'flaky-e2e', '--severity', 'S1', '--reason', 'it fails the release suite']],

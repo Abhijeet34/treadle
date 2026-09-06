@@ -7,6 +7,7 @@
 // the outcome. docs/DOMAIN.md carries the rule table the errors name.
 
 import { fail, type DomainError } from './errors.ts'
+import { withArticle } from './text.ts'
 import { MAX_REASON, overLength } from './fields.ts'
 import type { GateVerdict } from './gates.ts'
 import {
@@ -183,8 +184,8 @@ function evaluateGuard(guard: GuardId, context: TransitionContext, spec: Transit
       const wantsReview = spec.name === 'submit'
       if (wantsReview === context.reviewStep) return pass(context.reviewStep ? 'review' : 'no-review')
       return context.reviewStep
-        ? no(`a ${context.item.type} has a review step, so in_progress exits through in_review`, `run the submit transition on ${context.item.id} instead`)
-        : no(`a ${context.item.type} has no review step, so in_progress exits through done`, `run the finish transition on ${context.item.id} instead`)
+        ? no(`${withArticle(context.item.type)} has a review step, so in_progress exits through in_review`, `run the submit transition on ${context.item.id} instead`)
+        : no(`${withArticle(context.item.type)} has no review step, so in_progress exits through done`, `run the finish transition on ${context.item.id} instead`)
     }
     case 'G6': {
       const failed = context.doneGate.rules.filter((r) => !r.pass).map((r) => r.rule)

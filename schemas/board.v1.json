@@ -1,0 +1,553 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "board.v1.json",
+  "title": "board/1",
+  "description": "Group the live work by state, scoped to the open sprint, with blocked work first in every column.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "board/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL",
+        "INTEGRITY"
+      ]
+    },
+    "command": {
+      "const": "board"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "whole": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "blocked": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "done": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cancelled": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "narrowest": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "absent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "clause": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "draft": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "blocked"
+            }
+          ]
+        },
+        "ready": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "blocked"
+            }
+          ]
+        },
+        "in_progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "blocked"
+            }
+          ]
+        },
+        "in_review": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "blocked"
+            }
+          ]
+        },
+        "on_hold": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "type"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "pri"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "blocked"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

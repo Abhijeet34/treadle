@@ -363,6 +363,20 @@ committed onward. `sprint_id` is owned by `sprint commit` in `writerOf`, and `fi
 is held to the same rules. Guard `G4` stays `true`: only its sprint half exists, and arming
 half a guard would refuse every start in a workspace that runs no sprints; `board` decides it.
 
+## A board stores nothing, and its columns are blocks of one shape
+
+`board` is `backlog` grouped by state: `src/application/services/board.ts` reuses the
+backlog's filters, columns, rows and absence clauses, and adds one column, `blocked`, fed
+from `activeBlockerIndex` in `context.ts`, which is one pass over the relation graph where
+`activeBlockers` is one pass per call. Each of the five live states is a block property of
+the one shape, in flow order, printed empty; `done` and `cancelled` are counts. Nothing is
+stored, so there is no membership for `G4` and no column limit for `G3`, and both guards
+stay disarmed; ADR-0018 argues that and every other call. The scope is the one open sprint
+unless `--sprint` or `--all` says otherwise, two open sprints are a `C1` refusal naming
+both, and a blocked row sorts first in its column because a column is capped at `--limit`
+and the stuck work must be inside the cap. `--limit` without `--cursor` is the inventory's
+`capped` attribute, which is how the flag matrix stays derived.
+
 ## Where a terminal nuance goes, and where a derived flag goes
 
 Neither is a state.

@@ -84,7 +84,8 @@ See [Status](#status) for the line between implemented and specified-only.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never enter a sprint.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly.
-- **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest. Boards are specified and not yet implemented.
+- **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest.
+- **A board that stores nothing.** `board` is the backlog grouped by state, scoped to the open sprint unless told otherwise, with a blocked row first in its column and its blocker named beside it; it takes every filter `backlog` takes and caps each column at `--limit` with the column's total beside the cap.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change.
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
@@ -99,13 +100,14 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: ceremony records; `migrate` | Specified, not implemented; an impediment is a work-item type in the month shards rather than a record of its own, [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
 | `doctor`: nine findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
-| Sprints, boards, ceremonies, metrics, export, completions | Specified, not implemented |
+| Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
+| Ceremonies, metrics, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |

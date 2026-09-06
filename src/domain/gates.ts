@@ -6,6 +6,7 @@
 // a second code path, so what the gate prints is exactly what guards G1 and G6 decide.
 
 import { fail, ok, type Result } from './errors.ts'
+import { withArticle } from './text.ts'
 import { fieldsOf, isKnownField, requiredAtCreation, writeCommand, writerOf } from './fields.ts'
 import { isTerminal, type ItemId, type WorkItem, type WorkItemState, type WorkItemType } from './types.ts'
 
@@ -255,7 +256,7 @@ export function validateGate(gate: Gate): Result<Gate> {
       return fail(
         'VALIDATION',
         'V6',
-        `gate rule ${rule.id} reads ${field}, which is not a field of ${rule.scope === 'all' ? 'every type' : `a ${rule.scope}`}`,
+        `gate rule ${rule.id} reads ${field}, which is not a field of ${rule.scope === 'all' ? 'every type' : withArticle(rule.scope)}`,
         [rule.id, field],
       )
     }

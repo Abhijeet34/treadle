@@ -15,6 +15,7 @@ import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { setFields } from '../application/services/editing.ts'
 import { DEFAULT_BACKLOG_COLUMNS, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
+import { DEFAULT_BOARD_COLUMNS, board } from '../application/services/board.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
 import { explain, next, status } from '../application/services/insight.ts'
@@ -328,6 +329,17 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       columns,
       limit: positiveInt(flag(flags, 'limit'), 9),
       ...(cursor === undefined ? {} : { cursor }),
+      ...(absence === undefined ? {} : { explainAbsence: absence }),
+    })
+  }
+
+  if (command === 'board') {
+    const absence = flag(flags, 'explain-absence')
+    return board(store, systemClock, {
+      filters: filtersOf(flags, input.filterOrder),
+      columns: fieldsOf(flags, DEFAULT_BOARD_COLUMNS),
+      limit: positiveInt(flag(flags, 'limit'), 9),
+      all: flags['all'] === true,
       ...(absence === undefined ? {} : { explainAbsence: absence }),
     })
   }

@@ -429,7 +429,6 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // Both lines are absent when there is nothing to say, which is what keeps the
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
-      absent_features: 'board',
       ...(defects === undefined ? {} : { defects }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),

@@ -188,7 +188,7 @@ const QUESTIONS: readonly Question[] = [
   {
     n: 21, question: 'is any column over its limit',
     fullNeeds: 'each board column against its work-in-progress limit',
-    note: 'there is no board, so guard G3 evaluates against no column at all',
+    note: 'the board has columns but no stored work-in-progress limit, so guard G3 evaluates against no limit at all',
   },
   {
     n: 22, question: 'what will this command do',

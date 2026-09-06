@@ -7,6 +7,7 @@
 // ceiling, and reports a cycle as a named refusal rather than recursing into it.
 
 import { fail, ok, type Result } from './errors.ts'
+import { withArticle } from './text.ts'
 import {
   type ItemId,
   type WorkItemSummary,
@@ -177,7 +178,7 @@ export function setParent(
     return fail(
       'GUARD_REFUSED',
       'P1',
-      `a ${parentType} cannot be the parent of a ${childType}`,
+      `${withArticle(parentType)} cannot be the parent of ${withArticle(childType)}`,
       [parentId, childId],
     )
   }

@@ -52,6 +52,9 @@ describe('per-type required fields at creation', () => {
     }
   })
 
+  /** Spelled out rather than derived, so a message that read `a impediment` cannot pass. */
+  const article = (type: string): string => (type === 'epic' || type === 'impediment' ? 'an' : 'a')
+
   for (const type of WORK_ITEM_TYPES) {
     for (const field of expected[type] ?? []) {
       it(`refuses a ${type} missing ${field}, naming the field and the rule`, () => {
@@ -60,7 +63,7 @@ describe('per-type required fields at creation', () => {
         const error = errorOf(validateWorkItem(subject as never, OPTIONS))
         assert.equal(error.code, 'VALIDATION')
         assert.equal(error.rule, 'V4')
-        assert.ok(error.message.includes(field), error.message)
+        assert.equal(error.message, `${article(type)} ${type} needs ${field} at creation`)
       })
     }
   }

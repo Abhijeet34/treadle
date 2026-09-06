@@ -8,6 +8,7 @@ ADR-0013 belongs to no design record at all: it answers an incident in this repo
 ADR-0014 carries the next free number for the same reason ADR-0009 does: the read it reshapes is one the design never priced.
 ADR-0015 carries the next free number because the sprint is DR2's entity built under a design the four absent capabilities share, and that design is not a numbered design record.
 ADR-0016 carries the next free number for the same reason, and ADR-0017 carries the next free number after it for the same reason again: an impediment is one of the same four absent capabilities.
+ADR-0018 is the fourth of them, the board.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -28,6 +29,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0015](0015-relations-stored-once-and-the-guard-they-feed.md) | A relation is one stored direction on its source record with the inverse derived on read, the `G2` guard it feeds already existed, and a dangling edge is a finding |
 | [ADR-0016](0016-sprints.md) | A sprint is a period with a committed set, kept in one `sprints.md`, whose close records the carry-over and leaves unfinished work pointing at it |
 | [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) | An impediment is a work-item type that blocks through the relation graph, required at creation to say what would clear it, resolved by reaching `done` with nothing unlinked |
+| [ADR-0018](0018-the-board-is-a-projection.md) | The board is the backlog grouped by live state and scoped to the open sprint, stores nothing, sorts blocked work first, and leaves `G3` and `G4` disarmed |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.

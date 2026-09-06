@@ -42,7 +42,8 @@ describe('allowed parent pairs', () => {
         } else {
           const error = errorOf(result)
           assert.equal(error.rule, 'P1', `${parent}>${child} should be refused`)
-          assert.ok(error.message.includes(parent) && error.message.includes(child), error.message)
+          const article = (type: string): string => (type === 'epic' || type === 'impediment' ? 'an' : 'a')
+          assert.equal(error.message, `${article(parent)} ${parent} cannot be the parent of ${article(child)} ${child}`)
         }
       }
     }
