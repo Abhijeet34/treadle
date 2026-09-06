@@ -10,6 +10,7 @@ import {
   type AcceptanceCriterion,
   type ItemId,
   type WorkItem,
+  type WorkItemSummary,
   type WorkItemType,
 } from '../../domain/index.ts'
 import {
@@ -26,7 +27,7 @@ import {
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { readWorkspace, type WorkspaceView } from './context.ts'
+import { readWorkspace, wholeItem, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -360,7 +361,9 @@ export async function showItem(
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('show', 'read', view.error, undefined)
   const workspace = view.value.identity.id
-  const item = view.value.byId.get(id)
+  const whole = await wholeItem(store, view.value, id)
+  if (!whole.ok) return storeRefusal('show', 'read', whole.error, workspace)
+  const item = whole.value
   if (item === undefined) return notFound('show', workspace, view.value, id)
 
   const data: Record<string, Value> = {
@@ -461,7 +464,7 @@ export type Filter = {
   readonly value: string
 }
 
-function fieldOf(item: WorkItem, field: Filter['field']): string | undefined {
+function fieldOf(item: WorkItemSummary, field: Filter['field']): string | undefined {
   if (field === 'state') return item.state
   if (field === 'type') return item.type
   if (field === 'sprint') return item.sprint_id
@@ -470,20 +473,20 @@ function fieldOf(item: WorkItem, field: Filter['field']): string | undefined {
   return item.priority === undefined ? undefined : String(item.priority)
 }
 
-function matches(item: WorkItem, filters: readonly Filter[]): boolean {
+function matches(item: WorkItemSummary, filters: readonly Filter[]): boolean {
   return filters.every((filter) => fieldOf(item, filter.field) === filter.value)
 }
 
 const NO_PRIORITY = 6
 
-export function backlogOrder(a: WorkItem, b: WorkItem): number {
+export function backlogOrder(a: WorkItemSummary, b: WorkItemSummary): number {
   const priority = (a.priority ?? NO_PRIORITY) - (b.priority ?? NO_PRIORITY)
   if (priority !== 0) return priority
   if (a.filed_at !== b.filed_at) return a.filed_at < b.filed_at ? -1 : 1
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-export function rowFor(item: WorkItem, columns: readonly string[]): Row {
+export function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
   const row: Record<string, string | number | null> = {}
   for (const column of columns) {
     if (column === 'id') row[column] = item.id

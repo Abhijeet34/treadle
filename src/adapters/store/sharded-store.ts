@@ -16,7 +16,12 @@ import path from 'node:path'
 import {
   cycleAbove,
   findParentCycle,
+  type BugSeverity,
+  type Resolution,
   type WorkItem,
+  type WorkItemState,
+  type WorkItemSummary,
+  type WorkItemType,
 } from '../../domain/index.ts'
 import {
   duplicateRefusal,
@@ -46,7 +51,7 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource } from './index-cache.ts'
+import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
@@ -216,6 +221,23 @@ export class ShardedStore implements Store {
       if (!item.ok) return item
       if (item.value !== undefined) items.push(item.value)
     }
+    return storeOk(items)
+  }
+
+  async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
+    const fresh = await this.#refresh()
+    if (!fresh.ok) return fresh
+    const items: WorkItemSummary[] = []
+    // SQLite hands back a fresh string per cell, so 50,000 rows carried 50,000 copies of
+    // `task`. One copy of each value the bounded columns take is what the view then holds.
+    const seen = new Map<string, string>()
+    const intern = (value: string): string => {
+      const held = seen.get(value)
+      if (held !== undefined) return held
+      seen.set(value, value)
+      return value
+    }
+    for (const row of this.#index.listSummaries(query)) items.push(summaryOf(row, intern))
     return storeOk(items)
   }
 
@@ -829,7 +851,33 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
     assignee: item.assignee ?? null,
     filed_at: item.filed_at,
     title: item.title,
+    resolution: item.resolution ?? null,
+    due: item.due ?? null,
+    severity: item.severity ?? null,
     source,
+  }
+}
+
+/**
+ * The inverse of `rowOf` over the columns a summary carries. An absent field is absent, not
+ * null, so a summary reads exactly as the item `list` decodes from the same record.
+ */
+export function summaryOf(row: SummaryRow, intern: (value: string) => string = (value) => value): WorkItemSummary {
+  return {
+    id: row.id,
+    type: intern(row.type) as WorkItemType,
+    state: intern(row.state) as WorkItemState,
+    title: row.title,
+    filed_at: row.filed_at,
+    version: row.version,
+    ...(row.priority === null ? {} : { priority: row.priority }),
+    ...(row.points === null ? {} : { points: row.points }),
+    ...(row.parent === null ? {} : { parent_id: row.parent }),
+    ...(row.assignee === null ? {} : { assignee: intern(row.assignee) }),
+    ...(row.sprint === null ? {} : { sprint_id: intern(row.sprint) }),
+    ...(row.resolution === null ? {} : { resolution: intern(row.resolution) as Resolution }),
+    ...(row.due === null ? {} : { due: row.due }),
+    ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),
   }
 }
 

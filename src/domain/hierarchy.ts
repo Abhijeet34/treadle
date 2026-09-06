@@ -9,7 +9,7 @@
 import { fail, ok, type Result } from './errors.ts'
 import {
   type ItemId,
-  type WorkItem,
+  type WorkItemSummary,
   type WorkItemState,
   type WorkItemType,
 } from './types.ts'
@@ -47,7 +47,7 @@ export type RollUp = {
   readonly doneDescendants: number
 }
 
-function index(items: Iterable<WorkItem>): HierarchyGraph {
+function index(items: Iterable<WorkItemSummary>): HierarchyGraph {
   const parentOf = new Map<ItemId, ItemId>()
   const childrenOf = new Map<ItemId, ItemId[]>()
   const typeOf = new Map<ItemId, WorkItemType>()
@@ -69,7 +69,7 @@ function index(items: Iterable<WorkItem>): HierarchyGraph {
 }
 
 /** Builds the graph from a set of items. This is the load path, so it validates nothing. */
-export function hierarchyFrom(items: Iterable<WorkItem>): HierarchyGraph {
+export function hierarchyFrom(items: Iterable<WorkItemSummary>): HierarchyGraph {
   return index(items)
 }
 

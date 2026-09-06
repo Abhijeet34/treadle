@@ -5,7 +5,7 @@
 // what lets a later implementation coordinate differently without a contract change.
 
 import type { DomainErrorCode } from '../../domain/index.ts'
-import type { Instant, ItemId, WorkItem, WorkItemState, WorkItemType } from '../../domain/index.ts'
+import type { Instant, ItemId, WorkItem, WorkItemState, WorkItemSummary, WorkItemType } from '../../domain/index.ts'
 
 /**
  * The domain's three codes plus the five a store can produce on its own. Widening a
@@ -151,6 +151,12 @@ export interface Store {
   identity(): Promise<StoreResult<StoreIdentity>>
   get(id: ItemId): Promise<StoreResult<WorkItem | undefined>>
   list(query?: ItemQuery): Promise<StoreResult<readonly WorkItem[]>>
+  /**
+   * The same items as `list` in the same order, as the fields a scan over the whole set
+   * reads. The prose and the lists of one record are `get`'s to serve. Every field is the
+   * record's own as `list` would serve it, never a cached approximation of it.
+   */
+  summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
   /** All-or-nothing: every write lands or none does, under the store's own serialisation. */
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>

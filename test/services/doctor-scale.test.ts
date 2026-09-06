@@ -14,9 +14,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import { auditItem, auditWorkspace } from '../../src/application/services/doctor.ts'
-import type { WorkspaceView } from '../../src/application/services/context.ts'
 import type { StoreEvent } from '../../src/application/ports/store.ts'
-import { emptyRelationGraph, hierarchyFrom, type WorkItem } from '../../src/domain/index.ts'
+import type { WorkItem } from '../../src/domain/index.ts'
 
 const ITEMS = 50
 const EVENTS_PER_ITEM = 8
@@ -56,16 +55,6 @@ function aLog(items: readonly WorkItem[]): readonly StoreEvent[] {
   return events
 }
 
-function aView(items: readonly WorkItem[]): WorkspaceView {
-  return {
-    identity: { id: 'ws', name: 'ws', schema: 1 } as WorkspaceView['identity'],
-    items,
-    byId: new Map(items.map((item) => [item.id, item])),
-    hierarchy: hierarchyFrom(items),
-    relations: emptyRelationGraph(),
-  }
-}
-
 /** The same events, over an array that records how many times something iterated it. */
 function countingLog(events: readonly StoreEvent[]): { log: readonly StoreEvent[]; passes: () => number } {
   const log = [...events]
@@ -82,18 +71,17 @@ function countingLog(events: readonly StoreEvent[]): { log: readonly StoreEvent[
 describe('doctor audits a workspace in one pass over the log', () => {
   const items = Array.from({ length: ITEMS }, (_, index) => anItem(index))
   const events = aLog(items)
-  const view = aView(items)
 
   it('walks the whole log a bounded number of times, not once per item', () => {
     const { log, passes } = countingLog(events)
-    auditWorkspace(view, log)
+    auditWorkspace(items, log)
     // One pass builds the buckets. Anything that grows with the item count is the shape this
     // test exists to refuse: the version before the fix made three passes per item, 150 here.
     assert.ok(passes() <= 2, `auditWorkspace walked the whole log ${passes()} times over ${ITEMS} items`)
   })
 
   it('returns exactly what auditing each item against the whole log returns', () => {
-    const bucketed = auditWorkspace(view, events)
+    const bucketed = auditWorkspace(items, events)
     const whole = items.flatMap((item) => auditItem(item, events))
     assert.deepEqual(bucketed, whole)
     assert.ok(bucketed.length > 0, 'the fixture produced no findings, so the comparison proved nothing')

@@ -10,7 +10,7 @@
 // goes through encode, render, parse and decode exactly as the sharded store's does, so a
 // dry run can never approve a record the real store would refuse to write.
 
-import type { WorkItem } from '../../domain/index.ts'
+import { summaryOf, type WorkItem, type WorkItemSummary } from '../../domain/index.ts'
 import {
   duplicateRefusal,
   storeFail,
@@ -29,15 +29,23 @@ import {
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 
-function matches(item: WorkItem, query: ItemQuery): boolean {
+function matches(item: WorkItemSummary, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
   if (query.type !== undefined && item.type !== query.type) return false
   if (query.sprint !== undefined && item.sprint_id !== query.sprint) return false
   return true
 }
 
-function order(a: WorkItem, b: WorkItem): number {
+function order(a: WorkItemSummary, b: WorkItemSummary): number {
   return a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at)
+}
+
+/** The base store's rows with this layer's writes over them, in `list`'s order. */
+function merged<T extends WorkItemSummary>(base: readonly T[], pending: Iterable<T>, query: ItemQuery): readonly T[] {
+  const byId = new Map(base.map((item) => [item.id, item]))
+  for (const item of pending) byId.set(item.id, item)
+  const items = [...byId.values()].filter((item) => matches(item, query)).sort(order)
+  return query.limit === undefined ? items : items.slice(0, query.limit)
 }
 
 export class OverlayStore implements Store {
@@ -62,10 +70,13 @@ export class OverlayStore implements Store {
   async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
     const base = await this.#base.list({})
     if (!base.ok) return base
-    const merged = new Map(base.value.map((item) => [item.id, item]))
-    for (const [id, item] of this.#items) merged.set(id, item)
-    const items = [...merged.values()].filter((item) => matches(item, query)).sort(order)
-    return storeOk(query.limit === undefined ? items : items.slice(0, query.limit))
+    return storeOk(merged(base.value, this.#items.values(), query))
+  }
+
+  async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
+    const base = await this.#base.summaries({})
+    if (!base.ok) return base
+    return storeOk(merged(base.value, [...this.#items.values()].map(summaryOf), query))
   }
 
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {

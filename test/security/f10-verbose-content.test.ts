@@ -44,18 +44,25 @@ describe('F10: a value pasted into a description does not reach a verbose log', 
   it('logs the raw store operations at -vvv, so the level is not a no-op', async () => {
     const run = await runCli(['backlog', '-vvv'], { cwd })
     assert.match(run.err, /vvv store read /, 'nothing was logged at -vvv')
-    assert.match(run.err, /vvv store list n=/)
+    assert.match(run.err, /vvv store summaries n=/)
   })
 
+  // A scan reads no prose at all since ADR-0013, so `backlog` cannot leak a description and
+  // the log says so: its `read` lines carry no description field. `show` is the command
+  // that reads the whole record, so it is the one that has to name the field and its size.
   it('names the field and its size, and never its content', async () => {
-    const run = await runCli(['backlog', '-vvv'], { cwd })
+    const scan = await runCli(['backlog', '-vvv'], { cwd })
+    assert.equal(scan.err.includes(PASTED), false, `the pasted value reached stderr:\n${scan.err}`)
+    assert.doesNotMatch(scan.err, /description=/, 'a scan read a description it has no use for')
+    assert.equal(scan.out.includes(PASTED), false, 'a list row must not carry a description either')
+
+    const run = await runCli(['show', 'secret-probe', '-vvv'], { cwd })
     assert.equal(run.err.includes(PASTED), false, `the pasted value reached stderr:\n${run.err}`)
     assert.match(run.err, /description=<redacted \d+B>/, 'the field is not reported by name and size')
-    assert.equal(run.out.includes(PASTED), false, 'a list row must not carry a description either')
   })
 
   it('includes the value only when the caller asks for it', async () => {
-    const run = await runCli(['backlog', '-vvv', '--log-values'], { cwd })
+    const run = await runCli(['show', 'secret-probe', '-vvv', '--log-values'], { cwd })
     assert.ok(run.err.includes(PASTED), 'the explicit opt-in must still be able to show a value')
   })
 

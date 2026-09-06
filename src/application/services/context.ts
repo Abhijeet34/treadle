@@ -24,9 +24,10 @@ import {
   type TransitionContext,
   type WorkItem,
   type WorkItemState,
+  type WorkItemSummary,
   type WorkItemType,
 } from '../../domain/index.ts'
-import { storeFail, type Finding, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
+import { storeFail, storeOk, type Finding, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input. Workspace
@@ -40,8 +41,14 @@ export function hasReviewStep(type: WorkItemType): boolean {
 
 export type WorkspaceView = {
   readonly identity: StoreIdentity
-  /** Every item the store holds, because a view over fewer is refused before it exists. */
-  readonly items: readonly WorkItem[]
+  /**
+   * Every item the store holds, because a view over fewer is refused before it exists, as
+   * the fields a scan reads. The whole record of the one item a command acts on is read by
+   * `wholeItem` after this view has established that the id names one; holding every record
+   * decoded put the read every command performs at 408 MiB and 1.2 s over 50,000 items, to
+   * print a few hundred bytes about one of them. ADR-0013 carries the measurement.
+   */
+  readonly items: readonly WorkItemSummary[]
   /**
    * A lookup index over `items`, and only that. It used to be the third place a record's
    * identity was decided, because a `Map` keeps the last entry for a repeated key while the
@@ -49,7 +56,7 @@ export type WorkspaceView = {
    * `list` a repeated id. An id absent here is absent from the store, because a record the
    * store holds and does not serve refuses the whole read below rather than reaching a lookup.
    */
-  readonly byId: ReadonlyMap<ItemId, WorkItem>
+  readonly byId: ReadonlyMap<ItemId, WorkItemSummary>
   readonly hierarchy: HierarchyGraph
   readonly relations: RelationGraph
 }
@@ -68,14 +75,6 @@ export function hidesContent(finding: Finding): boolean {
   return !SERVED_ANYWAY.has(finding.rule)
 }
 
-export type ReadOptions = {
-  /**
-   * Serve the view over a store that holds content it cannot serve. `doctor` is the one
-   * caller, because its answer is the list of what is missing and cannot be refused for it.
-   */
-  readonly partial?: true
-}
-
 /**
  * The one read every command builds its answer on, and therefore the one place the answer
  * is refused when it could not be whole. ADR-0003 rule 7 says damage to a record never
@@ -87,25 +86,23 @@ export type ReadOptions = {
  * the refusal names the first hole with its file, line and reason, counts the rest, and
  * points at `doctor`, which lists them all.
  */
-export async function readWorkspace(store: Store, options: ReadOptions = {}): Promise<StoreResult<WorkspaceView>> {
+export async function readWorkspace(store: Store): Promise<StoreResult<WorkspaceView>> {
   const identity = await store.identity()
   if (!identity.ok) return identity
-  const items = await store.list()
+  const items = await store.summaries()
   if (!items.ok) return items
   const findings = await store.findings()
   if (!findings.ok) return findings
 
-  if (options.partial !== true) {
-    const hidden = findings.value.filter(hidesContent)
-    const first = hidden[0]
-    if (first !== undefined) {
-      const rest = hidden.length === 1 ? 'that finding hides a record' : `${hidden.length} findings hide records`
-      return storeFail(
-        'INTEGRITY', first.rule,
-        `${first.file} line ${first.line}: ${first.reason}; ${rest} this workspace holds, so no answer over it is whole`,
-        first.id === undefined ? [] : [first.id],
-      )
-    }
+  const hidden = findings.value.filter(hidesContent)
+  const first = hidden[0]
+  if (first !== undefined) {
+    const rest = hidden.length === 1 ? 'that finding hides a record' : `${hidden.length} findings hide records`
+    return storeFail(
+      'INTEGRITY', first.rule,
+      `${first.file} line ${first.line}: ${first.reason}; ${rest} this workspace holds, so no answer over it is whole`,
+      first.id === undefined ? [] : [first.id],
+    )
   }
 
   return {
@@ -118,6 +115,16 @@ export async function readWorkspace(store: Store, options: ReadOptions = {}): Pr
       relations: emptyRelationGraph(),
     },
   }
+}
+
+/**
+ * The whole record of the one item a command acts on: one index lookup, after the view has
+ * established that the id names a record the store serves. Absent means the record left the
+ * store between the two reads, which a caller treats exactly as an id it never held.
+ */
+export async function wholeItem(store: Store, view: WorkspaceView, id: ItemId): Promise<StoreResult<WorkItem | undefined>> {
+  if (!view.byId.has(id)) return storeOk(undefined)
+  return store.get(id)
 }
 
 export function activeBlockers(view: WorkspaceView, id: ItemId): readonly ItemId[] {

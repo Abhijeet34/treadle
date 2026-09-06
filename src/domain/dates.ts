@@ -6,7 +6,7 @@
 // passes may change what a read says and may never change what a record says, so nothing
 // here writes and `overdue` is derived on every read exactly as `blocked` is.
 
-import { isTerminal, type Instant, type ItemId, type WorkItem } from './types.ts'
+import { isTerminal, type Instant, type ItemId, type WorkItemSummary } from './types.ts'
 
 const DAY_MS = 86_400_000
 
@@ -18,7 +18,7 @@ export const MAX_OVERDUE_DAYS = 30
  * A terminal item is never overdue: the date said when the work was wanted, and the work
  * has stopped, so the flag would name a fact nobody can act on.
  */
-export function isOverdue(item: WorkItem, now: Instant): boolean {
+export function isOverdue(item: WorkItemSummary, now: Instant): boolean {
   if (item.due === undefined || isTerminal(item.state)) return false
   const due = Date.parse(item.due)
   const at = Date.parse(now)
@@ -26,7 +26,7 @@ export function isOverdue(item: WorkItem, now: Instant): boolean {
 }
 
 /** Whole days past `due`, clamped, and zero when the item is not overdue. */
-export function daysOverdue(item: WorkItem, now: Instant): number {
+export function daysOverdue(item: WorkItemSummary, now: Instant): number {
   if (!isOverdue(item, now)) return 0
   const days = Math.floor((Date.parse(now) - Date.parse(item.due as string)) / DAY_MS)
   return Math.max(0, Math.min(MAX_OVERDUE_DAYS, days))
@@ -49,7 +49,7 @@ export type HealthFinding = {
  * the remedy is one command. `doctor` is the command the design gives these findings; until
  * it lands `status` carries them, and it consumes this function unchanged when it arrives.
  */
-export function healthFindings(items: readonly WorkItem[], now: Instant): readonly HealthFinding[] {
+export function healthFindings(items: readonly WorkItemSummary[], now: Instant): readonly HealthFinding[] {
   return items
     .filter((item) => isOverdue(item, now) && item.assignee === undefined)
     .map((item): HealthFinding => ({ rule: 'H17', id: item.id, observed: String(item.due) }))
