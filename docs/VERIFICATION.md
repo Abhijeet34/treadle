@@ -107,7 +107,7 @@ Writing those tests is what found the crash below.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
 Measured on the branch that added this section: 20 of 20 runs completed, 20 green, 0 failed, a test count that did not move across the 20, and 1,147 s in total.
-The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06.
+The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06 and 1,499 on 2026-09-07.
 That command is the number's only authority, and it is one line to run.
 What the gate asserts is zero failures and a count that does not move within a run set, which is the part a later commit cannot make false.
 Individual runs ranged from 49.8 s to 88.6 s, which is a 1.78x spread on a shared machine and is the reason the fuzzer's time bound is generous rather than tight.
@@ -301,8 +301,9 @@ FAIL  the what column of history has one convention
 check-tests-kept: 772 tests at 3bce1ca4, ... 32 removed without a Removes-test trailer
 ```
 
-772 of this repository's 773 test declarations are read and compared.
-The one that is not is `it(file, ...)` in `test/architecture/license-header.test.ts`, whose title is a variable; the `describe` around it is compared, so deleting the loop is still caught.
+Every test declaration in this repository is read and compared, and the run prints how many it could not read: `0 titles not literal and not compared` on 2026-09-07, at 983 declarations against 969 at the merge base.
+A title built from a template literal is compared in a canonical form with each interpolation reduced to `${}`, so the per-file `it` in `test/architecture/license-header.test.ts` is one comparable title rather than an uncompared one; that was the single exception this section used to name, and it is closed.
+The count is the run's own, not this file's, which is the point of printing it.
 
 ### What check-tests-kept does not see
 
@@ -313,8 +314,8 @@ That is the case a manifest of behaviours checked against the built binary would
 **A subtest declared as `t.test(...)` rather than at the start of a line.**
 There are none here, and a file that adds one fails the check with the file named rather than passing over it, because the gate counts the declaration-shaped calls it did not read.
 
-**A test whose title is a variable.**
-One in 773, named above.
+**A test whose title the reader cannot resolve to a literal at all.**
+It is counted and printed rather than skipped, so an uncompared declaration is a number a reader can see rather than a silence. Today that number is 0.
 
 **A branch that is not up to date with main.**
 The comparison is against the merge base, so a test main gained after the fork is not one this branch removed.
