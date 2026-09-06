@@ -15,8 +15,8 @@ import { NOW, errorOf, item } from '../helpers/fixtures.ts'
 const OPTIONS = { now: NOW }
 
 describe('the closed type and state sets', () => {
-  it('carries exactly the six types the model names', () => {
-    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'chore'])
+  it('carries exactly the six types the model names and impediment', () => {
+    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'chore', 'impediment'])
   })
 
   it('carries exactly the seven states the model names, and blocked is not one of them', () => {
@@ -36,6 +36,7 @@ describe('per-type required fields at creation', () => {
     bug: ['severity', 'repro_steps', 'found_in'],
     spike: ['question', 'timebox_hours'],
     chore: [],
+    impediment: ['severity', 'proposed_resolution'],
   }
 
   for (const type of WORK_ITEM_TYPES) {

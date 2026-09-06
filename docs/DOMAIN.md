@@ -72,7 +72,7 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 
 ## Types and the required-field policy
 
-`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `chore`.
+`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `chore`, `impediment`.
 
 | Type | Required at creation | Fields the type owns beyond the common set |
 |---|---|---|
@@ -82,6 +82,10 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `bug` | `severity`, `repro_steps`, `found_in` | `severity`, `repro_steps`, `expected`, `actual`, `found_in`, `fix_confirmed` |
 | `spike` | `question`, `timebox_hours` | `question`, `timebox_hours`, `findings` |
 | `chore` | none | none |
+| `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
+
+An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
+`proposed_resolution` is required because raising one obliges the raiser to say what would clear it; [architecture/adr/0017-an-impediment-is-a-type-that-blocks.md](architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) carries the four decisions around it.
 
 Two of the common fields are conditional rather than free.
 `due` is an optional instant on every type, and `resolution` is legal only while the state is `cancelled`; a record carrying one in any other state is `V4`.
@@ -214,7 +218,8 @@ It refuses nothing: a stored cycle is `findRelationCycle`'s to report and an edg
 The field's own validation refuses a self edge, a repeated edge and more than `MAX_RELATION_ENTRIES`, which is 50, because those need no other record to see.
 
 `blockersOf(graph, stateOf, id)` returns the blockers that are still active, meaning their source is neither done nor cancelled, and is known to the caller: a blocker nobody can finish holds nothing.
-The derived blocked flag is that list being non-empty, or an open impediment naming the item; impediments are the caller's to add, because the impediment entity is not in this layer yet.
+The derived blocked flag is that list being non-empty.
+An impediment is an item, so one raised against the item is in that list through the same `blocks` edge, and is inactive once it is done or cancelled.
 
 `relationsOf(graph, id)` reports outgoing edges under their own kind and incoming edges under the inverse, so a derived value is never printed under a raw field's name.
 
@@ -252,6 +257,7 @@ Default done gate:
 | `DOD6` | bug | The fix is confirmed |
 | `DOD7` | all | The item points at evidence, when the type has a review step |
 
+`DOD2` reads the item's active blockers of type `impediment`, so an impediment raised against work in progress holds that work from `done` until it is resolved; its remedy is `treadle transition <impediment> done`, the same command `DOR3` names for any blocker.
 `DOD7` is scoped by the review step rather than by three per-type rules, exactly as `DOD3` is, so the two answer to one setting.
 Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
 

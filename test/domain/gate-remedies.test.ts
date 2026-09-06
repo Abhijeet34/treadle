@@ -9,9 +9,11 @@
 // names a command the inventory carries, that can perform it.
 //
 // WHAT A FUTURE CHECK'S AUTHOR HAS TO DO. Add the kind to `GateCheck` in
-// src/domain/gates.ts, then add one line to `PERFORMED_BY` below: `performedBy('<command>')`
-// naming the command its remedy invokes, or `unbuildable('<why>')` with a reason a reader
-// can weigh. A kind with no line fails the first test here, by name.
+// src/domain/gates.ts, then add one line to `PERFORMED_BY` below naming the command its
+// remedy invokes, and a context in `everyRemedy` that makes it fail. A kind with no line
+// fails the first test here, by name; a kind no context reaches fails the sweep. There is
+// no "no remedy" answer any more: `no_open_impediment` was declared unbuildable while the
+// impediment entity did not exist, and gained `transition` when it did.
 
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
@@ -29,33 +31,22 @@ import { COMMANDS } from '../../src/cli/inventory.ts'
 import { SRC } from '../helpers/src-scan.ts'
 import { child, gateContext, item } from '../helpers/fixtures.ts'
 
-type Performer =
-  | { readonly kind: 'command'; readonly command: string }
-  | { readonly kind: 'unbuildable'; readonly why: string }
-
-const performedBy = (command: string): Performer => ({ kind: 'command', command })
-const unbuildable = (why: string): Performer => ({ kind: 'unbuildable', why })
-
 /** Every check the gate evaluator can run, and the command whose remedy it emits. */
-const PERFORMED_BY: Readonly<Record<string, Performer>> = {
-  field_present: performedBy('set'),
-  field_non_empty_list: performedBy('set'),
-  list_all_ticked: performedBy('set'),
-  field_is_true: performedBy('set'),
-  type_required_fields: performedBy('set'),
-  estimate_set: performedBy('set'),
-  no_active_blocker: performedBy('transition'),
-  parent_present: performedBy('set'),
-  child_present: performedBy('file'),
-  no_open_child: performedBy('transition'),
-  no_open_impediment: unbuildable(
-    'the impediment entity is not in this build. src/domain/relations.ts says so and'
-    + ' src/application/services/context.ts hard-codes openImpediments to 0, so DOD2 cannot'
-    + ' fail and the check emits no remedy to any caller. It gets a command when the entity'
-    + ' that raises and resolves one does.',
-  ),
-  reviewer_distinct_from_assignee: performedBy('set'),
-  evidence_present: performedBy('evidence'),
+const PERFORMED_BY: Readonly<Record<string, string>> = {
+  field_present: 'set',
+  field_non_empty_list: 'set',
+  list_all_ticked: 'set',
+  field_is_true: 'set',
+  type_required_fields: 'set',
+  estimate_set: 'set',
+  no_active_blocker: 'transition',
+  parent_present: 'set',
+  child_present: 'file',
+  no_open_child: 'transition',
+  // Resolving the impediment is reaching `done`, the same command DOR3 names for a blocker.
+  no_open_impediment: 'transition',
+  reviewer_distinct_from_assignee: 'set',
+  evidence_present: 'evidence',
 }
 
 /** The kinds the evaluator's own switch handles, read from the source it is written in. */
@@ -64,10 +55,7 @@ function checkKinds(): readonly string[] {
   return [...source.matchAll(/^ {4}case '([a-z_]+)':/gm)].map((match) => match[1] as string).sort()
 }
 
-/**
- * Checks no shipped rule can fail on, each as a one-rule gate so the sweep still reaches it.
- * `no_open_impediment` is absent because it is the one kind declared unbuildable above.
- */
+/** Checks no shipped rule can fail on, each as a one-rule gate so the sweep still reaches it. */
 const PROBES: readonly Gate[] = ([
   { kind: 'parent_present' },
   { kind: 'child_present' },
@@ -96,6 +84,8 @@ function everyRemedy(): readonly Emitted[] {
       children: [child('c1', 'task', 'in_progress')],
     }),
     gateContext(item('task', { id: 't1' })),
+    // Work an impediment is raised against, which is the only way DOD2 fails.
+    gateContext(item('task', { id: 't2' }), { blockers: ['cert-expired'], openImpediments: ['cert-expired'] }),
   ]
   const gates = [DEFAULT_READY_GATE, DEFAULT_DONE_GATE, ...PROBES]
 
@@ -123,18 +113,10 @@ describe('every gate check declares what performs its remedy', () => {
 
   it('names a command the inventory carries, for every kind that has one', () => {
     for (const [kind, performer] of Object.entries(PERFORMED_BY)) {
-      if (performer.kind !== 'command') continue
       assert.ok(
-        COMMANDS.some((command) => command.name === performer.command),
-        `${kind} says ${performer.command} performs its remedy, and the inventory has no such command`,
+        COMMANDS.some((command) => command.name === performer),
+        `${kind} says ${performer} performs its remedy, and the inventory has no such command`,
       )
-    }
-  })
-
-  it('gives, for every unbuildable kind, a reason rather than a restatement', () => {
-    for (const [kind, performer] of Object.entries(PERFORMED_BY)) {
-      if (performer.kind !== 'unbuildable') continue
-      assert.ok(performer.why.length >= 40 && performer.why !== kind, `${kind} is unbuildable with no reason a reader can weigh`)
     }
   })
 })
@@ -152,16 +134,10 @@ describe('every remedy a gate can emit names a command that exists', () => {
 
   // Declaring a command and then never exercising the kind would pass every assertion below
   // while proving nothing, so the sweep has to reach each kind it claims to have covered.
-  it('reaches every kind that names a command, and no kind declared unbuildable', () => {
+  it('reaches every kind, so a declared command is exercised rather than asserted', () => {
     const swept = new Set(remedies.map((entry) => entry.kind))
     for (const [kind, performer] of Object.entries(PERFORMED_BY)) {
-      assert.equal(
-        swept.has(kind),
-        performer.kind === 'command',
-        performer.kind === 'command'
-          ? `${kind} names ${performer.command} and no context here makes it fail`
-          : `${kind} is declared unbuildable and emitted a remedy anyway`,
-      )
+      assert.ok(swept.has(kind), `${kind} names ${performer} and no context here makes it fail`)
     }
   })
 

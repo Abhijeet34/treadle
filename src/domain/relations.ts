@@ -217,8 +217,8 @@ export function relationsOf(graph: RelationGraph, id: ItemId): readonly Relation
 
 /**
  * The blockers that are still active. An item is blocked while at least one of these
- * exists, or while an open impediment names it; impediments are the caller's to add,
- * because the impediment entity is not in this layer yet.
+ * exists. An impediment is an item, so one that is raised against this item is in this
+ * list through the same `blocks` edge as any other blocker, and is inactive once resolved.
  *
  * A blocker the caller cannot find is not active: it cannot be finished or cancelled, so
  * counting it would hold the item forever on a record a hand edit removed. `doctor` names

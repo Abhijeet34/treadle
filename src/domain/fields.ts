@@ -55,8 +55,12 @@ const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
   bug: ['severity', 'repro_steps', 'expected', 'actual', 'found_in', 'fix_confirmed'],
   spike: ['question', 'timebox_hours', 'findings'],
   chore: [],
+  impediment: ['severity', 'proposed_resolution'],
 }
 
+// An impediment requires both of its fields the way a bug requires severity: raising one
+// obliges the raiser to say what would clear it, and an impediment with no proposed
+// resolution is a complaint (ADR-0017).
 const REQUIRED_AT_CREATION: Readonly<Record<WorkItemType, readonly string[]>> = {
   epic: ['outcome'],
   story: [],
@@ -64,6 +68,7 @@ const REQUIRED_AT_CREATION: Readonly<Record<WorkItemType, readonly string[]>> = 
   bug: ['severity', 'repro_steps', 'found_in'],
   spike: ['question', 'timebox_hours'],
   chore: [],
+  impediment: ['severity', 'proposed_resolution'],
 }
 
 /** The fields a creation refuses to go without, per type (2.1). */
@@ -401,6 +406,9 @@ const CHECKS: Readonly<Record<string, Check>> = {
   question: text('question', 1000),
   timebox_hours: int('timebox_hours', 1, 80),
   findings: text('findings', 10_000),
+  // The same bound as `outcome` and `question`: a paragraph saying what would clear the
+  // blocker, not the plan itself, which belongs in the item that carries it out.
+  proposed_resolution: text('proposed_resolution', 1000),
 }
 
 const HOLD_FIELDS = ['hold_reason', 'hold_until', 'held_from'] as const

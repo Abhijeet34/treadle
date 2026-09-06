@@ -191,6 +191,23 @@ export function auditRelationsOf(known: ReadonlySet<ItemId>, item: Pick<WorkItem
 }
 
 /**
+ * An open impediment that blocks nothing (H27). An impediment earns its keep through the
+ * `blocks` edge, which is stored on its own record, so this needs no other record to see: one
+ * raised against no work is a complaint on file, and the detail names the line that raises it
+ * against something. A resolved or cancelled one is history and is not reported.
+ */
+export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | 'relations'>): readonly DoctorFinding[] {
+  if (item.type !== 'impediment' || item.state === 'done' || item.state === 'cancelled') return []
+  if ((item.relations ?? []).some((relation) => relation.kind === 'blocks')) return []
+  return [{
+    rule: 'H27',
+    id: item.id,
+    where: 'relations',
+    detail: `the impediment is ${item.state} and blocks nothing, so it is raised against no work; treadle relation add ${item.id} blocks <id> names what it holds up`,
+  }]
+}
+
+/**
  * A `blocks` cycle the files carry (H25). `relation add` refuses one at write time (R2) and
  * cannot see one a hand edit or a merge put in; every item on it is blocked by itself.
  */
@@ -226,6 +243,7 @@ export function auditWorkspace(
     ...items.flatMap((item) => [
       ...auditItem(item, byEntity.get(item.id) ?? [], sprintIds),
       ...auditRelationsOf(known, item),
+      ...auditImpediment(item),
     ]),
     ...storedBlockingCycle(relationGraphFrom(items)),
   ]

@@ -107,6 +107,7 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   question: readable('show:question'),
   timebox_hours: readable('show:timebox'),
   findings: readable('show:findings'),
+  proposed_resolution: readable('show:proposed_resolution', 'cut at 64 cells, whole under `show <id> --field proposed_resolution`, and a G2 refusal on work the impediment blocks names that command'),
 }
 
 /** Every key one line of the append-only event log carries, and the surface that prints it. */
@@ -171,8 +172,8 @@ const ACTOR: Actor = { id: 'dana', kind: 'human' }
 const AGENT: Actor = { id: 'agent-7', kind: 'agent' }
 const NOW = '2026-09-05T09:00:00Z'
 
-/** The six records the fixture below builds, one per work-item type. */
-const ITEMS = ['every-epic', 'every-story', 'every-bug', 'every-spike', 'every-held', 'every-stopped'] as const
+/** The seven records the fixture below builds, one per work-item type. */
+const ITEMS = ['every-epic', 'every-story', 'every-bug', 'every-spike', 'every-held', 'every-stopped', 'every-raised'] as const
 
 /** Every field name the record grammar can persist, over every type. */
 function persistedItemFields(): readonly string[] {
@@ -277,10 +278,14 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   await move('every-held', 'on_hold', { until: '2026-10-15T09:00:00Z' })
   await file('chore', 'Remove OAuth 1 support', 'every-stopped', {})
   await move('every-stopped', 'cancelled', { resolution: 'superseded' })
+  await file('impediment', 'Staging certificate expired', 'every-raised', {
+    severity: 'S1', proposed_resolution: 'the platform team renews it from the vault',
+  })
 
   // A sprint carrying every field of its own dictionary: opened with a goal, given the spike
   // (the story is blocked above, and a blocked item fails the ready gate a commit reads), and
-  // closed with the spike still open so the carry-over is recorded.
+  // closed with the spike still open so the carry-over is recorded. Committed before the
+  // impediment is raised against it, because a blocked item fails that same ready gate.
   const sprintOpened = await openSprint(apply, clock, ids, {
     title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
   })
@@ -289,6 +294,11 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   if (!committed.ok) throw new Error(String(committed.data['cause']))
   const closed = await closeSprint(apply, clock, ids, { sprint: 'sprint-31', actor: ACTOR })
   if (!closed.ok) throw new Error(String(closed.data['cause']))
+
+  const raised = await relate(apply, clock, ids, {
+    verb: 'add', id: 'every-raised', kind: 'blocks', other: 'every-spike', actor: ACTOR,
+  })
+  if (!raised.ok) throw new Error(String(raised.data['cause']))
 
   // The bug's own log: a mark, an evidence pointer and a release that names its outcome.
   const marked = await markItem(apply, clock, ids, {

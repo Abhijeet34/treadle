@@ -16,6 +16,7 @@ import {
   type GuardResult,
   type ItemId,
   type Resolution,
+  type TransitionContext,
   type WorkItem,
   type WorkItemState,
 } from '../../domain/index.ts'
@@ -23,7 +24,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { readWorkspace, transitionContextFor, wholeItem } from './context.ts'
+import { openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { echoed, notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
@@ -162,7 +163,7 @@ export async function transition(
       rule: outcome.error.rule ?? 'T1',
       entity: `item ${item.id}`,
       cause: outcome.error.message,
-      fix: fixesFor(item, request, failed),
+      fix: fixesFor(item, request, failed, context, openImpedimentsOf(view.value, item.id)),
     }
     return errorResult(failed === undefined ? input : { ...input, guard: failed.guard })
   }
@@ -236,11 +237,27 @@ function guardsOnEdge(item: WorkItem, target: WorkItemState | 'resume'): readonl
 /** Remediations for a refused edge, most likely first, each runnable and each bounded. */
 function fixesFor(
   item: WorkItem, request: TransitionRequestInput, failed: GuardResult | undefined,
+  context: TransitionContext, impediments: readonly ItemId[],
 ): readonly string[] {
   const fixes: string[] = [`treadle explain ${item.id}`]
   const target = request.target === 'resume' ? item.held_from : request.target
   if (failed !== undefined && ['G2', 'G3', 'G7'].includes(failed.guard) && target !== undefined) {
     fixes.unshift(`treadle transition ${item.id} ${target} --override ${failed.guard} --reason "<why>"`)
+  }
+  // A gate guard's own reason names rule ids, and the rules' remedies are command lines
+  // (test/domain/gate-remedies.test.ts holds that), so a refusal on G1 or G6 hands them over
+  // rather than sending the caller through `explain` to read the same lines: a story blocked
+  // by an impediment is refused at `ready` with `treadle transition <impediment> done`.
+  const gate = failed?.guard === 'G1' ? context.readyGate : failed?.guard === 'G6' ? context.doneGate : undefined
+  if (gate !== undefined) {
+    const remedies = gate.rules.flatMap((rule) => (rule.pass || rule.remedy === undefined ? [] : [rule.remedy]))
+    fixes.unshift(...new Set(remedies))
+  }
+  // A blocker that is an impediment carries what would clear it, and the refusal that names
+  // the blocker is where a caller wants that read back; the field is the one line `show`
+  // cuts at 64 cells, so the fix asks for it whole.
+  if (failed?.guard === 'G2') {
+    fixes.unshift(...impediments.map((id) => `treadle show ${id} --field proposed_resolution`))
   }
   if (target !== undefined && isTerminal(target)) fixes.push(`treadle show ${item.id}`)
   return fixes

@@ -252,7 +252,7 @@ Each path's refusal asserted the other path's name did not exist.
 **What holds them closed.**
 `test/domain/gate-remedies.test.ts` sweeps every remedy the shipped gates and two probe gates can emit and asserts each names a command the inventory carries.
 It fails 29 of 34 against the tree before the fix, with `ready DOR6`, `ready DOR7`, `done DOD3` and `done DOD6` among the named failures.
-Every check kind in the evaluator carries a line saying which command performs its remedy, or a reason it has none; `no_open_impediment` is the one such line, because the impediment entity is not in this build and `openImpediments` is a hard-coded 0.
+Every check kind in the evaluator carries a line saying which command performs its remedy, and a context in the sweep that makes it fail; `no_open_impediment` was the one kind declared unbuildable until the impediment type landed, and now names `transition`, because resolving an impediment is reaching `done`.
 `writerOf` in the field dictionary is now the single statement of which command writes which field, read by the field editor and by the gate remedies, so a rule cannot tell a caller to `set severity` when `mark` is what writes it.
 `canonicalField` is the single statement of a field's two spellings, and `test/architecture/field-visibility.test.ts` holds it to the same table that says which surface prints each field.
 Two end-to-end cases in `test/cli/found-by-use.test.ts` drive the whole path: a bug reaches `ready` by running the remedy `explain` printed, verbatim, and both spellings of `description` work on both paths.

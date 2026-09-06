@@ -29,7 +29,7 @@ const CLOSED: Sprint = { ...OPEN, id: 'sprint-30', state: 'closed', closed_at: '
 
 function readyGate(subject: WorkItem, blockers: readonly string[] = []): GateVerdict {
   return evaluateGate(DEFAULT_READY_GATE, {
-    item: subject, blockers, children: [], reviewStep: false, openImpediments: 0,
+    item: subject, blockers, children: [], reviewStep: false, openImpediments: [],
   })
 }
 

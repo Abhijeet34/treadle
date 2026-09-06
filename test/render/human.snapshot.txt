@@ -4,7 +4,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -29,7 +29,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -54,7 +54,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -945,7 +945,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -975,7 +975,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1005,7 +1005,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1034,7 +1034,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1059,7 +1059,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1084,7 +1084,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1375,7 +1375,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1409,7 +1409,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1443,7 +1443,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  board impediment
+  absent_features  board
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7

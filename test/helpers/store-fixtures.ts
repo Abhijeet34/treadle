@@ -170,6 +170,10 @@ export class Gen {
       base['timebox_hours'] = this.int(1, 80)
       if (this.chance(0.5)) base['findings'] = this.safeBody()
     }
+    if (type === 'impediment') {
+      base['severity'] = this.pick(BUG_SEVERITIES)
+      base['proposed_resolution'] = this.safeBody()
+    }
     const item = { ...(base as unknown as WorkItem), ...overrides }
     // A resolution is legal only on a cancelled record, so it is generated only there;
     // `validateWorkItem` refuses the pair, which is exactly what the round trip asserts.

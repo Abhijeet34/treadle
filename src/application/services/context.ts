@@ -160,14 +160,18 @@ function childrenGates(view: WorkspaceView, id: ItemId): readonly GateChild[] {
   })
 }
 
+/** The active blockers of `id` that are impediments, which is what DOD2 reads. */
+export function openImpedimentsOf(view: WorkspaceView, id: ItemId): readonly ItemId[] {
+  return activeBlockers(view, id).filter((blocker) => view.byId.get(blocker)?.type === 'impediment')
+}
+
 export function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
   return {
     item,
     blockers: activeBlockers(view, item.id),
     children: childrenGates(view, item.id),
     reviewStep: hasReviewStep(item.type),
-    // Impediments are not an entity in the store yet, so nothing can be open against an item.
-    openImpediments: 0,
+    openImpediments: openImpedimentsOf(view, item.id),
   }
 }
 
