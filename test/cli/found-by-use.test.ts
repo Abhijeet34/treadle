@@ -405,6 +405,45 @@ describe('a refusal about a flag is written by the tool, not by its argument par
       assert.doesNotMatch(refused.err, /^\|cause /m)
     })
   }
+
+  // Axis A12 found that a refusal raised before the flags were read came back in the
+  // default rendering: `version --fields id --out json` wrote agent lines to a caller that
+  // was parsing stderr as JSON. The rendering is the caller's choice on every path.
+  const parseLevel: readonly (readonly string[])[] = [
+    ['version', '--fields', 'id'],
+    ['show', 'i18n-dates', '--limit', '3'],
+    ['nosuchverb'],
+    ['--nope'],
+  ]
+
+  for (const argv of parseLevel) {
+    it(`renders the refusal of \`${argv.join(' ')}\` as the JSON the caller asked for`, async () => {
+      const refused = await cli([...argv, '--out', 'json'])
+      assert.equal(refused.code, 2)
+      assert.equal(refused.out, '')
+      const object = JSON.parse(refused.err) as { schema: string; code: string; ok: boolean }
+      assert.equal(object.schema, 'error/1')
+      assert.equal(object.code, 'VALIDATION')
+      assert.equal(object.ok, false)
+    })
+  }
+
+  it('holds the width a caller asked for on a refusal raised before the flags were read', async () => {
+    const refused = await cli(['nosuchverb', '--out', 'human', '--width', '40'])
+    assert.equal(refused.code, 2)
+    const longest = Math.max(...refused.err.split('\n').map((line) => line.length))
+    assert.ok(longest <= 40, `${longest} cells at --width 40:\n${refused.err}`)
+  })
+
+  it('renders the runtime floor refusal as a result object, in the rendering asked for', async () => {
+    const refused = await runCli(['status', '--out', 'json'], { cwd: demo.root, nodeVersion: '22.0.0' })
+    assert.equal(refused.code, 6)
+    assert.equal(refused.out, '')
+    const object = JSON.parse(refused.err) as { schema: string; code: string; data: { cause: string } }
+    assert.equal(object.schema, 'error/1')
+    assert.equal(object.code, 'STORE_UNAVAILABLE')
+    assert.match(object.data.cause, /needs Node 24\.0\.0 or newer and this is 22\.0\.0/)
+  })
 })
 
 describe('an aggregate says what it aggregates, and a heading with no value prints none', () => {

@@ -3,6 +3,8 @@
   "lastMonth": "2026-09",
   "months": 24,
   "eventsPerItem": 10,
+  "relationsPerHundredItems": 10,
+  "impedimentsPerHundredItems": 1,
   "scales": [100, 1000, 10000, 50000],
   "samples": { "default": 30, "50000": 20 },
   "floorSamples": 50,

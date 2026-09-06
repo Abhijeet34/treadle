@@ -12,6 +12,8 @@ export type BenchConfig = {
   readonly lastMonth: string
   readonly months: number
   readonly eventsPerItem: number
+  readonly relationsPerHundredItems: number
+  readonly impedimentsPerHundredItems: number
   readonly scales: readonly number[]
   readonly samples: Readonly<Record<string, number>>
   readonly floorSamples: number

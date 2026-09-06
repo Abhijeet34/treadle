@@ -245,6 +245,31 @@ function flagRefusal(
   }
 }
 
+/**
+ * The global flags `emit` in main.ts reads to render a result, and nothing else. `--color`
+ * and `--no-color` are parsed and read by no renderer, so naming them here would promise a
+ * refusal something no other path delivers either.
+ */
+const PRESENTATION = ['out', 'width', 'quiet', 'ascii'] as const
+
+/**
+ * The presentation flags on a line the parser refused, read leniently so the refusal is
+ * still rendered the way the caller asked. Three parse-level refusals under `--out json`
+ * came back in the default rendering, because the refusal was raised before any flag was
+ * read; a caller parsing stderr as JSON then had no object at all.
+ */
+export function presentationFlags(argv: readonly string[]): Readonly<Record<string, unknown>> {
+  let values: Record<string, unknown>
+  try {
+    values = parseArgs({ args: [...argv], options: GLOBAL_OPTIONS, allowPositionals: true, strict: false }).values
+  } catch {
+    return {}
+  }
+  const kept: Record<string, unknown> = {}
+  for (const name of PRESENTATION) if (values[name] !== undefined) kept[name] = values[name]
+  return kept
+}
+
 export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
   let first
   try {
