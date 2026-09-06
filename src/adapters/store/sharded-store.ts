@@ -46,7 +46,7 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem } from './index-cache.ts'
+import { IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
@@ -275,7 +275,7 @@ export class ShardedStore implements Store {
 
   // -- reading ---------------------------------------------------------------------------
 
-  #decodeRow(row: IndexedItem): StoreResult<WorkItem | undefined> {
+  #decodeRow(row: IndexedSource): StoreResult<WorkItem | undefined> {
     const parsed = parseRecordSource(row.source, row.line)
     if (!parsed.ok) {
       return storeFail('INTEGRITY', parsed.rule, `${row.file} line ${row.line}: ${parsed.reason}`, [row.id])

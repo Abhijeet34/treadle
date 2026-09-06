@@ -34,6 +34,9 @@ export type Fingerprint = {
   readonly lines: number
 }
 
+/** The columns a record is decoded from; `line` and `file` name it in a refusal. */
+export type IndexedSource = Pick<IndexedItem, 'id' | 'file' | 'line' | 'source'>
+
 export type IndexedItem = {
   readonly id: string
   readonly file: string
@@ -535,7 +538,12 @@ export class IndexCache {
     this.#open().prepare('delete from meta where key = ?').run(HIERARCHY_KEY)
   }
 
-  listItems(query: ItemQuery): readonly IndexedItem[] {
+  /**
+   * Streamed, and projected to what decoding a record needs. Every other column is derived
+   * from `source` and the decoder derives it again; an array of 50,000 whole rows was held
+   * beside the items decoded from it, and the read every command performs paid for both.
+   */
+  listItems(query: ItemQuery): Iterable<IndexedSource> {
     const where: string[] = []
     const values: (string | number)[] = []
     if (query.state !== undefined) { where.push('state = ?'); values.push(query.state) }
@@ -545,8 +553,8 @@ export class IndexCache {
     const limit = query.limit === undefined ? '' : ' limit ?'
     if (query.limit !== undefined) values.push(query.limit)
     return this.#open()
-      .prepare(`select * from items${clause} order by filed_at, id${limit}`)
-      .all(...values) as unknown as readonly IndexedItem[]
+      .prepare(`select id, file, line, source from items${clause} order by filed_at, id${limit}`)
+      .iterate(...values) as unknown as Iterable<IndexedSource>
   }
 
   listEvents(query: EventQuery): readonly StoreEvent[] {
