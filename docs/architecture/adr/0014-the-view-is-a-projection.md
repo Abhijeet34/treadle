@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** DR8's peak-memory budgets, over the read the product actually performs
+**Overtaken in part by:** [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md), which widened `READ_OPS` to seven operations, so the DR8 read row is no longer weighed over the four this record names and now reports `doctor`'s decode churn rather than the view's peak; the projection and the on-demand record below still stand
 
 ## Context
 
@@ -78,7 +79,7 @@ A budget written before the operation it names existed is allowed to be wrong, b
 
 Every figure is a cold process per sample, seven samples, both trees interleaved per sample over clones of the same corpora, at 1-minute loads of 4.54 to 3.47, with `process.resourceUsage().maxRSS` read by the child.
 Those transcripts were the working record of the branch that landed this and are not committed, because `.gitignore` excludes `.fm-evidence/`.
-The figures below are what they printed, and the DR8 row `bench/gate.ts` weighs over `identity`, `get`, `list` and `workspace` is what fails if the read grows back.
+The figures below are what they printed, and the DR8 read row, which `bench/gate.ts` weighs over the worst of `READ_OPS` in `bench/axes/a4-latency.ts`, is what fails if the read grows back.
 
 **Positive**
 
