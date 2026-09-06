@@ -22,5 +22,6 @@ A behaviour change needs a test that failed before and passes after: paste both 
 - [ ] Every commit message follows Conventional Commits; CI checks this.
 - [ ] `npm run check` passes locally.
 - [ ] Every new source file carries `SPDX-License-Identifier: Apache-2.0`.
+- [ ] No test `main` has is removed, or a `Removes-test:` trailer names each one; CI checks this.
 - [ ] No new runtime dependency, or a decision record explaining one.
 - [ ] If this breaks the command-line surface, an exit code, the output schema or the file format, it is named here and in `docs/STABILITY.md` terms.
