@@ -60,6 +60,8 @@ import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 export const SCHEMA = 1
 
 export const WORKSPACE_FILE = 'workspace.md'
+/** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
+const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'
 const EVENTS_DIR = 'events'
 const INDEX_DIR = '.index'
@@ -257,7 +259,12 @@ export class ShardedStore implements Store {
     // Warm the index before the lock is taken. The refresh under the lock is then the delta
     // since this instant rather than a cold rebuild, which at 1.1 million events is two
     // minutes of synchronous work during which no heartbeat fires and the lock is forfeit.
-    const warm = await this.#refresh()
+    // The shards this transaction writes keep their parse from whichever refresh read them,
+    // because a create after a create was parsing the largest shard twice, 25 MiB of the
+    // 76 MiB one mutation allocated; `#readShard` proves the bytes have not moved before
+    // reusing one.
+    const writing = new Set(transaction.writes.map((write) => `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`))
+    const warm = await this.#refresh(writing)
     if (!warm.ok) return warm
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
       ...(this.#options.lockTimeoutMs === undefined ? {} : { timeoutMs: this.#options.lockTimeoutMs }),
@@ -269,7 +276,7 @@ export class ShardedStore implements Store {
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
       // Freshness first, inside the lock: the conflict message and the cross-shard id check
       // both read the index, and a check that decides a refusal may not read a stale cache.
-      const fresh = await this.#refresh(true)
+      const fresh = await this.#refresh(writing)
       if (!fresh.ok) return fresh
       return await this.#applyUnderLock(transaction, lock.value)
     } catch (error) {
@@ -338,7 +345,7 @@ export class ShardedStore implements Store {
    * re-read, and an event file that only grew has its old prefix hash checked so an append
    * costs the append rather than the file.
    */
-  async #refresh(keepParses = false): Promise<StoreResult<undefined>> {
+  async #refresh(keepParses: ReadonlySet<string> = NO_FILES): Promise<StoreResult<undefined>> {
     const layout = await this.#checkLayout()
     if (layout !== undefined) return layout
     try {
@@ -359,7 +366,7 @@ export class ShardedStore implements Store {
    * other clashes name drops those files' fingerprints, and one more pass re-decides them.
    * Two files clashing both ways settle on the second pass; the bound is a guard, not a budget.
    */
-  async #refreshIndex(keepParses: boolean): Promise<StoreResult<undefined>> {
+  async #refreshIndex(keepParses: ReadonlySet<string>): Promise<StoreResult<undefined>> {
     for (let pass = 0; pass < 3; pass += 1) {
       const again = await this.#refreshPass(keepParses)
       if (!again.ok) return again
@@ -369,11 +376,10 @@ export class ShardedStore implements Store {
     return storeOk(undefined)
   }
 
-  async #refreshPass(keepParses: boolean): Promise<StoreResult<boolean>> {
+  async #refreshPass(keepParses: ReadonlySet<string>): Promise<StoreResult<boolean>> {
     const known = this.#index.fingerprints()
     const seen = new Set<string>()
     let invalidated = false
-    this.#parsedUnderLock.clear()
 
     for (const file of await this.#storeFiles()) {
       const full = path.join(this.#root, file)
@@ -440,7 +446,7 @@ export class ShardedStore implements Store {
   }
 
   async #indexRecordFile(
-    file: string, full: string, size: number, mtime: number, keepParse = false,
+    file: string, full: string, size: number, mtime: number, keepParses: ReadonlySet<string> = NO_FILES,
   ): Promise<StoreResult<boolean>> {
     // The ceiling is checked against the size the stat already gave us, before the file is
     // read: a limit that only fires after the read has happened is not a limit (F8).
@@ -483,7 +489,13 @@ export class ShardedStore implements Store {
       findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
     }
     const invalidated = this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
-    if (keepParse) this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
+    // A shard the transaction writes keeps its parse; any other refresh keeps the last shard
+    // it read, one file, because the shard a write touches is usually the shard the previous
+    // write changed, and `get` before `apply` in one process was parsing it twice.
+    if (!keepParses.has(file)) {
+      for (const kept of this.#parsedUnderLock.keys()) if (!keepParses.has(kept)) this.#parsedUnderLock.delete(kept)
+    }
+    this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
     return storeOk(invalidated)
   }
 

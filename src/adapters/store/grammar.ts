@@ -412,7 +412,7 @@ export function parseFile(text: string, file: string): StoreResult<ParsedFile> {
     const to = s + 1 < starts.length ? (starts[s + 1] as number) : lines.length
     const segment = lines.slice(from, to)
     const source = segment.map((l) => l.raw).join('')
-    const outcome = parseSegment(segment, from + 1)
+    const outcome = parseSegment(segment, from + 1, source)
     chunks.push(outcome.ok
       ? { kind: 'record', record: outcome.record }
       : quarantine(outcome.rule, outcome.reason, from + 1, source, outcome.id))

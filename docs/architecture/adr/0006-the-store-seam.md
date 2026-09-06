@@ -22,6 +22,7 @@ interface Store {
   identity(): Promise<StoreResult<StoreIdentity>>
   get(id: ItemId): Promise<StoreResult<WorkItem | undefined>>
   list(query?: ItemQuery): Promise<StoreResult<readonly WorkItem[]>>
+  summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>
   findings(): Promise<StoreResult<readonly Finding[]>>
