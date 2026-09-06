@@ -17,14 +17,22 @@
 // `history` and `explain` answer from it. An event naming an item the store does not hold
 // is not a finding: a record removed by hand is a legitimate edit under D1, and the event
 // reaches no read surface.
+//
+// The audit is one pass over the records and one over the log, and holds neither. It held
+// both: 50,000 decoded records and 500,000 decoded events, 1,442 MiB allocated and a
+// 1,043,456 KiB peak against a 102,400 KiB budget, to look at each once. What it keeps per
+// item is the summary a scan reads plus the few findings decided off the whole record, and
+// what it keeps per event is nothing; ADR-0021 carries the profile.
 
 import {
   MAX_DESCRIPTION,
   findRelationCycle,
   relationGraphFrom,
+  summaryOf,
   type ItemId,
   type RelationGraph,
   type WorkItem,
+  type WorkItemSummary,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
@@ -76,84 +84,107 @@ function cell(value: string): string {
   return value.length > 0 && value.length <= MAX_CELL && !/\s/.test(value) ? value : '-'
 }
 
-function renderField(item: WorkItem, field: string): string {
+function renderField(item: WorkItemSummary, field: string): string {
   const value = (item as unknown as Record<string, unknown>)[field]
   return value === undefined || value === null ? '-' : String(value)
 }
 
+const NONE: readonly DoctorFinding[] = []
+
 /**
- * The value the log last recorded for one field of one item, folded forward over every
- * event that named it. `undefined` means the log never carried the field, which is what a
- * workspace written before the file event carried its fields looks like: silence there is
- * not evidence of an edit, so no finding is raised on it.
+ * One item under audit: what a scan reads of it, the findings decided off its whole record
+ * before the log is read, and what the log said about it once it has been.
  */
-function loggedValue(events: readonly StoreEvent[], id: ItemId, field: string): string | undefined {
-  let seen: string | undefined
-  for (const event of events) {
-    if (event.entity !== id) continue
-    const after = event.after
-    if (typeof after !== 'object' || after === null) continue
-    const value = (after as Record<string, unknown>)[field]
-    if (typeof value === 'string') seen = value
-  }
-  return seen
+type Audited = {
+  readonly item: WorkItemSummary
+  /** H26 and H18, in that order. */
+  readonly before: readonly DoctorFinding[]
+  /** H21. */
+  readonly after: readonly DoctorFinding[]
+  /**
+   * The value the log last recorded for each marked field, folded forward over every event
+   * that named it. Absent means the log never carried the field, which is what a workspace
+   * written before the file event carried its fields looks like: silence there is not
+   * evidence of an edit, so no finding is raised on it.
+   */
+  logged?: Map<string, string>
+  /** H23 and H19, in log order. */
+  fromLog?: DoctorFinding[]
 }
 
-/** Every audit finding over one workspace, in item then rule order. */
-export function auditItem(
-  item: WorkItem, events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
-): readonly DoctorFinding[] {
-  const findings: DoctorFinding[] = []
+/**
+ * The audit, fed one record at a time and then one event at a time, and read once both
+ * passes are over. The whole record is seen exactly once, at `record`, and the two findings
+ * that need more of it than a summary carries are decided there.
+ */
+export class WorkspaceAudit {
+  readonly #sprintIds: ReadonlySet<string>
+  readonly #entries: Audited[] = []
+  readonly #byId = new Map<ItemId, Audited>()
 
-  // No write path points an item at a sprint that is not a record: `file --sprint` and
-  // `sprint commit` both resolve the id first. A value written before sprints were records,
-  // or by hand, is reported rather than refused, because the item still serves.
-  if (item.sprint_id !== undefined && !sprintIds.has(item.sprint_id)) {
-    findings.push({
-      rule: 'H26',
-      id: item.id,
-      where: 'sprint_id',
-      detail: `sprint_id is ${item.sprint_id} and no sprint record carries that id; open one with --id ${item.sprint_id}, or commit the item to a sprint that exists`,
-    })
+  constructor(sprintIds: ReadonlySet<string>) {
+    this.#sprintIds = sprintIds
   }
 
-  if (item.description !== undefined && item.description.length > MAX_DESCRIPTION) {
-    findings.push({
-      rule: 'H18',
-      id: item.id,
-      where: 'description',
-      detail: `the stored description is ${item.description.length} characters and the bound is ${MAX_DESCRIPTION}; the long form belongs in a file this record points at`,
-    })
+  record(item: WorkItem): void {
+    const before: DoctorFinding[] = []
+    // No write path points an item at a sprint that is not a record: `file --sprint` and
+    // `sprint commit` both resolve the id first. A value written before sprints were records,
+    // or by hand, is reported rather than refused, because the item still serves.
+    if (item.sprint_id !== undefined && !this.#sprintIds.has(item.sprint_id)) {
+      before.push({
+        rule: 'H26',
+        id: item.id,
+        where: 'sprint_id',
+        detail: `sprint_id is ${item.sprint_id} and no sprint record carries that id; open one with --id ${item.sprint_id}, or commit the item to a sprint that exists`,
+      })
+    }
+    if (item.description !== undefined && item.description.length > MAX_DESCRIPTION) {
+      before.push({
+        rule: 'H18',
+        id: item.id,
+        where: 'description',
+        detail: `the stored description is ${item.description.length} characters and the bound is ${MAX_DESCRIPTION}; the long form belongs in a file this record points at`,
+      })
+    }
+    const after = item.state === 'done' && hasReviewStep(item.type) && (item.evidence ?? []).length === 0
+      ? [{
+        rule: 'H21',
+        id: item.id,
+        where: 'evidence',
+        detail: 'the item is done and points at no evidence, which DOD7 refuses; it was closed by a hand edit or before that rule',
+      }]
+      : NONE
+    const entry: Audited = { item: summaryOf(item), before: before.length === 0 ? NONE : before, after }
+    this.#entries.push(entry)
+    this.#byId.set(item.id, entry)
   }
 
-  for (const field of MARKED_FIELDS) {
-    const logged = loggedValue(events, item.id, field)
-    if (logged === undefined) continue
-    const stored = renderField(item, field)
-    if (stored === logged) continue
-    findings.push({
-      rule: 'H20',
-      id: item.id,
-      where: field,
-      detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
-    })
-  }
-
-  for (const event of events) {
-    if (event.entity !== item.id) continue
+  event(event: StoreEvent): void {
+    const entry = this.#byId.get(event.entity)
+    if (entry === undefined) return
+    const item = entry.item
+    const after = event.after
+    if (typeof after === 'object' && after !== null) {
+      for (const field of MARKED_FIELDS) {
+        const value = (after as Record<string, unknown>)[field]
+        if (typeof value !== 'string') continue
+        entry.logged ??= new Map()
+        entry.logged.set(field, value)
+      }
+    }
     if (Date.parse(event.at) < Date.parse(item.filed_at)) {
-      findings.push({
+      (entry.fromLog ??= []).push({
         rule: 'H23',
         id: item.id,
         where: cell(event.id),
         detail: `event ${event.id} is dated ${event.at}, before the item was filed at ${item.filed_at}; no write path records a change to an item that does not exist yet`,
       })
     }
-    if (event.op !== 'item.mark') continue
-    if (item.assignee === undefined || event.actor !== item.assignee) continue
-    const after = event.after
+    if (event.op !== 'item.mark') return
+    if (item.assignee === undefined || event.actor !== item.assignee) return
     const changed = typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
-    findings.push({
+    ;(entry.fromLog ??= []).push({
       rule: 'H19',
       id: item.id,
       where: cell(event.id),
@@ -161,16 +192,58 @@ export function auditItem(
     })
   }
 
-  if (item.state === 'done' && hasReviewStep(item.type) && (item.evidence ?? []).length === 0) {
-    findings.push({
-      rule: 'H21',
-      id: item.id,
-      where: 'evidence',
-      detail: 'the item is done and points at no evidence, which DOD7 refuses; it was closed by a hand edit or before that rule',
-    })
+  /** The findings of one item that need only its record and its own events, in rule order. */
+  #ofItem(entry: Audited): readonly DoctorFinding[] {
+    const item = entry.item
+    const findings: DoctorFinding[] = [...entry.before]
+    for (const field of MARKED_FIELDS) {
+      const logged = entry.logged?.get(field)
+      if (logged === undefined) continue
+      const stored = renderField(item, field)
+      if (stored === logged) continue
+      findings.push({
+        rule: 'H20',
+        id: item.id,
+        where: field,
+        detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
+      })
+    }
+    findings.push(...(entry.fromLog ?? NONE), ...entry.after)
+    return findings
   }
 
-  return findings
+  /** The findings of the one item `record` was given, which is what `explain` reads. */
+  ofOne(): readonly DoctorFinding[] {
+    const only = this.#entries[0]
+    return only === undefined ? NONE : this.#ofItem(only)
+  }
+
+  /** Every finding over the workspace, in item then rule order, the cycle check last. */
+  findings(): readonly DoctorFinding[] {
+    const known = new Set(this.#byId.keys())
+    return [
+      ...this.#entries.flatMap((entry) => [
+        ...this.#ofItem(entry),
+        ...auditRelationsOf(known, entry.item),
+        ...auditImpediment(entry.item),
+      ]),
+      ...storedBlockingCycle(relationGraphFrom(this.#entries.map((entry) => entry.item))),
+    ]
+  }
+
+  get checked(): number {
+    return this.#entries.length
+  }
+}
+
+/** The findings of one item against its own slice of the log, in rule order. */
+export function auditItem(
+  item: WorkItem, events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
+): readonly DoctorFinding[] {
+  const audit = new WorkspaceAudit(sprintIds)
+  audit.record(item)
+  for (const event of events) audit.event(event)
+  return audit.ofOne()
 }
 
 /**
@@ -222,33 +295,6 @@ function storedBlockingCycle(graph: RelationGraph): readonly DoctorFinding[] {
   }]
 }
 
-/**
- * One pass over the log, then one pass over each item's own slice of it. `auditItem` filters
- * by entity itself, so handing every item the whole log made this O(items x events): measured
- * on the bench corpora, `doctor` took 375 ms at 100 items and 1,000 events, 1,338 ms at 1,000
- * and 10,000, 273,554 ms at 10,000 and 100,000, and did not finish inside ten minutes at
- * 50,000 and 500,000. The buckets cost one map of the log and make it linear in both.
- */
-export function auditWorkspace(
-  items: readonly WorkItem[], events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
-): readonly DoctorFinding[] {
-  const byEntity = new Map<string, StoreEvent[]>()
-  for (const event of events) {
-    const bucket = byEntity.get(event.entity)
-    if (bucket === undefined) byEntity.set(event.entity, [event])
-    else bucket.push(event)
-  }
-  const known = new Set(items.map((item) => item.id))
-  return [
-    ...items.flatMap((item) => [
-      ...auditItem(item, byEntity.get(item.id) ?? [], sprintIds),
-      ...auditRelationsOf(known, item),
-      ...auditImpediment(item),
-    ]),
-    ...storedBlockingCycle(relationGraphFrom(items)),
-  ]
-}
-
 export async function doctor(store: Store): Promise<ResultObject> {
   const identity = await store.identity()
   if (!identity.ok) return storeRefusal('doctor', 'read', identity.error, undefined)
@@ -256,15 +302,15 @@ export async function doctor(store: Store): Promise<ResultObject> {
 
   const stored = await store.findings()
   if (!stored.ok) return storeRefusal('doctor', 'read', stored.error, workspace)
-  const events = await store.events()
-  if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
-  // The audit reads every field of every record against its events, so this is the one
-  // command that decodes the whole store rather than reading the view every other one does.
-  const records = await store.list()
-  if (!records.ok) return storeRefusal('doctor', 'read', records.error, workspace)
   const sprints = await store.sprints()
   if (!sprints.ok) return storeRefusal('doctor', 'read', sprints.error, workspace)
-  const sprintIds = new Set(sprints.value.map((sprint) => sprint.id))
+  const audit = new WorkspaceAudit(new Set(sprints.value.map((sprint) => sprint.id)))
+  // The audit reads every field of every record against its events, so this is the one
+  // command that decodes the whole store; it holds one record and one event at a time.
+  const records = await store.eachItem({}, (item) => audit.record(item))
+  if (!records.ok) return storeRefusal('doctor', 'read', records.error, workspace)
+  const events = await store.eachEvent({}, (event) => audit.event(event))
+  if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
 
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
@@ -273,7 +319,7 @@ export async function doctor(store: Store): Promise<ResultObject> {
       where: `${cell(finding.file)}:${finding.line}`,
       detail: finding.reason,
     })),
-    ...auditWorkspace(records.value, events.value, sprintIds),
+    ...audit.findings(),
   ]
 
   const block: Block = {
@@ -285,8 +331,8 @@ export async function doctor(store: Store): Promise<ResultObject> {
     })),
   }
 
-  const items = records.value.length
-  const logged = events.value.length
+  const items = audit.checked
+  const logged = events.value
   const data: Record<string, Value> = {
     store: identity.value.path ?? workspace,
     checked: items,

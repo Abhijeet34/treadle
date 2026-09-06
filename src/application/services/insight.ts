@@ -25,8 +25,10 @@ import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, t
 import type { Clock } from '../ports/clock.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import {
+  activeBlockerIndex,
   activeBlockers,
   blockedByThis,
+  blockedByThisIndex,
   doneVerdict,
   readWorkspace,
   wholeItem,
@@ -177,12 +179,22 @@ export function ageDays(filed: string, now: string): number {
 export function scoreOf(
   view: WorkspaceView, item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
 ): Score {
+  return scored(view, item, now, weights, forActor, blockedByThis(view, item.id).length)
+}
+
+/**
+ * The score with `d` handed in, so that `rank` can read it off one index over the graph
+ * rather than walking the whole relation list once per ready item. `d` is the number of
+ * active items this one directly blocks: finishing it frees that many. A blocker's own
+ * severity is `v` on its own row, and the depth below it is not counted because a chain is
+ * freed one link at a time.
+ */
+function scored(
+  view: WorkspaceView, item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
+  dependents: number,
+): Score {
   const priority = item.priority === undefined ? 0 : 6 - item.priority
   const age = ageDays(item.filed_at, now)
-  // `d` is the number of active items this one directly blocks: finishing it frees that
-  // many. A blocker's own severity is `v` on its own row, and the depth below it is not
-  // counted because a chain is freed one link at a time.
-  const dependents = blockedByThis(view, item.id).length
   // Membership of an open sprint, and only an open one: work left behind in a closed sprint
   // gets no lift until it is committed onward, which is what carry-over asks a team to do.
   const sprint = item.sprint_id !== undefined && view.sprintById.get(item.sprint_id)?.state === 'open' ? 1 : 0
@@ -207,9 +219,13 @@ export function scoreOf(
 export function rank(
   view: WorkspaceView, now: string, weights: Weights, forActor: string | undefined,
 ): readonly Score[] {
+  // Both directions of every active `blocks` edge, indexed once: the per-item forms walk the
+  // whole relation list per call, which over every ready item is the product of the two counts.
+  const blockers = activeBlockerIndex(view)
+  const blocking = blockedByThisIndex(view)
   return view.items
-    .filter((item) => item.state === 'ready' && activeBlockers(view, item.id).length === 0)
-    .map((item) => scoreOf(view, item, now, weights, forActor))
+    .filter((item) => item.state === 'ready' && !blockers.has(item.id))
+    .map((item) => scored(view, item, now, weights, forActor, blocking.get(item.id)?.length ?? 0))
     .sort((a, b) => (a.score === b.score ? (a.item.id < b.item.id ? -1 : 1) : b.score - a.score))
 }
 

@@ -23,7 +23,9 @@ interface Store {
   get(id: ItemId): Promise<StoreResult<WorkItem | undefined>>
   list(query?: ItemQuery): Promise<StoreResult<readonly WorkItem[]>>
   summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
+  eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
+  eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>>
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>
   findings(): Promise<StoreResult<readonly Finding[]>>
   close(): Promise<void>
@@ -38,7 +40,8 @@ Two implementations.
 - **`ShardedStore`** is ADR-0002 and ADR-0004: month-sharded files, the SQLite index, the lock, the journal.
 - **`OverlayStore`** wraps any base store and stages writes in memory. It takes no lock, touches no file, and merges its staged records over the base's on every read. A `--dry-run` reads its own writes back through it, which is how every guard downstream of a write sees the store the write would have made.
 
-`test/store/conformance.ts` is parameterised by a factory and runs 13 tests against both: identity, compare-and-set in all three of its forms, versioning, all-or-nothing multi-write, list filters and limits, `summaries` matching `list` projected onto its fields, event queries by entity and time range, refusal of a record the grammar could not write back, refusal of an item the field dictionary refuses, and unknown-field carry-through.
+`test/store/conformance.ts` is parameterised by a factory and runs 14 tests against both: identity, compare-and-set in all three of its forms, versioning, all-or-nothing multi-write, list filters and limits, `summaries` matching `list` projected onto its fields, `eachItem` and `eachEvent` visiting what `list` and `events` return in their order, event queries by entity and time range, refusal of a record the grammar could not write back, refusal of an item the field dictionary refuses, and unknown-field carry-through.
+`eachItem` and `eachEvent` are `list` and `events` without the array, added by ADR-0021 for the one command that reads every whole record and every event: the sharded store serves each from the index's own row iterator and holds one at a time, and the overlay serves them off the merged list it already holds, which is the cost ADR-0006 records for it.
 The overlay's base in that suite is a real empty sharded store on a temporary directory, not a stub.
 
 The overlay runs a write through the same encode, render, parse and decode the sharded store's write path runs, so a dry run can never approve a record the real store would refuse.

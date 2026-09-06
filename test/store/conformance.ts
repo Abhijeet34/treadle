@@ -223,6 +223,40 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('streams items and events one at a time, as the arrays serve them and in their order', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'item-one', filed_at: '2026-09-01T10:00:00Z' }) },
+            { item: anItem({ id: 'item-two', state: 'ready', filed_at: '2026-09-02T10:00:00Z' }) },
+          ],
+          events: [
+            anEvent({ id: 'ev-2', at: '2026-09-02T10:00:00Z', op: 'transition' }),
+            anEvent({ id: 'ev-1', at: '2026-09-01T10:00:00Z', op: 'file' }),
+          ],
+        })
+        const items = await store.list()
+        const seen: unknown[] = []
+        const visited = await store.eachItem({}, (item) => seen.push(item))
+        assert.deepEqual(visited, { ok: true, value: 2 })
+        assert.deepEqual(seen, items.ok ? items.value : [])
+
+        const ready: string[] = []
+        await store.eachItem({ state: 'ready' }, (item) => ready.push(item.id))
+        assert.deepEqual(ready, ['item-two'])
+
+        const events = await store.events()
+        const heard: unknown[] = []
+        const counted = await store.eachEvent({}, (event) => heard.push(event))
+        assert.deepEqual(counted, { ok: true, value: 2 })
+        assert.deepEqual(heard, events.ok ? events.value : [])
+        const first: string[] = []
+        await store.eachEvent({ limit: 1 }, (event) => first.push(event.id))
+        assert.deepEqual(first, ['ev-1'])
+      })
+    })
+
     it('reads events by entity and by time range, in instant order', async () => {
       await withStore(async (store) => {
         await store.apply({

@@ -73,12 +73,16 @@ load column and against the ten-run series in the report, not on its own.
 
 The corpus carries what the product stores, and adding a shape to it is how a cost stops
 hiding. It had no relation edge, no sprint record and no impediment until 2026-09-06, so three
-superlinear paths went unpriced: `relationGraphFrom` scans its accumulated edges per edge and
-every command pays it through `readWorkspace`, `findRelationCycle` runs a walk per edge, and
-`rank` in `insight.ts` calls `activeBlockers` once per item where `activeBlockerIndex` exists
-for that shape. Adding an operation to `READ_OPS` in `bench/axes/a4-latency.ts` widens what the
+superlinear paths went unpriced until then: `relationGraphFrom` scanned its accumulated edges
+per edge and every command paid it through `readWorkspace`, `findRelationCycle` ran a walk per
+edge, and `rank` in `insight.ts` asked the whole relation list twice per ready item. All three
+are linear now, and the shape is held by a test rather than a wall time:
+`test/services/next-scale.test.ts` counts passes over the relation list the way
+`test/services/doctor-scale.test.ts` counts passes over the log, so a per-item scan fails at
+60 items. Adding an operation to `READ_OPS` in `bench/axes/a4-latency.ts` widens what the
 peak-RSS read budget prices, which is deliberate and is how `doctor` at 1,021 MiB became
-visible. Two ceilings the generator found rather than the other way round are in
+visible; it held 500,000 decoded events beside 50,000 whole records to look at each once, and
+ADR-0021 records the streaming reads that replaced that. Two ceilings the generator found rather than the other way round are in
 `docs/BENCHMARKS.md`: a sprint past 744 item ids cannot write its own `carried` line, and
 `packageFacts` weighed whatever `dist/treadle.js` was on disk until it learned to refuse one
 older than the sources.
