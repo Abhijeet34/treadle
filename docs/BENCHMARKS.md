@@ -10,7 +10,7 @@ Four of the six meet their target, two miss it, and the two misses are reported 
 
 Reproduce it with `npm run bench`.
 The appendix at the end of this file is `bench/results/bench.md` from run `2026-09-05T12-08-34-931Z`, with its heading levels demoted one step and nothing else changed.
-Two later four-scale runs are in "The axis table re-derived at 50,000 items" and a third, taken after sprints, impediments, relations and boards landed, is in "The axis table re-derived after the four capabilities landed"; every paragraph that says "the appended run" means the one in the appendix and not those.
+Two later four-scale runs are in "The axis table re-derived at 50,000 items" and a fourth, taken after sprints, impediments, relations and boards landed, is in "The axis table re-derived after the four capabilities landed"; every paragraph that says "the appended run" means the one in the appendix and not those.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
 
 **One set of figures below is older than the appendix and is marked where it appears.**
@@ -520,11 +520,11 @@ It is 86.3 ms at a 1-minute load of 3.35 and 245.5 ms at 6.35, on the same code,
 ## The axis table re-derived after the four capabilities landed
 
 Sprints, impediments, relations and boards all shipped on 2026-09-06, so the table above was re-derived against the finished set rather than against any one of them.
-The run is `2026-09-06T12-35-25-257Z`, 688 s of wall time, four corpora regenerated in the run, 990 timed cold samples, 51 budgets: 31 pass, 0 fail, 4 open miss, 16 pending.
+The run is `2026-09-06T12-51-17-231Z`, 572 s of wall time, four corpora regenerated in the run, 990 timed cold samples, 51 budgets: 32 pass, 0 fail, 3 open miss, 16 pending.
 
 Read the timing column against its load and nothing else.
-The 1-minute load average was 11.11 at the start and 24.52 at the end, against the 3.47 to 4.54 the committed memory figures were taken at.
-Three runs against the same product within an hour produced nine, four and one timing open miss, in that order, and the one with the fewest was not the quietest: the nine-miss run started at a load of 10.18 and this one started at 11.11.
+The 1-minute load average was 10.96 at the start and 19.39 at the end, against the 3.47 to 4.54 the committed memory figures were taken at.
+Four runs within an hour produced nine, four, one and no timing open miss, and the one with the fewest was not the quietest: the nine-miss run started at a load of 10.18 and this one started at 10.96.
 That is the whole argument for why the timing budgets stay unarmed, and it is why the findings below are memory figures, counts and decompositions rather than wall times.
 
 ### What the corpus now holds
@@ -562,7 +562,7 @@ A corpus that manufactures findings measures the reporting of them rather than t
 | A1 durability under parallel writers | MET | 5/5, 24/24, 60/60, 200/200 landed; zero refusals, zero crashes, no lock or temp file left |
 | A2 the 25 questions | MISSED | **15 full, 8 partial, 2 none**, against the reference's 4/6/15 |
 | A3 output size per command | MET | all 12 artefacts inside their A.3 budget |
-| A4 latency at scale | MISSED | `get` p95 7.3 ms, `create` p95 644.3 ms against a 150 ms target, at a 1-minute load of 11.11 rising to 24.52 |
+| A4 latency at scale | MET | `get` p95 7.3 ms, `create` p95 117.4 ms against a 150 ms target, at a 1-minute load of 10.96; the ten-run series above is what bounds this axis, not one run |
 | A5 malformed input | MET | 206 damaged stores: 0 silent drops, 94 refusals naming the record, 108 absorbed, 4 where the edit removed the record |
 | A6 mis-target | MET | 0 mis-targets in 10 writes with no explicit target, 3 of 3 seam resolutions correct |
 | A7 audit | MET | 50 of 50 explained, 250 events replayed to the state shown, every event carries an actor |
@@ -608,39 +608,37 @@ A pass rate over the rows a table happens to have says nothing about the rows it
 
 | Budget | Recorded before | This run | Limit | Status |
 |---|---|---|---|---|
-| peak RSS, read at 50,000 | 166,944 KiB | **1,045,280 KiB** | 102,400 | open miss, and see below |
-| peak RSS, mutation at 50,000 | 147,088 / 146,960 KiB | 149,904 / 148,528 KiB | 122,880 | open miss |
-| first index build at 50,000 | 10,250 ms | 13,212 ms | 6,000 | open miss |
-| re-index after a hand edit | 100.4 ms | 110.2 ms | 135 | pass |
+| peak RSS, read at 50,000 | 166,944 KiB | **1,043,456 KiB** | 102,400 | open miss, and see below |
+| peak RSS, mutation at 50,000 | 147,088 / 146,960 KiB | 146,368 / 147,056 KiB | 122,880 | open miss |
+| first index build at 50,000 | 10,250 ms | 10,305 ms | 6,000 | open miss |
+| re-index after a hand edit | 100.4 ms | 80.2 ms | 135 | pass |
 | index size against the text it indexes | 1.538x | 1.54x | 1.6 | pass |
-| cold start, store layer loaded | 157.8 ms | 155.3 ms | 213 | pass |
-| install size, unpacked | 327,471 B | 439,373 B | 1,572,864 | pass |
-| bundle | 243,377 B | 328,057 B | 512,000 | pass |
+| cold start, store layer loaded | 157.8 ms | 87.1 ms | 213 | pass |
+| install size, unpacked | 327,471 B | 443,200 B | 1,572,864 | pass |
+| bundle | 243,377 B | 331,884 B | 512,000 | pass |
 | runtime dependencies | 0 | 0 | 0 | pass |
 | A1 durability / crashes | 1 / 0 | 1 / 0 | 1 / 0 | pass |
 | A5 silent drops / whole-store refusals / crashes | 0 / 0 / 0 | 0 / 0 / 0 | 0 / 0 / 0 | pass |
 | output size per command | 0 over budget | 0 over budget | 0 | pass |
 
-The run's fourth open miss is a timing row and is not in this table: `create` at 50,000 items reads 634.2 ms above the node floor against a 584.4 ms limit derived on a quieter day.
-
-Four budgets moved.
+Two moved, and one of the two is a change in what is measured rather than in the product.
 
 **The bundle and the install size moved with the four capabilities and nothing else.**
-84,680 bytes of bundle and 111,902 bytes unpacked, for a board, a sprint lifecycle, a relation graph and an impediment type.
-Both are armed and both are still 1.6x and 3.6x under their limits, so the movement shows up on every run without needing this paragraph.
+88,507 bytes of bundle and 115,729 bytes unpacked, for a board, a sprint lifecycle, a relation graph and an impediment type.
+Both are armed and both are still 1.5x and 3.5x under their limits, so the movement shows up on every run without needing this paragraph.
 
 Getting those two right took a fix to the rig.
 `packageFacts` reads `dist/treadle.js` off disk, refused an absent one and said nothing about a stale one, so an earlier run of this same table published 281,312 bundle bytes off a bundle a previous session had left behind while building at that commit gave 328,057.
 The three package rows now report `NOT MEASURED` naming the first source file newer than the bundle.
 A size budget over a bundle from another commit is worse than no figure, because it reads like one.
 
-**The first index build moved 29%, from 10,250 ms to 13,212 ms**, on a figure whose own run-to-run spread on this machine was measured at 10,578 to 25,920 ms and which read 11,026 ms in the run twenty minutes earlier.
-The corpus now carries 24 sprint records and 5,000 relation edges that were not there before, and neither is anywhere near 3 s of index work.
-This is the machine.
-
-**Peak RSS on a read went from 166,944 KiB to 1,045,280 KiB, and the reason is not that a read got six times heavier.**
+**Peak RSS on a read went from 166,944 KiB to 1,043,456 KiB, and the reason is not that a read got six times heavier.**
 It is that the budget is weighed over the worst of `READ_OPS`, and `doctor` is now in that set.
-`readWorkspace` itself reads 172,880 KiB in this run against 166,944 recorded, which is 3.6% on a corpus that gained 5,000 edges and 24 sprints, and is the like-for-like figure.
+`readWorkspace` itself reads 173,168 KiB in this run against 166,944 recorded, which is 3.7% on a corpus that gained 5,000 edges and 24 sprints, and is the like-for-like figure.
+
+The first index build read 10,305 ms against 10,250 recorded, and the mutation rows read 146,368 and 147,056 against 147,088 and 146,960.
+Neither moved.
+Both read 13,212 ms and 149,904 KiB in a run twenty minutes earlier on the same code, which is the load and not the product.
 
 ### Where the two open memory misses stand
 
@@ -648,51 +646,55 @@ The read miss is worse and the mutation miss is not.
 
 | Operation at 50,000 | in-process p50 | peak RSS |
 |---|---|---|
-| `identity` | 4.3 ms | 101,040 KiB |
-| `get` | 7.0 ms | 102,576 KiB |
-| `list`, bounded at 50 rows | 10.1 ms | 103,728 KiB |
-| `workspace` | 513.3 ms | 172,880 KiB |
-| `board --all` | 555.3 ms | 177,104 KiB |
-| `next` | 2,007.7 ms | 176,336 KiB |
-| `doctor` | 5,770.7 ms | **1,045,280 KiB** |
-| `create` | 372.9 ms | 149,904 KiB |
-| `transition` | 388.6 ms | 148,528 KiB |
+| `identity` | 4.3 ms | 101,216 KiB |
+| `get` | 7.0 ms | 102,224 KiB |
+| `list`, bounded at 50 rows | 10.0 ms | 102,992 KiB |
+| `workspace` | 506.3 ms | 173,168 KiB |
+| `board --all` | 553.2 ms | 178,320 KiB |
+| `next` | 2,002.3 ms | 176,368 KiB |
+| `doctor` | 3,707.5 ms | **1,043,456 KiB** |
+| `create` | 114.9 ms | 146,368 KiB |
+| `transition` | 117.9 ms | 147,056 KiB |
 
-`doctor` peaks at 1,021 MiB, which is 10.2x the 100 MiB budget and 6.0x the read every command performs.
-The run decomposes where that does not come from: `board --all` builds the same relation graph, indexes it by blocked item and groups five columns, and costs 4,224 KiB over `workspace`.
+`doctor` peaks at 1,019 MiB, which is 10.2x the 100 MiB budget and 6.0x the read every command performs.
+The run decomposes where that does not come from: `board --all` builds the same relation graph, indexes it by blocked item and groups five columns, and costs 5,152 KiB over `workspace`.
 The relation graph over 5,000 edges is single-digit megabytes.
-`doctor`'s other 872,400 KiB is the pass that pairs 50,000 items with 500,000 events, and it grows the way the item count does: 107,248 KiB at 100 items, 144,448 at 1,000, 383,712 at 10,000, 1,045,280 at 50,000.
+`doctor`'s other 870,288 KiB is the pass that pairs 50,000 items with 500,000 events, and it grows the way the item count does: 106,848 KiB at 100 items, 142,624 at 1,000, 383,776 at 10,000, 1,043,456 at 50,000.
 
-The mutation miss did not move: 149,904 KiB for `create` against 147,088 recorded, a 1.9% drift on a corpus that gained relations, sprints and impediments.
+The mutation miss did not move: 146,368 KiB for `create` against 147,088 recorded, on a corpus that gained relations, sprints and impediments.
 The parse that was fixed stayed fixed.
 
 Neither budget was adjusted.
 A budget nobody has met is a finding; a budget moved to fit a reading is nothing at all.
 
-### What the cycle check costs over a dense relation graph
+### What the cycle check costs over a dense relation graph, before and after #38
 
-`relationGraphFrom` scans the edges it has already accepted for every new one, and `findRelationCycle` runs a walk per `blocks` edge whose every step filters the whole edge list.
+`relationGraphFrom` builds the edge list and `findRelationCycle` walks it for a cycle in `blocks`.
 Both are taken apart here because a total would hide which half, and only one of them is `doctor`'s.
 One in-process sample per scale, on the corpus's own graph.
+[#38](https://github.com/Abhijeet34/treadle/pull/38) landed between the first measurement and this one and rewrote the walk, so both are given.
 
-| Edges | Graph build | Cycle walk |
-|---|---|---|
-| 10 | 0.033 ms | 0.182 ms |
-| 100 | 0.244 ms | 1.094 ms |
-| 1,000 | 7.958 ms | 66.215 ms |
-| 5,000 | 208.388 ms | 2,073.970 ms |
+| Edges | Graph build, before | Graph build, after | Cycle walk, before | Cycle walk, after |
+|---|---|---|---|---|
+| 10 | 0.033 ms | 0.032 ms | 0.182 ms | 0.125 ms |
+| 100 | 0.244 ms | 0.240 ms | 1.094 ms | 0.258 ms |
+| 1,000 | 7.958 ms | 7.914 ms | 66.215 ms | 1.864 ms |
+| 5,000 | 208.388 ms | 142.874 ms | 2,073.970 ms | **4.181 ms** |
 
-Ten times the edges costs 33x the build and 61x the walk between 100 and 1,000.
-The corpus is acyclic on purpose, because `findRelationCycle` returns on the first cycle it finds and a corpus with one in it would measure how fast the check gives up rather than what it costs.
+The walk ran a depth-first search per `blocks` edge, and each step of each search filtered the whole edge list.
+It is one pass over an adjacency map now, and at 5,000 edges it went from 2,073.970 ms to 4.181 ms.
+The build did not change: it read 142.573 and 208.388 ms in two runs before #38 and 142.874 after, and the 208 is the same machine the timing table above is about.
 
-**The build is paid by every command**, because `readWorkspace` calls it, so 208 ms of every read at 50,000 items is a duplicate scan over 5,000 edges.
-Only the 2,074 ms walk is `doctor`'s.
+**The build is what is left, and every command pays it**, because `readWorkspace` calls it: `relationGraphFrom` still scans the edges it has already accepted for each new one, so 143 ms of every read at 50,000 items is a quadratic duplicate check.
+Ten times the edges costs 33x the build between 100 and 1,000.
 
-A third path is worse than either and is not in this table.
-`rank` in `src/application/services/insight.ts` filters every item through `activeBlockers`, and each of those calls walks the whole relation list, which is 50,000 items against 5,000 edges once per command: `next` costs 2,007.7 ms against `workspace`'s 513.3 on the same read.
+A third path is untouched by #38 and is worse than the build.
+`rank` in `src/application/services/insight.ts` filters every item through `activeBlockers`, and each of those calls walks the whole relation list, which is 50,000 items against 5,000 edges once per command: `next` costs 2,002.3 ms against `workspace`'s 506.3 on the same read.
 `activeBlockerIndex` in `context.ts` already exists for exactly this shape and already carries the comment saying so, and `board` uses it while `next` does not.
 
-Three superlinear paths, none of them visible until a corpus had an edge in it.
+The corpus is acyclic on purpose, because `findRelationCycle` returns on the first cycle it finds and a corpus with one in it would measure how fast the check gives up rather than what it costs.
+
+Three superlinear paths, none of them visible until a corpus had an edge in it, and one of them closed within the hour by someone who could see the number.
 A budget over an operation nobody performs is not a measurement, and neither is a corpus without the shapes the product stores.
 
 ## Where it stops scaling, and what gives way first
