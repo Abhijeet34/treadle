@@ -295,6 +295,16 @@ Before hand-checking any of these, run the suite: it already checks them.
   the tree alone, so it runs under `npm test`, `coverage` and `flake` and fails on the
   developer's machine before a push; `tests kept` is a CI job because its comparison needs
   main's history, which a test of the tree cannot see.
+- A number a document states about this tree is held to the tree by
+  `test/architecture/documented-numbers.test.ts`: the README's command list against the
+  inventory, its type count against `WORK_ITEM_TYPES`, its backlog figures against `.work`,
+  the `H` table in `docs/architecture/adr/README.md` against what `doctor` raises, the Node
+  floor against `engines.node`, and the bundle budget against `bench/budgets.json`. When one
+  of those moves, the fix is the sentence, not the assertion. A measurement does not go in
+  that file: a wall time, a byte count of the tree or a coverage decimal moves on a commit
+  that changed nothing about the claim, and those live in `docs/VERIFICATION.md` with the
+  date and the load they were taken at. A record a later record overtakes is marked with an
+  `**Overtaken in part by:**` line in its own header rather than rewritten.
 - No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
   each golden object twice, once from a `structuredClone` and once after moving the process's
   cwd and environment, and asserts the bytes do not move.
