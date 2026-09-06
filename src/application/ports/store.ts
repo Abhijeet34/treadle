@@ -179,9 +179,19 @@ export interface Store {
    * record's own as `list` would serve it, never a cached approximation of it.
    */
   summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
+  /**
+   * `list` without the array: `visit` sees each item `list` would return, in its order, and
+   * the count comes back. The read is refused where `list` refuses it, and an item visited
+   * before the refusal is the caller's to discard. `doctor` is the reader: it audits every
+   * field of every record and held all of them at once, 484 MiB of the 1,442 it allocated
+   * at 50,000 items, to look at each one once.
+   */
+  eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>>
   /** Every sprint the store holds, in the order they were opened. There are few, so no query. */
   sprints(): Promise<StoreResult<readonly Sprint[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
+  /** `events` without the array, under the same contract as `eachItem`; 865 MiB of the same call. */
+  eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>>
   /** All-or-nothing: every write lands or none does, under the store's own serialisation. */
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>
   /** Quarantined records and load-time integrity violations, in file and line order. */

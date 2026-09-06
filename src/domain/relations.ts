@@ -84,13 +84,20 @@ export function emptyRelationGraph(): RelationGraph {
  * hand-edited cycle is `findRelationCycle`'s to report and an edge to a missing record is
  * the caller's finding. A symmetric edge a file spells the other way round is the same edge.
  */
-export function relationGraphFrom(items: Iterable<WorkItem>): RelationGraph {
+export function relationGraphFrom(items: Iterable<Pick<WorkItem, 'id' | 'relations'>>): RelationGraph {
   const relations: Relation[] = []
+  // Every command pays this build through the workspace read, so a repeated edge is found by
+  // key rather than by scanning the edges accepted so far: that scan was 105 ms of every
+  // command at 5,000 edges, and grows with the square of the count.
+  const seen = new Set<string>()
   for (const item of items) {
     for (const stored of item.relations ?? []) {
       if (!(RELATION_KINDS as readonly string[]).includes(stored.kind)) continue
       const edge = normalise({ kind: stored.kind, source: item.id, target: stored.target })
-      if (!relations.some((r) => same(r, edge))) relations.push(edge)
+      const key = `${edge.kind} ${edge.source} ${edge.target}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      relations.push(edge)
     }
   }
   return { relations }

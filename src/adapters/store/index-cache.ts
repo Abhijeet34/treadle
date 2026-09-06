@@ -717,7 +717,12 @@ export class IndexCache {
       .iterate(...values)
   }
 
-  listEvents(query: EventQuery): readonly StoreEvent[] {
+  /**
+   * One decoded event at a time, in log order. Streamed rather than materialised because the
+   * one reader of the whole log is `doctor`, which looks at each event once: `.all()` over
+   * 500,000 rows held 384 MiB of row objects and 431 MiB of decoded events to do that.
+   */
+  *iterateEvents(query: EventQuery): Iterable<StoreEvent> {
     const where: string[] = []
     const values: (string | number)[] = []
     if (query.entity !== undefined) { where.push('entity = ?'); values.push(query.entity) }
@@ -728,8 +733,8 @@ export class IndexCache {
     if (query.limit !== undefined) values.push(query.limit)
     const rows = this.#open()
       .prepare(`select id, at, entity, op, actor, txn, rest from events${clause} order by at, rowid${limit}`)
-      .all(...values) as unknown as readonly (Record<string, string> & { rest: string })[]
-    return rows.map((row) => eventFrom(row, row.rest))
+      .iterate(...values) as unknown as Iterable<Record<string, string> & { rest: string }>
+    for (const row of rows) yield eventFrom(row, row.rest)
   }
 
   /**

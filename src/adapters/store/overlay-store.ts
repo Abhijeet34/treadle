@@ -75,6 +75,16 @@ export class OverlayStore implements Store {
     return storeOk(merged(base.value, this.#items.values(), query))
   }
 
+  // The overlay merges its pending writes over the whole base list on every read, which
+  // ADR-0006 records as its cost, so its streaming reads hold what its array reads hold and
+  // keep only the contract: the same items, the same order, the same refusal.
+  async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
+    const items = await this.list(query)
+    if (!items.ok) return items
+    for (const item of items.value) visit(item)
+    return storeOk(items.value.length)
+  }
+
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
     const base = await this.#base.summaries({})
     if (!base.ok) return base
@@ -99,6 +109,13 @@ export class OverlayStore implements Store {
       return true
     }).sort((a, b) => (a.at === b.at ? a.id.localeCompare(b.id) : a.at.localeCompare(b.at)))
     return storeOk(query.limit === undefined ? all : all.slice(0, query.limit))
+  }
+
+  async eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>> {
+    const events = await this.events(query)
+    if (!events.ok) return events
+    for (const event of events.value) visit(event)
+    return storeOk(events.value.length)
   }
 
   async findings(): Promise<StoreResult<readonly Finding[]>> {

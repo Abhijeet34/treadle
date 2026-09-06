@@ -172,6 +172,25 @@ export function blockedByThis(view: WorkspaceView, id: ItemId): readonly ItemId[
     })
 }
 
+/**
+ * `blockedByThis` for every blocker at once, from one pass over the graph, for the same
+ * reason `activeBlockerIndex` exists: `next` scores every ready item and asked the whole
+ * relation list twice per item, 1,250 ms of a 1,885 ms call over 5,000 edges. An id absent
+ * here blocks nothing active.
+ */
+export function blockedByThisIndex(view: WorkspaceView): ReadonlyMap<ItemId, readonly ItemId[]> {
+  const index = new Map<ItemId, ItemId[]>()
+  for (const relation of view.relations.relations) {
+    if (relation.kind !== 'blocks') continue
+    const state = view.byId.get(relation.target)?.state
+    if (state === undefined || state === 'done' || state === 'cancelled') continue
+    const blocked = index.get(relation.source)
+    if (blocked === undefined) index.set(relation.source, [relation.target])
+    else blocked.push(relation.target)
+  }
+  return index
+}
+
 /** What a gate rule or a guard is told about a neighbour: enough to name its next move. */
 function gateItems(view: WorkspaceView, ids: readonly ItemId[]): readonly GateItem[] {
   return ids.flatMap((id) => {

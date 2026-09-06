@@ -233,15 +233,23 @@ export class ShardedStore implements Store {
   }
 
   async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
+    const items: WorkItem[] = []
+    const scanned = await this.eachItem(query, (item) => items.push(item))
+    return scanned.ok ? storeOk(items) : scanned
+  }
+
+  async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
-    const items: WorkItem[] = []
+    let visited = 0
     for (const row of this.#index.listItems(query)) {
       const item = this.#decodeRow(row)
       if (!item.ok) return item
-      if (item.value !== undefined) items.push(item.value)
+      if (item.value === undefined) continue
+      visit(item.value)
+      visited += 1
     }
-    return storeOk(items)
+    return storeOk(visited)
   }
 
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
@@ -278,7 +286,18 @@ export class ShardedStore implements Store {
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
-    return storeOk(this.#index.listEvents(query))
+    return storeOk([...this.#index.iterateEvents(query)])
+  }
+
+  async eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>> {
+    const fresh = await this.#refresh()
+    if (!fresh.ok) return fresh
+    let visited = 0
+    for (const event of this.#index.iterateEvents(query)) {
+      visit(event)
+      visited += 1
+    }
+    return storeOk(visited)
   }
 
   async findings(): Promise<StoreResult<readonly Finding[]>> {

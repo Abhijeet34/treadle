@@ -4,7 +4,7 @@
 // lives in src/cli/diagnostics.ts and finding F10 is why.
 
 import type {
-  Applied, EventQuery, Finding, ItemQuery, Store, StoreIdentity, StoreResult, StoreTransaction,
+  Applied, EventQuery, Finding, ItemQuery, Store, StoreEvent, StoreIdentity, StoreResult, StoreTransaction,
 } from '../application/ports/store.ts'
 import type { Sprint, WorkItem, WorkItemSummary } from '../domain/index.ts'
 
@@ -42,6 +42,15 @@ export class LoggingStore implements Store {
     return result
   }
 
+  async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
+    const result = await this.#inner.eachItem(query, (item) => {
+      this.#log.store('read', fieldsOf(item))
+      visit(item)
+    })
+    this.#log.store('eachItem', { n: result.ok ? result.value : 0 })
+    return result
+  }
+
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
     const result = await this.#inner.summaries(query)
     if (result.ok) for (const item of result.value) this.#log.store('read', fieldsOf(item))
@@ -55,9 +64,15 @@ export class LoggingStore implements Store {
     return result
   }
 
-  async events(query: EventQuery = {}): Promise<StoreResult<readonly import('../application/ports/store.ts').StoreEvent[]>> {
+  async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
     const result = await this.#inner.events(query)
     this.#log.store('events', { n: result.ok ? result.value.length : 0 })
+    return result
+  }
+
+  async eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>> {
+    const result = await this.#inner.eachEvent(query, visit)
+    this.#log.store('eachEvent', { n: result.ok ? result.value : 0 })
     return result
   }
 

@@ -184,7 +184,7 @@ describe('an append never decides a clash', () => {
       assert.equal(outcome.wholePass, true)
       assert.deepEqual(cache.findings(), [])
       assert.equal(cache.fingerprints().get(LOG)?.size, size, 'the fingerprint moved under a rolled-back append')
-      assert.equal(cache.listEvents({}).length, 2, 'the rolled-back append wrote a row')
+      assert.equal([...cache.iterateEvents({})].length, 2, 'the rolled-back append wrote a row')
     } finally {
       cache.close()
       await workspace.dispose()
