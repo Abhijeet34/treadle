@@ -79,7 +79,7 @@ False positives are the failure mode that kills a check like this, and this is t
 
 ## Consequences
 
-Measured over every pull request in this repository's history, all 28 of them, 24 pass untouched.
+Measured over every pull request in this repository's history, all 29 of them, 25 pass untouched.
 Four would have needed a declaration, nine trailers between them, and every one of the nine is a test whose title changed because the behaviour it names changed: `carries the five components of each row` to `carries the six`, `S3: a duplicate id refuses the write` to `refuses every answer`.
 That is the intended cost rather than a false positive, and it is one line in a commit message for a change that already had to be argued in review.
 

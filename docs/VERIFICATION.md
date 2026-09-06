@@ -47,7 +47,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
 | A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
 | The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
-| A pull request cannot silently remove a test that main has | The reconstructed pull request 29 resolution reports 1122 of 1122 tests passing and is refused by `check-tests-kept` naming 32 titles; over all 28 pull requests in main's history, 24 pass and 4 need 9 declarations between them, every one a title whose behaviour changed (`test/architecture/tests-kept.test.ts`) | Proven |
+| A pull request cannot silently remove a test that main has | The reconstructed pull request 29 resolution reports 1122 of 1122 tests passing and is refused by `check-tests-kept` naming 32 titles; over all 29 pull requests in main's history, 25 pass and 4 need 9 declarations between them, every one a title whose behaviour changed (`test/architecture/tests-kept.test.ts`) | Proven |
 
 ## What is not proven
 
