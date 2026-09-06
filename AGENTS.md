@@ -63,13 +63,15 @@ expected too.
 `npm run bench` is the measurement rig and `npm run bench:gate` is the same run with a
 non-zero exit on a regression. A full four-scale run takes about five and a half minutes and
 writes about 430 MB of corpora under `TREADLE_BENCH_DIR`, so pass `--scales 100,1000` while
-iterating. `bench/README.md` has the flags, `bench/bench.config.json` the parameters,
-`docs/BENCHMARKS.md` the last measured run and ADR-0008 the method. Two things about it are
-worth knowing before reading a figure: a value that could not be taken is the string
-`NOT MEASURED: <reason>` and never a zero, and the gate reads the median rather than the p95
-because the p95 moved 68.9% between two identical runs on one machine. This machine is shared
-and never idle, so every figure carries the load either side of it; judge a number against its
-load column and against the ten-run series in the report, not on its own.
+iterating. Two runs at once are safe without setting anything: each measures its own clone of
+a shared cache entry, described under "Two runs at once" in `bench/README.md`, which also has
+the flags. `bench/bench.config.json` has the parameters, `docs/BENCHMARKS.md` the last
+measured run and ADR-0008 the method. Two things about it are worth knowing before reading a
+figure: a value that could not be taken is the string `NOT MEASURED: <reason>` and never a
+zero, and the gate reads the median rather than the p95 because the p95 moved 68.9% between
+two identical runs on one machine. This machine is shared and never idle, so every figure
+carries the load either side of it; judge a number against its load column and against the
+ten-run series in the report, not on its own.
 
 The corpus carries what the product stores, and adding a shape to it is how a cost stops
 hiding. It had no relation edge, no sprint record and no impediment until 2026-09-06, so three

@@ -6,7 +6,7 @@
 // something to subtract, corpora are generated before anything is timed, and the axis that
 // deletes the index runs last within its scale.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -23,7 +23,7 @@ import { runA12 } from './axes/a12-contract.ts'
 import { remainingAxes } from './axes/remaining.ts'
 import type { AxisResult } from './axes/axis.ts'
 import { loadConfig, samplesFor, type BenchConfig } from './config.ts'
-import { buildCorpus, type Corpus } from './corpus.ts'
+import { acquireCorpus, type Corpus } from './corpus.ts'
 import { measureFloors } from './floors.ts'
 import { loadBudgets, programCost, runGate, ABSOLUTE_KEYS, AXIS_BUDGET_KEYS, type Budgets } from './gate.ts'
 import { peakLoad, sampleLoad } from './load.ts'
@@ -36,7 +36,7 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 type Flags = {
   readonly out: string
-  readonly reuseCorpus: boolean
+  readonly rebuildCorpus: boolean
   readonly writeBudgets: boolean
   readonly gate: boolean
   readonly scales?: readonly number[]
@@ -52,7 +52,7 @@ function parseFlags(argv: readonly string[]): Flags {
   const samples = value('--samples')
   return {
     out: value('--out') ?? path.join(ROOT, 'bench', 'results'),
-    reuseCorpus: argv.includes('--reuse-corpus'),
+    rebuildCorpus: argv.includes('--rebuild-corpus'),
     writeBudgets: argv.includes('--write-budgets'),
     gate: argv.includes('--gate'),
     ...(scales === undefined ? {} : { scales: scales.split(',').map(Number) }),
@@ -137,11 +137,17 @@ async function main(): Promise<void> {
 
   const machine = describeMachine('24.15.0')
 
-  await mkdir(config.corpusDir, { recursive: true })
+  // Isolation is the default, not a flag: every axis mutates the corpus it measures, so two
+  // runs sharing one root corrupt each other quietly. The run id and the pid together are
+  // unique to this process, which is the only key that holds when both runs are started from
+  // the same worktree. `cache/` under the same base stays shared and is never written to
+  // after publication, so generation is still paid once across runs.
+  const cacheDir = path.join(config.corpusDir, 'cache')
+  const runDir = path.join(config.corpusDir, `run-${runToken(runId)}-${process.pid}`)
   const corpora: Corpus[] = []
   for (const items of config.scales) {
     say(`bench: corpus of ${items} items`)
-    corpora.push(await buildCorpus(config.corpusDir, {
+    corpora.push(await acquireCorpus(cacheDir, runDir, {
       items,
       eventsPerItem: config.eventsPerItem,
       months: config.months,
@@ -149,7 +155,12 @@ async function main(): Promise<void> {
       lastMonth: config.lastMonth,
       relationsPerHundredItems: config.relationsPerHundredItems,
       impedimentsPerHundredItems: config.impedimentsPerHundredItems,
-    }, flags.reuseCorpus))
+    }, flags.rebuildCorpus))
+  }
+  for (const corpus of corpora) {
+    say(`bench: ${corpus.spec.items} items at ${corpus.root}`
+      + (corpus.reused ? `, cloned from cache in ${Math.round(corpus.cloneMs ?? 0)} ms`
+        : `, generated in ${Math.round(corpus.generatedMs ?? 0)} ms`))
   }
 
   // Floors AFTER the corpora and immediately before the operations they are subtracted from,
@@ -169,7 +180,7 @@ async function main(): Promise<void> {
   const a1 = await withLoad(() => runA1(a1Corpus, config.a1WriterCounts, runToken(runId)))
 
   say(`bench: A5, ${config.a5.randomEdits} random line edits plus the shaped cases`)
-  const a5 = await withLoad(() => runA5(a1Corpus, config.corpusDir, config.a5.randomEdits, config.seed))
+  const a5 = await withLoad(() => runA5(a1Corpus, runDir, config.a5.randomEdits, config.seed))
 
   say('bench: A6, mis-target across the three scenarios at the command surface')
   const a6 = await withLoad(async () => (await runA6(a1Corpus)).axis)
@@ -236,6 +247,10 @@ async function main(): Promise<void> {
     await writeFile(path.join(ROOT, 'bench', 'budgets.json'), `${JSON.stringify(budgets, null, 2)}\n`)
     say('bench: rewrote bench/budgets.json from this run')
   }
+
+  // The run's private corpora are this process's litter, so this process clears them. The
+  // shared cache survives, which is the whole point of splitting the two.
+  await rm(runDir, { recursive: true, force: true })
 
   const g = report.gate
   say(`bench: ${g.rows.length} budgets, ${g.passed} pass, ${g.failed} fail, ${g.openMisses} open miss, ${g.pending} pending`)
