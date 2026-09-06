@@ -10,7 +10,8 @@ The standing rule in this project is that a seam with one implementation is not 
 DR6 names six of them and requires each to ship two real implementations for a product reason rather than a test-only one, with one shared suite running against both.
 
 The store's second implementation has a product reason on day one.
-`--dry-run` and `--preview` have to evaluate every guard and diff every entity without writing, and the way to do that without a second code path through the guards is a copy-on-write layer over the base store.
+`--dry-run` has to evaluate every guard and diff every entity without writing, and the way to do that without a second code path through the guards is a copy-on-write layer over the base store.
+`--preview` is the cheaper question beside it, resolving the target and evaluating nothing, so it needs no store of its own.
 
 ## Decision
 
@@ -34,7 +35,7 @@ A refusal is a value, not an exception, the same contract the domain core uses.
 Two implementations.
 
 - **`ShardedStore`** is ADR-0002 and ADR-0004: month-sharded files, the SQLite index, the lock, the journal.
-- **`OverlayStore`** wraps any base store and stages writes in memory. It takes no lock, touches no file, and merges its staged records over the base's on every read. `pending()` returns what a dry run would have written, which is the diff `--preview` prints.
+- **`OverlayStore`** wraps any base store and stages writes in memory. It takes no lock, touches no file, and merges its staged records over the base's on every read. A `--dry-run` reads its own writes back through it, which is how every guard downstream of a write sees the store the write would have made.
 
 `test/store/conformance.ts` is parameterised by a factory and runs 12 tests against both: identity, compare-and-set in all three of its forms, versioning, all-or-nothing multi-write, list filters and limits, event queries by entity and time range, refusal of a record the grammar could not write back, refusal of an item the field dictionary refuses, and unknown-field carry-through.
 The overlay's base in that suite is a real empty sharded store on a temporary directory, not a stub.
@@ -58,7 +59,7 @@ Every guard, every compare-and-set and every refusal would then have two behavio
 
 **Positive**
 
-- The seam is proved rather than declared: the same 13 assertions hold for a store made of files and a store made of a `Map`.
+- The seam is proved rather than declared: the same 12 tests hold for a store made of files and a store made of a `Map`.
 - `--dry-run` is a store, so the application layer above it needs no dry-run branch at all.
 - A later store with a genuinely different shape has an acceptance test the day it starts.
 

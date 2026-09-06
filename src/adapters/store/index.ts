@@ -53,7 +53,7 @@ export {
   type LockToken,
 } from './lock.ts'
 
-export { OverlayStore, type Pending } from './overlay-store.ts'
+export { OverlayStore } from './overlay-store.ts'
 
 export {
   SCHEMA,

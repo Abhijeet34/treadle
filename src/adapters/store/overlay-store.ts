@@ -27,11 +27,6 @@ import {
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 
-export type Pending = {
-  readonly items: readonly WorkItem[]
-  readonly events: readonly StoreEvent[]
-}
-
 function matches(item: WorkItem, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
   if (query.type !== undefined && item.type !== query.type) return false
@@ -50,11 +45,6 @@ export class OverlayStore implements Store {
 
   constructor(base: Store) {
     this.#base = base
-  }
-
-  /** What a `--dry-run` would have written, for the diff it prints. */
-  pending(): Pending {
-    return { items: [...this.#items.values()].sort(order), events: [...this.#events] }
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {

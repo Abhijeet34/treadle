@@ -156,8 +156,9 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. The four ids are in
-`docs/architecture/adr/README.md` and argued in ADR-0011; `status`'s `findings` count stays
+same audit for one item off the events it already reads. The five ids are in
+`docs/architecture/adr/README.md`, and ADR-0011 argues `H18` to `H21` while `H23` came with
+the event-log integrity work; `status`'s `findings` count stays
 what it always was, the store's own load-time findings.
 
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
