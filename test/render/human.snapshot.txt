@@ -76,7 +76,8 @@ backlog  acme-platform
   points  39
   done_points  0
   more  15
-  page  treadle backlog --cursor queue-drain
+  page  treadle backlog --fields id,type,state,pts,title
+    --cursor queue-drain
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -96,7 +97,7 @@ backlog  acme-platform
   points  39
   done_points  0
   more  15
-  page  treadle backlog --cursor queue-drain
+  page  treadle backlog --fields id,type,state,pts,title --cursor queue-drain
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -116,7 +117,7 @@ backlog  acme-platform
   points  39
   done_points  0
   more  15
-  page  treadle backlog --cursor queue-drain
+  page  treadle backlog --fields id,type,state,pts,title --cursor queue-drain
 
 items  9 of 24
   ID            TYPE   STATE        PTS  TITLE
@@ -863,6 +864,8 @@ in_review; the done gate fails: DOD3, DOD4, DOD7
 
 Do one of these
 
+  treadle transition sso-saml in_review
+
   treadle explain sso-saml
 
   treadle show sso-saml
@@ -877,6 +880,8 @@ fails: DOD3, DOD4, DOD7
 
 Do one of these
 
+  treadle transition sso-saml in_review
+
   treadle explain sso-saml
 
   treadle show sso-saml
@@ -889,6 +894,8 @@ a story has a review step, so in_progress exits through in_review; the done gate
   rule   G5
 
 Do one of these
+
+  treadle transition sso-saml in_review
 
   treadle explain sso-saml
 
@@ -1157,7 +1164,7 @@ explain  acme-platform
 
 gates  5 of 10
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain do…
+  ready  DOR3  fail     treadle transition queue-drain re…
   ready  DOR4  fail     treadle set theme-dark acceptance…
   done   DOD3  fail     treadle set theme-dark reviewer=<…
   done   DOD4  fail     treadle set theme-dark acceptance…
@@ -1183,7 +1190,7 @@ explain  acme-platform
 
 gates  5 of 10
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain done
+  ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
   done   DOD3  fail     treadle set theme-dark reviewer=<name>
   done   DOD4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
@@ -1209,7 +1216,7 @@ explain  acme-platform
 
 gates  5 of 10
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain done
+  ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
   done   DOD3  fail     treadle set theme-dark reviewer=<name>
   done   DOD4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
@@ -1470,7 +1477,7 @@ queue-drain
 
 Do one of these
 
-  treadle transition queue-drain done
+  treadle transition queue-drain ready
 
   treadle explain theme-dark
 
@@ -1482,7 +1489,7 @@ theme-dark is not ready to be worked: DOR3 blocked by queue-drain
 
 Do one of these
 
-  treadle transition queue-drain done
+  treadle transition queue-drain ready
 
   treadle explain theme-dark
 
@@ -1494,7 +1501,7 @@ theme-dark is not ready to be worked: DOR3 blocked by queue-drain
 
 Do one of these
 
-  treadle transition queue-drain done
+  treadle transition queue-drain ready
 
   treadle explain theme-dark
 

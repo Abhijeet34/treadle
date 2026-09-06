@@ -15,8 +15,11 @@ import {
   EVIDENCE_KINDS,
   MAX_EVIDENCE_ENTRIES,
   MAX_REASON,
+  fieldsOf,
   overLength,
+  placeholderOf,
   validateWorkItem,
+  writeCommand,
   type BugSeverity,
   type EvidenceKind,
   type EvidencePointer,
@@ -98,10 +101,13 @@ export async function markItem(
   const item = whole.value
   if (item === undefined) return notFound('mark', workspace, view.value, request.id)
 
+  // Severity is a field of a bug and an impediment only, so the line offered names the one
+  // this type carries: `--severity` on a task was refused as printed.
   if (request.severity === undefined && request.priority === undefined) {
+    const field = fieldsOf(item.type).includes('severity') ? 'severity' : 'priority'
     return refusal('mark', workspace, 'C1', item.id,
       'mark sets a severity or a priority, and neither was given',
-      [`treadle mark ${item.id} --severity S1 --reason "<why>"`])
+      [writeCommand(field, item.id, placeholderOf(field)) as string])
   }
   if (request.severity !== undefined && !(BUG_SEVERITIES as readonly string[]).includes(request.severity)) {
     return refusal('mark', workspace, 'C1', item.id,

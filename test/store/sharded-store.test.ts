@@ -134,7 +134,7 @@ describe('the sharded store on disk', () => {
     }
   })
 
-  it('refuses to write a file whose schema is older, and names migrate', async () => {
+  it('refuses to write a file whose schema is older, and says that nothing here rewrites it', async () => {
     const workspace = await aWorkspace()
     try {
       await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
@@ -145,7 +145,10 @@ describe('the sharded store on disk', () => {
       })
       assert.equal(refused.ok, false)
       assert.equal(refused.ok ? '' : refused.error.code, 'SCHEMA_OLDER')
-      assert.match(refused.ok ? '' : refused.error.message, /run migrate/)
+      // The cause used to say `run migrate`, and no such command exists; a cause that names a
+      // command the reader cannot run is the same defect as a fix line that is refused.
+      assert.match(refused.ok ? '' : refused.error.message, /no command here rewrites it/)
+      assert.doesNotMatch(refused.ok ? '' : refused.error.message, /migrate/)
     } finally {
       await workspace.dispose()
     }

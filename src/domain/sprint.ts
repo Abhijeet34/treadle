@@ -11,10 +11,9 @@
 
 import { fail, ok, type DomainError, type Failure, type Result } from './errors.ts'
 import { MAX_REASON, isInstant } from './fields.ts'
-import type { GateVerdict } from './gates.ts'
 import { validateFieldKeys } from './record.ts'
 import { isSafeText } from './text.ts'
-import { isTerminal, type Instant, type ItemId, type WorkItemSummary } from './types.ts'
+import { isTerminal, type GateVerdict, type Instant, type ItemId, type WorkItemSummary } from './types.ts'
 
 export const SPRINT_STATES = ['open', 'closed'] as const
 export type SprintState = (typeof SPRINT_STATES)[number]

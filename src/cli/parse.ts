@@ -15,6 +15,7 @@
 
 import { parseArgs, type ParseArgsConfig } from 'node:util'
 
+import { shellWord } from '../domain/index.ts'
 import { GLOBAL_FLAGS, commandNamed, verdictFor, type GlobalFlag } from './inventory.ts'
 
 type OptionConfig = NonNullable<ParseArgsConfig['options']>
@@ -333,10 +334,13 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
   }
 
   if (passed.has('dry-run') && passed.has('preview')) {
+    // The caller's own line with one of the two flags taken off, operands and all: a fix that
+    // named the command word alone was refused for having no id and no target.
+    const without = (flag: string): string => `treadle ${argv.filter((token) => token !== flag).map(shellWord).join(' ')}`
     return {
       ok: false,
       cause: '--dry-run and --preview ask different questions: preview resolves the target and evaluates nothing, dry run evaluates every guard',
-      fix: [`treadle ${command} --preview`, `treadle ${command} --dry-run`],
+      fix: [without('--dry-run'), without('--preview')],
     }
   }
 

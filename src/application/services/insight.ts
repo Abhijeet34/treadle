@@ -34,7 +34,7 @@ import {
   type WorkspaceView,
 } from './context.ts'
 import { auditImpediment, auditItem, auditRelationsOf } from './doctor.ts'
-import { notFound } from './items.ts'
+import { invocation, notFound } from './items.ts'
 import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -57,6 +57,9 @@ export type Weights = {
  * person sets. The two components answer different questions and both are printed.
  */
 export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4, sev: 6 }
+
+/** Three, because the question is what to pick up and the answer is meant to be read whole. */
+export const DEFAULT_NEXT_LIMIT = 3
 
 const SEVERITY_RANK: Readonly<Record<BugSeverity, number>> = { S1: 4, S2: 3, S3: 2, S4: 1 }
 
@@ -223,8 +226,12 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   const workspace = view.value.identity.id
   const weights = DEFAULT_WEIGHTS
   const ranked = rank(view.value, clock.now(), weights, request.forActor)
+  // `--for` shapes the score, so a page without it ranks the same item differently.
+  const line = (cursor?: string): string => invocation('next', [], [
+    ['for', request.forActor], ['limit', request.limit === DEFAULT_NEXT_LIMIT ? undefined : String(request.limit)], ['cursor', cursor],
+  ])
   const from = request.cursor === undefined ? 0 : ranked.findIndex((scored) => scored.item.id === request.cursor)
-  if (from < 0) return unknownCursor('next', workspace, request.cursor as string, request.cursor as string, 'treadle next')
+  if (from < 0) return unknownCursor('next', workspace, request.cursor as string, request.cursor as string, line())
   const page = ranked.slice(from, from + request.limit)
 
   const block: Block = {
@@ -268,7 +275,7 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   if (remaining > 0) {
     data['more'] = remaining
     const following = ranked[from + page.length]
-    if (following !== undefined) data['page'] = `treadle next --cursor ${following.item.id}`
+    if (following !== undefined) data['page'] = line(following.item.id)
   }
   data['next'] = block
   return okResult(NEXT_SHAPE, { workspace, data })

@@ -263,7 +263,9 @@ Default done gate:
 | `DOD6` | bug | The fix is confirmed |
 | `DOD7` | all | The item points at evidence, when the type has a review step |
 
-`DOD2` reads the item's active blockers of type `impediment`, so an impediment raised against work in progress holds that work from `done` until it is resolved; its remedy is `treadle transition <impediment> done`, the same command `DOR3` names for any blocker.
+`DOD2` reads the item's active blockers of type `impediment`, so an impediment raised against work in progress holds that work from `done` until it is resolved; its remedy is the impediment's next move toward `done` from the state it is in, the same move `DOR3` names for any blocker and `DOD1` for an open child.
+`nextTowardDone(state, reviewStep)` reads that move off the transition table along the edges that need no reason, and `advance(item)` prints it as a command line: `done` is reachable from two states only, and a remedy is run from wherever the blocker stands.
+A guard's `remedy` is a command line under the same rule, and `overrideCommand` prints the override line for the three guards that take one.
 `DOD7` is scoped by the review step rather than by three per-type rules, exactly as `DOD3` is, so the two answer to one setting.
 Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
 

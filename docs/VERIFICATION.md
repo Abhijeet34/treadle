@@ -265,6 +265,15 @@ Every other budgeted artefact is byte-identical.
 
 A remedy is a promise, and a remedy naming no command is a promise nothing keeps.
 
+**A remedy naming a command is not yet a promise kept.**
+Eleven of the 41 command shapes the source emits were refused when run as printed with only the placeholder filled: `treadle transition <blocker> done` from a blocker in `draft`, `ready`, `in_review` or `on_hold` (`T1`), the `--dry-run --preview` fix with its operands dropped, `sprint open` without `--end`, `on_hold --until` without `--reason`, `set` naming the first three settable fields of the whole dictionary on a type that lacks the first, `mark --severity` on a task, `treadle init` on a workspace that already exists, and the fixes of a `file --sprint` refusal naming an item that was never created.
+Every `page` and `whole` line dropped the caller's filters, `--fields`, `--limit` and `--for`, so `backlog --state draft --limit 2` printed a cursor whose page was six unfiltered rows including a `done` item.
+`test/cli/runnable-lines.test.ts` holds all of it by running the lines: 116 provocations over seven workspace states collect 90 or more distinct lines, each is filled from one placeholder table, tokenised as a shell would and run in-process on a fresh copy of the state that printed it, and each has to exit 0 or with an exit the inventory declares as a verdict.
+Four more cases walk a filtered `backlog`, a `next --for`, a `history` and a scoped `board` by the lines they print and assert the pages concatenate to what the same filter prints in one page.
+A remedy is built from the blocker's own legal targets, `nextTowardDone` in `src/domain/state-machine.ts`, and a `page` line from the request that produced it, `invocation` in `src/application/services/items.ts`.
+
+A line the reader is told to run is verified by running it, from where the reader stands.
+
 ## The revert a green suite could not see
 
 Pull request 28 landed the acceptance-criteria readback and the `what` column convention.

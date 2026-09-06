@@ -29,7 +29,7 @@ import {
 } from '../../src/domain/index.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { SRC } from '../helpers/src-scan.ts'
-import { child, gateContext, item } from '../helpers/fixtures.ts'
+import { gateContext, item, neighbour } from '../helpers/fixtures.ts'
 
 /** Every check the gate evaluator can run, and the command whose remedy it emits. */
 const PERFORMED_BY: Readonly<Record<string, string>> = {
@@ -80,12 +80,12 @@ function everyRemedy(): readonly Emitted[] {
     // store refuses to write one, and a record from an older writer or a hand edit carries it.
     gateContext(item('bug', { id: 'b0', severity: undefined, repro_steps: undefined, found_in: undefined })),
     gateContext(item('epic', { id: 'e1' }), {
-      blockers: ['x1'],
-      children: [child('c1', 'task', 'in_progress')],
+      blockers: [neighbour('x1')],
+      children: [neighbour('c1', 'task', 'in_progress')],
     }),
     gateContext(item('task', { id: 't1' })),
     // Work an impediment is raised against, which is the only way DOD2 fails.
-    gateContext(item('task', { id: 't2' }), { blockers: ['cert-expired'], openImpediments: ['cert-expired'] }),
+    gateContext(item('task', { id: 't2' }), { blockers: [neighbour('cert-expired', 'impediment')] }),
   ]
   const gates = [DEFAULT_READY_GATE, DEFAULT_DONE_GATE, ...PROBES]
 

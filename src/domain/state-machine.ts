@@ -9,12 +9,13 @@
 import { fail, type DomainError } from './errors.ts'
 import { withArticle } from './text.ts'
 import { MAX_REASON, overLength } from './fields.ts'
-import type { GateVerdict } from './gates.ts'
 import {
   ATTEMPT_OUTCOMES,
   RESOLUTIONS,
   WORK_ITEM_STATES,
   type AttemptOutcome,
+  type GateItem,
+  type GateVerdict,
   type GuardId,
   type ItemId,
   type Resolution,
@@ -81,6 +82,7 @@ export type GuardResult = {
   /** The value the guard saw, such as `4/5` for a column limit, not merely its verdict. */
   readonly observed?: string
   readonly reason?: string
+  /** A command line that clears the guard from where the item stands, never advice. */
   readonly remedy?: string
   readonly overridden?: boolean
 }
@@ -90,8 +92,8 @@ export type TransitionContext = {
   /** G1 and G6: the same evaluation the gate command prints. */
   readonly readyGate: GateVerdict
   readonly doneGate: GateVerdict
-  /** G2: active blockers, derived from the relation graph. */
-  readonly blockers: readonly ItemId[]
+  /** G2: active blockers, derived from the relation graph, each with the state its remedy is run from. */
+  readonly blockers: readonly GateItem[]
   /** G3: the target column's usage. A limit of zero means unlimited. Absent means no board. */
   readonly column?: { readonly name: string; readonly used: number; readonly limit: number }
   /** G4: the item is in the active sprint, or on the board. */
@@ -101,7 +103,7 @@ export type TransitionContext = {
   /** G7: active items this one blocks. */
   readonly blockedByThis: readonly ItemId[]
   /** G8: children of an epic that are neither done nor cancelled. */
-  readonly openChildren: readonly ItemId[]
+  readonly openChildren: readonly GateItem[]
 }
 
 export type TransitionRequest = {
@@ -139,6 +141,43 @@ export function legalTargetsFrom(item: WorkItem): readonly WorkItemState[] {
     .map((spec) => spec.to)
 }
 
+/**
+ * The next move toward `done` from a state, read off the table along the edges that need no
+ * reason: groom, start, submit or finish as the review step decides, accept, and resume off a
+ * hold. `done` itself is reachable from two states only, and a remedy is run from wherever the
+ * blocker or the child stands, so a rule names this move rather than the destination.
+ */
+export function nextTowardDone(state: WorkItemState, reviewStep: boolean): WorkItemState | 'resume' | undefined {
+  if (state === 'on_hold') return 'resume'
+  const forward = (spec: TransitionSpec): boolean =>
+    !spec.requiresReason && spec.name !== 'resume'
+    && (spec.name !== 'submit' || reviewStep) && (spec.name !== 'finish' || !reviewStep)
+  // Breadth first, so the edge named is the first on the shortest path.
+  const queue: (readonly [WorkItemState, WorkItemState | undefined])[] = [[state, undefined]]
+  const seen = new Set<WorkItemState>([state])
+  while (queue.length > 0) {
+    const [at, first] = queue.shift() as readonly [WorkItemState, WorkItemState | undefined]
+    if (at === 'done') return first
+    for (const spec of TRANSITION_TABLE) {
+      if (spec.from !== at || !forward(spec) || seen.has(spec.to)) continue
+      seen.add(spec.to)
+      queue.push([spec.to, first ?? spec.to])
+    }
+  }
+  return undefined
+}
+
+/** The one command that moves a blocker or an open child a step toward done. */
+export function advance(item: GateItem): string {
+  return `treadle transition ${item.id} ${nextTowardDone(item.state, item.reviewStep) ?? 'done'}`
+}
+
+/** The override line for one of the three guards that yield to one, with what the edge records. */
+export function overrideCommand(id: ItemId, to: WorkItemState, guard: GuardId, resolution: Resolution | undefined): string {
+  const recorded = resolution === undefined ? '' : ` --resolution ${resolution}`
+  return `treadle transition ${id} ${to}${recorded} --override ${guard} --reason "<why>"`
+}
+
 function refuse(error: DomainError, guards: readonly GuardResult[] = []): TransitionOutcome {
   return { outcome: 'refused', error, guards }
 }
@@ -150,57 +189,72 @@ function guardsFor(spec: TransitionSpec, item: WorkItem, to: WorkItemState): rea
   return item.type === 'epic' && to === 'done' ? [...spec.guards, 'G8'] : spec.guards
 }
 
-function evaluateGuard(guard: GuardId, context: TransitionContext, spec: TransitionSpec): GuardResult {
+/**
+ * A guard's remedy is a command line, held to the same rule the gate remedies are: run from
+ * where the item stands, it clears the guard or hands back the next refusal with its own fix.
+ * They were prose (`run the submit transition on <id> instead`), which no surface printed and
+ * which left a `G5` refusal with no fix line naming the one move it asked for.
+ */
+function evaluateGuard(
+  guard: GuardId, context: TransitionContext, spec: TransitionSpec, request: TransitionRequest,
+): GuardResult {
+  const { item } = context
   const pass = (observed?: string): GuardResult =>
     (observed === undefined ? { guard, pass: true } : { guard, pass: true, observed })
   const no = (reason: string, remedy: string, observed?: string): GuardResult =>
     (observed === undefined
       ? { guard, pass: false, reason, remedy }
       : { guard, pass: false, reason, remedy, observed })
+  const gateRemedy = (verdict: GateVerdict): string =>
+    verdict.rules.find((rule) => !rule.pass && rule.remedy !== undefined)?.remedy ?? `treadle explain ${item.id}`
 
   switch (guard) {
     case 'G1': {
       const failed = context.readyGate.rules.filter((r) => !r.pass).map((r) => r.rule)
       return context.readyGate.pass
         ? pass()
-        : no(`the ready gate fails: ${failed.join(', ')}`, `run the ready gate on ${context.item.id} and fix ${failed.join(' and ')}`)
+        : no(`the ready gate fails: ${failed.join(', ')}`, gateRemedy(context.readyGate))
     }
-    case 'G2':
-      return context.blockers.length === 0
+    case 'G2': {
+      const first = context.blockers[0]
+      return first === undefined
         ? pass()
-        : no(`${context.item.id} is blocked by ${context.blockers.join(', ')}`, `finish or cancel ${context.blockers.join(' and ')}, or override G2 with a reason`)
+        : no(`${item.id} is blocked by ${context.blockers.map((b) => b.id).join(', ')}`, advance(first))
+    }
     case 'G3': {
       const column = context.column
       if (column === undefined) return pass()
       const observed = `${column.used}/${column.limit}`
       if (column.limit === 0 || column.used < column.limit) return pass(observed)
-      return no(`the ${column.name} column is at its limit of ${column.limit}`, 'finish something in that column, or override G3 with a reason', observed)
+      return no(`the ${column.name} column is at its limit of ${column.limit}`, overrideCommand(item.id, spec.to, 'G3', request.resolution), observed)
     }
     case 'G4':
       return context.iterationMember
         ? pass()
-        : no(`${context.item.id} is in no sprint and on no board`, `add ${context.item.id} to the active sprint or the board`)
+        : no(`${item.id} is in no sprint and on no board`, `treadle sprint commit <sprint> ${item.id}`)
     case 'G5': {
       const wantsReview = spec.name === 'submit'
       if (wantsReview === context.reviewStep) return pass(context.reviewStep ? 'review' : 'no-review')
       return context.reviewStep
-        ? no(`${withArticle(context.item.type)} has a review step, so in_progress exits through in_review`, `run the submit transition on ${context.item.id} instead`)
-        : no(`${withArticle(context.item.type)} has no review step, so in_progress exits through done`, `run the finish transition on ${context.item.id} instead`)
+        ? no(`${withArticle(item.type)} has a review step, so in_progress exits through in_review`, `treadle transition ${item.id} in_review`)
+        : no(`${withArticle(item.type)} has no review step, so in_progress exits through done`, `treadle transition ${item.id} done`)
     }
     case 'G6': {
       const failed = context.doneGate.rules.filter((r) => !r.pass).map((r) => r.rule)
       return context.doneGate.pass
         ? pass()
-        : no(`the done gate fails: ${failed.join(', ')}`, `run the done gate on ${context.item.id} and fix ${failed.join(' and ')}`)
+        : no(`the done gate fails: ${failed.join(', ')}`, gateRemedy(context.doneGate))
     }
     case 'G7':
       return context.blockedByThis.length === 0
         ? pass()
-        : no(`${context.blockedByThis.join(', ')} are still blocked by ${context.item.id}`, 'cascade the cancellation with a reason, which raises an impediment on each of them')
-    case 'G8':
-      return context.openChildren.length === 0
+        : no(`${context.blockedByThis.join(', ')} are still blocked by ${item.id}`, overrideCommand(item.id, spec.to, 'G7', request.resolution))
+    case 'G8': {
+      const first = context.openChildren[0]
+      return first === undefined
         ? pass()
-        : no(`the epic still has open children: ${context.openChildren.join(', ')}`, `finish or cancel ${context.openChildren.join(' and ')}`)
+        : no(`the epic still has open children: ${context.openChildren.map((c) => c.id).join(', ')}`, advance(first))
+    }
   }
 }
 
@@ -284,7 +338,7 @@ export function evaluateTransition(
   }
 
   const results = evaluated.map((guard): GuardResult => {
-    const result = evaluateGuard(guard, context, spec)
+    const result = evaluateGuard(guard, context, spec, request)
     return !result.pass && overrides.includes(guard)
       ? { ...result, pass: true, overridden: true }
       : result

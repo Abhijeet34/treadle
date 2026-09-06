@@ -143,16 +143,16 @@ const BY_SET: FieldWriter = { kind: 'set' }
  */
 const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
   id: { kind: 'command', usage: 'treadle file <type> "<title>" --id <value>' },
-  type: { kind: 'command', usage: 'treadle file <value> "<title>"' },
+  type: { kind: 'command', usage: 'treadle file <type> "<title>"' },
   state: { kind: 'command', usage: 'treadle transition <id> <state>' },
   severity: { kind: 'command', usage: 'treadle mark <id> --severity <S1-S4> --reason "<why>"' },
   priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
   evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
-  relations: { kind: 'command', usage: 'treadle relation add <id> <kind> <other>' },
+  relations: { kind: 'command', usage: 'treadle relation add <id> <blocks|duplicates|relates-to> <other>' },
   sprint_id: { kind: 'command', usage: 'treadle sprint commit <sprint> <id>' },
   resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
   hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
-  hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant>' },
+  hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant> --reason "<why>"' },
   held_from: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
   filed_at: { kind: 'none', why: 'the instant the item was filed is a record of what happened, not a field' },
   version: { kind: 'none', why: 'the store sets a version on every write, which is how a stale write is caught' },
@@ -175,6 +175,35 @@ export function writeCommand(field: string, id: string, value: string): string |
   return writer.kind === 'set'
     ? `treadle set ${id} ${name}=${value}`
     : writer.usage.replaceAll('<id>', id).replaceAll('<value>', value)
+}
+
+/**
+ * The placeholder a remedy prints where a field's value goes, so a line the reader fills in
+ * is filled with something the field accepts. `timebox_hours=<value>` sent a caller to a
+ * refusal that `timebox_hours=<n>` does not; prose fields take `<value>`.
+ */
+const PLACEHOLDER_OF: Readonly<Record<string, string>> = {
+  points: '<n>',
+  hours_estimate: '<n>',
+  timebox_hours: '<n>',
+  priority: '<1-5>',
+  severity: '<S1-S4>',
+  parent_id: '<id>',
+  sprint_id: '<id>',
+  assignee: '<name>',
+  reporter: '<name>',
+  reviewer: '<name>',
+  due: '<instant>',
+  hold_until: '<instant>',
+  found_in: `<${FOUND_IN_STAGES.join('|')}>`,
+  fix_confirmed: '<true|false>',
+  labels: '<slug>,<slug>',
+  acceptance_criteria: '"<entry>|<entry>"',
+  resolution: `<${RESOLUTIONS.join('|')}>`,
+}
+
+export function placeholderOf(field: string): string {
+  return PLACEHOLDER_OF[canonicalField(field)] ?? '<value>'
 }
 
 /** The dictionary name of a field, given either of its spellings. */

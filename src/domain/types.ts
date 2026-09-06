@@ -179,3 +179,35 @@ export type WorkItem = {
   /** Fields a newer writer produced that this version does not know (DR3). */
   readonly extra?: ReadonlyMap<string, string>
 }
+
+// The verdict and neighbour types the gate evaluator and the state machine both read. They
+// live here rather than in gates.ts because the state machine reads a gate verdict and the
+// gate evaluator names a neighbour's next move off the transition table, and the module
+// graph under src/ is held acyclic.
+
+/**
+ * What a rule knows about a neighbouring item, a blocker or a child: enough to name the one
+ * move that advances it. A remedy built from the id alone said `transition <blocker> done`,
+ * which is refused from four of the five states a blocker can be in.
+ */
+export type GateItem = {
+  readonly id: ItemId
+  readonly type: WorkItemType
+  readonly state: WorkItemState
+  /** Whether the neighbour's own type has a review step, which decides its move out of in_progress. */
+  readonly reviewStep: boolean
+}
+
+export type GateRuleVerdict = {
+  readonly rule: string
+  readonly sentence: string
+  readonly pass: boolean
+  readonly reason?: string
+  readonly remedy?: string
+}
+
+export type GateVerdict = {
+  readonly gate: string
+  readonly pass: boolean
+  readonly rules: readonly GateRuleVerdict[]
+}

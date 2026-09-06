@@ -158,12 +158,12 @@ export async function openSprint(
   const taken = new Set([...view.value.byId.keys(), ...view.value.sprintById.keys()])
   const id = request.id ?? slugFor(request.title, 'sprint', taken)
   if (view.value.sprintById.has(id)) {
-    return refusal(workspace, 'I5', id, `${id} is already a sprint here`, [`treadle sprints ${id}`, 'treadle sprint open "<title>" --id <slug>'])
+    return refusal(workspace, 'I5', id, `${id} is already a sprint here`, [`treadle sprints ${id}`, 'treadle sprint open "<title>" --end <date> --id <slug>'])
   }
   // The log is keyed by entity id alone, so a sprint and an item sharing one would share
   // a `history`; an id names one thing here, whichever file it lives in.
   if (view.value.byId.has(id)) {
-    return refusal(workspace, 'I5', id, `${id} is an item here, and an id names one thing: a sprint cannot share an item's id`, [`treadle show ${id}`, 'treadle sprint open "<title>" --id <slug>'])
+    return refusal(workspace, 'I5', id, `${id} is an item here, and an id names one thing: a sprint cannot share an item's id`, [`treadle show ${id}`, 'treadle sprint open "<title>" --end <date> --id <slug>'])
   }
   const sprint: Sprint = {
     id, title: request.title, state: 'open', filed_at: now, version: 1,

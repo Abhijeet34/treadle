@@ -158,11 +158,16 @@ A multi-line value never appears as a bare line: it arrives as `|<key> <lines> <
 followed by exactly that many content lines. Read the count, not the newlines. That is
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
-A `page` line is a cursor to follow, not an offset. The walk is exact over a workspace nothing
-is writing to, proved by count at 50,021 items over 101 pages, and it is read-committed rather
-than a snapshot: an item whose sort key moves past the cursor while the walk runs is skipped,
-and one that moves the other way is returned twice. A cursor the list no longer holds is
-refused with `C1` rather than served as the first page, which is what it used to be.
+A `page` line is a cursor to follow, not an offset, and it carries every flag the page was
+asked with: the filters, `--fields`, `--limit` and `--for`, so the page it names is a
+continuation of the one that printed it. It did not, and an agent following the cursor the
+tool handed it walked an unfiltered list with nothing in the output to read that from. The
+walk is exact over a workspace nothing is writing to, proved by count at 50,021 items over
+101 pages, and it is read-committed rather than a snapshot: an item whose sort key moves past
+the cursor while the walk runs is skipped, and one that moves the other way is returned twice.
+A cursor the list no longer holds is refused with `C1` rather than served as the first page,
+which is what it used to be. `invocation` in `src/application/services/items.ts` builds every
+such line, and a `whole` line on the board is built the same way.
 
 ## Narrowing a bound after files exist
 
@@ -264,6 +269,18 @@ Before hand-checking any of these, run the suite: it already checks them.
   holds that: each `GateCheck` kind declares the command that performs its remedy, or a
   reason it has none. A remedy that reads as advice is the defect that left a bug filed
   without `expected` permanently unadvanceable.
+- Every line the tool prints for the reader to run, a `fix`, a `page`, a `whole` or a `need`
+  cell, runs as printed from the state that printed it, and `test/cli/runnable-lines.test.ts`
+  holds that by running each one: it builds workspaces in the states that make the tool emit,
+  fills the placeholders from one table, and runs every collected line on a fresh copy of its
+  state. A remedy names the next move from where the item stands, never the destination:
+  `transition <blocker> done` was refused from four of the five states a blocker can be in,
+  and `nextTowardDone` in `src/domain/state-machine.ts` is what a rule names instead. A new
+  emit site needs a provocation in that file that reaches it; a placeholder the table does not
+  know fails by name. The check is a test rather than a CI job because the property is one of
+  the tree alone, so it runs under `npm test`, `coverage` and `flake` and fails on the
+  developer's machine before a push; `tests kept` is a CI job because its comparison needs
+  main's history, which a test of the tree cannot see.
 - No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
   each golden object twice, once from a `structuredClone` and once after moving the process's
   cwd and environment, and asserts the bytes do not move.

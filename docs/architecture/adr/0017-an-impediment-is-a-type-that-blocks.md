@@ -36,8 +36,12 @@ It is in no `ALLOWED_PARENT_PAIRS` entry, because it is raised against work thro
 
 An impediment holds work up through the one edge ADR-0015 built: `relation add <impediment> blocks <id>`, stored on the impediment's own record.
 No second mechanism exists.
-`G2` refuses starting the blocked item, `DOR3` fails its ready gate with `treadle transition <impediment> done` as the remedy, `next` leaves it out and names the impediment on `--explain-absence`, and `explain` prints `blocked yes <impediment>`.
+`G2` refuses starting the blocked item, `DOR3` fails its ready gate with the impediment's next move toward `done` as the remedy, `next` leaves it out and names the impediment on `--explain-absence`, and `explain` prints `blocked yes <impediment>`.
 All of that was true of any blocker before this record.
+
+The remedy was first written as `treadle transition <impediment> done`, and that line is refused by `T1` from `draft`, `ready`, `in_review` and `on_hold`, which is every state a fresh impediment is in.
+It now names the one move the table allows from where the impediment stands, `ready` from `draft`, `in_progress` from `ready`, `done` from `in_progress` and `resume` from a hold, so each refusal hands the reader the next runnable line and the sequence reaches `done` by running them.
+`nextTowardDone` in `src/domain/state-machine.ts` reads that move off the transition table, and `test/cli/runnable-lines.test.ts` runs every emitted line from the state that emitted it.
 
 What the type adds is `DOD2`, fed for the first time: the active blockers of an item that are impediments are what the done gate reads, so an impediment raised against work already in progress holds that work from `done` until it is resolved, with the same remedy.
 `DOR3` is not evaluated on the done gate, which is why the rule is kept beside it rather than folded into it.
@@ -88,7 +92,8 @@ The refusal is where a person wants it read back, because that is the moment the
 ### A refusal on `G1` or `G6` hands over the gate's own remedies
 
 `transition <story> ready` on blocked work was refused with `the ready gate fails: DOR3` and one fix line, `treadle explain <story>`, and the impediment was named only at the end of that second command.
-The gate rules' remedies are command lines, which `test/domain/gate-remedies.test.ts` holds, so a refusal on `G1` or `G6` now carries them as fix lines ahead of `explain`: the story is refused at `ready` with `fix treadle transition cert-expired done` on the refusal itself.
+The gate rules' remedies are command lines, which `test/domain/gate-remedies.test.ts` holds, so a refusal on `G1` or `G6` now carries them as fix lines ahead of `explain`: the story is refused at `ready` with `fix treadle transition cert-expired ready` on the refusal itself, the impediment being in `draft`.
+Every other guard's remedy is a command line too, and the refusal prints the first failed guard's: a story leaving `in_progress` for `done` fails `G5` and carries `fix treadle transition <story> in_review`, which used to be prose inside the cause and on no fix line.
 That is error prose and a fix list, which `docs/STABILITY.md` names as not breaking.
 
 ### `status` no longer lists `impediment` as absent
@@ -119,7 +124,7 @@ Refused above: it double-counts on the one row that carries the signal.
 ## Consequences
 
 - `impediment` joins the closed type set, with `severity` and `proposed_resolution` required at creation; `proposed_resolution` is a `## Proposed resolution` section on the record.
-- `GateContext.openImpediments` is a list of ids rather than a count, and `DOD2` fails with `treadle transition <impediment> done` as its remedy.
+- `GateContext.blockers` carries each blocker's type, state and review step as a `GateItem`, `DOD2` reads the impediments among them, and its remedy is the impediment's next move toward `done`, never a move the table refuses from where it stands.
 - `H27` joins the doctor's finding ids.
 - `show` gains a `proposed_resolution` text property, placed after `findings` and before the `evidence` block, which is where every text the field sweep appended went.
 - A `G1` or `G6` refusal carries the failing gate rules' remedies as fix lines, and a `G2` refusal on work an impediment blocks carries `treadle show <impediment> --field proposed_resolution`.

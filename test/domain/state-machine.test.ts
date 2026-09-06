@@ -16,7 +16,7 @@ import {
   legalTargetsFrom,
 } from '../../src/domain/index.ts'
 import type { TransitionName, WorkItemState } from '../../src/domain/index.ts'
-import { allowance, context, failing, idempotence, item, refusal } from '../helpers/fixtures.ts'
+import { allowance, context, failing, idempotence, item, neighbour, refusal } from '../helpers/fixtures.ts'
 
 /** from -> to -> the transition the model names for that edge. */
 const LEGAL: Readonly<Record<WorkItemState, Readonly<Partial<Record<WorkItemState, TransitionName>>>>> = {
@@ -195,7 +195,7 @@ describe('T6, the closed-set value two edges record', () => {
 
   it('evaluates no guard on the release edge, so a failed attempt always has an exit', () => {
     const allowed = allowance(evaluateTransition(
-      context(subject('in_progress'), { reviewStep: true, blockers: ['sso-saml'] }),
+      context(subject('in_progress'), { reviewStep: true, blockers: [neighbour('sso-saml', 'story', 'in_progress')] }),
       { target: 'ready', reason: 'the vendor endpoint is down', outcome: 'yielded' },
     ))
     assert.equal(allowed.transition, 'release')
@@ -240,7 +240,7 @@ describe('guards', () => {
 
   it('G2 refuses start while the item is blocked, and names the blocker', () => {
     const { error } = refusal(evaluateTransition(
-      context(subject('ready'), { blockers: ['auth-refresh'] }),
+      context(subject('ready'), { blockers: [neighbour('auth-refresh', 'story', 'ready')] }),
       { target: 'in_progress' },
     ))
     assert.equal(error.rule, 'G2')
@@ -249,7 +249,7 @@ describe('guards', () => {
 
   it('G2 can be overridden with a reason, and the guard result says it was', () => {
     const allowed = allowance(evaluateTransition(
-      context(subject('ready'), { blockers: ['auth-refresh'] }),
+      context(subject('ready'), { blockers: [neighbour('auth-refresh', 'story', 'ready')] }),
       { target: 'in_progress', overrides: ['G2'], reason: 'cosmetic' },
     ))
     const g2 = allowed.guards.find((g) => g.guard === 'G2')
@@ -259,7 +259,7 @@ describe('guards', () => {
 
   it('an override without a reason is refused', () => {
     const outcome = evaluateTransition(
-      context(subject('ready'), { blockers: ['x'] }),
+      context(subject('ready'), { blockers: [neighbour('x')] }),
       { target: 'in_progress', overrides: ['G2'] },
     )
     assert.equal(refusal(outcome).error.rule, 'T4')
@@ -360,7 +360,7 @@ describe('guards', () => {
   it('G8 refuses an epic reaching done while a child is still open', () => {
     const epic = item('epic', { id: 'sso', state: 'in_progress' })
     const { error } = refusal(evaluateTransition(
-      context(epic, { openChildren: ['sso-saml'] }),
+      context(epic, { openChildren: [neighbour('sso-saml', 'story', 'in_progress')] }),
       { target: 'done' },
     ))
     assert.equal(error.rule, 'G8')
@@ -369,7 +369,7 @@ describe('guards', () => {
 
   it('G8 is evaluated only for epics', () => {
     const allowed = allowance(evaluateTransition(
-      context(item('task', { state: 'in_progress' }), { openChildren: ['x'] }),
+      context(item('task', { state: 'in_progress' }), { openChildren: [neighbour('x')] }),
       { target: 'done' },
     ))
     assert.equal(allowed.guards.some((g) => g.guard === 'G8'), false)
@@ -378,7 +378,7 @@ describe('guards', () => {
   it('evaluates every guard on the edge and reports all of them, not only the first failure', () => {
     const outcome = refusal(evaluateTransition(
       context(subject('ready'), {
-        blockers: ['a'],
+        blockers: [neighbour('a')],
         iterationMember: false,
         column: { name: 'in_progress', used: 5, limit: 5 },
       }),
