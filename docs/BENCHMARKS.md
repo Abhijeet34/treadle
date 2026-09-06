@@ -1112,7 +1112,7 @@ On a filesystem without copy-on-write the clone is a byte copy and the trade cha
 
 ### The one check that survives content addressing
 
-A cache entry is named by a hash of the corpus spec together with the source of `bench/corpus.ts` and `src/adapters/store/`, and it is published by renaming a private staging directory into place.
+A cache entry is named by a hash of the corpus spec together with the source of `bench/corpus.ts`, `src/adapters/store/`, `src/domain/` and `test/helpers/store-fixtures.ts`, and it is published by renaming a private staging directory into place.
 Staleness, a wrong generator version and a corpus truncated by a killed process are all unreachable through that path rather than detected on it: the name encodes the identity, and a half-written corpus never occupies the name at all.
 Checksumming 430 MB per run to find states the layout forbids buys nothing.
 

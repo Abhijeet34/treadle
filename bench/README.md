@@ -31,10 +31,11 @@ So a run never measures a corpus another run can reach. Under the base directory
 | `cache/ws-<items>-<fingerprint>` | a corpus nothing writes to after it is published |
 | `run-<runId>-<pid>/ws-<items>` | this run's own copy, and the only thing it measures |
 
-The fingerprint is a hash of the corpus spec together with the source of `bench/corpus.ts`
-and `src/adapters/store/`, which is everything that decides the bytes. A corpus written by an
-older generator cannot be found at the path a newer run looks up, so reuse needs no staleness
-check. An entry is generated under a private staging name and moved into place with one
+The fingerprint is a hash of the corpus spec together with the source of `bench/corpus.ts`,
+`src/adapters/store/`, `src/domain/` and `test/helpers/store-fixtures.ts`, which is everything
+that decides the bytes. A corpus written by an older generator cannot be found at the path a
+newer run looks up, so reuse needs no staleness check. An entry is generated under a private
+staging name and moved into place with one
 `rename`, so a process killed mid-generation leaves staging litter rather than a short corpus
 at a path a reader trusts, and two runs racing for the same entry resolve without a lock:
 whoever renames first owns it and the loser discards its own work.
