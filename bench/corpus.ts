@@ -220,10 +220,10 @@ function sprintsFor(months: readonly string[], items: readonly WorkItem[]): read
     const closed = index !== openIndex
     // Two limits the store found here rather than the other way round. An empty list is an
     // absent field, so a sprint whose members all finished writes no `carried` line at all.
-    // And `carried` is a single-line field, bounded at MAX_FIELD_VALUE_BYTES: at 50,000 items
-    // over 24 sprints a close carries about 1,250 ids and the ceiling holds about 810, so a
-    // sprint that large cannot record its own carry-over. The corpus writes what fits and
-    // docs/BENCHMARKS.md carries the finding.
+    // And `carried` is a single-line field, bounded at MAX_FIELD_VALUE_BYTES, so a sprint
+    // past a few hundred open items cannot record its own carry-over. The corpus writes what
+    // fits and the corpora table prints wanted against stored, so the ceiling is a measured
+    // figure rather than one this comment asserts.
     const carried = fitting(members.get(id) ?? [])
     return {
       id,
@@ -241,15 +241,17 @@ function sprintsFor(months: readonly string[], items: readonly WorkItem[]): read
   })
 }
 
-/** As many ids as the store will accept on one field line, in order, with room for the key. */
+/**
+ * As many ids as the store will accept on one field line. The length is taken off the joined
+ * value with the separator the sprint codec writes, rather than estimated from the id length:
+ * an estimate that assumed a one-byte separator put 8,996 bytes on a line with an 8,192 byte
+ * ceiling and the store refused the whole corpus.
+ */
 function fitting(ids: readonly ItemId[]): readonly ItemId[] {
   const kept: ItemId[] = []
-  let bytes = 'carried '.length
   for (const id of ids) {
-    const next = id.length + (kept.length === 0 ? 0 : 1)
-    if (bytes + next > MAX_FIELD_VALUE_BYTES) break
+    if (Buffer.byteLength([...kept, id].join(', '), 'utf8') > MAX_FIELD_VALUE_BYTES) break
     kept.push(id)
-    bytes += next
   }
   return kept
 }
