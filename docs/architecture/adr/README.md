@@ -23,6 +23,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0012](0012-the-extension-surface-that-does-not-ship.md) | DR6's hook contract is refused rather than gated, and the generated adapter it designed has no surface to secure |
 | [ADR-0013](0013-a-branch-may-not-remove-a-test-main-has.md) | A pull request may not remove a test the merge base has without declaring it, and the check that says so is required by name outside the workflow file |
 | [ADR-0014](0014-the-view-is-a-projection.md) | The view every command reads holds the fields a scan reads, the one record a command acts on is read on demand, and the shard a write touches is parsed once |
+| [ADR-0015](0015-relations-stored-once-and-the-guard-they-feed.md) | A relation is one stored direction on its source record with the inverse derived on read, the `G2` guard it feeds already existed, and a dangling edge is a finding |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -61,7 +62,8 @@ They are raised in three places, because each id needs a different thing beside 
 `H17` comes from `status`, which has the clock.
 The rest come from `doctor` and from `explain`, the only reads that have the event log and
 the done gate. ADR-0010 argues `H17` and ADR-0011 `H18` to `H21`; `H23` is the log's own
-half of `H20`, added when a hand-written event line was found answering `explain`.
+half of `H20`, added when a hand-written event line was found answering `explain`. ADR-0015
+argues `H24` and `H25`, which need the whole relation graph beside the record.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -72,6 +74,8 @@ half of `H20`, added when a hand-written event line was found answering `explain
 | `H20` | `doctor`, `explain` | A record's state, severity or priority disagrees with the last event that recorded it, so one of the two was changed outside the tool |
 | `H21` | `doctor`, `explain` | A done item whose type has a review step points at no evidence |
 | `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
+| `H24` | `doctor`, `explain` | A stored relation names an item the store does not hold, so it counts for nothing on any read |
+| `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
 
 ## The CLI's rule ids
 

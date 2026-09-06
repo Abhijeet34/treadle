@@ -49,6 +49,7 @@ The set is closed.
 | `R1` | An item cannot relate to itself |
 | `R2` | The edge would close a cycle in a directional relation kind |
 | `R3` | The relation traversal hit its depth ceiling |
+| `R4` | An item already duplicates another, and a duplicate has one original |
 | `P1` | The parent and child types are not an allowed pair |
 | `P2` | The parent edge would close a cycle, or the stored hierarchy already contains one |
 | `P3` | The hierarchy traversal hit its depth ceiling |
@@ -169,7 +170,8 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 
 ## Relations
 
-Six kinds, each with a defined inverse.
+Six kinds, each with a defined inverse, and `relation add` writes three of them: `blocks`, `duplicates` and `relates_to`.
+The other three load and show from a record that carries one and gain a writer with a decision; [architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries why.
 
 | Kind | Inverse | Directional |
 |---|---|---|
@@ -180,13 +182,17 @@ Six kinds, each with a defined inverse.
 | `split_from` | `split_into` | yes |
 | `relates_to` | `relates_to` | no, symmetric |
 
-`addRelation` refuses a self-edge (`R1`) and, for every directional kind, an edge that would close a cycle (`R2`).
+`addRelation` refuses a self-edge (`R1`), for every directional kind an edge that would close a cycle (`R2`), and a second `duplicates` edge out of an item that already duplicates one (`R4`).
 The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "split from" is not a thing the domain can mean.
 `relates_to` is symmetric, stored once in id order, and unchecked, because a cycle in it says nothing.
 
 Writing an edge twice is idempotent: the second call returns `added: false` and the same graph.
 
-`blockersOf(graph, stateOf, id)` returns the blockers that are still active, meaning their source is neither done nor cancelled.
+An edge is stored once, as a `relations` entry on its source record, and `relationGraphFrom(items)` is the load path that reads every record's entries into one graph.
+It refuses nothing: a stored cycle is `findRelationCycle`'s to report and an edge to a missing record is the caller's finding.
+The field's own validation refuses a self edge, a repeated edge and more than `MAX_RELATION_ENTRIES`, which is 50, because those need no other record to see.
+
+`blockersOf(graph, stateOf, id)` returns the blockers that are still active, meaning their source is neither done nor cancelled, and is known to the caller: a blocker nobody can finish holds nothing.
 The derived blocked flag is that list being non-empty, or an open impediment naming the item; impediments are the caller's to add, because the impediment entity is not in this layer yet.
 
 `relationsOf(graph, id)` reports outgoing edges under their own kind and incoming edges under the inverse, so a derived value is never printed under a raw field's name.

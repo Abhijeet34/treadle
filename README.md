@@ -98,9 +98,9 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
-| Commands: `estimate`, `assign`, `link`, `unlink`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>` |
+| Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
 | `doctor`: five findings over records and the event log; the rest wait on entities that do not exist yet | Partly implemented |
 | Sprints, boards, ceremonies, metrics, impediments, export, completions | Specified, not implemented |
