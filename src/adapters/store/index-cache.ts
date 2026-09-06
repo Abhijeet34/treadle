@@ -26,8 +26,12 @@ import { STALE_MS } from './lock.ts'
 export type ReindexOutcome = {
   readonly clashes: readonly Finding[]
   readonly invalidated: boolean
-  /** An append whose base another process had already indexed past; nothing was written. */
-  readonly stale?: true
+  /**
+   * An append that was not applied, with nothing written: its base had moved under it, or a
+   * line in it repeated an id. The caller indexes the file whole, the one pass that may
+   * decide a clash.
+   */
+  readonly wholePass?: true
 }
 
 export type Fingerprint = {
@@ -498,19 +502,21 @@ export class IndexCache {
       // indexed, and every one of them clashed on the primary key: a false S14 per line,
       // recorded as a finding, and the workspace refused every read after it. The base is
       // checked here, inside the lock, and a moved one hands the file back for a full pass.
-      if (append && this.fingerprints().get(file)?.size !== basedOn) {
-        db.exec('rollback')
-        return { clashes: [], invalidated: false, stale: true }
-      }
+      if (append && this.fingerprints().get(file)?.size !== basedOn) return this.#handBack(db)
       if (!append) this.#dropRows(file)
       const insert = db.prepare(`insert into events
         (id, at, entity, op, actor, txn, file, rest) values (?, ?, ?, ?, ?, ?, ?, ?)`)
       const holder = db.prepare('select file from events where id = ?')
-      events.forEach((event, i) => {
+      for (const [i, event] of events.entries()) {
         try {
           insert.run(event.id, event.at, event.entity, event.op, event.actor, event.txn, file,
             eventRest(event))
         } catch {
+          // An append is a partial read of the file, so what it clashes against may be its
+          // own earlier lines under another fingerprint. A finding is a verdict on the files
+          // and it refuses every read after it, so only the pass that read the whole file
+          // may record one; the append hands the file back rather than deciding (ADR-0020).
+          if (append) return this.#handBack(db)
           // The id is this table's primary key and its one owner across files. An `insert
           // or ignore` here kept whichever copy was indexed first and dropped the other
           // without a word: a second file carrying an existing id replaced the real event
@@ -524,7 +530,7 @@ export class IndexCache {
             },
           })
         }
-      })
+      }
       this.#insertFindings(findings)
       this.#insertClashes(clashes)
       this.#setFingerprint(file, fingerprint)
@@ -537,6 +543,12 @@ export class IndexCache {
     }
   }
 
+  /** Rolls an append back untouched and hands the file to the pass that reads it whole. */
+  #handBack(db: DatabaseSync): ReindexOutcome {
+    db.exec('rollback')
+    return { clashes: [], invalidated: false, wholePass: true }
+  }
+
   dropFile(file: string): boolean {
     const db = this.#open()
     this.#begin(db)
@@ -547,6 +559,28 @@ export class IndexCache {
       const invalidated = this.#invalidateAgainst(file)
       db.exec('commit')
       return invalidated
+    } catch (error) {
+      db.exec('rollback')
+      throw error
+    }
+  }
+
+  /**
+   * Forgets every fingerprint and the hierarchy verdict, and names the files it forgot, so
+   * the next refresh re-reads every file whole and drops the rows of any that has gone. The
+   * rows stay until each file's re-read replaces them in its own transaction, which is what
+   * deleting `index.sqlite` by hand cannot offer a command that already holds it open, and
+   * the journal beside the database is not touched (ADR-0020).
+   */
+  forgetFingerprints(): ReadonlySet<string> {
+    const db = this.#open()
+    this.#begin(db)
+    try {
+      const known = new Set(this.fingerprints().keys())
+      db.exec('delete from files')
+      this.#forgetHierarchyVerdict()
+      db.exec('commit')
+      return known
     } catch (error) {
       db.exec('rollback')
       throw error

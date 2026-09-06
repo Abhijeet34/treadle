@@ -289,7 +289,9 @@ async function execute(env: Environment): Promise<number> {
   }
   diagnostics.note('store', root)
 
-  const opened = await openWorkspace(root)
+  // `doctor` answers from the files and never from what the index held: the refusal every
+  // other command prints names it as the fix, so it has to be the way back (ADR-0020).
+  const opened = await openWorkspace(root, command === 'doctor' ? { rederive: true } : {})
   if (!opened.ok) {
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read',
