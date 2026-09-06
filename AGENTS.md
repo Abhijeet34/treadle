@@ -115,6 +115,14 @@ never contends on the index, which opens before the lock is taken; what that hid
 command dying with a raw stack trace and losing its write. When a concurrency bug is reported,
 reach for N processes each running the command surface, not N promises against one store.
 
+The lock's heartbeat is a timer on the writer's own event loop, so any synchronous stretch
+under the lock longer than the 5 s stale window forfeits it, and a busy machine stretches the
+same work: `apply` yields once per record for that reason, held by
+`test/store/bulk-heartbeat.test.ts`. Every command writes one record and held the lock under
+a second at a 1-minute load of 165, while a 2,144-record transaction held it 10.3 s without
+a beat at 134 before the yield. Measure a change here with a poller on `.lock`'s mtime while
+the command runs under CPU spinners, and report the load beside every figure.
+
 Two more gates sit beside `npm run check`, and neither is in it because both cost minutes.
 `npm run coverage` runs the suite under Node's own coverage and holds it to the table in
 `scripts/coverage.ts`: 90 percent lines and 85 percent branches overall, 95 and 90 on the

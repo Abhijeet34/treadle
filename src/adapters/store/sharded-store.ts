@@ -58,6 +58,7 @@ import { decodeItem, encodeItem } from './item-codec.ts'
 import { decodeSprint, encodeSprint } from './sprint-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
+import { setImmediate as yieldToLoop } from 'node:timers/promises'
 
 /** The one compiled-in schema number. DR3: `migrate` is the only path that changes a file's. */
 export const SCHEMA = 1
@@ -716,6 +717,11 @@ export class ShardedStore implements Store {
     }
 
     for (const write of transaction.writes) {
+      // The heartbeat is a timer on this event loop, so it fires only between records. A
+      // transaction of 2,144 records encoded in one synchronous stretch went 10.3 s without
+      // a beat at a 1-minute load of 134 and was reclaimed while still writing; one turn
+      // per record keeps the beat honest whatever the transaction's size or the machine's load.
+      await yieldToLoop()
       const file = `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`
       const shard = shards.get(file) ?? await this.#readShard(file)
       if (!('chunks' in shard)) return shard
