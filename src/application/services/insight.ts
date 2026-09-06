@@ -125,9 +125,15 @@ export const EXPLAIN_SHAPE: ResultShape = {
   ],
 }
 
+// v2 dropped `absent_features`, which named the capabilities this build did not have yet.
+// It was a string literal in the result builder, hand-edited by the four pull requests that
+// landed relation, sprint, impediment and board, and the last of them left it writing
+// nothing. Every other key here is a fact about the workspace the caller passed; that one was
+// a fact about the build, and there is nothing in a workspace to compute it from. What this
+// build can do is `treadle --contract` and `help`, both derived from the command inventory.
 export const STATUS_SHAPE: ResultShape = {
   command: 'status',
-  version: 1,
+  version: 2,
   effect: 'read',
   summary: 'Orient a caller in the workspace in one call.',
   properties: [
@@ -136,7 +142,6 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'points', type: 'integer' },
     { kind: 'scalar', key: 'findings', type: 'integer' },
     { kind: 'scalar', key: 'overdue', type: 'integer' },
-    { kind: 'scalar', key: 'absent_features', type: 'string' },
     { kind: 'scalar', key: 'defects', type: 'string' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
