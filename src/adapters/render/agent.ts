@@ -114,7 +114,7 @@ export const agentRenderer: Renderer = {
       if (value === undefined) continue
       if (property.kind === 'block') {
         if (!isBlock(value)) continue
-        lines.push(...renderBlock(property.key, value))
+        for (const line of renderBlock(property.key, value)) lines.push(line)
         continue
       }
       if (quiet) continue
@@ -127,7 +127,7 @@ export const agentRenderer: Renderer = {
       }
       if (property.kind === 'text') {
         const cap = property.whole === true ? null : limit
-        lines.push(...renderText(property.key, String(value), cap, options.page))
+        for (const line of renderText(property.key, String(value), cap, options.page)) lines.push(line)
         continue
       }
       const text = scalarText(value)
