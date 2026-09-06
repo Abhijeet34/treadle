@@ -52,6 +52,12 @@ export type Sprint = {
    */
   readonly done?: number
   readonly done_points?: number
+  /**
+   * Frozen with `done` and for the same reason: a committed item cancelled after the close
+   * read as `done 1 cancelled 1` over `committed 1`, one item under two outcomes, because
+   * this count was still live beside a frozen one.
+   */
+  readonly cancelled?: number
   readonly goal?: string
   /** Keys a newer writer produced that this version does not know, preserved verbatim. */
   readonly extra?: ReadonlyMap<string, string>
@@ -64,7 +70,7 @@ export type Sprint = {
  */
 export const SPRINT_FIELDS = [
   'id', 'title', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried',
-  'done', 'done_points', 'goal', 'extra',
+  'done', 'done_points', 'cancelled', 'goal', 'extra',
 ] as const
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
@@ -159,7 +165,7 @@ export function validateSprint(sprint: Sprint): Result<Sprint> {
     }
     if (new Set(sprint.carried).size !== sprint.carried.length) return invalid('V4', 'carried names an item twice', id)
   }
-  for (const field of ['done', 'done_points'] as const) {
+  for (const field of ['done', 'done_points', 'cancelled'] as const) {
     const value = sprint[field]
     if (value === undefined) continue
     if (sprint.state !== 'closed') return invalid('V4', `${field} is set on a sprint whose state is ${sprint.state}, not closed`, id)

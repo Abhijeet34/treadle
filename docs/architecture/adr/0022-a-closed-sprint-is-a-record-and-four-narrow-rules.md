@@ -128,6 +128,8 @@ Refused: the ready gate already reaches every surface the finding named, and thr
 ## Consequences
 
 - The sprint dictionary gains `done` and `done_points`; `SPRINT_FIELDS`, `validateSprint`, the sprint codec's `FIELD_ORDER` and the field-visibility sweep all carry them, and a close prints both on its `set` list.
+- `cancelled` joined them in the fourth adversarial round: kept live beside a frozen `done`, an item finished at the close and cancelled afterwards read as `done 1 cancelled 1` over `committed 1`. A sprint closed before it was recorded reads it live, as `done` does.
+- A reopen is refused with `I2` once a carried item has been committed onward, found in the same round: the reopen clears `carried`, an open sprint's set is what points at it, and the re-close recorded a smaller sprint than the one a team had read.
 - `tallyOf` takes the sprint, and `sprints` and the sprint list read a closed sprint's completion off the record.
 - `H27` no longer fires on a `draft` impediment; `DOR9` and `DOR10` join the default ready gate, and `blocks_something` and `not_a_duplicate` join the closed set of check kinds.
 - `GateContext` gains `duplicateOf`, derived in `gateContextFor` from the item's own `duplicates` edge and resolved against the view.

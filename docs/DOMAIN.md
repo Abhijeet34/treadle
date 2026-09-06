@@ -200,7 +200,7 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 ## Sprints
 
 A sprint is a period with a committed set, and not a work item: it is `open` or `closed`, and nothing else about it moves.
-`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at` and `carried`, the ids of the items still open when it closed.
+`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at`, `carried`, the ids of the items still open when it closed, and the tally the close froze: `done`, `done_points` and `cancelled`.
 `goal` is optional and bounded at `MAX_GOAL`, which is `MAX_REASON`.
 `validateSprint` checks the dictionary; `isCalendarDate` refuses a date the calendar does not have, so `2026-02-30` is `I1` rather than the second of March.
 

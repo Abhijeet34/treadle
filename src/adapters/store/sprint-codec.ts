@@ -11,7 +11,7 @@ import { unwritableBodyLine, type ParsedRecord, type Section } from './grammar.t
 
 /** The single-line fields, in render order. `type` names the record kind for the grammar's resynchroniser. */
 const FIELD_ORDER = [
-  'type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried', 'done', 'done_points',
+  'type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried', 'done', 'done_points', 'cancelled',
 ] as const
 
 const GOAL_SECTION = 'Goal'
@@ -38,7 +38,7 @@ export function decodeSprint(record: ParsedRecord): StoreResult<Sprint> {
       extra.set(key, value)
       continue
     }
-    if (key === 'version' || key === 'done' || key === 'done_points') {
+    if (key === 'version' || key === 'done' || key === 'done_points' || key === 'cancelled') {
       if (!/^\d{1,15}$/.test(value)) return refuse('S1', `${record.id}: ${key} must be a whole number, not "${value}"`, record.id)
       draft[key] = Number(value)
       continue

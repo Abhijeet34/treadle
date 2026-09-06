@@ -375,6 +375,34 @@ describe('a carried item counts as done in the sprint that finished it, and in n
     assert.match(record.out, /^pts 1\/1$/m)
     assert.doesNotMatch(record.out, /^carried /m)
   })
+
+  // `cancelled` stayed live beside a frozen `done`, so an item finished at the close and
+  // cancelled afterwards read as `done 1 cancelled 1` over `committed 1`.
+  it('freezes the cancelled count with the done count, so an item cancelled after the close is under one outcome', async () => {
+    assert.equal((await cli(['sprint', 'open', 'Sprint D', '--id', 'sprint-d', '--start', '2026-10-19', '--end', '2026-10-30'])).code, 0)
+    assert.equal((await cli(['sprint', 'commit', 'sprint-d', 'webhook-retry'])).code, 0)
+    for (const target of ['in_progress', 'done']) assert.equal((await cli(['transition', 'webhook-retry', target])).code, 0)
+    const closed = await cli(['sprint', 'close', 'sprint-d'])
+    assert.equal(closed.code, 0, closed.err)
+    assert.match(closed.out, /^set done - -> 1$/m)
+    assert.match(closed.out, /^set cancelled - -> 0$/m)
+
+    assert.equal((await cli(['transition', 'webhook-retry', 'in_progress', '--reason', 'it regressed'])).code, 0)
+    const stopped = await cli(['transition', 'webhook-retry', 'cancelled', '--resolution', 'superseded', '--reason', 'replaced by a queue'])
+    assert.equal(stopped.code, 0, stopped.err)
+    const record = await cli(['sprints', 'sprint-d'])
+    assert.match(record.out, /^committed 1$/m)
+    assert.match(record.out, /^done 1$/m, 'the close recorded it done')
+    assert.match(record.out, /^cancelled 0$/m, 'and it is not counted cancelled as well')
+    const file = await readFile(path.join(demo.root, 'sprints.md'), 'utf8')
+    assert.match(file, /^done: 1\ndone_points: 3\ncancelled: 0$/m)
+
+    const reopened = await cli(['sprint', 'reopen', 'sprint-d'])
+    assert.equal(reopened.code, 0, reopened.err)
+    assert.match(reopened.out, /^set cancelled 0 -> -$/m)
+    const live = await cli(['sprints', 'sprint-d'])
+    assert.match(live.out, /^cancelled 1$/m, 'open again, the count is live')
+  })
 })
 
 // A sprint is a record with an id, and `show` and `explain` used to answer NOT_FOUND with

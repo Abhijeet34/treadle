@@ -129,6 +129,11 @@ function emittedLines(run: Run): readonly string[] {
     const walk = (value: unknown): void => {
       if (typeof value === 'string') {
         if (value.startsWith('treadle ')) found.push(value)
+        // A command line inside a sentence, as `note` and `cause` carry one after a
+        // semicolon: `... and next ranks ready work; treadle transition <id> ready`. The
+        // sweep never saw that shape, so a line there could be refused as printed unseen.
+        const embedded = /; (treadle [^;]+)$/.exec(value)
+        if (embedded !== null && !value.startsWith('treadle ')) found.push(embedded[1] as string)
       } else if (Array.isArray(value)) {
         for (const entry of value) walk(entry)
       } else if (typeof value === 'object' && value !== null) {

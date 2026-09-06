@@ -125,7 +125,9 @@ function tallyOf(sprint: Sprint, items: readonly WorkItemSummary[]): Tally {
   return {
     committed: items.length,
     done: frozen ? sprint.done as number : done.length,
-    cancelled: items.filter((item) => item.state === 'cancelled').length,
+    // A sprint closed before `cancelled` was recorded carries `done` alone and reads this
+    // one live, which is what it did.
+    cancelled: frozen && sprint.cancelled !== undefined ? sprint.cancelled : items.filter((item) => item.state === 'cancelled').length,
     points: items.reduce((sum, item) => sum + (item.points ?? 0), 0),
     donePoints: frozen ? sprint.done_points ?? 0 : done.reduce((sum, item) => sum + (item.points ?? 0), 0),
   }
@@ -389,11 +391,11 @@ async function moveSprint(
   // Read off the open sprint, so these are the live states at the instant of the close; a
   // carried item is not terminal by definition, so it is not among them.
   const frozen = tallyOf(sprint, committed)
-  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, ...rest } = sprint
+  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, cancelled: wasCancelled, ...rest } = sprint
   const after: Sprint = to === 'closed'
     ? {
       ...rest, state: 'closed', closed_at: now, ...(carried.length === 0 ? {} : { carried }),
-      done: frozen.done, done_points: frozen.donePoints,
+      done: frozen.done, done_points: frozen.donePoints, cancelled: frozen.cancelled,
     }
     : { ...rest, state: 'open' }
 
@@ -405,6 +407,7 @@ async function moveSprint(
   if (to === 'closed' || wasCarried !== undefined) set.push(`carried ${carriedLine(wasCarried)} -> ${carriedLine(after.carried)}`)
   if (to === 'closed' || wasDone !== undefined) set.push(`done ${numberLine(wasDone)} -> ${numberLine(after.done)}`)
   if (to === 'closed' || wasDonePoints !== undefined) set.push(`done_points ${numberLine(wasDonePoints)} -> ${numberLine(after.done_points)}`)
+  if (to === 'closed' || wasCancelled !== undefined) set.push(`cancelled ${numberLine(wasCancelled)} -> ${numberLine(after.cancelled)}`)
 
   const data: Record<string, Value> = { sprint: sprint.id, state: `${sprint.state} -> ${to}`, v: `${sprint.version} -> ${sprint.version + 1}`, set }
   if (to === 'closed') data['carried'] = carriedLine(carried)
@@ -472,7 +475,9 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   }
   data['committed'] = tally.committed
   data['done'] = tally.done
-  if (tally.cancelled > 0) data['cancelled'] = tally.cancelled
+  // Printed when there is one, or when the close recorded one: a stored `cancelled: 0` is a
+  // fact of the record, as `done 0` is, and a read surface has to carry every stored field.
+  if (tally.cancelled > 0 || sprint.cancelled !== undefined) data['cancelled'] = tally.cancelled
   // Named, not counted: "3 committed, 1 done" leaves a reader to work out for themselves
   // that one of the three is not workable, and which one.
   const ungroomed = notGroomed(committed)
