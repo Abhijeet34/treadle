@@ -81,7 +81,8 @@ export const AXIS_BUDGET_KEYS = [
 export type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
 
 export const ABSOLUTE_KEYS = [
-  'peakRssReadKb', 'peakRssMutationKb', 'firstIndexBuildMs', 'reindexAfterHandEditMs',
+  'peakRssReadKb', 'peakRssMutationKb', 'doctorRssOverWorkspace', 'nextCostOverWorkspace',
+  'firstIndexBuildMs', 'reindexAfterHandEditMs',
   'indexToTextRatio', 'runtimeDependencies', 'installUnpackedBytes', 'bundleBytes',
 ] as const
 export type AbsoluteKey = (typeof ABSOLUTE_KEYS)[number]
@@ -235,6 +236,26 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   rows.push(absolute(budgets, 'peakRssMutationKb', 'peak RSS, mutation at the largest scale',
     typeof writeRss === 'string' ? writeRss : writeRss.kb, 'KiB',
     typeof writeRss === 'string' ? undefined : `the worst of ${WRITE_OPS.join(', ')}, which was ${writeRss.op}`))
+  // Two commands over the read every command performs, priced against that read in the same
+  // job. A ratio of two figures taken on one runner is not a millisecond count on another,
+  // which is why these two are armed where the timing rows are not: `doctor` held the whole
+  // store at 6.2x the workspace read's peak and `next` ranked at 3.8x its cost, and no row
+  // was watching either shape because each was measured as an absolute wall time on a
+  // machine the budget did not name.
+  const workspaceRss = largest?.operations['workspace']?.peakRssKb
+  const doctorRss = largest?.operations['doctor']?.peakRssKb
+  rows.push(absolute(budgets, 'doctorRssOverWorkspace', 'peak RSS of doctor over the workspace read at the largest scale',
+    workspaceRss === undefined || doctorRss === undefined || workspaceRss === 0
+      ? 'NOT MEASURED: doctor or workspace reported no RSS at the largest scale'
+      : doctorRss / workspaceRss,
+    'x', workspaceRss === undefined || doctorRss === undefined ? undefined : `${doctorRss} KiB over ${workspaceRss} KiB at ${largest?.items} items`))
+  const workspaceCost = largest?.operations['workspace'] === undefined ? undefined : programCost(largest.operations['workspace'].wall.p50.ms, floor)
+  const nextCost = largest?.operations['next'] === undefined ? undefined : programCost(largest.operations['next'].wall.p50.ms, floor)
+  rows.push(absolute(budgets, 'nextCostOverWorkspace', 'program cost of next over the workspace read at the largest scale',
+    workspaceCost === undefined || nextCost === undefined || workspaceCost === 0
+      ? 'NOT MEASURED: next or workspace reported no median at the largest scale'
+      : nextCost / workspaceCost,
+    'x', workspaceCost === undefined || nextCost === undefined ? undefined : `${nextCost.toFixed(1)} ms over ${workspaceCost.toFixed(1)} ms at ${largest?.items} items, both above the node floor`))
   rows.push(absolute(budgets, 'firstIndexBuildMs', 'first index build at the largest scale', largest?.firstIndexBuildMs ?? 'NOT MEASURED: no scale ran', 'ms'))
   rows.push(absolute(budgets, 'reindexAfterHandEditMs', 're-index after a hand edit of the largest shard', largest?.reindexAfterHandEditMs ?? 'NOT MEASURED: no scale ran', 'ms'))
 

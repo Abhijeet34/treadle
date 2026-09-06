@@ -441,7 +441,8 @@ Stated plainly, because each one bounds what these numbers support.
 ## What the gate enforces
 
 `npm run bench:gate` fails on what transfers between machines: durability under parallel writers, silent drops, whole-store refusals and crashes on malformed input, the runtime dependency count, the install size, the bundle size and the per-command output budgets.
-The two peak-RSS rows are weighed over the worst of a named set of operations at the largest scale, `identity`, `get`, `list` and `workspace` for the read and `create` and `transition` for the mutation, and a member of the set with no figure makes the row `NOT MEASURED` rather than the worst of the rest, so the read budget cannot pass over a bounded `list` again.
+The two peak-RSS rows are weighed over the worst of a named set of operations at the largest scale, `identity`, `get`, `list`, `workspace`, `board`, `next` and `doctor` for the read and `create` and `transition` for the mutation, and a member of the set with no figure makes the row `NOT MEASURED` rather than the worst of the rest, so the read budget cannot pass over a bounded `list` again.
+Two enforced rows price `doctor` and `next` against the workspace read in the same job, as a ratio of peaks and a ratio of program costs at the largest scale: a ratio taken on one runner transfers where a millisecond count does not, and `doctor` at 6.2x and `next` at 3.8x were the two shapes no absolute row was watching; ADR-0021 carries both and "The audit holds one record and the ranking one index" below carries the measurement.
 Demonstrated: with the budgets as committed it exits 0, and with the install-size limit tightened to 1,000 bytes it reports `FAIL: install size, unpacked = 19568 bytes, limit 1000` and exits 1.
 
 It does not fail on the per-operation timing limits.
@@ -938,6 +939,69 @@ The next step there is a line scanner over offsets rather than `Line` objects, a
 `treadle doctor` on the 50,000-item corpus exited 1 with `INTERNAL: Maximum call stack size exceeded` on both trees.
 Both renderers spread a block's rows into a call's argument list, `lines.push(...table(...))` and `Math.max(...rows.map(...))`, and V8 caps an argument list near 120,000 values.
 A block is bounded by the store and not by the renderer, so the spreads are loops now, `test/render/large-block.test.ts` renders 200,000 rows through all three renderers, and the same command exits 7 with 261,913 lines of findings.
+
+## The audit holds one record and the ranking one index
+
+The first corpus with a relation graph in it, 5,000 edges over 50,000 items, put `doctor` at 1,043,456 KiB and `next` at 2,002.3 ms.
+ADR-0021 carries the decision; this section carries what was measured, in the order it was measured.
+
+### Where the memory and the time went, before anything changed
+
+The memory instrument is the inspector's sampling heap profiler at a 16 KiB interval with collected objects included, around the service call alone with the index warm; the time instrument is the inspector's CPU profiler at a 200 microsecond interval around the same call.
+
+`doctor` allocated 1,441.8 MiB.
+`store.events()` was 865.3 MiB of it, 384.2 MiB of SQLite row objects from `.all()` over 500,042 rows and 431.1 MiB of decoded events, and `store.list()` was 484.5 MiB, the whole-record decode ADR-0014 measured.
+The audit over those two arrays was 88.2 MiB.
+
+`next` took 1,885.2 ms, of which `rank` was 1,250.0: `activeBlockers` 644.0 ms and `scoreOf` 596.5, each walking the whole relation list once per ready item, 7,122 of them.
+`relationGraphFrom` was 112.9 ms more inside the workspace read, scanning every edge it had accepted for each new one.
+The ranking allocated 142.3 MiB for the whole call, 98.7 of it the summaries read, so it was time and not memory.
+
+### What each pass retains, after
+
+`process.memoryUsage()` at each phase of the audit over the 50,021-item corpus, with a forced collection after each pass.
+The record pass takes 858 ms and leaves 58.6 MiB in use over a 9.3 MiB baseline, the summaries and the findings decided off the whole record, with `heapTotal` at 190.8 MiB.
+The event pass takes 2,926 ms, reaches 154.9 MiB in use before the collector runs and 58.9 after it, with `heapTotal` at 223.1.
+Assembling 11,908 findings takes 40 ms.
+The peak is the committed heap under that churn and not what the audit holds: a 64 MB semi-space moves it by under 1 MiB, 334,752 against 335,584 KiB, so the transient objects are not being promoted, and the mechanism is the decode itself, the `parseFile` cost ADR-0014 named as the store's own ceiling.
+
+### Before and after, interleaved
+
+One cold process per sample, seven samples per cell, the two trees alternating on every sample over copies of the same corpora, at 1-minute loads of 4.34 at the start and 4.54 at the end; peak RSS is `process.resourceUsage().maxRSS` in the child and the time is the child's own `performance.now()` around the operation.
+
+| Items | Operation | Before | After |
+|---|---|---|---|
+| 100 | `workspace` | 14.1 ms, 103,616 KiB | 15.7 ms, 104,208 KiB |
+| 100 | `get` | 7.8 ms, 101,328 KiB | 7.4 ms, 102,880 KiB |
+| 100 | `next` | 14.8 ms, 102,432 KiB | 14.6 ms, 104,976 KiB |
+| 100 | `board` | 14.8 ms, 102,720 KiB | 16.5 ms, 104,784 KiB |
+| 100 | `doctor` | 26.9 ms, 106,752 KiB | 25.9 ms, 105,328 KiB |
+| 1,000 | `workspace` | 24.9 ms, 106,192 KiB | 24.6 ms, 107,008 KiB |
+| 1,000 | `get` | 8.2 ms, 101,600 KiB | 8.2 ms, 101,968 KiB |
+| 1,000 | `next` | 26.8 ms, 105,584 KiB | 26.7 ms, 106,944 KiB |
+| 1,000 | `board` | 32.0 ms, 105,568 KiB | 30.3 ms, 106,704 KiB |
+| 1,000 | `doctor` | 92.0 ms, 142,896 KiB | 93.3 ms, 114,096 KiB |
+| 10,000 | `workspace` | 96.9 ms, 120,304 KiB | 89.5 ms, 121,600 KiB |
+| 10,000 | `get` | 8.7 ms, 101,072 KiB | 7.6 ms, 102,144 KiB |
+| 10,000 | `next` | 154.6 ms, 120,720 KiB | 94.2 ms, 121,184 KiB |
+| 10,000 | `board` | 107.0 ms, 121,312 KiB | 100.0 ms, 122,560 KiB |
+| 10,000 | `doctor` | 703.9 ms, 383,120 KiB | 689.4 ms, 157,584 KiB |
+| 50,000 | `workspace` | 516.5 ms, 169,440 KiB | 373.4 ms, 170,480 KiB |
+| 50,000 | `get` | 7.4 ms, 100,960 KiB | 7.4 ms, 102,624 KiB |
+| 50,000 | `next` | 2,006.1 ms, 170,032 KiB | 396.4 ms, 171,392 KiB |
+| 50,000 | `board` | 559.8 ms, 170,064 KiB | 419.6 ms, 175,584 KiB |
+| 50,000 | `doctor` | 3,778.4 ms, 1,031,776 KiB | 3,416.8 ms, 335,584 KiB |
+
+The `workspace` and `get` rows are ADR-0014's, re-taken: the read every command performs stays at 170 MiB at 50,000 items and `get` stays flat between 7.4 and 8.2 ms from 100 to 50,000.
+The 143 ms the graph build cost every command came off `workspace`, `next` and `board` together.
+Every command's output over the 50,000-item corpus is byte-identical between the two trees: `doctor` at 1,619,659 bytes and exit 7 on both, `next --limit 50` at 4,395, `board --all` at 3,966, `status` at 638, `explain` at 317, `show` at 422 and `backlog --limit 20` at 1,691.
+
+### What is still open, and how far
+
+`doctor` reads 335,584 KiB against the 102,400 KiB read budget, 3.3x, down from 10.2x, and is still the worst member of the set the budget is weighed over.
+What the audit retains is 49 MiB; the rest is the heap V8 commits under 1.35 GB of transient decode in 3.4 s, and the step that closes it is the line scanner over offsets ADR-0014 already named.
+The budget is not moved.
+Two rows are armed in its place that a runner can hold: `doctor`'s peak over `workspace`'s at the largest scale, 2.0x against a limit of 3, and `next`'s program cost over `workspace`'s, 1.1x against a limit of 2; the shapes they refuse read 6.2x and 3.8x.
 
 ## Deep pagination, proved by counting
 

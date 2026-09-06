@@ -132,10 +132,11 @@ export async function runA4(
 
 /**
  * The load-time relation check over the corpus's own graph, taken once because it is a size
- * and not a latency: `relationGraphFrom` scans the edges it has already accepted for each new
- * one, and `findRelationCycle` runs a walk per edge whose every step filters the whole edge
- * list, so both are superlinear in the edge count and neither drifts run to run the way a
- * wall time does.
+ * and not a latency. Both halves were superlinear in the edge count when this row was added:
+ * `relationGraphFrom` scanned the edges it had already accepted for each new one and
+ * `findRelationCycle` ran a walk per edge whose every step filtered the whole edge list. Both
+ * are linear now, and the row stays because it is the figure that would say so if either
+ * went back.
  */
 function relationCycle(corpus: Corpus): RelationCycleRow | string {
   const sample = launchOnce(process.execPath, [OP, corpus.root, 'cycle'], { samples: 1 })
