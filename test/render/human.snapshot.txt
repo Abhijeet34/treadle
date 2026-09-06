@@ -347,7 +347,7 @@ explain  acme-platform
   by
     dana
 
-gates  3 of 10
+gates  3 of 11
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<nam…
   done  DOD4  fail     treadle set sso-saml acceptance_cr…
@@ -374,7 +374,7 @@ explain  acme-platform
   by
     dana
 
-gates  3 of 10
+gates  3 of 11
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
@@ -401,7 +401,7 @@ explain  acme-platform
   by
     dana
 
-gates  3 of 10
+gates  3 of 11
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
@@ -1174,7 +1174,7 @@ explain  acme-platform
   by
     dana
 
-gates  5 of 10
+gates  5 of 11
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain re…
   ready  DOR4  fail     treadle set theme-dark acceptance…
@@ -1200,7 +1200,7 @@ explain  acme-platform
   by
     dana
 
-gates  5 of 10
+gates  5 of 11
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
@@ -1226,7 +1226,7 @@ explain  acme-platform
   by
     dana
 
-gates  5 of 10
+gates  5 of 11
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
@@ -1741,6 +1741,8 @@ sprint  acme-platform  1 changed  txn t0910
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
   set  carried - -> avatar-crop
+  set  done - -> 1
+  set  done_points - -> 3
   carried  avatar-crop
   event  e0911
 
@@ -1752,6 +1754,8 @@ sprint  acme-platform  1 changed  txn t0910
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
   set  carried - -> avatar-crop
+  set  done - -> 1
+  set  done_points - -> 3
   carried  avatar-crop
   event  e0911
 
@@ -1763,6 +1767,8 @@ sprint  acme-platform  1 changed  txn t0910
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
   set  carried - -> avatar-crop
+  set  done - -> 1
+  set  done_points - -> 3
   carried  avatar-crop
   event  e0911
 

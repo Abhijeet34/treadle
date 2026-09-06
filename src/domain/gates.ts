@@ -30,6 +30,8 @@ export type GateCheck =
   | { readonly kind: 'child_present'; readonly childType?: WorkItemType }
   | { readonly kind: 'no_open_child' }
   | { readonly kind: 'no_open_impediment' }
+  | { readonly kind: 'blocks_something' }
+  | { readonly kind: 'not_a_duplicate' }
   | { readonly kind: 'reviewer_distinct_from_assignee' }
   | { readonly kind: 'evidence_present' }
 
@@ -53,6 +55,12 @@ export type GateContext = {
   readonly children: readonly GateItem[]
   /** Whether this type has a review step in this workspace (guard G5's setting). */
   readonly reviewStep: boolean
+  /**
+   * DOR10: the original this item is a copy of, when the store holds it. Absent covers both
+   * "no such edge" and "the edge names a record nothing holds", which is H24's finding and
+   * must not hold the copy at draft forever on a record nobody can move.
+   */
+  readonly duplicateOf?: GateItem
 }
 
 export const DEFAULT_READY_GATE: Gate = {
@@ -66,6 +74,11 @@ export const DEFAULT_READY_GATE: Gate = {
     { id: 'DOR6', scope: 'bug', sentence: 'The bug records what was expected.', check: { kind: 'field_present', field: 'expected' } },
     { id: 'DOR7', scope: 'bug', sentence: 'The bug records what actually happened.', check: { kind: 'field_present', field: 'actual' } },
     { id: 'DOR8', scope: 'epic', sentence: 'The epic has at least one child story.', check: { kind: 'child_present', childType: 'story' } },
+    // Appended rather than filed beside DOR3, because a rule id is a name a refusal prints
+    // and renumbering one would rewrite what every past refusal said. DOR10 is scoped to
+    // every type and still sits last for the same reason.
+    { id: 'DOR9', scope: 'impediment', sentence: 'The impediment says what it holds up.', check: { kind: 'blocks_something' } },
+    { id: 'DOR10', scope: 'all', sentence: 'The item is not a copy of another item.', check: { kind: 'not_a_duplicate' } },
   ],
 }
 
@@ -189,6 +202,27 @@ function run(check: GateCheck, context: GateContext): Outcome {
         : no(
           `${open.map((b) => b.id).join(', ')} ${open.length === 1 ? 'is' : 'are'} still open against the item`,
           advance(first),
+        )
+    }
+    // The impediment's own `blocks` edges, read off its own record, which is where ADR-0015
+    // stores them and where doctor's H27 reads them. Grooming is where this belongs: an
+    // impediment nobody has raised against anything is a record still being written, and
+    // `draft` is the state for that, so H27 no longer fires there and this refuses the move out.
+    case 'blocks_something':
+      // Finished work is history on both rules below: the remedy each names is a move the
+      // machine refuses from `done` or `cancelled`, and neither rule has anything to ask of
+      // an item nobody is going to pick up.
+      if (isTerminal(item.state)) return PASS
+      return (item.relations ?? []).some((relation) => relation.kind === 'blocks')
+        ? PASS
+        : no('it holds nothing up', `treadle relation add ${item.id} blocks <id>`)
+    case 'not_a_duplicate': {
+      const original = context.duplicateOf
+      return original === undefined || isTerminal(item.state)
+        ? PASS
+        : no(
+          `it duplicates ${original.id}, and a copy is not separate work`,
+          `treadle transition ${item.id} cancelled --resolution duplicate --reason "<why>"`,
         )
     }
     case 'reviewer_distinct_from_assignee': {

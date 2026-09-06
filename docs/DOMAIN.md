@@ -50,6 +50,7 @@ The set is closed.
 | `R2` | The edge would close a cycle in a directional relation kind |
 | `R3` | The relation traversal hit its depth ceiling |
 | `R4` | An item already duplicates another, and a duplicate has one original |
+| `R5` | A `blocks` edge out of a done or cancelled item would block nothing |
 | `P1` | The parent and child types are not an allowed pair |
 | `P2` | The parent edge would close a cycle, or the stored hierarchy already contains one |
 | `P3` | The hierarchy traversal hit its depth ceiling |
@@ -58,7 +59,7 @@ The set is closed.
 | `I2` | The sprint is closed, and a closed sprint's committed set is a record |
 | `I3` | The item is committed to another open sprint; an item is in one sprint |
 | `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
-| `I5` | The id is not a sprint in this workspace, or would name both a sprint and an item |
+| `I5` | The id is not a sprint in this workspace, would name both a sprint and an item, or names a sprint where an item was wanted |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |
@@ -208,6 +209,9 @@ An item carries `sprint_id`, so what is committed to an open sprint is what poin
 
 `dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
 `evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.
+A `draft` item whose fields are complete enters a sprint, and that is the decision rather than an omission: planning a sprint with work nobody has refined yet is ordinary, and `file --sprint` files in `draft` by construction, so refusing it would make that flag refuse every item it can file.
+What the tool owed the reader instead is the list, because `next` ranks `ready` only.
+`notGroomed(items)` in `src/application/services/context.ts` derives it, and five surfaces name those ids rather than leaving them inside a tally: `sprint commit` and `file --sprint` say it at the moment of committing, `sprints <id>` and `status` carry a `not_ready` line, and `board` has listed them in its `draft` column since ADR-0018.
 The ready gate is the item's own definition of "can be picked up", and a sprint is where work is picked up, so the same verdict decides both.
 [architecture/adr/0016-sprints.md](architecture/adr/0016-sprints.md) carries every judgement call.
 
@@ -225,7 +229,9 @@ The other three load and show from a record that carries one and gain a writer w
 | `split_from` | `split_into` | yes |
 | `relates_to` | `relates_to` | no, symmetric |
 
-`addRelation` refuses a self-edge (`R1`), for every directional kind an edge that would close a cycle (`R2`), and a second `duplicates` edge out of an item that already duplicates one (`R4`).
+`addRelation` refuses a self-edge (`R1`), for every directional kind an edge that would close a cycle (`R2`), a second `duplicates` edge out of an item that already duplicates one (`R4`), and a `blocks` edge whose source is already done or cancelled (`R5`).
+It takes the same `stateOf` reader `blockersOf` takes, because `R5` is the write-time half of the fact `blockersOf` applies on every read: a terminal blocker is inactive, so such an edge is written inert and the target reads `blocked no`.
+The edges a resolved impediment still carries were written while it was live, so `R5` refuses the write and never the stored edge.
 The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "split from" is not a thing the domain can mean.
 `relates_to` is symmetric, stored once in id order, and unchecked, because a cycle in it says nothing.
 
@@ -265,6 +271,8 @@ Default ready gate:
 | `DOR6` | bug | The bug records what was expected |
 | `DOR7` | bug | The bug records what actually happened |
 | `DOR8` | epic | The epic has at least one child story |
+| `DOR9` | impediment | The impediment says what it holds up |
+| `DOR10` | all | The item is not a copy of another item |
 
 Default done gate:
 
@@ -286,7 +294,7 @@ Together they are the anti-attestation pair: the item was accepted by someone ot
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
-The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `reviewer_distinct_from_assignee` and `evidence_present`.
+The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
 A workspace gate composes those; there is no custom predicate, because a gate is loaded from a text file and a text file cannot carry one.
 
 ## Records, and the two security findings that land here

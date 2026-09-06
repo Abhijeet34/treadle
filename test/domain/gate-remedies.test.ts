@@ -45,6 +45,11 @@ const PERFORMED_BY: Readonly<Record<string, string>> = {
   no_open_child: 'transition',
   // Resolving the impediment is reaching `done`, the same command DOR3 names for a blocker.
   no_open_impediment: 'transition',
+  // Raising the impediment against work is the one edge that does it (ADR-0017).
+  blocks_something: 'relation',
+  // A copy is closed as a duplicate, which is the resolution the closed set has carried
+  // since ADR-0010 and the one move that says why the record stops.
+  not_a_duplicate: 'transition',
   reviewer_distinct_from_assignee: 'set',
   evidence_present: 'evidence',
 }
@@ -86,6 +91,10 @@ function everyRemedy(): readonly Emitted[] {
     gateContext(item('task', { id: 't1' })),
     // Work an impediment is raised against, which is the only way DOD2 fails.
     gateContext(item('task', { id: 't2' }), { blockers: [neighbour('cert-expired', 'impediment')] }),
+    // An impediment whose record carries no `blocks` edge, which is the only way DOR9 fails.
+    gateContext(item('impediment', { id: 'cert-expired' })),
+    // A copy whose original the store holds, which is the only way DOR10 fails.
+    gateContext(item('task', { id: 'copy-1' }), { duplicateOf: neighbour('orig-1') }),
   ]
   const gates = [DEFAULT_READY_GATE, DEFAULT_DONE_GATE, ...PROBES]
 

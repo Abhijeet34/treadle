@@ -4,9 +4,9 @@
 // `explain` printed `blocked no` and `blocks -` on every item from the day it shipped, and
 // no command could write either: the tool reported a fact it had no way to record. This is
 // the write path for that fact, and it is a typed edge rather than a note because a typed
-// edge can be refused. An id that is not an item, a `blocks` edge that closes a cycle, an
-// item related to itself and a second original for one duplicate are each a refusal here
-// and a silent lie in prose.
+// edge can be refused. An id that is not an item, a `blocks` edge that closes a cycle or
+// comes out of finished work, an item related to itself and a second original for one
+// duplicate are each a refusal here and a silent lie in prose.
 //
 // An edge is stored once, on one record's `relations` section, and the other direction is
 // derived on every read by `relationsOf` and `blockersOf`. Two stored directions are two
@@ -17,7 +17,6 @@
 import {
   addRelation,
   isSymmetric,
-  isTerminal,
   linkableKindOf,
   removeRelation,
   validateWorkItem,
@@ -115,7 +114,7 @@ export async function relate(
   let edge: Relation
   let reads: readonly { readonly id: ItemId; readonly version: number }[] = []
   if (request.verb === 'add') {
-    const added = addRelation(view.value.relations, asked)
+    const added = addRelation(view.value.relations, asked, (other) => view.value.byId.get(other)?.state)
     if (!added.ok) {
       return errorResult({
         code: added.error.code === 'VALIDATION' ? 'VALIDATION' : 'GUARD_REFUSED',
@@ -193,12 +192,6 @@ export async function relate(
     v: `${before.version} -> ${applied.value.writes[0]?.version ?? before.version + 1}`,
     kind: edge.kind,
     other: edge.target,
-  }
-  // A terminal blocker is inactive on every read, so the edge just written blocks nothing;
-  // the write succeeds, because the edge is still the record of what was raised against
-  // what, and the caller is told rather than left to find `blocked no` on the target.
-  if (request.verb === 'add' && edge.kind === 'blocks' && isTerminal(source.state)) {
-    data['note'] = `${source.id} is ${source.state}, so this edge blocks nothing while it stays ${source.state}`
   }
   if (mode === 'dry-run') {
     return okResult(RELATION_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0 } })

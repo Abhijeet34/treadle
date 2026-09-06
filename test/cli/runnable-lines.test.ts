@@ -167,8 +167,10 @@ async function baseWorkspace(dir: string): Promise<void> {
   }
   const impediment = async (id: string, to: readonly string[], blocks: string): Promise<void> => {
     await m(['file', 'impediment', `Impediment ${id}`, '--id', id, '--set', 'severity=S1', '--set', 'proposed_resolution=renew it'])
-    for (const state of to) await m(['transition', id, state, '--reason', 'fixture'])
+    // The edge is raised before the moves, because DOR9 fails the ready gate of an
+    // impediment that holds nothing up and `G1` reads that gate.
     await m(['relation', 'add', id, 'blocks', blocks])
+    for (const state of to) await m(['transition', id, state, '--reason', 'fixture'])
   }
   const story = async (id: string, to: readonly string[], flags: readonly string[] = []): Promise<void> => {
     await m(['file', 'story', `Story ${id}`, '--id', id, '--points', '3', '--set', 'acceptance_criteria=one|two', '--assignee', 'dana', ...flags])

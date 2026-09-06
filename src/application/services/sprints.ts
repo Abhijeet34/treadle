@@ -4,9 +4,10 @@
 //
 // The committed set is never written. An item carries `sprint_id`, so what is committed to
 // a sprint is what points at it; `commit` and `uncommit` write items and never the sprint,
-// and `open`, `close` and `reopen` write the sprint and never an item. The one thing a close
-// writes that nothing else could recover is the carry-over, because the items it names move
-// on to the next sprint and stop pointing back. ADR-0016 carries the argument.
+// and `open`, `close` and `reopen` write the sprint and never an item. What a close writes
+// that nothing else could recover is the carry-over, because the items it names move on to
+// the next sprint and stop pointing back, and the tally at that instant, because those same
+// items are finished elsewhere afterwards. ADR-0016 and ADR-0022 carry the argument.
 
 import {
   carryOver,
@@ -23,7 +24,7 @@ import { columnsOf, errorResult, okResult, type Block, type ResultObject, type R
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
+import { notGroomed, notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
 import { echoed, nearIds, notFound, slugFor } from './items.ts'
 import { makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
@@ -48,6 +49,8 @@ export const SPRINT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'event', type: 'string' },
     { kind: 'scalar', key: 'events', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },
+    // Last, which STABILITY's output-schema rule makes a non-breaking addition.
+    { kind: 'scalar', key: 'not_ready', type: 'string' },
   ],
 }
 
@@ -74,6 +77,9 @@ export const SPRINTS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'none', type: 'string' },
     { kind: 'text', key: 'title', whole: true },
     { kind: 'text', key: 'goal', whole: true },
+    // Last of the non-block properties, which is as late as the renderer's blocks-last rule
+    // allows and moves nothing already declared.
+    { kind: 'scalar', key: 'not_ready', type: 'string' },
     {
       kind: 'block',
       key: 'sprints',
@@ -116,14 +122,23 @@ type Tally = {
   readonly donePoints: number
 }
 
-function tallyOf(items: readonly WorkItemSummary[]): Tally {
+/**
+ * The tally of one sprint's committed set. A closed sprint answers from the two numbers its
+ * close recorded rather than from the states of the moment: `committedTo` restores the items
+ * a carry-over took away, so a carried item finished in the next sprint used to be counted
+ * done in both, which inflates throughput by construction and moves a figure a team already
+ * read. A sprint closed by a build older than the record fields has no frozen numbers and
+ * reads live, which is what it always did. ADR-0022 carries the argument.
+ */
+function tallyOf(sprint: Sprint, items: readonly WorkItemSummary[]): Tally {
   const done = items.filter((item) => item.state === 'done')
+  const frozen = sprint.state === 'closed' && sprint.done !== undefined
   return {
     committed: items.length,
-    done: done.length,
+    done: frozen ? sprint.done as number : done.length,
     cancelled: items.filter((item) => item.state === 'cancelled').length,
     points: items.reduce((sum, item) => sum + (item.points ?? 0), 0),
-    donePoints: done.reduce((sum, item) => sum + (item.points ?? 0), 0),
+    donePoints: frozen ? sprint.done_points ?? 0 : done.reduce((sum, item) => sum + (item.points ?? 0), 0),
   }
 }
 
@@ -284,6 +299,11 @@ export async function commitItems(
   }
   data['committed'] = moves.map((move) => `${move.item.id} ${move.before ?? '-'} -> ${sprint.id}`)
   if (already.length > 0) data['already'] = already.join(',')
+  const ungroomed = notGroomed(moves.map((move) => move.item))
+  if (ungroomed.length > 0) {
+    data['not_ready'] = ungroomed.join(',')
+    data['note'] = notGroomedNote(ungroomed)
+  }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: sprint.id, state: sprint.state })
   return applyMoves(target, clock, ids, view.value, request.actor, moves, sprint.id, 'item.commit', data)
 }
@@ -351,17 +371,27 @@ async function moveSprint(
     return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
   }
   const now = clock.now()
-  const carried = to === 'closed' ? carryOver(committedTo(view.value, sprint)) : []
-  const { closed_at: _closedAt, carried: wasCarried, ...rest } = sprint
+  const committed = to === 'closed' ? committedTo(view.value, sprint) : []
+  const carried = to === 'closed' ? carryOver(committed) : []
+  // Read off the open sprint, so these are the live states at the instant of the close; a
+  // carried item is not terminal by definition, so it is not among them.
+  const frozen = tallyOf(sprint, committed)
+  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, ...rest } = sprint
   const after: Sprint = to === 'closed'
-    ? { ...rest, state: 'closed', closed_at: now, ...(carried.length === 0 ? {} : { carried }) }
+    ? {
+      ...rest, state: 'closed', closed_at: now, ...(carried.length === 0 ? {} : { carried }),
+      done: frozen.done, done_points: frozen.donePoints,
+    }
     : { ...rest, state: 'open' }
 
   const set = [`state ${sprint.state} -> ${to}`]
   if (to === 'closed') set.push(`closed_at - -> ${now}`)
   else if (sprint.closed_at !== undefined) set.push(`closed_at ${sprint.closed_at} -> -`)
   const carriedLine = (list: readonly string[] | undefined): string => (list === undefined || list.length === 0 ? '-' : list.join(','))
+  const numberLine = (value: number | undefined): string => (value === undefined ? '-' : String(value))
   if (to === 'closed' || wasCarried !== undefined) set.push(`carried ${carriedLine(wasCarried)} -> ${carriedLine(after.carried)}`)
+  if (to === 'closed' || wasDone !== undefined) set.push(`done ${numberLine(wasDone)} -> ${numberLine(after.done)}`)
+  if (to === 'closed' || wasDonePoints !== undefined) set.push(`done_points ${numberLine(wasDonePoints)} -> ${numberLine(after.done_points)}`)
 
   const data: Record<string, Value> = { sprint: sprint.id, state: `${sprint.state} -> ${to}`, v: `${sprint.version} -> ${sprint.version + 1}`, set }
   if (to === 'closed') data['carried'] = carriedLine(carried)
@@ -393,7 +423,7 @@ export function reopenSprint(target: Target, clock: Clock, ids: IdGenerator, req
 }
 
 function sprintRow(view: WorkspaceView, sprint: Sprint): Row {
-  const tally = tallyOf(committedTo(view, sprint))
+  const tally = tallyOf(sprint, committedTo(view, sprint))
   return {
     id: sprint.id, state: sprint.state, start: sprint.start, end: sprint.end,
     items: `${tally.done}/${tally.committed}`, pts: `${tally.donePoints}/${tally.points}`, title: sprint.title,
@@ -417,7 +447,7 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   const sprint = view.value.sprintById.get(id)
   if (sprint === undefined) return noSprint('sprints', 'read', workspace, view.value, id)
   const committed = committedTo(view.value, sprint)
-  const tally = tallyOf(committed)
+  const tally = tallyOf(sprint, committed)
   const data: Record<string, Value> = {
     sprint: sprint.id, state: sprint.state, start: sprint.start, end: sprint.end, filed: sprint.filed_at,
   }
@@ -430,9 +460,14 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   data['committed'] = tally.committed
   data['done'] = tally.done
   if (tally.cancelled > 0) data['cancelled'] = tally.cancelled
+  // Named, not counted: "3 committed, 1 done" leaves a reader to work out for themselves
+  // that one of the three is not workable, and which one.
+  const ungroomed = notGroomed(committed)
+  if (ungroomed.length > 0) data['not_ready'] = ungroomed.join(',')
   data['pts'] = `${tally.donePoints}/${tally.points}`
   // The list the close wrote, not the open items of the moment: after a close the two
-  // drift apart as carried items are committed onward, and the record is the answer.
+  // drift apart as carried items are committed onward, and the record is the answer. The
+  // `done` and `pts` above are frozen for the same reason and by the same record.
   if (sprint.carried !== undefined) data['carried'] = sprint.carried.join(',')
   if (sprint.extra !== undefined && sprint.extra.size > 0) data['extra'] = sprint.extra.size
   data['title'] = sprint.title

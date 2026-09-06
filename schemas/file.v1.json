@@ -123,6 +123,12 @@
             "string",
             "null"
           ]
+        },
+        "not_ready": {
+          "type": [
+            "string",
+            "null"
+          ]
         }
       }
     }

@@ -278,3 +278,147 @@ describe('a sprint from open to close, at the command surface', () => {
     assert.doesNotMatch(history.out, /item\.file/, 'the sprint\'s history carries no item event')
   })
 })
+
+// A closed sprint's completion used to rise after it closed. `committedTo` restores what the
+// carry-over took away and the tally read the states of the moment, so an item carried out of
+// one sprint and finished in the next was counted done in both and throughput was inflated by
+// construction. ADR-0022 records the decision to freeze the tally at close.
+describe('a carried item counts as done in the sprint that finished it, and in no other', () => {
+  let demo: Demo
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('leaves the closed sprint at 0/1 while the sprint that finished the work reports 1/1', async () => {
+    assert.equal((await cli(['sprint', 'open', 'Sprint A', '--id', 'sprint-a', '--start', '2026-09-07', '--end', '2026-09-18'])).code, 0)
+    const committed = await cli(['sprint', 'commit', 'sprint-a', 'avatar-crop'])
+    assert.equal(committed.code, 0, committed.err)
+    const closed = await cli(['sprint', 'close', 'sprint-a'])
+    assert.equal(closed.code, 0, closed.err)
+    assert.match(closed.out, /^set done - -> 0$/m)
+    assert.match(closed.out, /^set done_points - -> 0$/m)
+    assert.match(closed.out, /^carried avatar-crop$/m)
+
+    assert.equal((await cli(['sprint', 'open', 'Sprint B', '--id', 'sprint-b', '--start', '2026-09-21', '--end', '2026-10-02'])).code, 0)
+    const onward = await cli(['sprint', 'commit', 'sprint-b', 'avatar-crop'])
+    assert.equal(onward.code, 0, onward.err)
+    for (const target of ['in_progress', 'done']) {
+      const moved = await cli(['transition', 'avatar-crop', target])
+      assert.equal(moved.code, 0, moved.err)
+    }
+
+    const first = await cli(['sprints', 'sprint-a'])
+    assert.match(first.out, /^committed 1$/m, 'the carry-over is still in the closed sprint\'s committed set')
+    assert.match(first.out, /^done 0$/m, 'and it was not done when the sprint closed')
+    assert.match(first.out, /^pts 0\/2$/m)
+    const second = await cli(['sprints', 'sprint-b'])
+    assert.match(second.out, /^done 1$/m)
+    assert.match(second.out, /^pts 2\/2$/m)
+    const list = await cli(['sprints'])
+    assert.match(list.out, /^sprint-a closed 2026-09-07 2026-09-18 0\/1 0\/2 Sprint A$/m)
+    assert.match(list.out, /^sprint-b open 2026-09-21 2026-10-02 1\/1 2\/2 Sprint B$/m)
+
+    // The two numbers are on the record, so a reader of sprints.md sees the same velocity.
+    const file = await readFile(path.join(demo.root, 'sprints.md'), 'utf8')
+    assert.match(file, /^carried: avatar-crop\ndone: 0\ndone_points: 0$/m)
+  })
+
+  it('reads live again once the sprint is reopened, because the freeze is what the close recorded', async () => {
+    const reopened = await cli(['sprint', 'reopen', 'sprint-a'])
+    assert.equal(reopened.code, 0, reopened.err)
+    assert.match(reopened.out, /^set done 0 -> -$/m)
+    assert.match(reopened.out, /^set done_points 0 -> -$/m)
+    const record = await cli(['sprints', 'sprint-a'])
+    assert.match(record.out, /^committed 0$/m, 'the carry-over is cleared, so nothing points at it any more')
+    assert.doesNotMatch(record.out, /^carried /m)
+  })
+})
+
+// A sprint is a record with an id, and `show` and `explain` used to answer NOT_FOUND with
+// "is in no record here" while `history` answered from the same id (ADR-0022).
+describe('an id-taking read that is handed a sprint id names the read that works', () => {
+  let demo: Demo
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  before(async () => {
+    assert.equal((await runCli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'], { cwd: demo.root })).code, 0)
+  })
+
+  it('refuses show and explain by saying it is a sprint, and names sprints and backlog --sprint', async () => {
+    for (const command of ['show', 'explain']) {
+      const refused = await cli([command, 'sprint-31'])
+      assert.equal(refused.code, 5, refused.out)
+      assert.match(refused.err, /^rule I5$/m)
+      assert.match(refused.err, new RegExp(`^"cause sprint-31 is a sprint here, not an item, and ${command} reads items$`, 'm'))
+      assert.match(refused.err, /^fix treadle sprints sprint-31$/m)
+      assert.match(refused.err, /^fix treadle backlog --sprint sprint-31$/m)
+    }
+    assert.equal((await cli(['sprints', 'sprint-31'])).code, 0)
+    assert.equal((await cli(['history', 'sprint-31'])).code, 0)
+  })
+
+  it('offers a mistyped sprint id as a near miss, so the next line reaches the refusal above', async () => {
+    const missed = await cli(['show', 'sprint-3'])
+    assert.equal(missed.code, 5)
+    assert.match(missed.err, /^near sprint-31$/m)
+  })
+})
+
+// Row 12 of the audit: a sprint admits work `next` will never suggest, and nothing said why.
+// The admission is deliberate, so what is held here is that every surface a caller reads
+// names those ids rather than leaving them inside a tally (ADR-0022).
+describe('a sprint says which of its committed work is not groomed yet', () => {
+  let demo: Demo
+  before(async () => {
+    demo = await aDemoWorkspace()
+    assert.equal((await runCli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'], { cwd: demo.root })).code, 0)
+  })
+  after(async () => { await demo.dispose() })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('says it at the moment of committing, with the line that grooms the first one', async () => {
+    // metrics-p95 and queue-drain are draft; avatar-crop is ready.
+    const committed = await cli(['sprint', 'commit', 'sprint-31', 'avatar-crop', 'metrics-p95', 'queue-drain'])
+    assert.equal(committed.code, 0, committed.err)
+    assert.match(committed.out, /^not_ready metrics-p95,queue-drain$/m)
+    assert.match(committed.out, /^note metrics-p95,queue-drain are draft, and next ranks ready work; treadle transition metrics-p95 ready$/m)
+  })
+
+  it('says it on file --sprint, which files in draft and so always has something to say', async () => {
+    const filed = await cli(['file', 'task', 'Rotate the deploy key', '--id', 'deploy-key', '--points', '1', '--sprint', 'sprint-31'])
+    assert.equal(filed.code, 0, filed.err)
+    assert.match(filed.out, /^set sprint_id - -> sprint-31$/m)
+    assert.match(filed.out, /^not_ready deploy-key$/m)
+    assert.match(filed.out, /^note deploy-key is draft, and next ranks ready work; treadle transition deploy-key ready$/m)
+  })
+
+  it('names them on sprints <id> and on status, beside the tally rather than inside it', async () => {
+    const record = await cli(['sprints', 'sprint-31'])
+    assert.match(record.out, /^committed 4$/m)
+    assert.match(record.out, /^done 0$/m)
+    assert.match(record.out, /^not_ready deploy-key,metrics-p95,queue-drain$/m, 'three of the four committed items are not workable')
+    const orientation = await cli(['status'])
+    assert.match(orientation.out, /^not_ready deploy-key,metrics-p95,queue-drain$/m)
+  })
+
+  it('lists them by id in the board draft column, which is the read that made this visible', async () => {
+    const board = await cli(['board'])
+    assert.equal(board.code, 0, board.err)
+    const draft = board.out.slice(board.out.indexOf('~draft'), board.out.indexOf('~ready'))
+    for (const id of ['deploy-key', 'metrics-p95', 'queue-drain']) {
+      assert.match(draft, new RegExp(`^${id} `, 'm'), `the draft column does not name ${id}`)
+    }
+  })
+
+  it('stops saying it once the work is groomed, and next then ranks it', async () => {
+    for (const id of ['deploy-key', 'metrics-p95', 'queue-drain']) {
+      assert.equal((await cli(['transition', id, 'ready'])).code, 0)
+    }
+    const record = await cli(['sprints', 'sprint-31'])
+    assert.doesNotMatch(record.out, /^not_ready /m)
+    assert.doesNotMatch((await cli(['status'])).out, /^not_ready /m)
+    assert.match((await cli(['next', '--limit', '20'])).out, /^deploy-key /m)
+  })
+})

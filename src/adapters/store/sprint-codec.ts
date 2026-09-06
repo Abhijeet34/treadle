@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // Sprint to record and back, over the one record grammar every file in the store shares.
 // The grammar knows lines; this file knows the sprint's field dictionary: which keys are
-// single-line, that the goal is an H2 section, how the carried list is spelled, and the
-// order a rendered sprint takes. It is the item codec's shape over a smaller dictionary.
+// single-line, that the goal is an H2 section, how the carried list is spelled, which of
+// them are whole numbers, and the order a rendered sprint takes. It is the item codec's
+// shape over a smaller dictionary.
 
 import { SPRINT_FIELDS, validateSprint, type Sprint } from '../../domain/index.ts'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
 import { unwritableBodyLine, type ParsedRecord, type Section } from './grammar.ts'
 
 /** The single-line fields, in render order. `type` names the record kind for the grammar's resynchroniser. */
-const FIELD_ORDER = ['type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried'] as const
+const FIELD_ORDER = [
+  'type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried', 'done', 'done_points',
+] as const
 
 const GOAL_SECTION = 'Goal'
 
@@ -35,8 +38,8 @@ export function decodeSprint(record: ParsedRecord): StoreResult<Sprint> {
       extra.set(key, value)
       continue
     }
-    if (key === 'version') {
-      if (!/^\d{1,15}$/.test(value)) return refuse('S1', `${record.id}: version must be a whole number, not "${value}"`, record.id)
+    if (key === 'version' || key === 'done' || key === 'done_points') {
+      if (!/^\d{1,15}$/.test(value)) return refuse('S1', `${record.id}: ${key} must be a whole number, not "${value}"`, record.id)
       draft[key] = Number(value)
       continue
     }

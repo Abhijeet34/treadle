@@ -139,6 +139,8 @@ const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
   end: readable('sprints:end'),
   closed_at: readable('sprints:closed'),
   carried: readable('sprints:carried', 'the ids joined by commas, which is the form `explain` already gives a list of ids'),
+  done: readable('sprints:done', 'the count the close froze, which is what a closed sprint reports instead of a live count over a set its carry-over has left'),
+  done_points: readable('sprints:pts', 'the numerator of the points figure, printed done over committed as the live tally is'),
   goal: readable('sprints:goal'),
   extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
 }
@@ -284,8 +286,9 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
 
   // A sprint carrying every field of its own dictionary: opened with a goal, given the spike
   // (the story is blocked above, and a blocked item fails the ready gate a commit reads), and
-  // closed with the spike still open so the carry-over is recorded. Committed before the
-  // impediment is raised against it, because a blocked item fails that same ready gate.
+  // closed with the spike still open so the carry-over and the frozen tally are recorded.
+  // Committed before the impediment is raised against it, because a blocked item fails that
+  // same ready gate.
   const sprintOpened = await openSprint(apply, clock, ids, {
     title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
   })

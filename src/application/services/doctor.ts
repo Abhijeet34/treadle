@@ -264,13 +264,22 @@ export function auditRelationsOf(known: ReadonlySet<ItemId>, item: Pick<WorkItem
 }
 
 /**
- * An open impediment that blocks nothing (H27). An impediment earns its keep through the
+ * A raised impediment that blocks nothing (H27). An impediment earns its keep through the
  * `blocks` edge, which is stored on its own record, so this needs no other record to see: one
  * raised against no work is a complaint on file, and the detail names the line that raises it
  * against something. A resolved or cancelled one is history and is not reported.
+ *
+ * A `draft` one is not reported either, and that is the whole of the fix for a finding that
+ * used to fire between the two commands the tool itself prescribes. `file` lands an
+ * impediment in `draft` and `help file` then prescribes `relation add`, so a CI job running
+ * `doctor` between those two lines met exit 7, which is also what a corrupt store returns.
+ * `draft` is the state for a record still being written; DOR9 is what refuses to let one
+ * out of it while it holds nothing up, so this finding now reports only what a hand edit or
+ * a later `relation remove` produced, which is the write-time-guard-and-load-time-finding
+ * pair R2 and H25 already are. ADR-0022 carries the argument.
  */
 export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | 'relations'>): readonly DoctorFinding[] {
-  if (item.type !== 'impediment' || item.state === 'done' || item.state === 'cancelled') return []
+  if (item.type !== 'impediment' || item.state === 'draft' || item.state === 'done' || item.state === 'cancelled') return []
   if ((item.relations ?? []).some((relation) => relation.kind === 'blocks')) return []
   return [{
     rule: 'H27',

@@ -6,8 +6,10 @@
 // The committed set is not stored here either. An item carries `sprint_id`, so the set of
 // items committed to an open sprint is the set of items that point at it, and storing the
 // same list on the sprint would be one fact in two places. What the sprint record does keep
-// is the one thing that cannot be derived after the fact: the carry-over its close recorded.
-// docs/architecture/adr/0016-sprints.md carries the argument for each of these.
+// is what cannot be derived after the fact: the carry-over its close recorded, and the tally
+// at that instant, because both drift once the carry-over is worked on somewhere else.
+// docs/architecture/adr/0016-sprints.md carries the argument for each of these, and
+// docs/architecture/adr/0022-a-closed-sprint-is-a-record.md the argument for the tally.
 
 import { fail, ok, type DomainError, type Failure, type Result } from './errors.ts'
 import { MAX_REASON, isInstant } from './fields.ts'
@@ -41,6 +43,14 @@ export type Sprint = {
    * next sprint nothing else in the store says they were here.
    */
   readonly carried?: readonly ItemId[]
+  /**
+   * The tally frozen at close: how many of the committed items were done then, and their
+   * points. Both are recorded because velocity is a historical record, and a live count over
+   * a closed sprint's set rises as its carry-over is finished elsewhere, which counts one
+   * item in two sprints. Absent on a sprint an older build closed, which reads live.
+   */
+  readonly done?: number
+  readonly done_points?: number
   readonly goal?: string
   /** Keys a newer writer produced that this version does not know, preserved verbatim. */
   readonly extra?: ReadonlyMap<string, string>
@@ -52,7 +62,8 @@ export type Sprint = {
  * the record heading, as an item's do.
  */
 export const SPRINT_FIELDS = [
-  'id', 'title', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried', 'goal', 'extra',
+  'id', 'title', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried',
+  'done', 'done_points', 'goal', 'extra',
 ] as const
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
@@ -147,6 +158,12 @@ export function validateSprint(sprint: Sprint): Result<Sprint> {
     }
     if (new Set(sprint.carried).size !== sprint.carried.length) return invalid('V4', 'carried names an item twice', id)
   }
+  for (const field of ['done', 'done_points'] as const) {
+    const value = sprint[field]
+    if (value === undefined) continue
+    if (sprint.state !== 'closed') return invalid('V4', `${field} is set on a sprint whose state is ${sprint.state}, not closed`, id)
+    if (!Number.isInteger(value) || value < 0) return invalid('V4', `${field} must be a whole number of 0 or more`, id)
+  }
   if (sprint.goal !== undefined) {
     if (typeof sprint.goal !== 'string' || sprint.goal.length === 0 || !isSafeText(sprint.goal, 'text')) {
       return invalid('V4', `goal must be 1 to ${MAX_GOAL} characters and may carry newlines but no other control characters`, id)
@@ -182,6 +199,13 @@ export type CommitOutcome =
  * item's own definition of "can be picked up", and a sprint is where work gets picked up, so
  * the same rule decides both; a draft story with no acceptance criterion can exist and can
  * never enter a sprint, which is the README's oldest promise about types.
+ *
+ * A `draft` item whose fields are complete commits, and that is the decision rather than an
+ * omission: planning a sprint with work nobody has refined yet is ordinary practice, and
+ * `file --sprint` files in `draft` by construction, so refusing it would make that flag
+ * refuse every item it can file. What was wrong was the silence afterwards, because `next`
+ * ranks `ready` only: `notGroomed` in the sprint service is what every surface that commits
+ * or reads a committed set now says out loud. ADR-0022 carries the argument.
  */
 export function evaluateCommit(context: CommitContext): CommitOutcome {
   const { sprint, item, current, readyGate } = context
