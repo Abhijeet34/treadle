@@ -96,3 +96,12 @@ function isEmojiJoin(points: readonly string[], at: number): boolean {
 export function isSafeText(value: string, mode: TextMode = 'line'): boolean {
   return findUnsafeCharacter(value, mode) === undefined
 }
+
+/**
+ * A noun with its indefinite article: `an epic`, `an impediment`, `a story`. Every closed set
+ * a message names a member of is spelled so that the first letter decides, and a message
+ * that read `a impediment` was picked without looking.
+ */
+export function withArticle(noun: string): string {
+  return `${/^[aeiou]/i.test(noun) ? 'an' : 'a'} ${noun}`
+}

@@ -32,7 +32,7 @@ describe('raising an impediment', () => {
     const complaint = await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', 'severity=S1'])
     assert.equal(complaint.code, 2)
     assert.equal(line(complaint, 'rule'), 'rule V4')
-    assert.match(complaint.err, /^"cause a impediment needs proposed_resolution at creation$/m)
+    assert.match(complaint.err, /^"cause an impediment needs proposed_resolution at creation$/m)
     const unweighed = await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', `proposed_resolution=${RESOLUTION}`])
     assert.equal(unweighed.code, 2)
     assert.match(unweighed.err, /needs severity at creation/)

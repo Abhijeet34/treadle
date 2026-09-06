@@ -26,7 +26,7 @@ A second state machine for one type was refused for the reason ADR-0010 refused 
 
 It owns two fields and requires both at creation, the way a bug requires `severity`, `repro_steps` and `found_in`: `severity` from the same closed set a bug uses, and `proposed_resolution`, a paragraph of up to 1,000 characters saying what would clear it.
 The captain's recorded decision on this capability is that the proposed resolution is what makes an impediment worth filing.
-Filing one without it is refused with `V4`, `a impediment needs proposed_resolution at creation`, exit 2.
+Filing one without it is refused with `V4`, `an impediment needs proposed_resolution at creation`, exit 2.
 `severity` is written by `mark` afterwards, as a bug's is; `proposed_resolution` is `set`'s, so it can be revised, and `history` reads the revision as `proposed_resolution=(text:76)->(text:27)` under the convention every prose field has.
 
 It has no review step, so `in_progress` exits through `finish` straight to `done`: what attests the resolution is the blocked work moving, which is the next section.

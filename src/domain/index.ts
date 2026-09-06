@@ -68,6 +68,7 @@ export {
 export {
   findUnsafeCharacter,
   isSafeText,
+  withArticle,
   type TextMode,
   type UnsafeCharacter,
 } from './text.ts'

@@ -5,7 +5,7 @@
 
 import { fail, ok, type Failure, type Result } from './errors.ts'
 import { validateFieldKeys } from './record.ts'
-import { findUnsafeCharacter, isSafeText } from './text.ts'
+import { findUnsafeCharacter, isSafeText, withArticle } from './text.ts'
 import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
@@ -448,7 +448,7 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
 
   for (const name of requiredAtCreation(item.type)) {
     if (item[name as keyof WorkItem] === undefined) {
-      return invalid('V4', `a ${item.type} needs ${name} at creation`, item)
+      return invalid('V4', `${withArticle(item.type)} needs ${name} at creation`, item)
     }
   }
 
