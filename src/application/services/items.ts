@@ -3,12 +3,14 @@
 // renders nothing; the shape beside each is what the schema under schemas/ is generated from.
 
 import {
+  ALLOWED_PARENT_PAIRS,
   canonicalField,
   daysOverdue,
   evaluateCommit,
   placeholderOf,
   relationsOf,
   requiredAtCreation,
+  setParent,
   shellWord,
   shortField,
   validateWorkItem,
@@ -266,8 +268,14 @@ const CRITERIA_FIELDS = new Set(['acceptance_criteria'])
  */
 const CRITERIA_TICK = /^\[([ x])\] /
 
-/** One `<field>=<value>` string as the dictionary's own type for that field. */
+/**
+ * One `<field>=<value>` string as the dictionary's own type for that field. An empty value
+ * is the field's absence: no field in the dictionary accepts the empty string, and the two
+ * list fields already read `labels=` as an empty list, so `<field>=` is the one clearing
+ * syntax rather than a sentinel that some prose field could legitimately hold as its value.
+ */
 export function coerce(name: string, value: string): unknown {
+  if (value === '') return undefined
   if (INT_FIELDS.has(name)) return Number.isInteger(Number(value)) ? Number(value) : value
   if (name === 'fix_confirmed') return value === 'true' ? true : value === 'false' ? false : value
   if (LIST_FIELDS.has(name)) return value.split(',').filter((part) => part.length > 0)
@@ -342,6 +350,11 @@ export async function fileItem(
       rule: valid.error.rule ?? 'V4', entity: id, cause: valid.error.message,
       fix: [`treadle help file`],
     })
+  }
+
+  if (item.parent_id !== undefined) {
+    const refused = parentRefusal('file', workspace, view.value, item, item.parent_id)
+    if (refused !== undefined) return refused
   }
 
   // `--sprint` at creation is a commit, and it is held to the commit's rules: the sprint
@@ -769,5 +782,37 @@ export function notFound(
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
     near: nearIds(view.byId.keys(), id),
     fix: ['treadle backlog'],
+  })
+}
+
+/**
+ * The hierarchy's three rules, applied where a parent edge is written, or `undefined` when
+ * the edge is legal. `setParent` refused a disallowed pair, a cycle and an unknown parent
+ * from the start and no command called it, so `set` wrote `draft-task -> draft-task` and
+ * `doctor` then blamed a hand edit for it, while `file --parent nope` was reported nowhere.
+ * The child is added to the graph's type index when it is not yet filed, which is `file`.
+ *
+ * A fix line lists the types that may parent this one rather than `parent_id=<id>`: the
+ * reader's own workspace is what filled `<id>` with the guess that was just refused.
+ */
+export function parentRefusal(
+  command: string, workspace: string, view: WorkspaceView,
+  child: { readonly id: ItemId; readonly type: WorkItemType }, parentId: ItemId,
+): ResultObject | undefined {
+  const graph = view.hierarchy.typeOf.has(child.id)
+    ? view.hierarchy
+    : { ...view.hierarchy, typeOf: new Map(view.hierarchy.typeOf).set(child.id, child.type) }
+  const edge = setParent(graph, child.id, parentId)
+  if (edge.ok) return undefined
+  const parents = ALLOWED_PARENT_PAIRS.filter((pair) => pair.child === child.type)
+    .map((pair) => `treadle backlog --type ${pair.parent}`)
+  const unknown = edge.error.rule === 'P4'
+  // A chain that already closes a cycle above the parent is the store's finding, not this write's.
+  const fix = edge.error.code === 'INTEGRITY' ? ['treadle doctor'] : parents.length > 0 ? parents : [`treadle show ${child.id}`]
+  return errorResult({
+    code: unknown ? 'NOT_FOUND' : edge.error.code, command, workspace, effect: 'mutate',
+    rule: edge.error.rule ?? 'P1', entity: child.id, cause: edge.error.message,
+    ...(unknown ? { near: nearIds(view.byId.keys(), parentId) } : {}),
+    fix,
   })
 }
