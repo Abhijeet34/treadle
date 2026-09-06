@@ -1,0 +1,237 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sprints.v1.json",
+  "title": "sprints/1",
+  "description": "List the sprints, or print one with its dates, its committed set and what carried over.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "sprints/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL",
+        "INTEGRITY"
+      ]
+    },
+    "command": {
+      "const": "sprints"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "start": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "end": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "closed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "v": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "day": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "committed": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "done": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "cancelled": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "pts": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "carried": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extra": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "goal": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "sprints": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "state"
+            },
+            {
+              "name": "start"
+            },
+            {
+              "name": "end"
+            },
+            {
+              "name": "items"
+            },
+            {
+              "name": "pts"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

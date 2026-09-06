@@ -88,6 +88,8 @@ function invocations(inside: string, elsewhere: string): ReadonlyMap<string, Inv
     ['mark', ['mark', 'flaky-e2e', '--severity', 'S1', '--reason', 'it fails the release suite']],
     ['evidence', ['evidence', 'add', 'flaky-e2e', 'run', '8813', 'five of five green']],
     ['relation', ['relation', 'add', 'auth-refresh', 'blocks', 'csv-export']],
+    ['sprint', ['sprint', 'open', 'Sprint one', '--start', '2026-09-07', '--end', '2026-09-18']],
+    ['sprints', ['sprints']],
     ['doctor', ['doctor']],
     ['next', ['next', '--limit', '3']],
     ['explain', ['explain', 'auth-refresh']],

@@ -101,9 +101,21 @@ function loggedValue(events: readonly StoreEvent[], id: ItemId, field: string): 
 
 /** Every audit finding over one workspace, in item then rule order. */
 export function auditItem(
-  item: WorkItem, events: readonly StoreEvent[],
+  item: WorkItem, events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
 ): readonly DoctorFinding[] {
   const findings: DoctorFinding[] = []
+
+  // No write path points an item at a sprint that is not a record: `file --sprint` and
+  // `sprint commit` both resolve the id first. A value written before sprints were records,
+  // or by hand, is reported rather than refused, because the item still serves.
+  if (item.sprint_id !== undefined && !sprintIds.has(item.sprint_id)) {
+    findings.push({
+      rule: 'H26',
+      id: item.id,
+      where: 'sprint_id',
+      detail: `sprint_id is ${item.sprint_id} and no sprint record carries that id; open one with --id ${item.sprint_id}, or commit the item to a sprint that exists`,
+    })
+  }
 
   if (item.description !== undefined && item.description.length > MAX_DESCRIPTION) {
     findings.push({
@@ -201,7 +213,7 @@ function storedBlockingCycle(graph: RelationGraph): readonly DoctorFinding[] {
  * 50,000 and 500,000. The buckets cost one map of the log and make it linear in both.
  */
 export function auditWorkspace(
-  items: readonly WorkItem[], events: readonly StoreEvent[],
+  items: readonly WorkItem[], events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
 ): readonly DoctorFinding[] {
   const byEntity = new Map<string, StoreEvent[]>()
   for (const event of events) {
@@ -212,7 +224,7 @@ export function auditWorkspace(
   const known = new Set(items.map((item) => item.id))
   return [
     ...items.flatMap((item) => [
-      ...auditItem(item, byEntity.get(item.id) ?? []),
+      ...auditItem(item, byEntity.get(item.id) ?? [], sprintIds),
       ...auditRelationsOf(known, item),
     ]),
     ...storedBlockingCycle(relationGraphFrom(items)),
@@ -232,6 +244,9 @@ export async function doctor(store: Store): Promise<ResultObject> {
   // command that decodes the whole store rather than reading the view every other one does.
   const records = await store.list()
   if (!records.ok) return storeRefusal('doctor', 'read', records.error, workspace)
+  const sprints = await store.sprints()
+  if (!sprints.ok) return storeRefusal('doctor', 'read', sprints.error, workspace)
+  const sprintIds = new Set(sprints.value.map((sprint) => sprint.id))
 
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
@@ -240,7 +255,7 @@ export async function doctor(store: Store): Promise<ResultObject> {
       where: `${cell(finding.file)}:${finding.line}`,
       detail: finding.reason,
     })),
-    ...auditWorkspace(records.value, events.value),
+    ...auditWorkspace(records.value, events.value, sprintIds),
   ]
 
   const block: Block = {

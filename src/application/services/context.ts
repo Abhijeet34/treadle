@@ -20,6 +20,7 @@ import {
   type HierarchyGraph,
   type ItemId,
   type RelationGraph,
+  type Sprint,
   type TransitionContext,
   type WorkItem,
   type WorkItemState,
@@ -58,6 +59,13 @@ export type WorkspaceView = {
   readonly byId: ReadonlyMap<ItemId, WorkItemSummary>
   readonly hierarchy: HierarchyGraph
   readonly relations: RelationGraph
+  /**
+   * Every sprint, whole. There are tens of them where there are tens of thousands of items,
+   * and a sprint's record is a few lines, so the read that projects items to their summary
+   * fields carries the sprints as they are (ADR-0016).
+   */
+  readonly sprints: readonly Sprint[]
+  readonly sprintById: ReadonlyMap<string, Sprint>
 }
 
 /**
@@ -90,6 +98,8 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   if (!identity.ok) return identity
   const items = await store.summaries()
   if (!items.ok) return items
+  const sprints = await store.sprints()
+  if (!sprints.ok) return sprints
   const findings = await store.findings()
   if (!findings.ok) return findings
 
@@ -112,6 +122,8 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
       byId: new Map(items.value.map((item) => [item.id, item])),
       hierarchy: hierarchyFrom(items.value),
       relations: relationGraphFrom(items.value),
+      sprints: sprints.value,
+      sprintById: new Map(sprints.value.map((sprint) => [sprint.id, sprint])),
     },
   }
 }
@@ -182,6 +194,9 @@ export function transitionContextFor(view: WorkspaceView, item: WorkItem): Trans
     blockers: activeBlockers(view, item.id),
     // No board exists until `board` lands, and an absent column is what the domain reads as
     // "no work-in-progress limit applies", rather than a limit of zero which would refuse.
+    // G4 reads "in the active sprint, or on the board", and only its sprint half exists; armed
+    // alone it would refuse every start in a workspace that runs no sprints, so it stays true
+    // until `board` can answer the other half (ADR-0016).
     iterationMember: true,
     reviewStep: hasReviewStep(item.type),
     blockedByThis: blockedByThis(view, item.id),

@@ -5,6 +5,7 @@
 import {
   canonicalField,
   daysOverdue,
+  evaluateCommit,
   relationsOf,
   shortField,
   validateWorkItem,
@@ -28,7 +29,7 @@ import {
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { readWorkspace, wholeItem, type WorkspaceView } from './context.ts'
+import { readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -183,16 +184,19 @@ function slugHead(base: string): string {
   return boundary >= 3 ? base.slice(0, boundary) : base.slice(0, SLUG_LIMIT)
 }
 
-/** A readable id a person reviewing the file recognises, deduped against what is stored. */
-export function slugFor(title: string, type: WorkItemType, taken: ReadonlySet<string>): ItemId {
+/**
+ * A readable id a person reviewing the file recognises, deduped against what is stored.
+ * `kind` is the word a too-short title is prefixed with: the item's type, or `sprint`.
+ */
+export function slugFor(title: string, kind: string, taken: ReadonlySet<string>): ItemId {
   const base = slugHead(title
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(SLUG_TRIM, ''))
     .replace(SLUG_TRIM, '')
-  let head = base.length >= 3 ? base : `${type}-${base}`.replace(SLUG_TRIM, '')
-  if (head.length < 3) head = `${type}-item`
+  let head = base.length >= 3 ? base : `${kind}-${base}`.replace(SLUG_TRIM, '')
+  if (head.length < 3) head = `${kind}-item`
   if (!taken.has(head)) return head
   for (let n = 2; ; n += 1) {
     const candidate = `${head}-${n}`
@@ -287,6 +291,28 @@ export async function fileItem(
       rule: valid.error.rule ?? 'V4', entity: id, cause: valid.error.message,
       fix: [`treadle help file`],
     })
+  }
+
+  // `--sprint` at creation is a commit, and it is held to the commit's rules: the sprint
+  // exists and is open, and the item is ready to be worked. Before sprints were records the
+  // flag stored any string, which is the one narrowing this change makes to the surface.
+  if (item.sprint_id !== undefined) {
+    const sprint = view.value.sprintById.get(item.sprint_id)
+    if (sprint === undefined) {
+      return errorResult({
+        code: 'NOT_FOUND', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: item.sprint_id,
+        cause: `${item.sprint_id} is no sprint here; this workspace holds ${view.value.sprints.length} ${view.value.sprints.length === 1 ? 'sprint' : 'sprints'}`,
+        near: nearIds(view.value.sprintById.keys(), item.sprint_id),
+        fix: ['treadle sprints'],
+      })
+    }
+    const outcome = evaluateCommit({ sprint, item: { ...item, sprint_id: undefined }, current: undefined, readyGate: readyVerdict(view.value, item) })
+    if (outcome.outcome === 'refused') {
+      return errorResult({
+        code: 'GUARD_REFUSED', command: 'file', workspace, effect: 'mutate',
+        rule: outcome.error.rule ?? 'I4', entity: id, cause: outcome.error.message, fix: outcome.fix,
+      })
+    }
   }
 
   const txn = ids.txn()

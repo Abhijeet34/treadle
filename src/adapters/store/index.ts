@@ -41,6 +41,8 @@ export { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts
 
 export { decodeItem, encodeItem, STRUCTURAL_NOW } from './item-codec.ts'
 
+export { decodeSprint, encodeSprint, type EncodedSprint } from './sprint-codec.ts'
+
 export * from './limits.ts'
 
 export {
@@ -63,5 +65,6 @@ export {
   openWorkspace,
   resolveWorkspace,
   rowOf,
+  sprintRowOf,
   type ShardedStoreOptions,
 } from './sharded-store.ts'

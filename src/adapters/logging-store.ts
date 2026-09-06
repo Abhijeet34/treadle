@@ -6,7 +6,7 @@
 import type {
   Applied, EventQuery, Finding, ItemQuery, Store, StoreIdentity, StoreResult, StoreTransaction,
 } from '../application/ports/store.ts'
-import type { WorkItem, WorkItemSummary } from '../domain/index.ts'
+import type { Sprint, WorkItem, WorkItemSummary } from '../domain/index.ts'
 
 export interface OperationLog {
   store(operation: string, fields: Readonly<Record<string, unknown>>): void
@@ -49,6 +49,12 @@ export class LoggingStore implements Store {
     return result
   }
 
+  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
+    const result = await this.#inner.sprints()
+    this.#log.store('sprints', { n: result.ok ? result.value.length : 0 })
+    return result
+  }
+
   async events(query: EventQuery = {}): Promise<StoreResult<readonly import('../application/ports/store.ts').StoreEvent[]>> {
     const result = await this.#inner.events(query)
     this.#log.store('events', { n: result.ok ? result.value.length : 0 })
@@ -57,6 +63,7 @@ export class LoggingStore implements Store {
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     for (const write of transaction.writes) this.#log.store('write', fieldsOf(write.item))
+    for (const write of transaction.sprints ?? []) this.#log.store('write', { id: write.sprint.id, state: write.sprint.state })
     const result = await this.#inner.apply(transaction)
     this.#log.store('apply', { txn: transaction.txn, ok: result.ok })
     return result

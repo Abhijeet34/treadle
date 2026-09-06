@@ -86,6 +86,13 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   },
   evidence: {},
   relation: {},
+  sprint: {
+    id: { type: 'string' },
+    start: { type: 'string' },
+    end: { type: 'string' },
+    goal: { type: 'string' },
+  },
+  sprints: {},
   doctor: {},
   next: { for: { type: 'string' } },
   explain: {},

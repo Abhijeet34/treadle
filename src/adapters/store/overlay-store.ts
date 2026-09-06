@@ -10,7 +10,7 @@
 // goes through encode, render, parse and decode exactly as the sharded store's does, so a
 // dry run can never approve a record the real store would refuse to write.
 
-import { summaryOf, type WorkItem, type WorkItemSummary } from '../../domain/index.ts'
+import { summaryOf, type Sprint, type WorkItem, type WorkItemSummary } from '../../domain/index.ts'
 import {
   duplicateRefusal,
   storeFail,
@@ -28,6 +28,7 @@ import {
 } from '../../application/ports/store.ts'
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
+import { decodeSprint, encodeSprint } from './sprint-codec.ts'
 
 function matches(item: WorkItemSummary, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
@@ -51,6 +52,7 @@ function merged<T extends WorkItemSummary>(base: readonly T[], pending: Iterable
 export class OverlayStore implements Store {
   readonly #base: Store
   readonly #items = new Map<string, WorkItem>()
+  readonly #sprints = new Map<string, Sprint>()
   readonly #events: StoreEvent[] = []
 
   constructor(base: Store) {
@@ -77,6 +79,14 @@ export class OverlayStore implements Store {
     const base = await this.#base.summaries({})
     if (!base.ok) return base
     return storeOk(merged(base.value, [...this.#items.values()].map(summaryOf), query))
+  }
+
+  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
+    const base = await this.#base.sprints()
+    if (!base.ok) return base
+    const byId = new Map(base.value.map((sprint) => [sprint.id, sprint]))
+    for (const sprint of this.#sprints.values()) byId.set(sprint.id, sprint)
+    return storeOk([...byId.values()].sort((a, b) => (a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at))))
   }
 
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
@@ -129,19 +139,38 @@ export class OverlayStore implements Store {
       applied.push({ id: write.item.id, version })
     }
 
+    const stagedSprints = new Map<string, Sprint>()
+    for (const write of transaction.sprints ?? []) {
+      const held = stagedSprints.get(write.sprint.id) ?? await this.sprints()
+        .then((r) => (r.ok ? r.value.find((sprint) => sprint.id === write.sprint.id) : undefined))
+      const conflict = compareAndSet(write.sprint.id, held, write.ifVersion)
+      if (conflict !== undefined) return conflict
+      const version = (held?.version ?? 0) + 1
+      const encoded = encodeSprint({ ...write.sprint, version })
+      if (!encoded.ok) return encoded
+      const parsed = parseRecordSource(renderRecord(encoded.value), 1)
+      if (!parsed.ok) return storeFail('VALIDATION', parsed.rule, `${write.sprint.id}: ${parsed.reason}`, [write.sprint.id])
+      const round = decodeSprint(parsed.record)
+      if (!round.ok) return round
+      stagedSprints.set(write.sprint.id, round.value)
+      applied.push({ id: write.sprint.id, version })
+    }
+
     for (const [id, item] of staged) this.#items.set(id, item)
+    for (const [id, sprint] of stagedSprints) this.#sprints.set(id, sprint)
     this.#events.push(...transaction.events)
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
   }
 
   async close(): Promise<void> {
     this.#items.clear()
+    this.#sprints.clear()
     this.#events.length = 0
   }
 }
 
 function compareAndSet(
-  id: string, current: WorkItem | undefined, ifVersion: number | undefined,
+  id: string, current: { readonly version: number } | undefined, ifVersion: number | undefined,
 ): StoreResult<never> | undefined {
   if (ifVersion === undefined) {
     if (current === undefined) return undefined

@@ -68,21 +68,23 @@ function countingLog(events: readonly StoreEvent[]): { log: readonly StoreEvent[
   return { log, passes: () => passes }
 }
 
+const NO_SPRINTS: ReadonlySet<string> = new Set()
+
 describe('doctor audits a workspace in one pass over the log', () => {
   const items = Array.from({ length: ITEMS }, (_, index) => anItem(index))
   const events = aLog(items)
 
   it('walks the whole log a bounded number of times, not once per item', () => {
     const { log, passes } = countingLog(events)
-    auditWorkspace(items, log)
+    auditWorkspace(items, log, NO_SPRINTS)
     // One pass builds the buckets. Anything that grows with the item count is the shape this
     // test exists to refuse: the version before the fix made three passes per item, 150 here.
     assert.ok(passes() <= 2, `auditWorkspace walked the whole log ${passes()} times over ${ITEMS} items`)
   })
 
   it('returns exactly what auditing each item against the whole log returns', () => {
-    const bucketed = auditWorkspace(items, events)
-    const whole = items.flatMap((item) => auditItem(item, events))
+    const bucketed = auditWorkspace(items, events, NO_SPRINTS)
+    const whole = items.flatMap((item) => auditItem(item, events, NO_SPRINTS))
     assert.deepEqual(bucketed, whole)
     assert.ok(bucketed.length > 0, 'the fixture produced no findings, so the comparison proved nothing')
   })

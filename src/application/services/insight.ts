@@ -9,6 +9,7 @@
 import {
   BUG_SEVERITIES,
   TRANSITION_TABLE,
+  dayOfSprint,
   daysOverdue,
   healthFindings,
   isOverdue,
@@ -34,6 +35,7 @@ import {
 } from './context.ts'
 import { auditItem, auditRelationsOf } from './doctor.ts'
 import { notFound } from './items.ts'
+import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
 export type Weights = {
@@ -143,6 +145,13 @@ export const STATUS_SHAPE: ResultShape = {
       key: 'next',
       columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'title', text: true }],
     },
+    // Appended last, which STABILITY's output-schema rule makes a non-breaking addition, and
+    // absent when no sprint is open, so a workspace that runs none pays nothing for it.
+    {
+      kind: 'block',
+      key: 'sprints',
+      columns: [{ name: 'id' }, { name: 'day' }, { name: 'items' }, { name: 'pts' }, { name: 'title', text: true }],
+    },
   ],
 }
 
@@ -166,7 +175,9 @@ export function scoreOf(
   // many. A blocker's own severity is `v` on its own row, and the depth below it is not
   // counted because a chain is freed one link at a time.
   const dependents = blockedByThis(view, item.id).length
-  const sprint = item.sprint_id === undefined ? 0 : 1
+  // Membership of an open sprint, and only an open one: work left behind in a closed sprint
+  // gets no lift until it is committed onward, which is what carry-over asks a team to do.
+  const sprint = item.sprint_id !== undefined && view.sprintById.get(item.sprint_id)?.state === 'open' ? 1 : 0
   const match = forActor !== undefined && item.assignee === forActor ? 1 : 0
   const overdue = daysOverdue(item, now)
   const severity = severityRank(item)
@@ -351,7 +362,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['moves'] = moves
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
-  const audit = [...auditItem(item, log), ...auditRelationsOf(new Set(view.value.byId.keys()), item)]
+  const audit = [...auditItem(item, log, new Set(view.value.sprintById.keys())), ...auditRelationsOf(new Set(view.value.byId.keys()), item)]
   if (audit.length > 0) {
     data['findings'] = {
       columns: columnsOf(EXPLAIN_SHAPE, 'findings'),
@@ -392,6 +403,18 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   const ranked = rank(view.value, now, DEFAULT_WEIGHTS, undefined).slice(0, 3)
   const overdue = view.value.items.filter((item) => isOverdue(item, now))
   const health = healthFindings(view.value.items, now)
+  const sprintRows = view.value.sprints.filter((sprint) => sprint.state === 'open').map((sprint): Row => {
+    const committed = committedTo(view.value, sprint)
+    const done = committed.filter((item) => item.state === 'done')
+    const at = dayOfSprint(sprint, now)
+    return {
+      id: sprint.id,
+      day: `${at.day}/${at.days}`,
+      items: `${done.length}/${committed.length}`,
+      pts: `${done.reduce((sum, item) => sum + (item.points ?? 0), 0)}/${committed.reduce((sum, item) => sum + (item.points ?? 0), 0)}`,
+      title: sprint.title,
+    }
+  })
   return okResult(STATUS_SHAPE, {
     workspace,
     data: {
@@ -402,7 +425,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // Both lines are absent when there is nothing to say, which is what keeps the
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
-      absent_features: 'sprint board impediment',
+      absent_features: 'board impediment',
       ...(defects === undefined ? {} : { defects }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
@@ -429,6 +452,14 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
           title: scored.item.title,
         })),
       },
+      ...(sprintRows.length === 0 ? {} : {
+        sprints: {
+          columns: columnsOf(STATUS_SHAPE, 'sprints'),
+          shown: sprintRows.length,
+          total: sprintRows.length,
+          rows: sprintRows,
+        },
+      }),
     },
   })
 }

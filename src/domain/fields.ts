@@ -144,6 +144,7 @@ const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
   priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
   evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
   relations: { kind: 'command', usage: 'treadle relation add <id> <kind> <other>' },
+  sprint_id: { kind: 'command', usage: 'treadle sprint commit <sprint> <id>' },
   resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
   hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
   hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant>' },

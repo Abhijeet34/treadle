@@ -47,6 +47,8 @@ Counts are per run, and every property suite prints its own count as a test diag
 | No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
 | A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
 | The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
+| An item is in one sprint, and a close records what it did not finish | `sprint commit` into a second open sprint refuses `I3` at exit 3 naming both sprints, with `uncommit` and `close` as the remedies; a close of a sprint holding one done and two open items writes `carried` with the two, and `sprints <id>` still answers `committed 3` after both are committed onward (`test/cli/sprint.test.ts`, `test/domain/sprint.test.ts`) | Proven |
+| A sprint record does not move the read every command performs | `readWorkspace` at 50,000 items: 166,624 KiB before and 167,376 KiB after at the median of 7 interleaved cold samples, inside the base's own 165,568 to 169,568 spread; `treadle show` through the bundle 129,312 KiB before and 128,832 after, against the 129,568 KiB line the projection work landed at (ADR-0016) | Proven |
 | A pull request cannot silently remove a test that main has | The reconstructed pull request 29 resolution reports 1122 of 1122 tests passing and is refused by `check-tests-kept` naming 32 titles; over all 29 pull requests in main's history, 25 pass and 4 need 9 declarations between them, every one a title whose behaviour changed (`test/architecture/tests-kept.test.ts`) | Proven |
 
 ## What is not proven

@@ -216,6 +216,32 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('writes a sprint under the same compare-and-set rule as an item, and reads it back whole', async () => {
+      await withStore(async (store) => {
+        const sprint = {
+          id: 'sprint-one', title: 'Sprint one', state: 'open' as const, filed_at: '2026-09-01T09:00:00Z', version: 1,
+          start: '2026-09-01', end: '2026-09-12', goal: 'the first fortnight',
+        }
+        const created = await store.apply({ txn: 't1', writes: [], sprints: [{ sprint }], events: [] })
+        assert.ok(created.ok, created.ok ? '' : created.error.message)
+        assert.deepEqual(created.value.writes, [{ id: 'sprint-one', version: 1 }])
+        const read = await store.sprints()
+        assert.deepEqual(read.ok ? read.value : 'refused', [sprint])
+
+        const closed = { ...sprint, state: 'closed' as const, closed_at: '2026-09-13T09:00:00Z', carried: ['item-one'] }
+        const moved = await store.apply({ txn: 't2', writes: [], sprints: [{ sprint: closed, ifVersion: 1 }], events: [] })
+        assert.ok(moved.ok, moved.ok ? '' : moved.error.message)
+        const again = await store.sprints()
+        assert.deepEqual(again.ok ? again.value : 'refused', [{ ...closed, version: 2 }])
+
+        const stale = await store.apply({ txn: 't3', writes: [], sprints: [{ sprint: closed, ifVersion: 1 }], events: [] })
+        assert.equal(stale.ok, false)
+        assert.equal(stale.ok ? '' : stale.error.rule, 'S10')
+        const invalid = await store.apply({ txn: 't4', writes: [], sprints: [{ sprint: { ...sprint, id: 'sprint-two', end: '2026-08-01' } }], events: [] })
+        assert.equal(invalid.ok ? '' : invalid.error.rule, 'I1')
+      })
+    })
+
     it('refuses a record the grammar could not write back', async () => {
       await withStore(async (store) => {
         const refused = await store.apply({

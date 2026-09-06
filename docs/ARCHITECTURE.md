@@ -32,7 +32,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 
 | Seam | What it does | First implementation | Second implementation |
 |---|---|---|---|
-| Store (built) | Reads records and events by id, state, sprint and time range; applies a transaction under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing. `--preview` resolves the target and evaluates none, so it takes no overlay |
+| Store (built) | Reads records and events by id, state, sprint and time range, and the sprint records whole; applies a transaction of item and sprint writes under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing. `--preview` resolves the target and evaluates none, so it takes no overlay |
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |

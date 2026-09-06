@@ -325,9 +325,10 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 `bench/budgets.json` says which budgets are armed and why the timing ones are not.
 
 A figure taken at the store seam is not a figure about a command. Every command goes through
-`readWorkspace`, which reads every item's summary fields off the index, indexes them by id and
-builds the hierarchy, and the six commands that act on one record then read that record with
-`wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
+`readWorkspace`, which reads every item's summary fields off the index, indexes them by id,
+builds the hierarchy and reads the sprint records whole (tens of rows, a few lines each,
+measured at no change to the 50,000-item peak), and the six commands that act on one record
+then read that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
 of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
 a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
 never a read from the record text (ADR-0014). A4 times that read as the `workspace` operation
@@ -343,6 +344,20 @@ must bucket the log by entity first: `doctor` scanned the whole log once per ite
 answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path only, so a
 month past 8 MiB is written happily and then refused by every command with `S4` and no way
 back. "Where it stops scaling" in `docs/BENCHMARKS.md` carries the measurements.
+
+## A sprint is a record in one file, and its committed set is derived
+
+`sprints.md` holds every sprint in the record grammar the shards use, indexed in its own
+table and quarantined the same way; `src/domain/sprint.ts` is the dictionary and the three
+commit refusals (`I2` closed, `I3` in another open sprint, `I4` cannot be worked), and
+ADR-0016 argues every judgement call. The committed set is never stored: it is the items
+whose `sprint_id` points at the sprint, plus what the close recorded as `carried`, and
+`committedTo` in `src/application/services/sprints.ts` is the one place that union is made.
+A close leaves unfinished items pointing at the closed sprint; `next`'s `spr` component is
+1 only for a member of an open sprint, so leftover work is not boosted until it is
+committed onward. `sprint_id` is owned by `sprint commit` in `writerOf`, and `file --sprint`
+is held to the same rules. Guard `G4` stays `true`: only its sprint half exists, and arming
+half a guard would refuse every start in a workspace that runs no sprints; `board` decides it.
 
 ## Where a terminal nuance goes, and where a derived flag goes
 

@@ -84,7 +84,7 @@ See [Status](#status) for the line between implemented and specified-only.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never enter a sprint.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly.
-- **Sprints and boards, both first class.** Specified, not yet implemented: a team will be able to run sprints and still enforce column limits.
+- **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest. Boards are specified and not yet implemented.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change.
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
@@ -95,7 +95,8 @@ See [Status](#status) for the line between implemented and specified-only.
 | Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
 | Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; ten of the twelve comparison axes measured, two not (no metrics layer, no adapter generator) |
-| Store: sprint, impediment and ceremony records; `migrate` | Specified, not implemented |
+| Store: sprint records in `sprints.md` | Implemented |
+| Store: impediment and ceremony records; `migrate` | Specified, not implemented |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
 | Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
