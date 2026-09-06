@@ -17,6 +17,7 @@
 import {
   addRelation,
   isSymmetric,
+  isTerminal,
   linkableKindOf,
   removeRelation,
   validateWorkItem,
@@ -112,6 +113,7 @@ export async function relate(
   }
   let written: WorkItem
   let edge: Relation
+  let reads: readonly { readonly id: ItemId; readonly version: number }[] = []
   if (request.verb === 'add') {
     const added = addRelation(view.value.relations, asked)
     if (!added.ok) {
@@ -125,6 +127,11 @@ export async function relate(
       return okResult(RELATION_SHAPE, { workspace, txn: null, changed: 0, data: { already: source.id, v: String(source.version) } })
     }
     edge = added.value.graph.relations[added.value.graph.relations.length - 1] as Relation
+    // Every record the cycle check read, at the version it read; the store refuses the
+    // write if one moved, which is what stops two commands closing a cycle between them.
+    reads = added.value.read
+      .filter((id) => id !== edge.source)
+      .flatMap((id) => { const item = view.value.byId.get(id); return item === undefined ? [] : [{ id, version: item.version }] })
     const holder = await record(edge.source)
     if (holder === undefined) return notFound('relation', workspace, view.value, edge.source)
     written = { ...holder, relations: [...(holder.relations ?? []), { kind: edge.kind, target: edge.target }] }
@@ -172,6 +179,7 @@ export async function relate(
   const applied = await store.apply({
     txn,
     writes: [{ item: written, ifVersion: before.version }],
+    ...(reads.length === 0 ? {} : { reads }),
     events: [makeEvent({
       id: eventId, at: now, actor: request.actor, entity: written.id, op: `item.relation.${request.verb}`,
       ...(request.verb === 'add' ? { after: snapshot } : { before: snapshot }),
@@ -185,6 +193,12 @@ export async function relate(
     v: `${before.version} -> ${applied.value.writes[0]?.version ?? before.version + 1}`,
     kind: edge.kind,
     other: edge.target,
+  }
+  // A terminal blocker is inactive on every read, so the edge just written blocks nothing;
+  // the write succeeds, because the edge is still the record of what was raised against
+  // what, and the caller is told rather than left to find `blocked no` on the target.
+  if (request.verb === 'add' && edge.kind === 'blocks' && isTerminal(source.state)) {
+    data['note'] = `${source.id} is ${source.state}, so this edge blocks nothing while it stays ${source.state}`
   }
   if (mode === 'dry-run') {
     return okResult(RELATION_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0 } })

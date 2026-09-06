@@ -113,6 +113,14 @@ export class OverlayStore implements Store {
     const findings = await this.findings()
     if (!findings.ok) return findings
 
+    for (const read of transaction.reads ?? []) {
+      const current = await this.get(read.id).then((r) => (r.ok ? r.value : undefined))
+      if (current?.version === read.version) continue
+      return storeFail('CONFLICT', 'S10',
+        `${read.id} is at version ${current?.version ?? 'none'} and the write was decided against version ${read.version}`,
+        [read.id], { expected: read.version })
+    }
+
     for (const write of transaction.writes) {
       const clash = duplicateRefusal(write.item.id, findings.value)
       if (clash !== undefined) return clash

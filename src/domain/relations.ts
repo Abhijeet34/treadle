@@ -106,53 +106,73 @@ function same(a: Relation, b: Relation): boolean {
   return a.kind === b.kind && a.source === b.source && a.target === b.target
 }
 
-function outgoing(graph: RelationGraph, kind: RelationKind, from: ItemId): readonly ItemId[] {
-  return graph.relations.filter((r) => r.kind === kind && r.source === from).map((r) => r.target)
+/**
+ * The out-edges of one kind, keyed by source, built once per decision. Both traversals
+ * below used to filter the whole relation list once per node they visited, which made a
+ * write-time check O(nodes x edges) and the load-time finder O(edges x nodes x edges):
+ * measured at 12.3 s for `doctor` over 200 records carrying 3,600 `blocks` edges.
+ */
+type Adjacency = ReadonlyMap<ItemId, readonly ItemId[]>
+
+function adjacencyOf(graph: RelationGraph, kind: RelationKind): Adjacency {
+  const out = new Map<ItemId, ItemId[]>()
+  for (const relation of graph.relations) {
+    if (relation.kind !== kind) continue
+    const targets = out.get(relation.source)
+    if (targets === undefined) out.set(relation.source, [relation.target])
+    else targets.push(relation.target)
+  }
+  return out
 }
+
+function outgoing(adjacency: Adjacency, from: ItemId): readonly ItemId[] {
+  return adjacency.get(from) ?? []
+}
+
+type Reach =
+  | { readonly outcome: 'path'; readonly path: readonly ItemId[] }
+  | { readonly outcome: 'too-deep' }
+  /** `read` is every node whose out-edges the walk consulted, which is the decision's read set. */
+  | { readonly outcome: 'none'; readonly read: readonly ItemId[] }
 
 /**
  * Depth-bounded reachability. Returns the path when `to` is reachable from `from`,
- * `'too-deep'` when the walk hits the ceiling, and undefined when it is not reachable.
+ * `'too-deep'` when the walk hits the ceiling, and otherwise the nodes it read.
  */
-function pathBetween(
-  graph: RelationGraph,
-  kind: RelationKind,
-  from: ItemId,
-  to: ItemId,
-): readonly ItemId[] | 'too-deep' | undefined {
+function reach(adjacency: Adjacency, from: ItemId, to: ItemId): Reach {
   const stack: { readonly node: ItemId; readonly path: readonly ItemId[] }[] = [{ node: from, path: [from] }]
   const seen = new Set<ItemId>()
   while (stack.length > 0) {
     const frame = stack.pop() as { node: ItemId; path: readonly ItemId[] }
-    if (frame.path.length > MAX_RELATION_DEPTH) return 'too-deep'
-    if (frame.node === to && frame.path.length > 1) return frame.path
+    if (frame.path.length > MAX_RELATION_DEPTH) return { outcome: 'too-deep' }
+    if (frame.node === to && frame.path.length > 1) return { outcome: 'path', path: frame.path }
     if (seen.has(frame.node)) continue
     seen.add(frame.node)
-    for (const next of outgoing(graph, kind, frame.node)) {
-      if (next === to) return [...frame.path, next]
+    for (const next of outgoing(adjacency, frame.node)) {
+      if (next === to) return { outcome: 'path', path: [...frame.path, next] }
       stack.push({ node: next, path: [...frame.path, next] })
     }
   }
-  return undefined
+  return { outcome: 'none', read: [...seen] }
 }
 
 export function addRelation(
   graph: RelationGraph,
   relation: Relation,
-): Result<{ readonly graph: RelationGraph; readonly added: boolean }> {
+): Result<{ readonly graph: RelationGraph; readonly added: boolean; readonly read: readonly ItemId[] }> {
   if (relation.source === relation.target) {
     return fail('GUARD_REFUSED', 'R1', `an item cannot be related to itself: ${relation.source} ${relation.kind} ${relation.source}`, [relation.source])
   }
 
   const edge = normalise(relation)
   if (graph.relations.some((r) => same(r, edge))) {
-    return ok({ graph, added: false })
+    return ok({ graph, added: false, read: [] })
   }
 
   // A copy has one original. Two `duplicates` edges out of one item would say it is a copy
   // of two things, and the second is almost always the first spelled against the wrong id.
   if (edge.kind === 'duplicates') {
-    const already = outgoing(graph, 'duplicates', edge.source)[0]
+    const already = outgoing(adjacencyOf(graph, 'duplicates'), edge.source)[0]
     if (already !== undefined) {
       return fail('GUARD_REFUSED', 'R4',
         `${edge.source} already duplicates ${already}, and an item is a duplicate of one thing`,
@@ -160,21 +180,26 @@ export function addRelation(
     }
   }
 
+  // The read set is every node whose edges decided this: a concurrent write to one of them
+  // is a write the store refuses, because a cycle two commands close between them is one
+  // neither could see (the store's `reads` precondition, ADR-0015).
+  let read: readonly ItemId[] = []
   if (!isSymmetric(edge.kind)) {
-    const closing = pathBetween(graph, edge.kind, edge.target, edge.source)
-    if (closing === 'too-deep') {
+    const closing = reach(adjacencyOf(graph, edge.kind), edge.target, edge.source)
+    if (closing.outcome === 'too-deep') {
       return fail('GUARD_REFUSED', 'R3',
         `the ${edge.kind} graph below ${edge.target} is deeper than the ceiling of ${MAX_RELATION_DEPTH}`,
         [edge.source, edge.target])
     }
-    if (closing !== undefined) {
+    if (closing.outcome === 'path') {
       return fail('GUARD_REFUSED', 'R2',
-        `${edge.source} ${edge.kind} ${edge.target} closes a cycle through ${[edge.source, ...closing].join(' -> ')}`,
+        `${edge.source} ${edge.kind} ${edge.target} closes a cycle through ${[edge.source, ...closing.path].join(' -> ')}`,
         [edge.source, edge.target])
     }
+    read = closing.read
   }
 
-  return ok({ graph: { relations: [...graph.relations, edge] }, added: true })
+  return ok({ graph: { relations: [...graph.relations, edge] }, added: true, read })
 }
 
 export function removeRelation(
@@ -186,16 +211,42 @@ export function removeRelation(
   return { graph: { relations: kept }, removed: kept.length !== graph.relations.length }
 }
 
-/** The load-time cycle check, which write-time detection cannot perform for a hand edit. */
+/**
+ * The load-time cycle check, which write-time detection cannot perform for a hand edit. One
+ * depth-first pass with an explicit stack, so it is linear in the graph and bounded by the
+ * node count rather than by the write-time ceiling: a hand-edited cycle longer than
+ * MAX_RELATION_DEPTH is a cycle all the same, and this used to miss it.
+ */
 export function findRelationCycle(
   graph: RelationGraph,
   kind: RelationKind,
 ): readonly ItemId[] | undefined {
   if (isSymmetric(kind)) return undefined
-  for (const relation of graph.relations) {
-    if (relation.kind !== kind) continue
-    const closing = pathBetween(graph, kind, relation.target, relation.source)
-    if (closing !== undefined && closing !== 'too-deep') return [...closing, relation.target]
+  const adjacency = adjacencyOf(graph, kind)
+  const done = new Set<ItemId>()
+  for (const root of adjacency.keys()) {
+    if (done.has(root)) continue
+    const path: ItemId[] = [root]
+    const cursor: number[] = [0]
+    const onPath = new Set<ItemId>([root])
+    while (path.length > 0) {
+      const node = path[path.length - 1] as ItemId
+      const at = cursor[cursor.length - 1] as number
+      const next = outgoing(adjacency, node)[at]
+      if (next === undefined) {
+        done.add(node)
+        onPath.delete(node)
+        path.pop()
+        cursor.pop()
+        continue
+      }
+      cursor[cursor.length - 1] = at + 1
+      if (onPath.has(next)) return [...path.slice(path.indexOf(next)), next]
+      if (done.has(next)) continue
+      path.push(next)
+      cursor.push(0)
+      onPath.add(next)
+    }
   }
   return undefined
 }

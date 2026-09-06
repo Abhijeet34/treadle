@@ -253,12 +253,17 @@ const line = (name: string, max: number): Check => (value) =>
       ? overLength(name, max, value.length)
       : `${name} must be a single line of 1 to ${max} characters with no control or bidi override characters`
 
-const text = (name: string, max: number): Check => (value) =>
-  typeof value === 'string' && isText(value, max)
-    ? undefined
-    : typeof value === 'string' && value.length > max
+const text = (name: string, max: number): Check => (value, _item, options) => {
+  if (typeof value !== 'string' || !isText(value, max)) {
+    return typeof value === 'string' && value.length > max
       ? overLength(name, max, value.length)
       : `${name} must be 1 to ${max} characters and may carry newlines and tabs but no other control characters`
+  }
+  // A required paragraph made of spaces says nothing: `proposed_resolution=" "` filed an
+  // impediment that named no resolution. Write-time only, as every narrowed bound is.
+  if (options.storedProse !== true && value.trim().length === 0) return `${name} is only whitespace, and a text says something or is left unset`
+  return undefined
+}
 
 const int = (name: string, min: number, max: number): Check => (value) =>
   isBoundedInt(value, min, max) ? undefined : `${name} must be a whole number from ${min} to ${max}`

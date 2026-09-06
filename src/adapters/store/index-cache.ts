@@ -695,6 +695,12 @@ export class IndexCache {
    * order the append-only log holds them, and an `at` never spans two files because the file
    * is chosen by the month of that same instant, so `rowid` is that append order.
    */
+  /** The stored version of one served record, or undefined for an id the index does not hold. */
+  versionOf(id: string): number | undefined {
+    const row = this.#open().prepare('select version from items where id = ?').get(id) as { version: number } | undefined
+    return row?.version
+  }
+
   lastEventFor(entity: string): StoreEvent | undefined {
     const row = this.#open()
       .prepare('select id, at, entity, op, actor, txn, rest from events where entity = ? order by at desc, rowid desc limit 1')

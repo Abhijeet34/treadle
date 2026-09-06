@@ -16,6 +16,7 @@ import type { Store } from '../ports/store.ts'
 import { activeBlockerIndex, readWorkspace, type WorkspaceView } from './context.ts'
 import { ITEM_COLUMNS, absence, backlogOrder, columnRefusal, matches, narrowestClause, rowFor, type Filter } from './items.ts'
 import { storeRefusal } from './refusal.ts'
+import { noSprint } from './sprints.ts'
 
 /**
  * The columns, in flow order. `done` and `cancelled` are counts rather than columns: finished
@@ -80,7 +81,15 @@ function scopeOf(view: WorkspaceView, request: BoardRequest, workspace: string):
       fix: ['treadle board --all', `treadle board --sprint ${named.value}`],
     })
   }
-  if (named !== undefined) return { kind: 'sprint', id: named.value, defaulted: false }
+  if (named !== undefined) {
+    // A scope that is no sprint record and that no item points at is a typo, and it gets
+    // the refusal `sprints <id>` gives, with the near ids; a closed sprint's leftovers and
+    // an `H26` value some record still carries are both scopes with something to show.
+    if (!view.sprintById.has(named.value) && !view.items.some((item) => item.sprint_id === named.value)) {
+      return noSprint('board', 'read', workspace, view, named.value)
+    }
+    return { kind: 'sprint', id: named.value, defaulted: false }
+  }
   if (request.all) return { kind: 'workspace' }
   const open = view.sprints.filter((sprint) => sprint.state === 'open')
   if (open.length === 0) return { kind: 'workspace' }
