@@ -26,6 +26,8 @@ import { STALE_MS } from './lock.ts'
 export type ReindexOutcome = {
   readonly clashes: readonly Finding[]
   readonly invalidated: boolean
+  /** An append whose base another process had already indexed past; nothing was written. */
+  readonly stale?: true
 }
 
 export type Fingerprint = {
@@ -485,11 +487,21 @@ export class IndexCache {
     lines: readonly number[],
     findings: readonly Finding[],
     append: boolean,
+    basedOn?: number,
   ): ReindexOutcome {
     const db = this.#open()
     const clashes: { finding: Finding; against: string }[] = []
     this.#begin(db)
     try {
+      // The delta was scanned from the size the caller last saw, outside this transaction.
+      // A reader racing a writer saw an older size, scanned lines the writer had already
+      // indexed, and every one of them clashed on the primary key: a false S14 per line,
+      // recorded as a finding, and the workspace refused every read after it. The base is
+      // checked here, inside the lock, and a moved one hands the file back for a full pass.
+      if (append && this.fingerprints().get(file)?.size !== basedOn) {
+        db.exec('rollback')
+        return { clashes: [], invalidated: false, stale: true }
+      }
       if (!append) this.#dropRows(file)
       const insert = db.prepare(`insert into events
         (id, at, entity, op, actor, txn, file, rest) values (?, ?, ?, ?, ?, ?, ?, ?)`)

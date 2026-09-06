@@ -577,11 +577,13 @@ export class ShardedStore implements Store {
       ], false).invalidated)
     }
     const whole = await readFile(full)
-    return storeOk(this.#index.replaceEventFile(
+    const outcome = this.#index.replaceEventFile(
       file,
       { size, mtime, hash: hashOf(whole), lines: read.value.lines },
-      read.value.events, read.value.at, read.value.findings, appendOnly,
-    ).invalidated)
+      read.value.events, read.value.at, read.value.findings, appendOnly, appendOnly ? from : undefined,
+    )
+    if (outcome.stale === true) return this.#indexEventFile(file, full, size, mtime, undefined)
+    return storeOk(outcome.invalidated)
   }
 
   async #prefixUnchanged(full: string, previous: Fingerprint): Promise<boolean> {
