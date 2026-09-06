@@ -77,7 +77,8 @@ A budget written before the operation it names existed is allowed to be wrong, b
 ## Consequences
 
 Every figure is a cold process per sample, seven samples, both trees interleaved per sample over clones of the same corpora, at 1-minute loads of 4.54 to 3.47, with `process.resourceUsage().maxRSS` read by the child.
-The transcripts are under `.fm-evidence/` on the branch that landed this.
+Those transcripts were the working record of the branch that landed this and are not committed, because `.gitignore` excludes `.fm-evidence/`.
+The figures below are what they printed, and the DR8 row `bench/gate.ts` weighs over `identity`, `get`, `list` and `workspace` is what fails if the read grows back.
 
 **Positive**
 

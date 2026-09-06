@@ -210,6 +210,19 @@ describe('the published package is the bundle and nothing else', () => {
     assert.equal(declared.replace(/^[\^~]/, '').split('.')[0], floorMajor,
       `@types/node is ${declared} while engines.node floors at ${floorMajor}.x`)
   })
+
+  it('the floor the CLI names in a refusal is the floor package.json declares', () => {
+    // The one copy a user reads. checkRuntime prints DECLARED_FLOOR to anyone below the hard
+    // floor, so a raise that moved engines.node and left this literal behind would have the
+    // tool naming a version it no longer supports, and the three-places assertion above does
+    // not look here. Derived from the manifest rather than restated, so there is no sixth
+    // literal to keep in step.
+    const declared = (manifest.engines?.node ?? '').replace(/^>=/, '')
+    const source = readFileSync(path.join(ROOT, 'src', 'cli', 'runtime.ts'), 'utf8')
+    const named = /^export const DECLARED_FLOOR = '([^']+)'$/m.exec(source)?.[1]
+    assert.equal(named, declared,
+      `src/cli/runtime.ts names ${String(named)} as the supported floor while package.json declares ${declared}`)
+  })
 })
 
 describe('F13 control three: the release path attests what it publishes', () => {
