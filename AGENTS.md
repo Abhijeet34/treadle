@@ -284,6 +284,8 @@ a legitimate edit and the event reaches no read surface.
 An edge between two items is stored once, as a `## Relations` section on its source record: the blocker for `blocks`, the copy for `duplicates`, the lower id for `relates_to`.
 Everything else is derived on read from that one direction: `show`'s inverse rows (`blocked_by`), `explain`'s `blocked` and `blocks` lines, the `dep` component of `next`, and guards `G2`, `G7` and `DOR3`.
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
+`addRelation` returns the ids whose edges its cycle check read, and the writer passes them as the transaction's `reads`, which the store refuses with `S10` if one moved: without that, two processes adding the two halves of a cycle at once both landed.
+Both traversals walk an adjacency map; a traversal that filters the relation list per node visited is the shape that put `doctor` at 12.3 s over 3,600 edges.
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
 
 An impediment is a work-item type, not an entity of its own: it blocks through that same edge, `DOD2` reads its active impediment blockers, and resolving it is reaching `done`, which frees the work with nothing unlinked because a terminal blocker is already inactive on every read.

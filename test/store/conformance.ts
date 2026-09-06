@@ -106,6 +106,36 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('refuses a write whose read set moved, naming the record that did, and writes nothing', async () => {
+      await withStore(async (store) => {
+        await store.apply({ txn: 't1', writes: [{ item: anItem() }, { item: anItem({ id: 'item-two' }) }], events: [] })
+        await store.apply({ txn: 't2', writes: [{ item: anItem({ id: 'item-two', state: 'ready' }), ifVersion: 1 }], events: [] })
+
+        const decided = await store.apply({
+          txn: 't3',
+          writes: [{ item: anItem({ state: 'ready' }), ifVersion: 1 }],
+          reads: [{ id: 'item-two', version: 1 }],
+          events: [],
+        })
+        assert.equal(decided.ok, false)
+        if (decided.ok) return
+        assert.equal(decided.error.code, 'CONFLICT')
+        assert.equal(decided.error.rule, 'S10')
+        assert.deepEqual(decided.error.entities, ['item-two'])
+        assert.equal(decided.error.details?.['expected'], 1)
+        const untouched = await store.get('item-one')
+        assert.equal(untouched.ok && untouched.value?.version, 1)
+
+        const current = await store.apply({
+          txn: 't4',
+          writes: [{ item: anItem({ state: 'ready' }), ifVersion: 1 }],
+          reads: [{ id: 'item-two', version: 2 }],
+          events: [],
+        })
+        assert.equal(current.ok, true, 'a read set at the stored versions is no obstacle')
+      })
+    })
+
     it('applies a multi-write transaction as one unit, or not at all', async () => {
       await withStore(async (store) => {
         const both = await store.apply({

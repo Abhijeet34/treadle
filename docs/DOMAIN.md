@@ -58,7 +58,7 @@ The set is closed.
 | `I2` | The sprint is closed, and a closed sprint's committed set is a record |
 | `I3` | The item is committed to another open sprint; an item is in one sprint |
 | `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
-| `I5` | The id is not a sprint in this workspace |
+| `I5` | The id is not a sprint in this workspace, or would name both a sprint and an item |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |
@@ -212,6 +212,9 @@ The domain model requires cycle detection on the blocking graph and the hierarch
 `relates_to` is symmetric, stored once in id order, and unchecked, because a cycle in it says nothing.
 
 Writing an edge twice is idempotent: the second call returns `added: false` and the same graph.
+
+A successful `addRelation` also returns `read`, the ids whose outgoing edges the cycle check consulted.
+The writer hands those to the store as the transaction's read set, and the store refuses the write with `S10` if any of them moved between the read and the lock, so two commands that each passed the check against the other's absence cannot close a cycle between them.
 
 An edge is stored once, as a `relations` entry on its source record, and `relationGraphFrom(items)` is the load path that reads every record's entries into one graph.
 It refuses nothing: a stored cycle is `findRelationCycle`'s to report and an edge to a missing record is the caller's finding.

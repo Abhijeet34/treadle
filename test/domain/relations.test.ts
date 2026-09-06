@@ -22,7 +22,7 @@ import {
   removeRelation,
   validateWorkItem,
 } from '../../src/domain/index.ts'
-import type { RelationGraph, RelationKind, WorkItemState } from '../../src/domain/index.ts'
+import type { Relation, RelationGraph, RelationKind, WorkItemState } from '../../src/domain/index.ts'
 import { NOW, errorOf, item, unwrap } from '../helpers/fixtures.ts'
 
 function graphOf(...edges: readonly (readonly [string, RelationKind, string])[]): RelationGraph {
@@ -229,6 +229,69 @@ describe('cycle detection on write', () => {
     const error = errorOf(addRelation(deep, { kind: 'blocks', source: last, target: 'n-0000' }))
     // Either the cycle or the ceiling refuses it; both are named refusals, never a crash.
     assert.ok(['R2', 'R3'].includes(error.rule ?? ''), `rule was ${error.rule}`)
+  })
+})
+
+/** A layered graph: every item in one layer blocks every item in the next. */
+function layered(layers: number, width: number): RelationGraph {
+  const relations: Relation[] = []
+  for (let layer = 0; layer < layers - 1; layer += 1) {
+    for (let i = 0; i < width; i += 1) {
+      for (let j = 0; j < width; j += 1) {
+        relations.push({ kind: 'blocks', source: `l${layer}-${i}`, target: `l${layer + 1}-${j}` })
+      }
+    }
+  }
+  return { relations }
+}
+
+/** The graph with its relation list counting how many times something walked it whole. */
+function counted(graph: RelationGraph): { readonly graph: RelationGraph; readonly passes: () => number } {
+  let passes = 0
+  const walks: ReadonlySet<string | symbol> = new Set([Symbol.iterator, 'filter', 'some', 'map', 'find', 'forEach'])
+  const relations = new Proxy(graph.relations, {
+    get(target, property, receiver) {
+      if (walks.has(property)) passes += 1
+      return Reflect.get(target, property, receiver)
+    },
+  })
+  return { graph: { relations }, passes: () => passes }
+}
+
+describe('the cost of a cycle check, and the read set it reports', () => {
+  it('walks the relation list once per decision, not once per node it visits', () => {
+    // `doctor` took 12.3 s over 200 records carrying 3,600 blocks edges, because each
+    // node visited filtered the whole list; a pass count is the shape, wall time is not.
+    const finder = counted(layered(6, 8))
+    assert.equal(findRelationCycle(finder.graph, 'blocks'), undefined)
+    assert.ok(finder.passes() <= 2, `findRelationCycle walked the list ${finder.passes()} times`)
+
+    const writer = counted(layered(6, 8))
+    unwrap(addRelation(writer.graph, { kind: 'blocks', source: 'top', target: 'l0-0' }))
+    assert.ok(writer.passes() <= 3, `addRelation walked the list ${writer.passes()} times`)
+  })
+
+  it('finds a hand-edited cycle longer than the write-time ceiling, which a bounded walk missed', () => {
+    const length = MAX_RELATION_DEPTH + 6
+    const ring: RelationGraph = {
+      relations: Array.from({ length }, (_, i) => ({
+        kind: 'blocks' as const, source: `r-${i}`, target: `r-${(i + 1) % length}`,
+      })),
+    }
+    const path = findRelationCycle(ring, 'blocks')
+    assert.ok(path !== undefined, 'a cycle is a cycle at any length')
+    assert.equal(path[0], path[path.length - 1])
+    assert.equal(path.length, length + 1)
+  })
+
+  it('reports every record whose edges decided the write, so the store can refuse if one moved', () => {
+    const graph = graphOf(['b-1', 'blocks', 'c-1'], ['c-1', 'blocks', 'd-1'], ['x-1', 'blocks', 'y-1'])
+    const added = unwrap(addRelation(graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }))
+    assert.deepEqual([...added.read].sort(), ['b-1', 'c-1', 'd-1'], 'the nodes reachable from the target, and nothing off that path')
+    const symmetric = unwrap(addRelation(graph, { kind: 'relates_to', source: 'a-1', target: 'b-1' }))
+    assert.deepEqual(symmetric.read, [], 'a symmetric edge reads nothing')
+    const again = unwrap(addRelation(graph, { kind: 'blocks', source: 'b-1', target: 'c-1' }))
+    assert.deepEqual(again.read, [], 'an edge already stored decides nothing')
   })
 })
 

@@ -263,4 +263,18 @@ describe('a sprint from open to close, at the command surface', () => {
     const why = await cli(['explain', 'csv-export'])
     assert.match(why.out, /^H26 /m)
   })
+
+  it('refuses a sprint id an item holds and an item id a sprint holds, because history is keyed by id alone', async () => {
+    const asItem = await cli(['sprint', 'open', 'Sprint over an item', '--id', 'csv-export', '--end', '2026-09-12'])
+    assert.equal(asItem.code, 2, asItem.out)
+    assert.match(asItem.err, /^rule I5$/m)
+    assert.match(asItem.err, /^"cause csv-export is an item here, and an id names one thing/m)
+    const asSprint = await cli(['file', 'task', 'A task named like a sprint', '--id', 'sprint-31'])
+    assert.equal(asSprint.code, 2, asSprint.out)
+    assert.match(asSprint.err, /^rule I5$/m)
+    assert.match(asSprint.err, /^"cause sprint-31 is a sprint here, and an id names one thing/m)
+    const history = await cli(['history', 'sprint-31', '--out', 'agent'])
+    assert.equal(history.code, 0, history.err)
+    assert.doesNotMatch(history.out, /item\.file/, 'the sprint\'s history carries no item event')
+  })
 })
