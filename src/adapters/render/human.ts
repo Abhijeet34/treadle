@@ -55,8 +55,10 @@ function table(
     const value = row[column.name]
     return value === null || value === undefined || value === '' ? '-' : isolated(String(value))
   }
+  // A loop, not a spread into `Math.max` or `push`: a block is bounded by the store and not
+  // by the argument list, and `doctor` over 50,000 items overflowed the stack on both.
   const widths = order.map((column) =>
-    Math.max(displayWidth(column.name), ...rows.map((row) => displayWidth(cell(row, column)))))
+    rows.reduce((widest, row) => Math.max(widest, displayWidth(cell(row, column))), displayWidth(column.name)))
 
   const fixedWidth = fixed.reduce((sum, _, index) => sum + (widths[index] as number) + 2, 2)
   const freeBudget = width - fixedWidth
@@ -141,7 +143,7 @@ function errorLines(result: ResultObject, width: number): readonly string[] {
   const fixes = (result.data['fix'] as readonly string[] | undefined) ?? []
   const near = (result.data['near'] as readonly string[] | undefined) ?? []
   const lines: string[] = []
-  lines.push(...wrap(isolated(typeof cause === 'string' ? cause : result.code), width, ''))
+  for (const line of wrap(isolated(typeof cause === 'string' ? cause : result.code), width, '')) lines.push(line)
   lines.push('')
   if (guard !== undefined) lines.push(`  guard  ${String(guard)}`)
   if (entity !== undefined) lines.push(`  entity ${isolated(String(entity))}`)
@@ -196,7 +198,7 @@ export const humanRenderer: Renderer = {
           lines.push('')
           lines.push(`${property.key}  ${value.shown} of ${value.total}`)
         }
-        lines.push(...table(value.columns, value.rows, width, ascii))
+        for (const line of table(value.columns, value.rows, width, ascii)) lines.push(line)
         afterBlock = true
         continue
       }
@@ -217,7 +219,7 @@ export const humanRenderer: Renderer = {
         if (text.length === 0) continue
         open()
         lines.push(`  ${property.key}`)
-        lines.push(...wrap(isolated(text), width - 4, '    '))
+        for (const line of wrap(isolated(text), width - 4, '    ')) lines.push(line)
         continue
       }
       const text = scalarText(value)

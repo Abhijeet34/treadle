@@ -202,7 +202,7 @@ function damagedHeadingAt(lines: readonly Line[], from: number, to: number, inRe
 export type SegmentOutcome = { readonly ok: true; readonly record: ParsedRecord }
   | { readonly ok: false; readonly rule: string; readonly reason: string; readonly id?: string }
 
-function parseSegment(lines: readonly Line[], first: number): SegmentOutcome {
+function parseSegment(lines: readonly Line[], first: number, source?: string): SegmentOutcome {
   const heading = (lines[0] as Line).text
   if (!heading.startsWith('# ')) {
     // A segment `damagedHeadingAt` resynchronised on. The id is recovered from the reshaped
@@ -329,7 +329,7 @@ function parseSegment(lines: readonly Line[], first: number): SegmentOutcome {
       title,
       fields: record.value,
       sections,
-      source: lines.map((l) => l.raw).join(''),
+      source: source ?? lines.map((l) => l.raw).join(''),
       line: first,
     },
   }
@@ -412,7 +412,7 @@ export function parseFile(text: string, file: string): StoreResult<ParsedFile> {
     const to = s + 1 < starts.length ? (starts[s + 1] as number) : lines.length
     const segment = lines.slice(from, to)
     const source = segment.map((l) => l.raw).join('')
-    const outcome = parseSegment(segment, from + 1)
+    const outcome = parseSegment(segment, from + 1, source)
     chunks.push(outcome.ok
       ? { kind: 'record', record: outcome.record }
       : quarantine(outcome.rule, outcome.reason, from + 1, source, outcome.id))
@@ -496,7 +496,8 @@ export function parseRecordSource(source: string, line: number): SegmentOutcome 
   if (lines.length === 0 || !(lines[0] as Line).text.startsWith('# ')) {
     return { ok: false, rule: 'S1', reason: 'a record starts with "# <slug>: <title>"' }
   }
-  return parseSegment(lines, line)
+  // The join of every raw line is the input by construction, so the input is the source.
+  return parseSegment(lines, line, source)
 }
 
 export function sourceOf(chunk: Chunk): string {

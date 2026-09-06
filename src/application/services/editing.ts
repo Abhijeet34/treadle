@@ -28,7 +28,7 @@ import {
 import { errorResult, okResult, type ResultObject, type ResultShape, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
-import { readWorkspace } from './context.ts'
+import { readWorkspace, wholeItem } from './context.ts'
 import { coerce, echoed, notFound } from './items.ts'
 import { auditedSnapshot, diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
@@ -97,7 +97,9 @@ export async function setFields(
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('set', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
-  const item = view.value.byId.get(request.id)
+  const whole = await wholeItem(store, view.value, request.id)
+  if (!whole.ok) return storeRefusal('set', 'mutate', whole.error, workspace)
+  const item = whole.value
   if (item === undefined) return notFound('set', workspace, view.value, request.id)
 
   if (request.assignments.length === 0) {

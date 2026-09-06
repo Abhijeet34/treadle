@@ -34,6 +34,9 @@ export type Fingerprint = {
   readonly lines: number
 }
 
+/** The columns a record is decoded from; `line` and `file` name it in a refusal. */
+export type IndexedSource = Pick<IndexedItem, 'id' | 'file' | 'line' | 'source'>
+
 export type IndexedItem = {
   readonly id: string
   readonly file: string
@@ -48,8 +51,14 @@ export type IndexedItem = {
   readonly assignee: string | null
   readonly filed_at: string
   readonly title: string
+  readonly resolution: string | null
+  readonly due: string | null
+  readonly severity: string | null
   readonly source: string
 }
+
+/** The columns a summary is built from: every column but the record's text and its place. */
+export type SummaryRow = Omit<IndexedItem, 'file' | 'line' | 'source'>
 
 const SCHEMA = `
 create table if not exists files (
@@ -58,7 +67,8 @@ create table if not exists files (
 create table if not exists items (
   id text primary key, file text not null, line integer not null, type text not null,
   state text not null, parent text, sprint text, points integer, priority integer, version integer not null,
-  assignee text, filed_at text not null, title text not null, source text not null);
+  assignee text, filed_at text not null, title text not null,
+  resolution text, due text, severity text, source text not null);
 create index if not exists items_file on items(file);
 -- Both orders listItems can ask for. Every query it builds ends in an order by filed_at, id
 -- with an optional limit, so an index that leads on the filter and continues in that order
@@ -91,7 +101,7 @@ const META_SCHEMA = 'create table if not exists meta (key text primary key, valu
  * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
  * that cannot leave a half-migrated table behind.
  */
-const INDEX_FORMAT = '3'
+const INDEX_FORMAT = '4'
 const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
@@ -289,8 +299,9 @@ export class IndexCache {
       }
 
       const insert = db.prepare(`insert into items
-        (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, source)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title,
+         resolution, due, severity, source)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       const holder = db.prepare('select file from items where id = ?')
       for (const item of items) {
         const was = previous.get(item.id)
@@ -301,7 +312,7 @@ export class IndexCache {
         try {
           insert.run(item.id, item.file, item.line, item.type, item.state, item.parent,
             item.sprint, item.points, item.priority, item.version, item.assignee,
-            item.filed_at, item.title, item.source)
+            item.filed_at, item.title, item.resolution, item.due, item.severity, item.source)
         } catch {
           // The id is already in the store, and because the parser refuses a repeat inside
           // one file, "already" now means another shard. That is the half of D1 obligation 4
@@ -535,7 +546,24 @@ export class IndexCache {
     this.#open().prepare('delete from meta where key = ?').run(HIERARCHY_KEY)
   }
 
-  listItems(query: ItemQuery): readonly IndexedItem[] {
+  /**
+   * Streamed, and projected to what decoding a record needs. Every other column is derived
+   * from `source` and the decoder derives it again; an array of 50,000 whole rows was held
+   * beside the items decoded from it, and the read every command performs paid for both.
+   */
+  listItems(query: ItemQuery): Iterable<IndexedSource> {
+    return this.#items('id, file, line, source', query) as Iterable<IndexedSource>
+  }
+
+  /** The same rows as `listItems`, as every column but the text: what a summary is built from. */
+  listSummaries(query: ItemQuery): Iterable<SummaryRow> {
+    return this.#items(
+      'id, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, resolution, due, severity',
+      query,
+    ) as Iterable<SummaryRow>
+  }
+
+  #items(columns: string, query: ItemQuery): Iterable<unknown> {
     const where: string[] = []
     const values: (string | number)[] = []
     if (query.state !== undefined) { where.push('state = ?'); values.push(query.state) }
@@ -545,8 +573,8 @@ export class IndexCache {
     const limit = query.limit === undefined ? '' : ' limit ?'
     if (query.limit !== undefined) values.push(query.limit)
     return this.#open()
-      .prepare(`select * from items${clause} order by filed_at, id${limit}`)
-      .all(...values) as unknown as readonly IndexedItem[]
+      .prepare(`select ${columns} from items${clause} order by filed_at, id${limit}`)
+      .iterate(...values)
   }
 
   listEvents(query: EventQuery): readonly StoreEvent[] {

@@ -6,7 +6,7 @@
 import type {
   Applied, EventQuery, Finding, ItemQuery, Store, StoreIdentity, StoreResult, StoreTransaction,
 } from '../application/ports/store.ts'
-import type { WorkItem } from '../domain/index.ts'
+import type { WorkItem, WorkItemSummary } from '../domain/index.ts'
 
 export interface OperationLog {
   store(operation: string, fields: Readonly<Record<string, unknown>>): void
@@ -29,6 +29,8 @@ export class LoggingStore implements Store {
 
   async get(id: string): Promise<StoreResult<WorkItem | undefined>> {
     const result = await this.#inner.get(id)
+    // The one read that carries a record's prose, so the one place F10's rule has to hold.
+    if (result.ok && result.value !== undefined) this.#log.store('read', fieldsOf(result.value))
     this.#log.store('get', { id, found: result.ok && result.value !== undefined })
     return result
   }
@@ -37,6 +39,13 @@ export class LoggingStore implements Store {
     const result = await this.#inner.list(query)
     if (result.ok) for (const item of result.value) this.#log.store('read', fieldsOf(item))
     this.#log.store('list', { n: result.ok ? result.value.length : 0 })
+    return result
+  }
+
+  async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
+    const result = await this.#inner.summaries(query)
+    if (result.ok) for (const item of result.value) this.#log.store('read', fieldsOf(item))
+    this.#log.store('summaries', { n: result.ok ? result.value.length : 0 })
     return result
   }
 
@@ -63,7 +72,7 @@ export class LoggingStore implements Store {
 }
 
 /** Every field of a record, so the log is complete; the formatter decides what it may show. */
-function fieldsOf(item: WorkItem): Readonly<Record<string, unknown>> {
+function fieldsOf(item: WorkItemSummary | WorkItem): Readonly<Record<string, unknown>> {
   const out: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(item)) {
     if (value !== undefined && key !== 'extra') out[key] = value

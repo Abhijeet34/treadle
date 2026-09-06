@@ -21,7 +21,7 @@
 import { MAX_DESCRIPTION, type ItemId, type WorkItem } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { hasReviewStep, readWorkspace, type WorkspaceView } from './context.ts'
+import { hasReviewStep } from './context.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const DOCTOR_SHAPE: ResultShape = {
@@ -162,7 +162,7 @@ export function auditItem(
  * 50,000 and 500,000. The buckets cost one map of the log and make it linear in both.
  */
 export function auditWorkspace(
-  view: WorkspaceView, events: readonly StoreEvent[],
+  items: readonly WorkItem[], events: readonly StoreEvent[],
 ): readonly DoctorFinding[] {
   const byEntity = new Map<string, StoreEvent[]>()
   for (const event of events) {
@@ -170,18 +170,22 @@ export function auditWorkspace(
     if (bucket === undefined) byEntity.set(event.entity, [event])
     else bucket.push(event)
   }
-  return view.items.flatMap((item) => auditItem(item, byEntity.get(item.id) ?? []))
+  return items.flatMap((item) => auditItem(item, byEntity.get(item.id) ?? []))
 }
 
 export async function doctor(store: Store): Promise<ResultObject> {
-  const view = await readWorkspace(store, { partial: true })
-  if (!view.ok) return storeRefusal('doctor', 'read', view.error, undefined)
-  const workspace = view.value.identity.id
+  const identity = await store.identity()
+  if (!identity.ok) return storeRefusal('doctor', 'read', identity.error, undefined)
+  const workspace = identity.value.id
 
   const stored = await store.findings()
   if (!stored.ok) return storeRefusal('doctor', 'read', stored.error, workspace)
   const events = await store.events()
   if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
+  // The audit reads every field of every record against its events, so this is the one
+  // command that decodes the whole store rather than reading the view every other one does.
+  const records = await store.list()
+  if (!records.ok) return storeRefusal('doctor', 'read', records.error, workspace)
 
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
@@ -190,7 +194,7 @@ export async function doctor(store: Store): Promise<ResultObject> {
       where: `${cell(finding.file)}:${finding.line}`,
       detail: finding.reason,
     })),
-    ...auditWorkspace(view.value, events.value),
+    ...auditWorkspace(records.value, events.value),
   ]
 
   const block: Block = {
@@ -202,10 +206,10 @@ export async function doctor(store: Store): Promise<ResultObject> {
     })),
   }
 
-  const items = view.value.items.length
+  const items = records.value.length
   const logged = events.value.length
   const data: Record<string, Value> = {
-    store: view.value.identity.path ?? workspace,
+    store: identity.value.path ?? workspace,
     checked: items,
   }
   if (rows.length === 0) {

@@ -5,6 +5,7 @@ The numbers match the design records they implement, so ADR-0002 is DR2's storag
 ADR-0009 is the exception: the design phase wrote no record for release and CI, and the threat model's F13 fix asks for one, so it carries the next free number rather than a design record's.
 ADR-0012 is the other kind of exception: it records a piece of DR6 that was refused rather than built, so it carries the next free number and leaves ADR-0006 to the seam that shipped.
 ADR-0013 belongs to no design record at all: it answers an incident in this repository's history, so it carries the next free number too.
+ADR-0014 carries the next free number for the same reason ADR-0009 does: the read it reshapes is one the design never priced.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -21,6 +22,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0011](0011-evidence-and-the-severity-audit.md) | Severity on every read surface and in the ranking, severity and priority changes audited, and a bounded evidence pointer the done gate requires |
 | [ADR-0012](0012-the-extension-surface-that-does-not-ship.md) | DR6's hook contract is refused rather than gated, and the generated adapter it designed has no surface to secure |
 | [ADR-0013](0013-a-branch-may-not-remove-a-test-main-has.md) | A pull request may not remove a test the merge base has without declaring it, and the check that says so is required by name outside the workflow file |
+| [ADR-0014](0014-the-view-is-a-projection.md) | The view every command reads holds the fields a scan reads, the one record a command acts on is read on demand, and the shard a write touches is parsed once |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.

@@ -8,6 +8,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import type { Store } from '../../src/application/ports/store.ts'
+import { SUMMARY_FIELDS } from '../../src/domain/index.ts'
 import { anEvent, anItem } from '../helpers/store-fixtures.ts'
 
 export type Subject = { readonly store: Store; dispose(): Promise<void> }
@@ -158,6 +159,37 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
 
         const one = await store.list({ limit: 1 })
         assert.equal(one.ok && one.value.length, 1)
+      })
+    })
+
+    it('serves summaries as the fields of the items list serves, in the same order', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'item-one', filed_at: '2026-09-01T10:00:00Z', due: '2026-09-30T00:00:00Z', description: 'prose a summary leaves out' }) },
+            { item: anItem({ id: 'item-two', type: 'bug', severity: 'S2', repro_steps: 'x', found_in: 'dev', filed_at: '2026-09-02T10:00:00Z' }) },
+            { item: anItem({ id: 'item-tri', state: 'ready', sprint_id: 'sprint-one', priority: 2, points: 3, filed_at: '2026-10-01T10:00:00Z' }) },
+          ],
+          events: [],
+        })
+        const items = await store.list()
+        const summaries = await store.summaries()
+        assert.ok(items.ok && summaries.ok)
+        // Exactly the summary fields, each present only when the item carries it: a summary
+        // that read `undefined` where the item has a value would sort or filter wrong silently.
+        const projected = items.value.map((item) => Object.fromEntries(
+          SUMMARY_FIELDS.flatMap((field) => (item[field] === undefined ? [] : [[field, item[field]]])),
+        ))
+        assert.deepEqual(summaries.value, projected)
+        assert.ok(summaries.value.some((s) => s.due !== undefined && s.severity === undefined))
+        assert.ok(summaries.value.some((s) => s.severity === 'S2'))
+        assert.equal('description' in (summaries.value[0] as object), false)
+
+        const ready = await store.summaries({ state: 'ready' })
+        assert.deepEqual(ready.ok ? ready.value.map((i) => i.id) : [], ['item-tri'])
+        const one = await store.summaries({ limit: 1 })
+        assert.deepEqual(one.ok ? one.value.map((i) => i.id) : [], ['item-one'])
       })
     })
 

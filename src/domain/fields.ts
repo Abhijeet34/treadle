@@ -64,14 +64,23 @@ export function requiredAtCreation(type: WorkItemType): readonly string[] {
   return REQUIRED_AT_CREATION[type]
 }
 
+// Built once. Validation runs on every record a read decodes, and a set and two arrays
+// allocated per call were 340 MiB of the 1,072 MiB a read of 50,000 items allocated.
+const FIELDS_OF: Readonly<Record<WorkItemType, readonly string[]>> = Object.fromEntries(
+  WORK_ITEM_TYPES.map((type) => [type, [...COMMON_FIELDS, ...TYPE_FIELDS[type]]]),
+) as unknown as Record<WorkItemType, readonly string[]>
+const PERMITTED: ReadonlyMap<WorkItemType, ReadonlySet<string>> = new Map(
+  WORK_ITEM_TYPES.map((type) => [type, new Set(FIELDS_OF[type])]),
+)
+const KNOWN_FIELDS: ReadonlySet<string> = new Set(WORK_ITEM_TYPES.flatMap((type) => FIELDS_OF[type]))
+
 /** Every field name this type may carry: the common set plus its own. */
 export function fieldsOf(type: WorkItemType): readonly string[] {
-  return [...COMMON_FIELDS, ...TYPE_FIELDS[type]]
+  return FIELDS_OF[type]
 }
 
 export function isKnownField(name: string): boolean {
-  return (COMMON_FIELDS as readonly string[]).includes(name)
-    || WORK_ITEM_TYPES.some((t) => TYPE_FIELDS[t].includes(name))
+  return KNOWN_FIELDS.has(name)
 }
 
 /**
@@ -373,10 +382,10 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
   const typeFailure = CHECKS['type']?.(item.type, item, options)
   if (typeFailure !== undefined) return invalid('V4', typeFailure, item)
 
-  const permitted = new Set(fieldsOf(item.type))
-  const present = Object.entries(item).filter(([, value]) => value !== undefined)
+  const permitted = PERMITTED.get(item.type) as ReadonlySet<string>
+  const present = Object.keys(item).filter((name) => item[name as keyof WorkItem] !== undefined)
 
-  for (const [name] of present) {
+  for (const name of present) {
     if (!permitted.has(name)) {
       return invalid(
         'V5',
@@ -400,8 +409,8 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
     }
   }
 
-  for (const [name, value] of present) {
-    const why = CHECKS[name]?.(value, item, options)
+  for (const name of present) {
+    const why = CHECKS[name]?.(item[name as keyof WorkItem], item, options)
     if (why !== undefined) return invalid('V4', why, item)
   }
 

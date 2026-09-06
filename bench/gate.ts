@@ -38,13 +38,16 @@ import type { RunReport } from './report.ts'
  */
 function worstRss(
   scale: ScaleRow | undefined, ops: readonly string[],
-): { readonly kb: number; readonly op: string } | undefined {
+): { readonly kb: number; readonly op: string } | string {
   let worst: { kb: number; op: string } | undefined
   for (const op of ops) {
     const kb = scale?.operations[op]?.peakRssKb
-    if (kb !== undefined && (worst === undefined || kb > worst.kb)) worst = { kb, op }
+    // An op with no figure is the whole row unmeasured. Weighing the rest would let the
+    // budget pass over `list` again the moment `workspace` failed to report.
+    if (kb === undefined) return `NOT MEASURED: ${op} reported no RSS, and this budget is the worst of ${ops.join(', ')}`
+    if (worst === undefined || kb > worst.kb) worst = { kb, op }
   }
-  return worst
+  return worst ?? 'NOT MEASURED: no operations ran'
 }
 
 export type Budgets = {
@@ -227,11 +230,11 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
   const readRss = worstRss(largest, READ_OPS)
   const writeRss = worstRss(largest, WRITE_OPS)
   rows.push(absolute(budgets, 'peakRssReadKb', 'peak RSS, read at the largest scale',
-    readRss?.kb ?? 'NOT MEASURED: no RSS reported', 'KiB',
-    readRss === undefined ? undefined : `the worst of ${READ_OPS.join(', ')}, which was ${readRss.op}`))
+    typeof readRss === 'string' ? readRss : readRss.kb, 'KiB',
+    typeof readRss === 'string' ? undefined : `the worst of ${READ_OPS.join(', ')}, which was ${readRss.op}`))
   rows.push(absolute(budgets, 'peakRssMutationKb', 'peak RSS, mutation at the largest scale',
-    writeRss?.kb ?? 'NOT MEASURED: no RSS reported', 'KiB',
-    writeRss === undefined ? undefined : `the worst of ${WRITE_OPS.join(', ')}, which was ${writeRss.op}`))
+    typeof writeRss === 'string' ? writeRss : writeRss.kb, 'KiB',
+    typeof writeRss === 'string' ? undefined : `the worst of ${WRITE_OPS.join(', ')}, which was ${writeRss.op}`))
   rows.push(absolute(budgets, 'firstIndexBuildMs', 'first index build at the largest scale', largest?.firstIndexBuildMs ?? 'NOT MEASURED: no scale ran', 'ms'))
   rows.push(absolute(budgets, 'reindexAfterHandEditMs', 're-index after a hand edit of the largest shard', largest?.reindexAfterHandEditMs ?? 'NOT MEASURED: no scale ran', 'ms'))
 

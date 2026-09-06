@@ -26,7 +26,7 @@ import {
 import { errorResult, okResult, type ResultObject, type ResultShape, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
-import { readWorkspace } from './context.ts'
+import { readWorkspace, wholeItem } from './context.ts'
 import { echoed, notFound } from './items.ts'
 import { diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
@@ -93,7 +93,9 @@ export async function markItem(
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('mark', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
-  const item = view.value.byId.get(request.id)
+  const whole = await wholeItem(store, view.value, request.id)
+  if (!whole.ok) return storeRefusal('mark', 'mutate', whole.error, workspace)
+  const item = whole.value
   if (item === undefined) return notFound('mark', workspace, view.value, request.id)
 
   if (request.severity === undefined && request.priority === undefined) {
@@ -192,7 +194,9 @@ export async function addEvidence(
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('evidence', 'mutate', view.error, undefined)
   const workspace = view.value.identity.id
-  const item = view.value.byId.get(request.id)
+  const whole = await wholeItem(store, view.value, request.id)
+  if (!whole.ok) return storeRefusal('evidence', 'mutate', whole.error, workspace)
+  const item = whole.value
   if (item === undefined) return notFound('evidence', workspace, view.value, request.id)
 
   if (!(EVIDENCE_KINDS as readonly string[]).includes(request.kind)) {

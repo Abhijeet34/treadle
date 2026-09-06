@@ -18,6 +18,7 @@ import {
   type GuardId,
   type ItemId,
   type WorkItem,
+  type WorkItemSummary,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
@@ -27,6 +28,7 @@ import {
   blockedByThis,
   doneVerdict,
   readWorkspace,
+  wholeItem,
   readyVerdict,
   type WorkspaceView,
 } from './context.ts'
@@ -57,7 +59,7 @@ export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 
 const SEVERITY_RANK: Readonly<Record<BugSeverity, number>> = { S1: 4, S2: 3, S3: 2, S4: 1 }
 
 /** 4 for an S1 down to 1 for an S4, and 0 for anything with no severity. */
-export function severityRank(item: WorkItem): number {
+export function severityRank(item: WorkItemSummary): number {
   return item.severity === undefined ? 0 : SEVERITY_RANK[item.severity]
 }
 
@@ -145,7 +147,7 @@ export const STATUS_SHAPE: ResultShape = {
 }
 
 export type Score = {
-  readonly item: WorkItem
+  readonly item: WorkItemSummary
   readonly score: number
   readonly parts: string
 }
@@ -156,7 +158,7 @@ export function ageDays(filed: string, now: string): number {
 }
 
 export function scoreOf(
-  view: WorkspaceView, item: WorkItem, now: string, weights: Weights, forActor: string | undefined,
+  view: WorkspaceView, item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
 ): Score {
   const priority = item.priority === undefined ? 0 : 6 - item.priority
   const age = ageDays(item.filed_at, now)
@@ -280,7 +282,9 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('explain', 'read', view.error, undefined)
   const workspace = view.value.identity.id
-  const item = view.value.byId.get(id)
+  const whole = await wholeItem(store, view.value, id)
+  if (!whole.ok) return storeRefusal('explain', 'read', whole.error, workspace)
+  const item = whole.value
   if (item === undefined) return notFound('explain', workspace, view.value, id)
 
   const blockers = activeBlockers(view.value, id)

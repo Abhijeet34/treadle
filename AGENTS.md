@@ -215,7 +215,7 @@ Before hand-checking any of these, run the suite: it already checks them.
   per deliberate removal. `.github/rulesets/main.json` requires the `tests kept` context by
   name beside `checks`, because a branch that deleted the job from `ci.yml` would leave
   `checks` green with the guard gone, so renaming that job means editing the ruleset in the
-  same change. ADR-0013 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
+  same change. ADR-0014 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
   resolution or a revert is what a change needs, do not resolve a conflict by taking one side
   whole: that is the move this rule exists to catch.
 - Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
@@ -318,15 +318,20 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 `bench/budgets.json` says which budgets are armed and why the timing ones are not.
 
 A figure taken at the store seam is not a figure about a command. Every command goes through
-`readWorkspace`, which lists the store with no query, indexes it by id and builds the
-hierarchy, so `store.get` at 7.4 ms and `treadle show` at 1.6 s are both true and only one of
-them is what a caller pays. A4 times that read as the `workspace` operation and `bench/gate.ts`
-weighs each memory budget over the worst of a named set rather than over one operation, which
-is what stopped the read budget being met by a `list` bounded at 50 rows. Adding an operation
-to A4 therefore changes what a budget prices, deliberately.
+`readWorkspace`, which reads every item's summary fields off the index, indexes them by id and
+builds the hierarchy, and the six commands that act on one record then read that record with
+`wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
+of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
+a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
+never a read from the record text (ADR-0014). A4 times that read as the `workspace` operation
+and `bench/gate.ts` weighs each memory budget over the worst of a named set rather than over
+one operation, reporting `NOT MEASURED` if any member of the set has no figure, which is what
+stopped the read budget being met by a `list` bounded at 50 rows. Adding an operation to A4
+therefore changes what a budget prices, deliberately.
 
 Two things are known to give way past 50,000 items and neither is the shard key. The read
-above is 416 MiB at 50,000 and 984 MiB at 200,000, and anything that pairs items with events
+above was 416 MiB at 50,000 and 984 MiB at 200,000 while it held whole records, and is
+167 MiB at 50,000 as a projection; anything that pairs items with events
 must bucket the log by entity first: `doctor` scanned the whole log once per item and had no
 answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path only, so a
 month past 8 MiB is written happily and then refused by every command with `S4` and no way
