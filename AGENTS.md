@@ -359,6 +359,8 @@ An edge between two items is stored once, as a `## Relations` section on its sou
 Everything else is derived on read from that one direction: `show`'s inverse rows (`blocked_by`), `explain`'s `blocked` and `blocks` lines, the `dep` component of `next`, and guards `G2`, `G7` and `DOR3`.
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
 `addRelation` returns the ids whose edges its cycle check read, and the writer passes them as the transaction's `reads`, which the store refuses with `S10` if one moved: without that, two processes adding the two halves of a cycle at once both landed.
+`guardReads` in `src/application/services/context.ts` is the same read set for every guard and gate rule that reads a neighbour, and `transition` and `sprint commit` pass it: a start decided against a done blocker landed after the blocker was reopened, and an accept landed after a done child was, until they did.
+A new guard that reads another record's state adds that record there, or `test/services/guard-race.test.ts` is where its race shows.
 Both traversals walk an adjacency map; a traversal that filters the relation list per node visited is the shape that put `doctor` at 12.3 s over 3,600 edges.
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
 

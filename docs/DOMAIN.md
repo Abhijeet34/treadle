@@ -56,10 +56,10 @@ The set is closed.
 | `P3` | The hierarchy traversal hit its depth ceiling |
 | `P4` | The id is not an item in this workspace |
 | `I1` | A sprint date is not a calendar day written `YYYY-MM-DD`, or the end is before the start |
-| `I2` | The sprint is closed, and a closed sprint's committed set is a record |
+| `I2` | The sprint is closed, and a closed sprint's committed set is a record; a reopen that would drop a carried item since committed onward is refused under the same rule |
 | `I3` | The item is committed to another open sprint; an item is in one sprint |
 | `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
-| `I5` | The id is not a sprint in this workspace, would name both a sprint and an item, or names a sprint where an item was wanted |
+| `I5` | The id is not a sprint in this workspace, is already taken by a record of the kind being created, names a sprint where an item was wanted, or names an item where a sprint was wanted |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |
@@ -207,6 +207,7 @@ A sprint is a period with a committed set, and not a work item: it is `open` or 
 The committed set is not a field.
 An item carries `sprint_id`, so what is committed to an open sprint is what points at it, and `carried` is the one list a close writes because the items it names move on and stop pointing back.
 `carryOver(items)` is what a close records: every committed item whose state is not terminal, in id order, so a cancelled item stays in the set and is not carried.
+A reopen clears `carried`, so once a carried item has been committed onward the reopen is refused with `I2`: the item would leave the record and the re-close would count a smaller sprint than the one a team already read.
 
 `dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
 `evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.
@@ -240,6 +241,8 @@ Writing an edge twice is idempotent: the second call returns `added: false` and 
 
 A successful `addRelation` also returns `read`, the ids whose outgoing edges the cycle check consulted.
 The writer hands those to the store as the transaction's read set, and the store refuses the write with `S10` if any of them moved between the read and the lock, so two commands that each passed the check against the other's absence cannot close a cycle between them.
+The guards and gate rules that read a neighbour carry the same read set: `guardReads` in `src/application/services/context.ts` names every item on a `blocks` edge with the item, every child and the original it duplicates, at the version the decision read, and `transition` and `sprint commit` hand it to the store.
+Without it a start decided against a done blocker landed after that blocker was reopened, and an accept landed after a done child was.
 
 An edge is stored once, as a `relations` entry on its source record, and `relationGraphFrom(items)` is the load path that reads every record's entries into one graph.
 It refuses nothing: a stored cycle is `findRelationCycle`'s to report and an edge to a missing record is the caller's finding.

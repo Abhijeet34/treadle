@@ -249,6 +249,26 @@ describe('a sprint from open to close, at the command surface', () => {
     await insideEveryWidth(['history', 'sprint-32'])
   })
 
+  // sprint-31 carried csv-export and avatar-crop, and csv-export was committed onward to
+  // sprint-32 above. A reopen clears `carried` and an open sprint's set is what points at it,
+  // so this reopen would shrink sprint-31 from three items to two and its re-close would
+  // record the smaller sprint: the record a team already read would move.
+  it('refuses to reopen a sprint whose carry-over has been committed onward, because the record would lose it', async () => {
+    const refused = await cli(['sprint', 'reopen', 'sprint-31'])
+    assert.equal(refused.code, 3, refused.out)
+    assert.match(refused.err, /^rule I2$/m)
+    assert.match(refused.err, /^"cause sprint-31 carried avatar-crop, csv-export, which have since moved on \(avatar-crop to sprint-32\); a reopen would drop them from the record, and a closed sprint's committed set is a record$/m)
+    assert.match(refused.err, /^fix treadle sprints sprint-31$/m)
+    assert.match(refused.err, /^fix treadle sprints sprint-32$/m)
+    const record = await cli(['sprints', 'sprint-31'])
+    assert.match(record.out, /^state closed$/m)
+    assert.match(record.out, /^committed 3$/m)
+    assert.match(record.out, /^carried avatar-crop,csv-export$/m)
+    const dry = await cli(['sprint', 'reopen', 'sprint-31', '--dry-run'])
+    assert.equal(dry.code, 3)
+    await insideEveryWidth(['sprint', 'reopen', 'sprint-31'])
+  })
+
   it('reports an item pointing at no sprint record as H26 on doctor, rather than refusing the record', async () => {
     // csv-export was filed in August, so its record lives in that month's shard.
     const shard = path.join(demo.root, 'items', '2026-08.md')
@@ -324,12 +344,35 @@ describe('a carried item counts as done in the sprint that finished it, and in n
   })
 
   it('reads live again once the sprint is reopened, because the freeze is what the close recorded', async () => {
-    const reopened = await cli(['sprint', 'reopen', 'sprint-a'])
+    // sprint-a's carry-over went on to sprint-b, so its reopen is refused: the record would
+    // lose avatar-crop. The reopen that reads live is one whose carried item still points at
+    // it, finished there after the close, which is the case the freeze exists to hide.
+    const moved = await cli(['sprint', 'reopen', 'sprint-a'])
+    assert.equal(moved.code, 3, moved.out)
+    assert.match(moved.err, /^rule I2$/m)
+
+    assert.equal((await cli(['sprint', 'close', 'sprint-b'])).code, 0)
+    assert.equal((await cli(['sprint', 'open', 'Sprint C', '--id', 'sprint-c', '--start', '2026-10-05', '--end', '2026-10-16'])).code, 0)
+    assert.equal((await cli(['sprint', 'commit', 'sprint-c', 'dep-bump'])).code, 0)
+    const closed = await cli(['sprint', 'close', 'sprint-c'])
+    assert.equal(closed.code, 0, closed.err)
+    assert.match(closed.out, /^set done - -> 0$/m)
+    for (const target of ['in_progress', 'done']) {
+      const finished = await cli(['transition', 'dep-bump', target])
+      assert.equal(finished.code, 0, finished.err)
+    }
+    const frozen = await cli(['sprints', 'sprint-c'])
+    assert.match(frozen.out, /^done 0$/m, 'the close recorded nothing done, and the item finishing afterwards does not move it')
+    assert.match(frozen.out, /^pts 0\/1$/m)
+
+    const reopened = await cli(['sprint', 'reopen', 'sprint-c'])
     assert.equal(reopened.code, 0, reopened.err)
     assert.match(reopened.out, /^set done 0 -> -$/m)
     assert.match(reopened.out, /^set done_points 0 -> -$/m)
-    const record = await cli(['sprints', 'sprint-a'])
-    assert.match(record.out, /^committed 0$/m, 'the carry-over is cleared, so nothing points at it any more')
+    const record = await cli(['sprints', 'sprint-c'])
+    assert.match(record.out, /^committed 1$/m, 'the item still points at the sprint, so the set is whole')
+    assert.match(record.out, /^done 1$/m, 'and the count is live again')
+    assert.match(record.out, /^pts 1\/1$/m)
     assert.doesNotMatch(record.out, /^carried /m)
   })
 })
@@ -351,7 +394,7 @@ describe('an id-taking read that is handed a sprint id names the read that works
       const refused = await cli([command, 'sprint-31'])
       assert.equal(refused.code, 5, refused.out)
       assert.match(refused.err, /^rule I5$/m)
-      assert.match(refused.err, new RegExp(`^"cause sprint-31 is a sprint here, not an item, and ${command} reads items$`, 'm'))
+      assert.match(refused.err, new RegExp(`^"cause sprint-31 is a sprint here, not an item, and ${command} takes an item id$`, 'm'))
       assert.match(refused.err, /^fix treadle sprints sprint-31$/m)
       assert.match(refused.err, /^fix treadle backlog --sprint sprint-31$/m)
     }
@@ -363,6 +406,26 @@ describe('an id-taking read that is handed a sprint id names the read that works
     const missed = await cli(['show', 'sprint-3'])
     assert.equal(missed.code, 5)
     assert.match(missed.err, /^near sprint-31$/m)
+  })
+
+  // The mirror: an item id where a sprint id goes answered "no sprint here" with no `near`
+  // line and no word that it was an item, while the reverse slip got both.
+  it('answers an item id in a sprint slot as an item, and a mistyped item id there with the near miss', async () => {
+    for (const argv of [['sprint', 'commit', 'csv-export', 'avatar-crop'], ['sprints', 'csv-export'], ['sprint', 'close', 'csv-export'], ['board', '--sprint', 'csv-export']]) {
+      const refused = await cli(argv)
+      assert.equal(refused.code, 5, `${argv.join(' ')}: ${refused.out}`)
+      assert.match(refused.err, /^rule I5$/m)
+      assert.match(refused.err, new RegExp(`^"cause csv-export is an item here, not a sprint, and ${argv[0]} takes a sprint id$`, 'm'))
+      assert.match(refused.err, /^fix treadle show csv-export$/m)
+      assert.match(refused.err, /^fix treadle sprints$/m)
+    }
+    const filed = await cli(['file', 'task', 'Into an item', '--sprint', 'csv-export'])
+    assert.equal(filed.code, 5)
+    assert.match(filed.err, /^"cause csv-export is an item here, not a sprint, and file takes a sprint id$/m)
+    const missed = await cli(['sprint', 'commit', 'csv-expor', 'avatar-crop'])
+    assert.equal(missed.code, 5)
+    assert.match(missed.err, /^"cause csv-expor is no sprint here; this workspace holds 1 sprint$/m)
+    assert.match(missed.err, /^near csv-export$/m)
   })
 })
 

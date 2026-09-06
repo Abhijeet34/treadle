@@ -16,7 +16,7 @@ import type { Store } from '../ports/store.ts'
 import { activeBlockerIndex, readWorkspace, type WorkspaceView } from './context.ts'
 import { ITEM_COLUMNS, absence, backlogOrder, columnRefusal, invocation, listFlags, matches, narrowestClause, rowFor, type Filter } from './items.ts'
 import { storeRefusal } from './refusal.ts'
-import { noSprint } from './sprints.ts'
+import { noSprint } from './items.ts'
 
 /**
  * The columns, in flow order. `done` and `cancelled` are counts rather than columns: finished

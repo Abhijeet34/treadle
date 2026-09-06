@@ -7,11 +7,13 @@
 // cheap "am I pointing at the right thing" check can never be mistaken for a guard check.
 
 import {
+  ATTEMPT_OUTCOMES,
   OVERRIDABLE_GUARDS,
   TRANSITION_TABLE,
   evaluateTransition,
   isTerminal,
   overrideCommand,
+  placeholderOf,
   validateWorkItem,
   type AttemptOutcome,
   type GuardId,
@@ -26,7 +28,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem } from './context.ts'
+import { guardReads, openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { echoed, notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
@@ -159,13 +161,17 @@ export async function transition(
 
   if (outcome.outcome === 'refused') {
     const failed = outcome.guards.find((guard) => !guard.pass)
+    const rule = outcome.error.rule ?? 'T1'
     const input = {
       code: (outcome.error.code === 'GUARD_REFUSED' ? 'GUARD_REFUSED' : 'VALIDATION') as 'GUARD_REFUSED' | 'VALIDATION',
       command: 'transition', workspace, effect: 'mutate' as const,
-      rule: outcome.error.rule ?? 'T1',
+      rule,
       entity: `item ${item.id}`,
       cause: outcome.error.message,
-      fix: fixesFor(item, request, outcome.guards, context, openImpedimentsOf(view.value, item.id)),
+      fix: [
+        ...completedLine(item, request, rule),
+        ...fixesFor(item, request, outcome.guards, context, openImpedimentsOf(view.value, item.id)),
+      ],
     }
     return errorResult(failed === undefined ? input : { ...input, guard: failed.guard })
   }
@@ -188,9 +194,11 @@ export async function transition(
 
   const txn = ids.txn()
   const eventId = ids.event()
+  const reads = guardReads(view.value, item)
   const applied = await store.apply({
     txn,
     writes: [{ item: after, ifVersion: item.version }],
+    ...(reads.length === 0 ? {} : { reads }),
     events: [makeEvent({
       id: eventId, at: now, actor: request.actor, entity: item.id, op: 'item.transition',
       before: { state: outcome.from }, after: { state: outcome.to },
@@ -234,6 +242,28 @@ function guardsOnEdge(item: WorkItem, target: WorkItemState | 'resume'): readonl
   const spec = TRANSITION_TABLE.find((edge) => edge.from === item.state && edge.to === to)
   if (spec === undefined) return []
   return item.type === 'epic' && to === 'done' ? [...spec.guards, 'G8'] : spec.guards
+}
+
+/**
+ * The caller's own line, completed, when the refusal is about what the line left off: T4 is a
+ * reason missing and T6 a closed-set value missing. `explain` and `show` were the only fixes
+ * on both, and neither adds the flag the refusal asked for; the dry-run and preview clash
+ * already answers with the caller's line corrected, and this is that shape for the two rules
+ * whose remedy is one more flag. Any other rule adds nothing here.
+ */
+function completedLine(item: WorkItem, request: TransitionRequestInput, rule: string): readonly string[] {
+  if (rule !== 'T4' && rule !== 'T6') return []
+  const to = request.target
+  const cancel = to === 'cancelled'
+  const release = to === 'ready' && item.state === 'in_progress'
+  // T6 also refuses a value outside the set or on the wrong edge; only a missing one is completed.
+  if (rule === 'T6' && !((cancel && request.resolution === undefined) || (release && request.outcome === undefined))) return []
+  const flags: string[] = []
+  if (cancel) flags.push(`--resolution ${request.resolution ?? placeholderOf('resolution')}`)
+  if (release) flags.push(`--outcome ${request.outcome ?? `<${ATTEMPT_OUTCOMES.join('|')}>`}`)
+  for (const guard of request.overrides ?? []) flags.push(`--override ${guard}`)
+  flags.push('--reason "<why>"')
+  return [`treadle transition ${item.id} ${to} ${flags.join(' ')}`]
 }
 
 /**

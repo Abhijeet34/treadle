@@ -133,6 +133,60 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     assert.equal(dataOf(dry)['dry_run'], 1)
     assert.equal(await parentOf('draft-task'), undefined)
   })
+
+  // A type nothing may parent has no `backlog --type` line to offer, and the fallback named
+  // the child: right for `set`, where the record exists, and a NOT_FOUND as printed for
+  // `file`, where it does not.
+  it('file --parent on a type nothing may parent offers the line that files it alone, not an id that was never filed', async () => {
+    const before = await held()
+    const run = await cli(['file', 'impediment', 'Under an epic', '--parent', 'epic-one', '--set', 'severity=S1', '--set', 'proposed_resolution=renew it'])
+    assert.equal(run.code, 3, run.err)
+    const data = dataOf(run)
+    assert.equal(data['rule'], 'P1')
+    assert.equal(data['cause'], 'an epic cannot be the parent of an impediment')
+    assert.deepEqual(data['fix'], ['treadle file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>'])
+    assert.equal(await held(), before)
+  })
+
+  it('a sprint id in the parent slot is answered as a sprint, the way every other command answers it', async () => {
+    await must(['sprint', 'open', 'Sprint one', '--id', 'sprint-one', '--end', '2030-01-31'])
+    const run = await cli(['file', 'task', 'Under a sprint', '--parent', 'sprint-one'])
+    assert.equal(run.code, 5, run.err)
+    const data = dataOf(run)
+    assert.equal(data['rule'], 'I5')
+    assert.equal(data['cause'], 'sprint-one is a sprint here, not an item, and file takes an item id')
+    assert.deepEqual(data['fix'], ['treadle sprints sprint-one', 'treadle backlog --sprint sprint-one'])
+  })
+
+  // `--set parent_id=` won over `--parent` in silence, and the same held for every named flag
+  // against its `--set` spelling.
+  it('refuses one field set twice with two values on one file line, and takes it once with one', async () => {
+    const clash = await cli(['file', 'task', 'Both parents', '--parent', 'epic-one', '--set', 'parent_id=spare-task'])
+    assert.equal(clash.code, 2, clash.err)
+    const data = dataOf(clash)
+    assert.equal(data['rule'], 'C1')
+    assert.equal(data['cause'], '--parent and --set parent_id= both set parent_id, and a field is set once on one line')
+    const alias = await cli(['file', 'task', 'Both descriptions', '--desc', 'one', '--set', 'description=two'])
+    assert.equal(alias.code, 2, alias.err)
+    assert.equal(dataOf(alias)['cause'], '--desc and --set description= both set description, and a field is set once on one line')
+    const twice = await cli(['file', 'task', 'Set twice', '--set', 'desc=one', '--set', 'description=two'])
+    assert.equal(twice.code, 2, twice.err)
+    assert.equal(dataOf(twice)['cause'], '--set desc= and --set description= both set description, and a field is set once on one line')
+    const same = await must(['file', 'task', 'Agreeing', '--id', 'agreeing', '--parent', 'epic-one', '--set', 'parent=epic-one'])
+    assert.ok((dataOf(same)['set'] as string[]).includes('parent_id - -> epic-one'))
+  })
+
+  // `sprint open --id` refuses a taken sprint id as `I5`; `file --id` left a taken item id to
+  // the store, which answered `CONFLICT S10` and sent the caller to re-read and retry a line
+  // that can never land.
+  it('refuses file --id naming an item that exists as the same I5 sprint open gives a taken sprint id', async () => {
+    const run = await cli(['file', 'task', 'Again', '--id', 'draft-task'])
+    assert.equal(run.code, 2, `exit 4 is the store's CONFLICT: ${run.err}`)
+    const data = dataOf(run)
+    assert.equal(data['rule'], 'I5')
+    assert.equal(data['cause'], 'draft-task is already an item here, and an id names one thing')
+    assert.deepEqual(data['fix'], ['treadle show draft-task', 'treadle file task "<title>" --id <slug>'])
+  })
 })
 
 describe('a stored field is cleared by an empty value', () => {

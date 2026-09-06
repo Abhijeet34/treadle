@@ -467,7 +467,7 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
       return invalid(
         'V5',
         isKnownField(name)
-          ? `${name} is not a field of a ${item.type}`
+          ? `${name} is not a field of ${withArticle(item.type)}`
           : `${name} is not a field of any work item`,
         item,
       )

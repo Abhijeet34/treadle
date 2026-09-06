@@ -284,8 +284,16 @@ const SCENARIOS: readonly Scenario[] = [
       ['set', 'epic-one', 'parent_id=child-story'],
       ['set', 'task-plain', 'parent_id=nope'],
       ['file', 'task', 'Under nothing', '--parent', 'nope'],
+      ['file', 'impediment', 'Under an epic', '--parent', 'epic-one', '--set', 'severity=S1', '--set', 'proposed_resolution=renew it'],
+      ['file', 'task', 'Under a sprint', '--parent', 'sprint-open'],
+      ['file', 'task', 'Both parents', '--parent', 'epic-one', '--set', 'parent_id=spare-task'],
+      ['file', 'task', 'Taken twice', '--id', 'task-plain'],
       ['set', 'task-plain', 'title='],
       ['set', 'bug-cold', 'repro_steps='],
+      // A reason or a closed-set value left off, answered with the caller's line completed.
+      ['transition', 'task-plain', 'cancelled', '--resolution', 'wont_do'],
+      ['transition', 'blocked-wip', 'ready'],
+      ['transition', 'blocked-ready', 'in_progress', '--override', 'G2'],
       // `mark` and `evidence`.
       ['mark', 'task-plain'],
       ['mark', 'bug-cold'],
@@ -310,7 +318,9 @@ const SCENARIOS: readonly Scenario[] = [
       ['sprint', 'commit'],
       ['sprint', 'commit', 'sprint-open'],
       ['sprint', 'commit', 'nope', 'task-plain'],
+      ['sprint', 'commit', 'task-plain', 'spare-task'],
       ['sprint', 'commit', 'sprint-closed', 'task-plain'],
+      ['show', 'sprint-open'],
       ['sprint', 'commit', 'sprint-open', 'draft-story-noac'],
       ['sprint', 'commit', 'sprint-open', 'done-task'],
       ['sprint', 'uncommit'],
@@ -353,14 +363,15 @@ const SCENARIOS: readonly Scenario[] = [
     ],
   },
   {
-    name: 'two open sprints',
+    name: 'two open sprints, and a closed one whose carry-over moved on',
     build: async (dir) => {
       await baseWorkspace(dir)
       await must(dir, ['sprint', 'open', 'Sprint two', '--id', 'sprint-two', '--end', '2030-02-28'])
-      await must(dir, ['sprint', 'commit', 'sprint-two', 'committed-task'])
+      await must(dir, ['sprint', 'commit', 'sprint-two', 'committed-task', 'carried-task'])
     },
     provocations: [
       ['sprint', 'commit', 'sprint-open', 'committed-task'],
+      ['sprint', 'reopen', 'sprint-closed'],
       ['board'],
     ],
   },
@@ -431,6 +442,12 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['an older schema answered with version, not init', /^treadle version$/],
   ['a refused parent answered with the types that may parent the item', /^treadle backlog --type epic$/],
   ['a field that refuses to clear answered with the write that fills it', /^treadle set bug-cold repro_steps=<value>$/],
+  ['a parent refused on a type nothing may parent answered with the line that files it alone', /^treadle file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>$/],
+  ['an item id in a sprint slot answered with the item read', /^treadle show task-plain$/],
+  ['a missing reason answered with the caller\'s line completed', /^treadle transition task-plain cancelled --resolution wont_do --reason "<why>"$/],
+  ['a missing outcome answered with the release completed', /^treadle transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
+  ['an override without a reason answered with the reason added', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
+  ['a reopen refused for carry-over that moved on, naming both sprints', /^treadle sprints sprint-two$/],
 ]
 
 type Collected = {

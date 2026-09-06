@@ -335,6 +335,16 @@ export async function fileItem(
       fix: [`treadle sprints ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
     })
   }
+  // The same answer `sprint open --id` gives for a sprint id already taken. Left to the store
+  // this was `CONFLICT S10`, "already exists at version 1", which a caller reads as a stale
+  // write to re-read and retry, and no retry of the same line can land.
+  if (view.value.byId.has(id)) {
+    return errorResult({
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      cause: `${id} is already an item here, and an id names one thing`,
+      fix: [`treadle show ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
+    })
+  }
   const draft: Record<string, unknown> = {
     id, type: request.type, state: 'draft', title: request.title, filed_at: now, version: 1,
   }
@@ -367,14 +377,7 @@ export async function fileItem(
   // says that `next` will not rank it yet (ADR-0022); the note is set after the write.
   if (item.sprint_id !== undefined) {
     const sprint = view.value.sprintById.get(item.sprint_id)
-    if (sprint === undefined) {
-      return errorResult({
-        code: 'NOT_FOUND', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: item.sprint_id,
-        cause: `${item.sprint_id} is no sprint here; this workspace holds ${view.value.sprints.length} ${view.value.sprints.length === 1 ? 'sprint' : 'sprints'}`,
-        near: nearIds(view.value.sprintById.keys(), item.sprint_id),
-        fix: ['treadle sprints'],
-      })
-    }
+    if (sprint === undefined) return noSprint('file', 'mutate', workspace, view.value, item.sprint_id)
     const outcome = evaluateCommit({ sprint, item: { ...item, sprint_id: undefined }, current: undefined, readyGate: readyVerdict(view.value, item) })
     if (outcome.outcome === 'refused') {
       // Nothing was filed, so the commit's own fixes, which name the item, would each exit
@@ -799,7 +802,7 @@ export function notFound(
   if (view.sprintById.has(id)) {
     return errorResult({
       code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-      cause: `${id} is a sprint here, not an item, and ${command} reads items`,
+      cause: `${id} is a sprint here, not an item, and ${command} takes an item id`,
       fix: [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`],
     })
   }
@@ -809,6 +812,29 @@ export function notFound(
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
     near: nearIds([...view.byId.keys(), ...view.sprintById.keys()], id),
     fix: ['treadle backlog'],
+  })
+}
+
+/**
+ * `notFound`'s mirror for a sprint id nothing here carries. It searched the sprint ids alone,
+ * so the operand-order slip `sprint commit <item> <item>` said "no sprint here" with no `near`
+ * line and never that the id was an item, while `show <sprint>` said "is a sprint here, not an
+ * item" with two fix lines. Both refusals now answer the same way from either side.
+ */
+export function noSprint(command: string, effect: Effect, workspace: string, view: WorkspaceView, id: string): ResultObject {
+  if (view.byId.has(id)) {
+    return errorResult({
+      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
+      cause: `${id} is an item here, not a sprint, and ${command} takes a sprint id`,
+      fix: [`treadle show ${id}`, 'treadle sprints'],
+    })
+  }
+  const held = view.sprints.length
+  return errorResult({
+    code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
+    cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
+    near: nearIds([...view.sprintById.keys(), ...view.byId.keys()], id),
+    fix: ['treadle sprints'],
   })
 }
 
@@ -826,16 +852,25 @@ export function parentRefusal(
   command: string, workspace: string, view: WorkspaceView,
   child: { readonly id: ItemId; readonly type: WorkItemType }, parentId: ItemId,
 ): ResultObject | undefined {
-  const graph = view.hierarchy.typeOf.has(child.id)
+  const filed = view.hierarchy.typeOf.has(child.id)
+  const graph = filed
     ? view.hierarchy
     : { ...view.hierarchy, typeOf: new Map(view.hierarchy.typeOf).set(child.id, child.type) }
   const edge = setParent(graph, child.id, parentId)
   if (edge.ok) return undefined
+  const unknown = edge.error.rule === 'P4'
+  // A sprint id in the parent slot gets the answer every other command gives it, not a `near`
+  // list of items that happen to spell like it.
+  if (unknown && view.sprintById.has(parentId)) return notFound(command, 'mutate', workspace, view, parentId)
   const parents = ALLOWED_PARENT_PAIRS.filter((pair) => pair.child === child.type)
     .map((pair) => `treadle backlog --type ${pair.parent}`)
-  const unknown = edge.error.rule === 'P4'
+  // A type nothing may parent has no list to offer. For a filed item the record is the answer;
+  // for `file` nothing was filed, so `show <id>` named a record that did not exist and the
+  // line is the one that files it without the parent, as the `--sprint` refusal does.
+  const required = requiredAtCreation(child.type).map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
+  const alone = filed ? `treadle show ${child.id}` : `treadle file ${child.type} "<title>"${required}`
   // A chain that already closes a cycle above the parent is the store's finding, not this write's.
-  const fix = edge.error.code === 'INTEGRITY' ? ['treadle doctor'] : parents.length > 0 ? parents : [`treadle show ${child.id}`]
+  const fix = edge.error.code === 'INTEGRITY' ? ['treadle doctor'] : parents.length > 0 ? parents : [alone]
   return errorResult({
     code: unknown ? 'NOT_FOUND' : edge.error.code, command, workspace, effect: 'mutate',
     rule: edge.error.rule ?? 'P1', entity: child.id, cause: edge.error.message,

@@ -32,14 +32,21 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
 }
 
-/** The number a document spelled in front of `noun`, as in "nineteen commands". */
+/**
+ * The number a document spelled in front of `noun`, as in "nineteen commands". Every sentence
+ * that spells one is read, and they have to agree: this took the first match alone, so a
+ * later sentence in the same section could contradict the first and pass. A match whose word
+ * is not a number ("that are `done`") is skipped rather than refused, so a count is one the
+ * document spelled and not one this file guessed.
+ */
 function spelled(text: string, noun: string): number {
-  const match = new RegExp(`([A-Za-z]+) ${noun}`, 'i').exec(text)
-  assert.ok(match !== null, `no sentence in the document reads "<number> ${noun}"`)
-  const word = (match[1] ?? '').toLowerCase()
-  const value = NUMBER_WORDS[word]
-  assert.ok(value !== undefined, `"${word} ${noun}" does not spell a number this file knows`)
-  return value
+  const found = [...text.matchAll(new RegExp(`([A-Za-z]+) ${noun}`, 'gi'))]
+    .map((match) => (match[1] ?? '').toLowerCase())
+    .filter((word) => word in NUMBER_WORDS)
+    .map((word) => NUMBER_WORDS[word] as number)
+  assert.ok(found.length > 0, `no sentence in the document reads "<number> ${noun}"`)
+  assert.equal(new Set(found).size, 1, `the document spells "${noun}" as ${found.join(' and then ')} in different sentences`)
+  return found[0] as number
 }
 
 /** Every command named in a backticked list, reading `evidence add` as `evidence`. */
@@ -95,10 +102,54 @@ describe("the README's figures for treadle's own backlog are what .work holds", 
   })
 
   for (const state of ['done', 'ready', 'draft', 'cancelled']) {
-    it(`states how many items are ${state}`, () => {
-      assert.equal(spelled(section, `(?:is|are) \`${state}\``), states.get(state) ?? 0)
+    it(`states how many items are ${state}, the same in every sentence that says so`, () => {
+      assert.equal(spelled(section, `(?:(?:that )?(?:is|are)|in) \`${state}\``), states.get(state) ?? 0)
     })
   }
+})
+
+describe('the domain rule table names every rule id the domain raises, and no other', () => {
+  // The ids a refusal prints are the closed set docs/DOMAIN.md publishes under "Rule ids".
+  // Nothing held the two together: a rule added to the code and not the table, or kept in
+  // the table after its code went, read as documentation either way.
+  // `I5` is raised by the services, which is where a sprint id meets an item id, so the
+  // application layer is scanned with the domain; `C`, `H` and `S` ids belong to other tables.
+  const DOMAIN_PREFIXES = /^(G|T|R|P|I|V)\d+$/
+  const raised = new Set<string>()
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) { walk(full); continue }
+      if (!entry.name.endsWith('.ts')) continue
+      for (const match of readFileSync(full, 'utf8').matchAll(/'([A-Z]+\d+)'/g)) {
+        const id = match[1]
+        if (id !== undefined && DOMAIN_PREFIXES.test(id)) raised.add(id)
+      }
+    }
+  }
+  walk(path.join(ROOT, 'src', 'domain'))
+  walk(path.join(ROOT, 'src', 'application'))
+  const table = read('docs/DOMAIN.md')
+  const start = table.indexOf('## Rule ids')
+  const end = table.indexOf('\n## ', start + 1)
+  const documented = new Set<string>()
+  for (const row of table.slice(start, end).matchAll(/^\| `([A-Z]+\d+)` \|/gm)) {
+    const id = row[1]
+    if (id !== undefined && DOMAIN_PREFIXES.test(id)) documented.add(id)
+  }
+  const ordered = (ids: Iterable<string>): string[] => [...ids].sort((a, b) => a.localeCompare(b, 'en', { numeric: true }))
+
+  it('lists every id src/domain raises', () => {
+    assert.deepEqual(ordered(raised).filter((id) => !documented.has(id)), [])
+  })
+
+  it('lists no id src/domain does not raise', () => {
+    assert.deepEqual(ordered(documented).filter((id) => !raised.has(id)), [])
+  })
+
+  it('checks a set large enough to mean something', () => {
+    assert.ok(raised.size >= 30, `only ${raised.size} domain rule ids were found in src/domain`)
+  })
 })
 
 describe('the decision records name the rule ids the code raises', () => {

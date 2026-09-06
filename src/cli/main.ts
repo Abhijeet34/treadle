@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { WORK_ITEM_STATES, WORK_ITEM_TYPES, type GuardId } from '../domain/index.ts'
+import { WORK_ITEM_STATES, WORK_ITEM_TYPES, canonicalField, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -120,26 +120,42 @@ function fieldsOf(flags: Readonly<Record<string, unknown>>, fallback: readonly s
   return asked.split(',').filter((name) => name.length > 0)
 }
 
-function setFieldsOf(flags: Readonly<Record<string, unknown>>): Readonly<Record<string, string>> {
+/**
+ * The fields `file` was given, from its named flags and its `--set` pairs. One field named
+ * twice with two values is a refusal rather than a quiet winner: `--parent epic-one --set
+ * parent_id=story-wip` filed under story-wip and said nothing about the flag it dropped.
+ */
+function setFieldsOf(
+  flags: Readonly<Record<string, unknown>>,
+): { readonly fields: Readonly<Record<string, string>> } | { readonly refusal: ResultObject } {
   const fields: Record<string, string> = {}
+  const spelled = new Map<string, string>()
   const direct: readonly (readonly [string, string])[] = [
     ['points', 'points'], ['priority', 'priority'], ['assignee', 'assignee'],
     ['desc', 'description'], ['sprint', 'sprint_id'], ['parent', 'parent_id'],
   ]
   for (const [name, field] of direct) {
     const value = flag(flags, name)
-    if (value !== undefined) fields[field] = value
+    if (value !== undefined) { fields[field] = value; spelled.set(field, `--${name}`) }
   }
   const labels = flags['label']
-  if (Array.isArray(labels) && labels.length > 0) fields['labels'] = labels.join(',')
+  if (Array.isArray(labels) && labels.length > 0) { fields['labels'] = labels.join(','); spelled.set('labels', '--label') }
   const sets = flags['set']
   if (Array.isArray(sets)) {
     for (const entry of sets as readonly string[]) {
       const at = entry.indexOf('=')
-      if (at > 0) fields[entry.slice(0, at)] = entry.slice(at + 1)
+      if (at <= 0) continue
+      const name = canonicalField(entry.slice(0, at))
+      const value = entry.slice(at + 1)
+      const before = spelled.get(name)
+      if (before !== undefined && fields[name] !== value) {
+        return { refusal: validation('file', `${before} and --set ${entry.slice(0, at)}= both set ${name}, and a field is set once on one line`, ['treadle help file']) }
+      }
+      fields[name] = value
+      spelled.set(name, `--set ${entry.slice(0, at)}=`)
     }
   }
-  return fields
+  return { fields }
 }
 
 function validation(command: string, cause: string, fix: readonly string[]): ResultObject {
@@ -396,9 +412,11 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     }
     if (title === undefined) return validation('file', 'file needs a title in quotes', ['treadle help file'])
     const chosen = flag(flags, 'id')
+    const given = setFieldsOf(flags)
+    if ('refusal' in given) return given.refusal
     return fileItem(target, systemClock, randomIds, {
       type: type as WorkItemType, title, ...(chosen === undefined ? {} : { id: chosen }),
-      fields: setFieldsOf(flags), actor,
+      fields: given.fields, actor,
     })
   }
 

@@ -23,9 +23,9 @@ import {
 import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
-import type { Store, StoreEvent } from '../ports/store.ts'
-import { notGroomed, notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
-import { echoed, nearIds, notFound, slugFor } from './items.ts'
+import type { ItemRead, Store, StoreEvent } from '../ports/store.ts'
+import { guardReads, notGroomed, notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
+import { echoed, noSprint, notFound, slugFor } from './items.ts'
 import { makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -90,17 +90,6 @@ export const SPRINTS_SHAPE: ResultShape = {
 
 function refusal(workspace: string, rule: string, entity: string, cause: string, fix: readonly string[]): ResultObject {
   return errorResult({ code: 'VALIDATION', command: 'sprint', workspace, effect: 'mutate', rule, entity, cause, fix })
-}
-
-/** The one refusal for a sprint id nothing here carries, with the nearest sprint ids beside it. */
-export function noSprint(command: string, effect: 'read' | 'mutate', workspace: string, view: WorkspaceView, id: string): ResultObject {
-  const held = view.sprints.length
-  return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-    cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
-    near: nearIds(view.sprintById.keys(), id),
-    fix: ['treadle sprints'],
-  })
 }
 
 /** The items committed to one sprint: what points at it, plus what its close carried away. */
@@ -237,7 +226,7 @@ async function itemsNamed(
 async function applyMoves(
   target: Target, clock: Clock, ids: IdGenerator, view: WorkspaceView, actor: Actor,
   moves: readonly ItemMove[], to: string | undefined, op: 'item.commit' | 'item.uncommit',
-  data: Record<string, Value>,
+  data: Record<string, Value>, reads: readonly ItemRead[] = [],
 ): Promise<ResultObject> {
   const workspace = view.identity.id
   const now = clock.now()
@@ -253,7 +242,7 @@ async function applyMoves(
     }))
     return { item: draft as unknown as WorkItem, ifVersion: move.item.version }
   })
-  const applied = await target.store.apply({ txn, writes, events })
+  const applied = await target.store.apply({ txn, writes, ...(reads.length === 0 ? {} : { reads }), events })
   if (!applied.ok) return storeRefusal('sprint', 'mutate', applied.error, workspace)
   const summary = { ...data, events: `${events.length} ${op}` }
   if (target.mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...summary, dry_run: 1, would_exit: 0 } })
@@ -305,7 +294,11 @@ export async function commitItems(
     data['note'] = notGroomedNote(ungroomed)
   }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: sprint.id, state: sprint.state })
-  return applyMoves(target, clock, ids, view.value, request.actor, moves, sprint.id, 'item.commit', data)
+  // The ready gate read each item's neighbours, so the write carries them: a commit decided
+  // against a blocker that was done landed after that blocker was reopened.
+  const moving = new Set(moves.map((move) => move.item.id))
+  const reads = moves.flatMap((move) => guardReads(view.value, move.item)).filter((read) => !moving.has(read.id))
+  return applyMoves(target, clock, ids, view.value, request.actor, moves, sprint.id, 'item.commit', data, reads)
 }
 
 export type UncommitRequest = {
@@ -369,6 +362,26 @@ async function moveSprint(
   if (sprint === undefined) return noSprint('sprint', 'mutate', workspace, view.value, request.sprint)
   if (sprint.state === to) {
     return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
+  }
+  // A reopen clears `carried`, and an open sprint's set is what points at it, so a carried
+  // item that has since been committed onward would leave the record on the reopen and the
+  // re-close would count a smaller sprint. The close has been acted on by then, and I2's rule
+  // holds for it as it does for commit and uncommit: the committed set is a record.
+  const movedOn = (sprint.carried ?? []).filter((id) => {
+    const item = view.value.byId.get(id)
+    return item !== undefined && item.sprint_id !== sprint.id
+  })
+  const first = movedOn[0]
+  if (to === 'open' && first !== undefined) {
+    const where = view.value.byId.get(first)?.sprint_id
+    const moved = movedOn.length === 1
+      ? `${first}, which is now in ${where ?? 'no sprint'}`
+      : `${movedOn.join(', ')}, which have since moved on (${first} to ${where ?? 'no sprint'})`
+    return errorResult({
+      code: 'GUARD_REFUSED', command: 'sprint', workspace, effect: 'mutate', rule: 'I2', entity: sprint.id,
+      cause: `${sprint.id} carried ${moved}; a reopen would drop ${movedOn.length === 1 ? 'it' : 'them'} from the record, and a closed sprint's committed set is a record`,
+      fix: [`treadle sprints ${sprint.id}`, ...(where === undefined ? [] : [`treadle sprints ${where}`])],
+    })
   }
   const now = clock.now()
   const committed = to === 'closed' ? committedTo(view.value, sprint) : []
