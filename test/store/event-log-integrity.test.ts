@@ -12,8 +12,10 @@ import { appendFile, copyFile, mkdir, readdir, rm, writeFile } from 'node:fs/pro
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { parseEventLine } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { IndexCache, parseEventLine } from '../../src/adapters/store/index.ts'
+import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
+
+const LOG = 'events/2026-09.jsonl'
 
 function line(id: string, at: string, extra: Record<string, unknown> = {}): string {
   return `${JSON.stringify({
@@ -150,6 +152,75 @@ describe('a clash finding goes with the file it clashed against', () => {
       assert.ok(served.ok)
       assert.equal(served.value.length, 1)
     } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+// A reader refreshing beside a writer read the file's fingerprint before the writer had
+// indexed its append, scanned the same lines from the older size, and every one clashed on
+// the primary key: one false S14 per line, recorded, and every command refused at exit 7
+// until the index was deleted by hand. The append is a partial read, so it may add rows and
+// never decide a clash; both ways it can be wrong hand the file back for a whole pass (ADR-0020).
+describe('an append never decides a clash', () => {
+  async function indexed(): Promise<{ workspace: Awaited<ReturnType<typeof aWorkspace>>; cache: IndexCache; size: number }> {
+    const workspace = await aWorkspace()
+    const log = path.join(workspace.root, LOG)
+    await mkdir(path.dirname(log), { recursive: true })
+    await writeFile(log, line('e1', '2026-09-01T10:00:00Z') + line('e2', '2026-09-01T11:00:00Z'))
+    const served = await workspace.store.events()
+    assert.ok(served.ok && served.value.length === 2)
+    const cache = new IndexCache(path.join(workspace.root, '.index'))
+    const size = cache.fingerprints().get(LOG)?.size
+    assert.ok(size !== undefined)
+    return { workspace, cache, size }
+  }
+
+  it('hands the file back untouched when another process has indexed past its base', async () => {
+    const { workspace, cache, size } = await indexed()
+    try {
+      const grown = { size: size + 40, mtime: 1, hash: 'later', lines: 3 }
+      const outcome = cache.replaceEventFile(LOG, grown, [anEvent({ id: 'e3' })], [3], [], true, size - 10)
+      assert.equal(outcome.wholePass, true)
+      assert.deepEqual(cache.findings(), [])
+      assert.equal(cache.fingerprints().get(LOG)?.size, size, 'the fingerprint moved under a rolled-back append')
+      assert.equal(cache.listEvents({}).length, 2, 'the rolled-back append wrote a row')
+    } finally {
+      cache.close()
+      await workspace.dispose()
+    }
+  })
+
+  it('hands the file back rather than recording S14 when an appended line repeats an indexed id', async () => {
+    const { workspace, cache, size } = await indexed()
+    try {
+      const grown = { size: size + 40, mtime: 1, hash: 'later', lines: 3 }
+      const outcome = cache.replaceEventFile(LOG, grown, [anEvent({ id: 'e2' })], [3], [], true, size)
+      assert.equal(outcome.wholePass, true)
+      assert.deepEqual(cache.findings(), [], 'a partial read recorded a finding')
+      assert.equal(cache.fingerprints().get(LOG)?.size, size)
+    } finally {
+      cache.close()
+      await workspace.dispose()
+    }
+  })
+
+  it('still reports a repeat the tail really carries as S14 at its line, from the whole pass', async () => {
+    const { workspace, cache, size } = await indexed()
+    try {
+      await appendFile(path.join(workspace.root, LOG), line('e1', '2026-09-01T12:00:00Z', { actor: 'mallory' }))
+      const findings = await workspace.store.findings()
+      assert.ok(findings.ok)
+      const clash = findings.value.find((finding) => finding.rule === 'S14')
+      assert.ok(clash !== undefined, `no S14 among ${JSON.stringify(findings.value)}`)
+      assert.equal(clash.line, 3)
+      assert.ok((cache.fingerprints().get(LOG)?.size ?? 0) > size, 'the whole pass did not record the grown file')
+      const events = await workspace.store.events()
+      assert.ok(events.ok)
+      assert.equal(events.value.length, 2)
+      assert.equal(events.value.find((event) => event.id === 'e1')?.actor, 'a', 'the first copy is the one served')
+    } finally {
+      cache.close()
       await workspace.dispose()
     }
   })
