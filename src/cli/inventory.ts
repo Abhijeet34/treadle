@@ -68,6 +68,7 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle file story "Refresh the access token on a 401"', 'file a story in draft'],
       ['treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay"', 'a bug needs the three fields its type requires at creation'],
+      ['treadle file impediment "Staging certificate expired" --set severity=S1 --set proposed_resolution="platform renews it"', 'an impediment needs a severity and what would clear it; relation add <id> blocks <other> raises it against work'],
     ],
   },
   {

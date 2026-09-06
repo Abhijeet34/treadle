@@ -49,7 +49,8 @@ export type GateContext = {
   readonly children: readonly GateChild[]
   /** Whether this type has a review step in this workspace (guard G5's setting). */
   readonly reviewStep: boolean
-  readonly openImpediments: number
+  /** The active blockers of type `impediment`, a subset of `blockers`, which DOD2 reads. */
+  readonly openImpediments: readonly ItemId[]
 }
 
 export type GateRuleVerdict = {
@@ -185,14 +186,17 @@ function run(check: GateCheck, context: GateContext): Outcome {
         ? PASS
         : no(`${open.join(', ')} are still open`, `treadle transition ${open[0]} done`)
     }
-    // The one check with no remedy, because no command raises or resolves an impediment: the
-    // entity is not in this build and `openImpediments` is a hard-coded 0, so this branch is
-    // unreachable. test/domain/gate-remedies.test.ts declares that, and wiring the entity up
-    // means giving this a command there too.
+    // An impediment is resolved by reaching `done`, so the remedy is the same command DOR3
+    // names for any blocker; the rule is kept beside it because it fails on the done gate,
+    // where DOR3 is not evaluated: an impediment raised against work in progress holds the
+    // work from finishing until it is resolved.
     case 'no_open_impediment':
-      return context.openImpediments === 0
+      return context.openImpediments.length === 0
         ? PASS
-        : no(`${context.openImpediments} impediments are still open`)
+        : no(
+          `${context.openImpediments.join(', ')} ${context.openImpediments.length === 1 ? 'is' : 'are'} still open against the item`,
+          `treadle transition ${context.openImpediments[0]} done`,
+        )
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
       const reviewer = writeCommand('reviewer', item.id, '<name>')

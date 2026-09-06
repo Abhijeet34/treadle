@@ -61,6 +61,7 @@ const SECTION_FIELD: readonly (readonly [string, string])[] = [
   ['Expected', 'expected'],
   ['Actual', 'actual'],
   ['Findings', 'findings'],
+  ['Proposed resolution', 'proposed_resolution'],
   ['Evidence', 'evidence'],
   ['Relations', 'relations'],
 ]

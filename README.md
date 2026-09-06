@@ -69,7 +69,7 @@ Nothing in `src/domain` reads the filesystem, the clock, a random source, or the
 import { DEFAULT_READY_GATE, evaluateGate, evaluateTransition } from './src/domain/index.ts'
 
 const verdict = evaluateGate(DEFAULT_READY_GATE, {
-  item: story, blockers: [], children: [], reviewStep: false, openImpediments: 0,
+  item: story, blockers: [], children: [], reviewStep: false, openImpediments: [],
 })
 // verdict.rules -> one pass/fail per rule, each with the reason and what would satisfy it
 
@@ -96,15 +96,16 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; ten of the twelve comparison axes measured, two not (no metrics layer, no adapter generator) |
 | Store: sprint records in `sprints.md` | Implemented |
-| Store: impediment and ceremony records; `migrate` | Specified, not implemented |
+| Store: ceremony records; `migrate` | Specified, not implemented; an impediment is a work-item type in the month shards rather than a record of its own, [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
 | Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
-| `doctor`: seven findings over records, the event log and the relation graph; the rest wait on entities that do not exist yet | Partly implemented |
-| Sprints, boards, ceremonies, metrics, impediments, export, completions | Specified, not implemented |
+| `doctor`: nine findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
+| Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
+| Sprints, boards, ceremonies, metrics, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR1's 500 KB | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |

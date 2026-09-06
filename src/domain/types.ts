@@ -8,7 +8,12 @@ export type ItemId = string
 /** RFC 3339 in UTC with a `Z` suffix. Validated by `isInstant`, never parsed here. */
 export type Instant = string
 
-export const WORK_ITEM_TYPES = ['epic', 'story', 'task', 'bug', 'spike', 'chore'] as const
+/**
+ * The model's six, and `impediment`: a blocker as a record of its own, flowing through the
+ * same states, where `done` means resolved. It is a type rather than a second machine, and it
+ * holds up work through the same `blocks` edge every other item uses; ADR-0017.
+ */
+export const WORK_ITEM_TYPES = ['epic', 'story', 'task', 'bug', 'spike', 'chore', 'impediment'] as const
 export type WorkItemType = (typeof WORK_ITEM_TYPES)[number]
 
 export const WORK_ITEM_STATES = [
@@ -168,6 +173,8 @@ export type WorkItem = {
   readonly question?: string
   readonly timebox_hours?: number
   readonly findings?: string
+  /** What would clear an impediment, required when it is raised; without it, it is a complaint. */
+  readonly proposed_resolution?: string
 
   /** Fields a newer writer produced that this version does not know (DR3). */
   readonly extra?: ReadonlyMap<string, string>

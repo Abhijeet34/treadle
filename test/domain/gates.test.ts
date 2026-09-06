@@ -164,8 +164,11 @@ describe('the default done gate', () => {
   })
 
   it('fails an item with an open impediment', () => {
-    const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task'), { openImpediments: 2 }))
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task'), { openImpediments: ['cert-expired', 'vendor-hold'] }))
     assert.deepEqual(failed(verdict), ['DOD2'])
+    const rule = verdict.rules.find((r) => r.rule === 'DOD2')
+    assert.equal(rule?.reason, 'cert-expired, vendor-hold are still open against the item')
+    assert.equal(rule?.remedy, 'treadle transition cert-expired done', 'resolving the impediment is the remedy')
   })
 
   it('requires a reviewer only when the type has a review step, and never the assignee', () => {

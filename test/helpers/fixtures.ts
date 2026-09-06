@@ -54,6 +54,7 @@ const TYPE_DEFAULTS: Record<WorkItemType, Partial<WorkItem>> = {
   bug: { severity: 'S2', repro_steps: 'Sign in, wait for the token to expire, reload', found_in: 'test' },
   spike: { question: 'Which ranker do we adopt', timebox_hours: 8 },
   chore: {},
+  impediment: { severity: 'S2', proposed_resolution: 'The platform team renews the staging certificate' },
 }
 
 export function item(type: WorkItemType, over: Partial<WorkItem> = {}): WorkItem {
@@ -102,7 +103,7 @@ export function gateContext(subject: WorkItem, over: Partial<GateContext> = {}):
     blockers: [],
     children: [],
     reviewStep: false,
-    openImpediments: 0,
+    openImpediments: [],
     ...over,
   }
 }

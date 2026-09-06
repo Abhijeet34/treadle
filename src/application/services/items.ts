@@ -119,6 +119,10 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'text', key: 'expected' },
     { kind: 'text', key: 'actual' },
     { kind: 'text', key: 'findings' },
+    // The impediment's own field, after the last text and before the first block, which is
+    // where every text the field sweep appended went: cut at 64 cells here and printed
+    // whole under `show <id> --field proposed_resolution`.
+    { kind: 'text', key: 'proposed_resolution' },
     {
       kind: 'block',
       key: 'evidence',
@@ -245,7 +249,7 @@ const REPORTED = [
   'type', 'state', 'filed_at', 'description', 'priority', 'points', 'hours_estimate',
   'parent_id', 'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
   'outcome', 'acceptance_criteria', 'severity', 'repro_steps', 'expected', 'actual',
-  'found_in', 'fix_confirmed', 'question', 'timebox_hours', 'findings',
+  'found_in', 'fix_confirmed', 'question', 'timebox_hours', 'findings', 'proposed_resolution',
 ] as const
 
 /** The longest a reported value prints before it is reported as its size instead. */
@@ -448,6 +452,7 @@ export async function showItem(
   if (item.expected !== undefined) data['expected'] = item.expected
   if (item.actual !== undefined) data['actual'] = item.actual
   if (item.findings !== undefined) data['findings'] = item.findings
+  if (item.proposed_resolution !== undefined) data['proposed_resolution'] = item.proposed_resolution
 
   const evidence = item.evidence ?? []
   if (evidence.length > 0) {

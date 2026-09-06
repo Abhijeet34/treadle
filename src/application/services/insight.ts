@@ -33,7 +33,7 @@ import {
   readyVerdict,
   type WorkspaceView,
 } from './context.ts'
-import { auditItem, auditRelationsOf } from './doctor.ts'
+import { auditImpediment, auditItem, auditRelationsOf } from './doctor.ts'
 import { notFound } from './items.ts'
 import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
@@ -362,7 +362,11 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['moves'] = moves
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
-  const audit = [...auditItem(item, log, new Set(view.value.sprintById.keys())), ...auditRelationsOf(new Set(view.value.byId.keys()), item)]
+  const audit = [
+    ...auditItem(item, log, new Set(view.value.sprintById.keys())),
+    ...auditRelationsOf(new Set(view.value.byId.keys()), item),
+    ...auditImpediment(item),
+  ]
   if (audit.length > 0) {
     data['findings'] = {
       columns: columnsOf(EXPLAIN_SHAPE, 'findings'),
@@ -425,7 +429,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // Both lines are absent when there is nothing to say, which is what keeps the
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
-      absent_features: 'board impediment',
+      absent_features: 'board',
       ...(defects === undefined ? {} : { defects }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),

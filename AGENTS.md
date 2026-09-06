@@ -286,6 +286,10 @@ Everything else is derived on read from that one direction: `show`'s inverse row
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
 
+An impediment is a work-item type, not an entity of its own: it blocks through that same edge, `DOD2` reads its active impediment blockers, and resolving it is reaching `done`, which frees the work with nothing unlinked because a terminal blocker is already inactive on every read.
+It requires `severity` and `proposed_resolution` at creation, one that blocks nothing is `H27`, and ADR-0017 carries the four argued calls (resolution, nesting, ranking, sprint membership).
+A `G1` or `G6` refusal carries the failing gate rules' remedies as fix lines, so a change to a gate remedy changes a refusal's fix list too.
+
 ## Where a record's identity and its boundary are decided
 
 One place each, and both are in `src/adapters/store/grammar.ts`.

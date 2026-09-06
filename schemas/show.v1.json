@@ -244,6 +244,10 @@
           "type": "string",
           "x-trust": "data"
         },
+        "proposed_resolution": {
+          "type": "string",
+          "x-trust": "data"
+        },
         "evidence": {
           "type": "object",
           "additionalProperties": false,
