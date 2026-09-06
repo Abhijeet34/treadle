@@ -17,6 +17,8 @@ export type BenchConfig = {
   readonly scales: readonly number[]
   readonly samples: Readonly<Record<string, number>>
   readonly floorSamples: number
+  /** The base the rig works under. `cache/` beneath it holds shared corpora nobody mutates;
+   *  each run clones what it measures into its own `run-<id>-<pid>/` beside that. */
   readonly corpusDir: string
   readonly a1WriterCounts: readonly number[]
   readonly a5: { readonly corpusScale: number; readonly randomEdits: number }
