@@ -276,6 +276,14 @@ const SCENARIOS: readonly Scenario[] = [
       ['set', 'task-plain', 'title=x', '--actor', LONG_ACTOR],
       ['set', 'nope', 'title=x'],
       ['set'],
+      // The hierarchy rules where a parent edge is written, and the fields that refuse to clear.
+      ['set', 'task-plain', 'parent_id=task-plain'],
+      ['set', 'task-plain', 'parent_id=spare-task'],
+      ['set', 'epic-one', 'parent_id=child-story'],
+      ['set', 'task-plain', 'parent_id=nope'],
+      ['file', 'task', 'Under nothing', '--parent', 'nope'],
+      ['set', 'task-plain', 'title='],
+      ['set', 'bug-cold', 'repro_steps='],
       // `mark` and `evidence`.
       ['mark', 'task-plain'],
       ['mark', 'bug-cold'],
@@ -419,6 +427,8 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['an unknown field answered with the set syntax', /^treadle set task-plain <field>=<value>$/],
   ['file --sprint refused with a line that files it', /^treadle file bug "<title>" --set severity=<S1-S4> --set repro_steps=<value> --set found_in=<[a-z|]+>$/],
   ['an older schema answered with version, not init', /^treadle version$/],
+  ['a refused parent answered with the types that may parent the item', /^treadle backlog --type epic$/],
+  ['a field that refuses to clear answered with the write that fills it', /^treadle set bug-cold repro_steps=<value>$/],
 ]
 
 type Collected = {

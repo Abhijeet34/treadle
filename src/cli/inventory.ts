@@ -143,6 +143,7 @@ export const COMMANDS: readonly Command[] = [
       ['treadle set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
       ['treadle set checkout-500 fix_confirmed=true reviewer=kim', 'the two fields the done gate reads, in one write'],
       ['treadle set save-cart acceptance_criteria="[x] a shopper reopens a saved cart|[ ] the cart expires after 30 days"', 'rewrite the whole checklist; a leading [x] ticks a criterion, which is how ac 0/2 becomes 1/2'],
+      ['treadle set save-cart parent_id= assignee=', 'an empty value clears a field; title and the fields the type requires at creation refuse it'],
     ],
   },
   {

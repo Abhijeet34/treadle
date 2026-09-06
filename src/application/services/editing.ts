@@ -20,6 +20,8 @@ import {
   canonicalField,
   fieldsOf,
   isKnownField,
+  placeholderOf,
+  requiredAtCreation,
   validateWorkItem,
   withArticle,
   writerOf,
@@ -30,7 +32,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import { readWorkspace, wholeItem } from './context.ts'
-import { coerce, echoed, notFound } from './items.ts'
+import { coerce, echoed, notFound, parentRefusal } from './items.ts'
 import { auditedSnapshot, diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -126,7 +128,15 @@ export async function setFields(
     const field = canonicalField(assignment.slice(0, at))
     const why = unsettable(field, item)
     if (why !== undefined) return refusal(workspace, 'V5', item.id, why.cause, why.fix)
-    wanted.set(field, assignment.slice(at + 1))
+    const value = assignment.slice(at + 1)
+    // An empty value clears the field. The validator would refuse clearing a required one
+    // too, but as `a bug needs repro_steps at creation`, which reads wrong after creation.
+    if (value === '' && (field === 'title' || requiredAtCreation(item.type).includes(field))) {
+      return refusal(workspace, 'V4', item.id,
+        `${field} cannot be cleared; ${withArticle(item.type)} needs it`,
+        [`treadle set ${item.id} ${field}=${placeholderOf(field)}`])
+    }
+    wanted.set(field, value)
   }
 
   const draft: Record<string, unknown> = { ...item }
@@ -148,6 +158,10 @@ export async function setFields(
   const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadle show ${item.id}`])
+  }
+  if (wanted.has('parent_id') && after.parent_id !== undefined) {
+    const refused = parentRefusal('set', workspace, view.value, item, after.parent_id)
+    if (refused !== undefined) return refused
   }
 
   const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)

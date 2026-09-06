@@ -90,6 +90,13 @@ An impediment is a blocker as a record of its own: it flows through the same sev
 Two of the common fields are conditional rather than free.
 `due` is an optional instant on every type, and `resolution` is legal only while the state is `cancelled`; a record carrying one in any other state is `V4`.
 
+A field `set` writes is cleared by an empty value: `set <id> parent_id=` removes the parent, and `set <id> parent_id= assignee=` is one write and one event, with each side recorded as `(unset)` in `history`.
+The empty value is the clearing syntax because no field in the dictionary accepts it, so it can never collide with a stored value the way a sentinel such as `-` would on a prose field, and because `labels=` already read as an empty list.
+`title` and the fields the type requires at creation refuse it as `V4`, naming the write that fills them.
+A field another command owns is cleared by that command: `sprint uncommit` clears `sprint_id`, and a transition off `on_hold` clears the three hold fields.
+`file` reads an empty value as the field left unset, so `--set assignee=` files without one and `--set severity=` on a bug is the same `V4` as leaving it off.
+`help set` carries the rule as its last example.
+
 `requiredAtCreation(type)` returns the first column and `fieldsOf(type)` returns the common set plus the second.
 `validateWorkItem(item, { now, pointScale })` checks both, plus every field's own validation from the field dictionary.
 `now` is an argument because a hold expiry has to be in the future and this layer does not read a clock.
@@ -158,8 +165,12 @@ G1, G4, G5, G6 and G8 never do: the answer there is to fix the item.
 One parent per item, unlimited children, six allowed type pairs: epic to story, epic to task, epic to chore, story to task, story to bug, spike to task.
 
 `setParent` refuses an unknown id (`P4`), a disallowed pair (`P1`) and an edge that closes a cycle (`P2`).
+`set <id> parent_id=<id>` and `file --parent <id>` run it before they write, so each refusal is an exit status: `P1` and `P2` are `GUARD_REFUSED`, and a parent naming no record is `NOT_FOUND` with the nearest ids beside it.
+The fix lines name the types that may parent the item, `backlog --type epic` for a task, because the id the caller chose is the one that was just refused.
+Before the write paths called it, both commands wrote the edge unchecked: `set draft-task parent_id=draft-task` exited 0, and `doctor` reported the cycle as `S12`, the finding for a hand edit.
 No pair in the table can form a cycle on its own, so the cycle check exists for a graph that a file or a merge already left a bad edge in.
-That is not hypothetical: the committed files are authoritative, so a hand edit never passes through a write.
+That is not hypothetical: the committed files are authoritative, so a hand edit never passes through a write, which is why the load-time check below stays beside the write-time one.
+A chain that already closes a cycle above the chosen parent is refused as `INTEGRITY` with `doctor` as the fix, because the write that made it is not this one.
 
 `rollUp(graph, id)` walks the subtree and returns points, done points, progress, direct child counts and descendant counts.
 Points are summed over every non-cancelled descendant, and a cancelled descendant is excluded together with its own subtree.
