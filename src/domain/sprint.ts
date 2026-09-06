@@ -9,7 +9,8 @@
 // is what cannot be derived after the fact: the carry-over its close recorded, and the tally
 // at that instant, because both drift once the carry-over is worked on somewhere else.
 // docs/architecture/adr/0016-sprints.md carries the argument for each of these, and
-// docs/architecture/adr/0022-a-closed-sprint-is-a-record.md the argument for the tally.
+// docs/architecture/adr/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md the
+// argument for the tally.
 
 import { fail, ok, type DomainError, type Failure, type Result } from './errors.ts'
 import { MAX_REASON, isInstant } from './fields.ts'
