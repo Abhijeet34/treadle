@@ -32,12 +32,12 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 
 | Seam | What it does | First implementation | Second implementation |
 |---|---|---|---|
-| Store (built) | Reads records and events by id, state, sprint and time range; applies a transaction under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` and `--preview` evaluate every guard without writing |
+| Store (built) | Reads records and events by id, state, sprint and time range; applies a transaction under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing. `--preview` resolves the target and evaluates none, so it takes no overlay |
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
 | Event sink (not built) | Receives the committed events of one transaction | The monthly event log | Unnamed: DR6's answer was hook dispatch, which [ADR-0012](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses |
-| Policy | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, validated on load |
+| Policy (evaluator built) | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, validated on load |
 
 The Store seam exists, with both implementations under one conformance suite; [architecture/adr/0006-the-store-seam.md](architecture/adr/0006-the-store-seam.md) is the record.
 
@@ -50,9 +50,11 @@ The Event sink is the one seam with no second implementation and no interface to
 DR6's second implementation for it was hook dispatch, and [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses that, so whoever builds this seam owes it a second implementation that exists for a product reason.
 Until one is named, the rule at the top of this section says what to do: an interface with one implementation is not a seam, and the store keeps writing the log itself.
 
-The Policy seam is the other one that already exists.
-Its second implementation is data rather than a second code path: `evaluateGate` takes any `Gate`, so a workspace gate and a built-in gate run through the same evaluator, and what the gate command prints is exactly what guards G1 and G6 decide.
-`validateGate` is what makes a configured gate safe to load.
+The Policy seam has its evaluator and not yet its second implementation.
+Its second implementation is meant to be data rather than a second code path: `evaluateGate` takes any `Gate`, so a workspace gate and a built-in gate run through the same evaluator, and the gates block `explain` prints is exactly what guards G1 and G6 decide.
+`validateGate` is what makes a configured gate safe to load, and nothing loads one today.
+`readyVerdict` and `doneVerdict` each take a gate and every caller passes the built-in default, so the shape is there and the second gate is not.
+The `gate` and `config` commands README lists as specified are where it arrives, and until then this seam sits with the Event sink rather than with the Store.
 
 ## Storage, in one paragraph, so the domain's shape makes sense
 

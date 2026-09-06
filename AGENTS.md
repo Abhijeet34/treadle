@@ -156,8 +156,9 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. The four ids are in
-`docs/architecture/adr/README.md` and argued in ADR-0011; `status`'s `findings` count stays
+same audit for one item off the events it already reads. The five ids are in
+`docs/architecture/adr/README.md`, and ADR-0011 argues `H18` to `H21` while `H23` came with
+the event-log integrity work; `status`'s `findings` count stays
 what it always was, the store's own load-time findings.
 
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
@@ -178,6 +179,13 @@ Before hand-checking any of these, run the suite: it already checks them.
 
 - `src/domain` may import nothing but `src/domain`, and may not touch the filesystem, the
   clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
+- `tsconfig.json` sets `noUnusedLocals` and `noUnusedParameters`, so an unused local, import
+  or parameter fails `npm run typecheck` and cannot land. What tsc cannot see is an export
+  nothing imports, which is therefore the only shape dead code takes here: look for a symbol
+  whose every occurrence tree-wide is its own declaration plus a barrel line in
+  `src/domain/index.ts` or `src/adapters/store/index.ts`. Nothing is published
+  (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
+  alive; a test-only caller does not either.
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
   filesystem. `test/security/f1-f7-no-execution.test.ts` and

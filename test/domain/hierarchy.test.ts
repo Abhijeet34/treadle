@@ -11,7 +11,7 @@ import {
   ALLOWED_PARENT_PAIRS,
   MAX_HIERARCHY_DEPTH,
   WORK_ITEM_TYPES,
-  findHierarchyCycle,
+  findParentCycle,
   hierarchyFrom,
   rollUp,
   setParent,
@@ -84,8 +84,8 @@ describe('cycle detection on write', () => {
       item('task', { id: 'task-b', parent_id: 'task-c' }),
       item('task', { id: 'task-c', parent_id: 'task-a' }),
     ])
-    assert.equal(findHierarchyCycle(clean), undefined)
-    const path = findHierarchyCycle(cycle)
+    assert.equal(findParentCycle(clean.parentOf), undefined)
+    const path = findParentCycle(cycle.parentOf)
     assert.ok(path !== undefined, 'the hand-edited cycle must be found on load')
     assert.equal(path[0], path[path.length - 1], 'the reported path closes on itself')
     assert.equal(new Set(path).size, 3)

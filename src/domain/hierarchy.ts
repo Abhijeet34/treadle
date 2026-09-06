@@ -107,10 +107,6 @@ export function findParentCycle(parentOf: ReadonlyMap<ItemId, ItemId>): readonly
   return undefined
 }
 
-export function findHierarchyCycle(graph: HierarchyGraph): readonly ItemId[] | undefined {
-  return findParentCycle(graph.parentOf)
-}
-
 /**
  * The cycle through one node's ancestry, for a caller that knows which edges moved and holds
  * a graph too large to draw whole. Removing an edge cannot close a cycle and neither can

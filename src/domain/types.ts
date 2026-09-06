@@ -17,8 +17,6 @@ export const WORK_ITEM_STATES = [
 export type WorkItemState = (typeof WORK_ITEM_STATES)[number]
 
 /** Blocked is not a state. It is derived from the relation graph; see relations.ts. */
-export const TERMINAL_STATES = ['done', 'cancelled'] as const
-
 export function isTerminal(state: WorkItemState | undefined): boolean {
   return state === 'done' || state === 'cancelled'
 }

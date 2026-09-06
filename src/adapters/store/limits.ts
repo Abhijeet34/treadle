@@ -21,7 +21,13 @@ export const MAX_RECORDS_PER_FILE = 20_000
 /** The longest single-line field in the dictionary (2.14) is hold_reason at 500; 16x that. */
 export const MAX_FIELD_VALUE_BYTES = 8 * 1024
 
-/** 2.14's largest multi-line field is description at 100,000 characters. */
+/**
+ * 2.14's largest multi-line field was `description` at 100,000 characters when this ceiling
+ * was set. The write bound is now `MAX_DESCRIPTION` at 10,000, and this number stays where
+ * it is because it is the load bound: narrowing it would stop the store serving a section an
+ * earlier version wrote, which docs/STABILITY.md says the file format never does. A stored
+ * value over the write bound is doctor finding `H18` rather than a refusal.
+ */
 export const MAX_SECTION_BYTES = 128 * 1024
 
 /** The dictionary names 21 common fields and at most 6 type fields; the rest is headroom. */
@@ -40,24 +46,8 @@ export const MAX_EVENT_FILE_BYTES = 256 * 1024 * 1024
 /** DR2's whole-corpus event count is 500,000; four times it, in a single month. */
 export const MAX_EVENTS_PER_FILE = 2_000_000
 
-/** One event carries a before and an after snapshot; description alone caps at 100,000. */
+/** One event carries a before and an after snapshot; a stored description reaches 100,000. */
 export const MAX_EVENT_LINE_BYTES = 1024 * 1024
 
 /** An event's before, after and guards are JSON of the store's own shapes: two deep. */
 export const MAX_JSON_DEPTH = 32
-
-export type Ceiling = {
-  readonly name: string
-  readonly limit: number
-  readonly observed: number
-}
-
-/** Names the first ceiling an observation crosses, so a refusal can quote both numbers. */
-export function exceeded(
-  checks: readonly (readonly [string, number, number])[],
-): Ceiling | undefined {
-  for (const [name, observed, limit] of checks) {
-    if (observed > limit) return { name, limit, observed }
-  }
-  return undefined
-}

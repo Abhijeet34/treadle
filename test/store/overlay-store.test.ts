@@ -51,10 +51,6 @@ describe('the overlay writes nothing to the base', () => {
       const base = await workspace.store.get('item-one')
       assert.equal(base.ok && base.value?.state, 'draft')
       assert.equal(base.ok && base.value?.version, 1)
-
-      const pending = overlay.pending()
-      assert.deepEqual(pending.items.map((i) => i.id), ['item-one', 'item-two'])
-      assert.deepEqual(pending.events.map((e) => e.id), ['ev-9'])
     } finally {
       await workspace.dispose()
     }

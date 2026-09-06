@@ -81,12 +81,12 @@ Every ceiling is checked against the size the stat already returned, before the 
 | `MAX_FILE_BYTES` | 8 MiB | DR2's largest measured shard is 1,688 KB; its own reopen trigger is a month past 5,000 items, which it puts at 4 MB. Twice the trigger. |
 | `MAX_RECORDS_PER_FILE` | 20,000 | Four times that same 5,000-item reopen trigger. |
 | `MAX_FIELD_VALUE_BYTES` | 8 KiB | The longest single-line field in the dictionary is `hold_reason` at 500 characters. Sixteen times it. |
-| `MAX_SECTION_BYTES` | 128 KiB | The largest multi-line field is `description` at 100,000 characters. |
+| `MAX_SECTION_BYTES` | 128 KiB | The largest multi-line field was `description` at 100,000 characters when this was set. It is the load bound and stays: the write bound narrowed to `MAX_DESCRIPTION` at 10,000, and narrowing a load bound after files exist is what STABILITY.md forbids. |
 | `MAX_FIELDS_PER_RECORD` | 256 | The dictionary names 21 common fields and at most 6 type fields. |
 | `MAX_SECTIONS_PER_RECORD` | 64 | The dictionary names six sections across every type. |
 | `MAX_EVENT_FILE_BYTES` | 256 MiB | DR2's whole 50,000-item corpus is 500,000 events in 117.3 MB across 24 files. |
 | `MAX_EVENTS_PER_FILE` | 2,000,000 | Four times that whole-corpus event count, in a single month. |
-| `MAX_EVENT_LINE_BYTES` | 1 MiB | One event carries a before and an after snapshot; `description` alone caps at 100,000 characters. |
+| `MAX_EVENT_LINE_BYTES` | 1 MiB | One event carries a before and an after snapshot; a stored `description` reaches 100,000 characters. |
 | `MAX_JSON_DEPTH` | 32 | An event's `before`, `after` and `guards` are the store's own shapes, two levels deep. |
 
 Crossing one is an `S4`, `S5`, `S6` or `S7` finding that names the file and both numbers, and the file stops being served while every other file keeps serving.

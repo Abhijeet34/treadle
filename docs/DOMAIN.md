@@ -152,7 +152,9 @@ That is not hypothetical: the committed files are authoritative, so a hand edit 
 Points are summed over every non-cancelled descendant, and a cancelled descendant is excluded together with its own subtree.
 Progress is `null` rather than a division by zero when nothing in the subtree is estimated.
 
-`findHierarchyCycle(graph)` is the load-time check, returning the path that closes the cycle.
+`findParentCycle(parentOf)` is the load-time check, returning the path that closes the cycle.
+It takes the parent edges alone rather than a whole graph, because every node has at most one parent and no other column decides the answer, which is what lets the store read it as two index columns.
+`cycleAbove(id, parentOf)` is the same walk from one node, for a caller that knows which edges moved.
 `MAX_HIERARCHY_DEPTH` is 64, and every traversal carries a visited set and that ceiling.
 
 ## Dates

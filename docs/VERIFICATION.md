@@ -101,7 +101,10 @@ Writing those tests is what found the crash below.
 `npm run flake` runs the whole suite 20 times in a row and reports the count that completed alongside the count that passed.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
-Measured on this branch: 20 of 20 runs completed, 20 green, 0 failed, 757 tests in every run, 1,147 s in total.
+Measured on the branch that added this section: 20 of 20 runs completed, 20 green, 0 failed, a test count that did not move across the 20, and 1,147 s in total.
+The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06.
+That command is the number's only authority, and it is one line to run.
+What the gate asserts is zero failures and a count that does not move within a run set, which is the part a later commit cannot make false.
 Individual runs ranged from 49.8 s to 88.6 s, which is a 1.78x spread on a shared machine and is the reason the fuzzer's time bound is generous rather than tight.
 The figure before this branch was 626 s over 20 runs of a smaller suite on an idle machine, ranging 27.1 s to 34.4 s; what both runs assert is the budget of zero failures and a test count that does not move, never the seconds.
 

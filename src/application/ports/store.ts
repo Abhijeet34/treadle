@@ -4,7 +4,7 @@
 // conformance suite runs against both. The interface names no path and no lock, which is
 // what lets a later implementation coordinate differently without a contract change.
 
-import type { DomainError, DomainErrorCode } from '../../domain/index.ts'
+import type { DomainErrorCode } from '../../domain/index.ts'
 import type { Instant, ItemId, WorkItem, WorkItemState, WorkItemType } from '../../domain/index.ts'
 
 /**
@@ -50,11 +50,6 @@ export function storeFail<T = never>(
       ? { code, rule, message, entities }
       : { code, rule, message, entities, details },
   }
-}
-
-/** Carries a domain refusal outward unchanged apart from the rule id defaulting. */
-export function fromDomainError<T = never>(error: DomainError): StoreResult<T> {
-  return storeFail(error.code, error.rule ?? 'V4', error.message, error.entities, error.details)
 }
 
 /** One line of the append-only event log (DR3). Keys render in this declaration order. */

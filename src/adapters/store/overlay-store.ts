@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // The second real implementation of the store seam (DR6): a copy-on-write layer over a
-// base store. It is how `--dry-run` and `--preview` evaluate every guard and diff every
-// entity without writing, which is a product requirement (2.15) rather than a test double.
+// base store. It is how `--dry-run` evaluates every guard and diffs every entity without
+// writing, which is a product requirement (2.15) rather than a test double. `--preview` is
+// the cheaper question beside it: it resolves the target and evaluates no guard, so it runs
+// against the real store and never reaches here.
 //
 // It writes nothing, takes no lock and touches no file, and it is still held to the same
 // contract: `test/store/conformance.ts` runs against both implementations. A write here
@@ -27,11 +29,6 @@ import {
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 
-export type Pending = {
-  readonly items: readonly WorkItem[]
-  readonly events: readonly StoreEvent[]
-}
-
 function matches(item: WorkItem, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
   if (query.type !== undefined && item.type !== query.type) return false
@@ -50,11 +47,6 @@ export class OverlayStore implements Store {
 
   constructor(base: Store) {
     this.#base = base
-  }
-
-  /** What a `--dry-run` would have written, for the diff it prints. */
-  pending(): Pending {
-    return { items: [...this.#items.values()].sort(order), events: [...this.#events] }
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
