@@ -179,6 +179,13 @@ Before hand-checking any of these, run the suite: it already checks them.
 
 - `src/domain` may import nothing but `src/domain`, and may not touch the filesystem, the
   clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
+- `tsconfig.json` sets `noUnusedLocals` and `noUnusedParameters`, so an unused local, import
+  or parameter fails `npm run typecheck` and cannot land. What tsc cannot see is an export
+  nothing imports, which is therefore the only shape dead code takes here: look for a symbol
+  whose every occurrence tree-wide is its own declaration plus a barrel line in
+  `src/domain/index.ts` or `src/adapters/store/index.ts`. Nothing is published
+  (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
+  alive; a test-only caller does not either.
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
   filesystem. `test/security/f1-f7-no-execution.test.ts` and

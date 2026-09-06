@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // The second real implementation of the store seam (DR6): a copy-on-write layer over a
-// base store. It is how `--dry-run` and `--preview` evaluate every guard and diff every
-// entity without writing, which is a product requirement (2.15) rather than a test double.
+// base store. It is how `--dry-run` evaluates every guard and diffs every entity without
+// writing, which is a product requirement (2.15) rather than a test double. `--preview` is
+// the cheaper question beside it: it resolves the target and evaluates no guard, so it runs
+// against the real store and never reaches here.
 //
 // It writes nothing, takes no lock and touches no file, and it is still held to the same
 // contract: `test/store/conformance.ts` runs against both implementations. A write here
