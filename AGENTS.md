@@ -71,6 +71,24 @@ because the p95 moved 68.9% between two identical runs on one machine. This mach
 and never idle, so every figure carries the load either side of it; judge a number against its
 load column and against the ten-run series in the report, not on its own.
 
+The corpus carries what the product stores, and adding a shape to it is how a cost stops
+hiding. It had no relation edge, no sprint record and no impediment until 2026-09-06, so three
+superlinear paths went unpriced: `relationGraphFrom` scans its accumulated edges per edge and
+every command pays it through `readWorkspace`, `findRelationCycle` runs a walk per edge, and
+`rank` in `insight.ts` calls `activeBlockers` once per item where `activeBlockerIndex` exists
+for that shape. Adding an operation to `READ_OPS` in `bench/axes/a4-latency.ts` widens what the
+peak-RSS read budget prices, which is deliberate and is how `doctor` at 1,021 MiB became
+visible. Two ceilings the generator found rather than the other way round are in
+`docs/BENCHMARKS.md`: a sprint past 744 item ids cannot write its own `carried` line, and
+`packageFacts` weighed whatever `dist/treadle.js` was on disk until it learned to refuse one
+older than the sources.
+
+An axis that asserts an absence is the one that goes stale, because nothing fails when a
+capability closes it. A2 published "there is no sprint entity in this tree" for a release after
+that stopped being true and "there is no history verb" for months. So a question with a command
+to aim at is aimed at it, including when the expected answer is a refusal, and A12 names every
+command in the inventory it never drove.
+
 Six of the twelve comparison axes score behaviour rather than time and share one harness,
 `bench/axes/surface.ts`, which builds a workspace by running `init` and `file` and drives
 `src/cli/main.ts`'s own `run` with argv, the cwd, the environment and both streams passed in.
