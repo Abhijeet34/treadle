@@ -134,6 +134,24 @@ export {
 } from './hierarchy.ts'
 
 export {
+  MAX_GOAL,
+  SPRINT_FIELDS,
+  SPRINT_STATES,
+  carryOver,
+  dateOf,
+  dayOfSprint,
+  evaluateCommit,
+  isCalendarDate,
+  isSprintField,
+  validateSprint,
+  type CalendarDate,
+  type CommitContext,
+  type CommitOutcome,
+  type Sprint,
+  type SprintState,
+} from './sprint.ts'
+
+export {
   MAX_RELATION_DEPTH,
   LINKABLE_KINDS,
   addRelation,

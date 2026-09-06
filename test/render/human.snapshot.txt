@@ -4,7 +4,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -29,7 +29,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -54,7 +54,7 @@ status  acme-platform
   items  24
   points  83
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -487,7 +487,7 @@ help  acme-platform
     are listed" actual="one is charged" # fill in what a bug
     was filed without, which is what the ready gate reads
 
-commands  16 of 16
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
@@ -498,6 +498,8 @@ commands  16 of 16
   mark        mutate  no        Set the severity or the p…
   evidence    mutate  no        Append one bounded pointe…
   relation    mutate  no        Link two items with a typ…
+  sprint      mutate  no        Open a sprint, commit ite…
+  sprints     read    no        List the sprints, or prin…
   doctor      read    no        Report what the stored fi…
   next        read    yes       Rank what to pick up, and…
   explain     read    no        Say why one item is where…
@@ -528,7 +530,7 @@ help  acme-platform
     actual="one is charged" # fill in what a bug was filed without, which is
     what the ready gate reads
 
-commands  16 of 16
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
@@ -539,6 +541,8 @@ commands  16 of 16
   mark        mutate  no        Set the severity or the priority of one item,…
   evidence    mutate  no        Append one bounded pointer at an artefact a t…
   relation    mutate  no        Link two items with a typed edge, or remove o…
+  sprint      mutate  no        Open a sprint, commit items to it, and close …
+  sprints     read    no        List the sprints, or print one with its dates…
   doctor      read    no        Report what the stored files say that no writ…
   next        read    yes       Rank what to pick up, and print the component…
   explain     read    no        Say why one item is where it is, and what eac…
@@ -562,7 +566,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
   example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 
-commands  16 of 16
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
@@ -573,6 +577,8 @@ commands  16 of 16
   mark        mutate  no        Set the severity or the priority of one item, with the reason and both values in the log.
   evidence    mutate  no        Append one bounded pointer at an artefact a third party can open.
   relation    mutate  no        Link two items with a typed edge, or remove one; the inverse is derived, never stored.
+  sprint      mutate  no        Open a sprint, commit items to it, and close it with what carried over recorded.
+  sprints     read    no        List the sprints, or print one with its dates, its committed set and what carried over.
   doctor      read    no        Report what the stored files say that no write path would have accepted.
   next        read    yes       Rank what to pick up, and print the components and weights that produced the order.
   explain     read    no        Say why one item is where it is, and what each legal next move needs.
@@ -939,7 +945,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -969,7 +975,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -999,7 +1005,7 @@ status  acme-platform
   points  84
   findings  0
   overdue  1
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1028,7 +1034,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1053,7 +1059,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1078,7 +1084,7 @@ status  acme-platform
   items  26
   points  84
   findings  0
-  absent_features  sprint board impediment
+  absent_features  board impediment
   defects  S1 1 S2 1 S3 1
 
 states  7 of 7
@@ -1270,4 +1276,357 @@ show  acme-platform
 relations  1 of 1
   KIND    OTHER
   blocks  theme-dark
+
+### sprint-open @ 60
+sprint  acme-platform  1 changed  txn t0906
+  sprint  sprint-31
+  state  open
+  v  1
+  set  start - -> 2026-09-07
+  set  end - -> 2026-09-18
+  set  goal - -> Ship the token refresh
+  event  e0906
+
+### sprint-open @ 80
+sprint  acme-platform  1 changed  txn t0906
+  sprint  sprint-31
+  state  open
+  v  1
+  set  start - -> 2026-09-07
+  set  end - -> 2026-09-18
+  set  goal - -> Ship the token refresh
+  event  e0906
+
+### sprint-open @ 200
+sprint  acme-platform  1 changed  txn t0906
+  sprint  sprint-31
+  state  open
+  v  1
+  set  start - -> 2026-09-07
+  set  end - -> 2026-09-18
+  set  goal - -> Ship the token refresh
+  event  e0906
+
+### sprint-commit @ 60
+sprint  acme-platform  2 changed  txn t0907
+  sprint  sprint-31
+  state  open
+  committed  webhook-retry - -> sprint-31
+  committed  avatar-crop - -> sprint-31
+  events  2 item.commit
+
+### sprint-commit @ 80
+sprint  acme-platform  2 changed  txn t0907
+  sprint  sprint-31
+  state  open
+  committed  webhook-retry - -> sprint-31
+  committed  avatar-crop - -> sprint-31
+  events  2 item.commit
+
+### sprint-commit @ 200
+sprint  acme-platform  2 changed  txn t0907
+  sprint  sprint-31
+  state  open
+  committed  webhook-retry - -> sprint-31
+  committed  avatar-crop - -> sprint-31
+  events  2 item.commit
+
+### sprint-refused @ 60
+theme-dark is not ready to be worked: DOR3 blocked by
+queue-drain
+
+  entity theme-dark
+  rule   I4
+
+Do one of these
+
+  treadle transition queue-drain done
+
+  treadle explain theme-dark
+
+### sprint-refused @ 80
+theme-dark is not ready to be worked: DOR3 blocked by queue-drain
+
+  entity theme-dark
+  rule   I4
+
+Do one of these
+
+  treadle transition queue-drain done
+
+  treadle explain theme-dark
+
+### sprint-refused @ 200
+theme-dark is not ready to be worked: DOR3 blocked by queue-drain
+
+  entity theme-dark
+  rule   I4
+
+Do one of these
+
+  treadle transition queue-drain done
+
+  treadle explain theme-dark
+
+### status-sprint @ 60
+status  acme-platform
+  store  <store>
+  items  26
+  points  84
+  findings  0
+  overdue  1
+  absent_features  board impediment
+  defects  S1 1 S2 1 S3 1
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             PTS  SCORE  TITLE
+  flaky-e2e      2    74     Checkout suite fails, one ru…
+  gdpr-export    5    47     Export everything we hold on…
+  webhook-retry  3    46     Retry a failed webhook three…
+
+sprints  1 of 1
+  ID         DAY   ITEMS  PTS  TITLE
+  sprint-31  3/12  0/2    0/5  Sprint 31
+
+### status-sprint @ 80
+status  acme-platform
+  store  <store>
+  items  26
+  points  84
+  findings  0
+  overdue  1
+  absent_features  board impediment
+  defects  S1 1 S2 1 S3 1
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             PTS  SCORE  TITLE
+  flaky-e2e      2    74     Checkout suite fails, one run in five
+  gdpr-export    5    47     Export everything we hold on one account
+  webhook-retry  3    46     Retry a failed webhook three times
+
+sprints  1 of 1
+  ID         DAY   ITEMS  PTS  TITLE
+  sprint-31  3/12  0/2    0/5  Sprint 31
+
+### status-sprint @ 200
+status  acme-platform
+  store  <store>
+  items  26
+  points  84
+  findings  0
+  overdue  1
+  absent_features  board impediment
+  defects  S1 1 S2 1 S3 1
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             PTS  SCORE  TITLE
+  flaky-e2e      2    74     Checkout suite fails, one run in five
+  gdpr-export    5    47     Export everything we hold on one account
+  webhook-retry  3    46     Retry a failed webhook three times
+
+sprints  1 of 1
+  ID         DAY   ITEMS  PTS  TITLE
+  sprint-31  3/12  0/2    0/5  Sprint 31
+
+### sprints-open @ 60
+sprints  acme-platform
+  sprint  sprint-31
+  state  open
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  v  1
+  day  3/12
+  committed  2
+  done  0
+  pts  0/5
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
+
+### sprints-open @ 80
+sprints  acme-platform
+  sprint  sprint-31
+  state  open
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  v  1
+  day  3/12
+  committed  2
+  done  0
+  pts  0/5
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
+
+### sprints-open @ 200
+sprints  acme-platform
+  sprint  sprint-31
+  state  open
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  v  1
+  day  3/12
+  committed  2
+  done  0
+  pts  0/5
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
+
+### sprint-close @ 60
+sprint  acme-platform  1 changed  txn t0910
+  sprint  sprint-31
+  state  open -> closed
+  v  1 -> 2
+  set  state open -> closed
+  set  closed_at - -> 2026-09-04T09:30:00Z
+  set  carried - -> avatar-crop
+  carried  avatar-crop
+  event  e0911
+
+### sprint-close @ 80
+sprint  acme-platform  1 changed  txn t0910
+  sprint  sprint-31
+  state  open -> closed
+  v  1 -> 2
+  set  state open -> closed
+  set  closed_at - -> 2026-09-04T09:30:00Z
+  set  carried - -> avatar-crop
+  carried  avatar-crop
+  event  e0911
+
+### sprint-close @ 200
+sprint  acme-platform  1 changed  txn t0910
+  sprint  sprint-31
+  state  open -> closed
+  v  1 -> 2
+  set  state open -> closed
+  set  closed_at - -> 2026-09-04T09:30:00Z
+  set  carried - -> avatar-crop
+  carried  avatar-crop
+  event  e0911
+
+### sprints @ 60
+sprints  acme-platform
+
+sprints  1 of 1
+  ID         STATE   START       END         ITEMS  PTS
+  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5
+    Sprint 31
+
+### sprints @ 80
+sprints  acme-platform
+
+sprints  1 of 1
+  ID         STATE   START       END         ITEMS  PTS  TITLE
+  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5  Sprint 31
+
+### sprints @ 200
+sprints  acme-platform
+
+sprints  1 of 1
+  ID         STATE   START       END         ITEMS  PTS  TITLE
+  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5  Sprint 31
+
+### sprints-closed @ 60
+sprints  acme-platform
+  sprint  sprint-31
+  state  closed
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  closed  2026-09-04T09:30:00Z
+  v  2
+  committed  2
+  done  1
+  pts  3/5
+  carried  avatar-crop
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
+
+### sprints-closed @ 80
+sprints  acme-platform
+  sprint  sprint-31
+  state  closed
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  closed  2026-09-04T09:30:00Z
+  v  2
+  committed  2
+  done  1
+  pts  3/5
+  carried  avatar-crop
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
+
+### sprints-closed @ 200
+sprints  acme-platform
+  sprint  sprint-31
+  state  closed
+  start  2026-09-07
+  end  2026-09-18
+  filed  2026-09-04T09:30:00Z
+  closed  2026-09-04T09:30:00Z
+  v  2
+  committed  2
+  done  1
+  pts  3/5
+  carried  avatar-crop
+  title
+    Sprint 31
+  goal
+    Ship the token refresh
 

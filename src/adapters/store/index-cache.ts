@@ -63,6 +63,16 @@ export type IndexedItem = {
 /** The columns a summary is built from: every column but the record's text and its place. */
 export type SummaryRow = Omit<IndexedItem, 'file' | 'line' | 'source'>
 
+/** A sprint's row: its place, the two columns a read orders on, and the record text it is decoded from. */
+export type IndexedSprint = {
+  readonly id: string
+  readonly file: string
+  readonly line: number
+  readonly state: string
+  readonly filed_at: string
+  readonly source: string
+}
+
 const SCHEMA = `
 create table if not exists files (
   path text primary key, size integer not null, mtime real not null,
@@ -81,6 +91,11 @@ create index if not exists items_file on items(file);
 drop index if exists items_state;
 create index if not exists items_state_filed on items(state, filed_at, id);
 create index if not exists items_filed on items(filed_at, id);
+-- Sprints are few and are read whole, so the table carries the source and the two columns
+-- the one read orders on, and nothing a scan would filter by.
+create table if not exists sprints (
+  id text primary key, file text not null, line integer not null, state text not null,
+  filed_at text not null, source text not null);
 create table if not exists events (
   id text primary key, at text not null, entity text not null, op text not null,
   actor text not null, txn text not null, file text not null, rest text not null);
@@ -109,6 +124,7 @@ const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
 drop table if exists items;
+drop table if exists sprints;
 drop table if exists events;
 drop table if exists findings;
 `
@@ -387,6 +403,38 @@ export class IndexCache {
   }
 
   /**
+   * Replaces the sprint file's rows as a unit. The file holds a few dozen records at most, so
+   * it is dropped and reloaded rather than diffed; a duplicate id inside it is the parser's
+   * to quarantine, and there is one sprint file, so the cross-file clash items need has no
+   * counterpart here.
+   */
+  replaceSprintFile(
+    file: string, fingerprint: Fingerprint, sprints: readonly IndexedSprint[], findings: readonly Finding[],
+  ): void {
+    const db = this.#open()
+    db.exec('begin immediate')
+    try {
+      db.prepare('delete from sprints where file = ?').run(file)
+      db.prepare('delete from findings where file = ?').run(file)
+      const insert = db.prepare('insert into sprints (id, file, line, state, filed_at, source) values (?, ?, ?, ?, ?, ?)')
+      for (const sprint of sprints) insert.run(sprint.id, sprint.file, sprint.line, sprint.state, sprint.filed_at, sprint.source)
+      this.#insertFindings(findings)
+      this.#setFingerprint(file, fingerprint)
+      db.exec('commit')
+    } catch (error) {
+      db.exec('rollback')
+      throw error
+    }
+  }
+
+  /** Every sprint's row, in the order the sprints were opened. */
+  listSprints(): readonly IndexedSprint[] {
+    return this.#open()
+      .prepare('select id, file, line, state, filed_at, source from sprints order by filed_at, id')
+      .all() as unknown as readonly IndexedSprint[]
+  }
+
+  /**
    * Drops the fingerprint of every other file carrying a clash against `file`, so the next
    * refresh pass re-reads it and re-decides the clash against what `file` now holds.
    */
@@ -496,6 +544,7 @@ export class IndexCache {
   #dropRows(file: string): void {
     const db = this.#open()
     db.prepare('delete from items where file = ?').run(file)
+    db.prepare('delete from sprints where file = ?').run(file)
     db.prepare('delete from events where file = ?').run(file)
     db.prepare('delete from findings where file = ?').run(file)
   }

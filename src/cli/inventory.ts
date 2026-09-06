@@ -17,6 +17,7 @@ import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
 import { RELATION_SHAPE } from '../application/services/relation.ts'
 import { TRANSITION_SHAPE } from '../application/services/lifecycle.ts'
+import { SPRINT_SHAPE, SPRINTS_SHAPE } from '../application/services/sprints.ts'
 import { INIT_SHAPE } from '../application/services/workspace.ts'
 
 /** What a command produces, which decides whether a column selector can mean anything. */
@@ -154,6 +155,33 @@ export const COMMANDS: readonly Command[] = [
       ['treadle relation add auth-refresh blocks sso-saml', 'sso-saml cannot start until auth-refresh is done; explain shows both sides'],
       ['treadle relation add login-cta-2 duplicates login-cta', 'the first id is the copy; a copy of two things is refused'],
       ['treadle relation add audit-log relates-to gdpr-export', 'see also, with no rule attached, so blocks stops being used for it'],
+    ],
+  },
+  {
+    name: 'sprint', shape: SPRINT_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: [
+      'treadle sprint open <title> --end <date> [--start <date>] [--id <slug>] [--goal <text>]',
+      'treadle sprint commit <sprint> <id> [<id> ...]',
+      'treadle sprint uncommit <id> [<id> ...]',
+      'treadle sprint close <sprint>',
+      'treadle sprint reopen <sprint>',
+    ],
+    examples: [
+      ['treadle sprint open "Sprint 31" --start 2026-09-07 --end 2026-09-18 --goal "Ship the token refresh"', 'open a two-week sprint; dates are calendar days, read in UTC'],
+      ['treadle sprint commit sprint-31 auth-refresh sso-saml', 'commit two items; refused if either sits in another open sprint or fails its ready gate'],
+      ['treadle sprint close sprint-31', 'close it; the items still open are recorded on the sprint as carried'],
+    ],
+  },
+  {
+    name: 'sprints', shape: SPRINTS_SHAPE, effect: 'read', record: 'list',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle sprints [<sprint>]'],
+    examples: [
+      ['treadle sprints', 'every sprint with its dates and how much of its committed set is done'],
+      ['treadle sprints sprint-31', 'one sprint: its dates, goal, tally, and what carried over when it closed'],
     ],
   },
   {

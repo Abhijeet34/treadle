@@ -40,7 +40,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
-import { WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type WorkItem } from '../../src/domain/index.ts'
+import { SPRINT_FIELDS, WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type Sprint, type WorkItem } from '../../src/domain/index.ts'
 import { EVENT_KEYS } from '../../src/adapters/store/event-log.ts'
 import { SHAPES } from '../../src/application/shapes.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
@@ -52,6 +52,7 @@ import { explain } from '../../src/application/services/insight.ts'
 import { fileItem } from '../../src/application/services/items.ts'
 import { addEvidence, markItem } from '../../src/application/services/marking.ts'
 import { relate } from '../../src/application/services/relation.ts'
+import { closeSprint, commitItems, openSprint, sprints } from '../../src/application/services/sprints.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import { makeEvent, type Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -114,7 +115,7 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   at: readable('history:at'),
   actor: readable('history:by'),
   actor_kind: readable('history:kind'),
-  entity_kind: hidden('one value is ever written. `makeEvent` defaults it to `item` and no caller passes another, so a column of it would be a column of one constant; it becomes a column when a second entity kind does, which is the sprint and impediment work that is separately ordered.'),
+  entity_kind: hidden('`history <id>` is asked for one entity, and every row it prints belongs to that entity, so the kind is the same on every row: a column of it would restate what the caller typed. `item` and `sprint` are the two values written, and which one a log is about is decided by the id the reader named.'),
   entity: hidden('it is the argument. `history <id>` and `explain <id>` are both asked for one entity and every row they print is that entity, so the column would restate the `item` line above it.'),
   op: readable('history:op'),
   before: hidden('the values a change moved away from. `history` names the fields a change moved and `show` prints what they are now, so a `before` column would put a per-row copy of the old record inside a list whose budget is per row. The one question the old value answers alone is whether the record still agrees with the log, and `doctor` H20 asks it against the record rather than printing it.'),
@@ -124,6 +125,21 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   outcome: readable('history:what', 'as `outcome=<v>`'),
   cmd: hidden('`op` is the same fact in the vocabulary the store owns: `item.mark` for `mark`. `cmd` is kept in the log so a later rename of a command stays traceable against old events, and printing both prints one fact twice.'),
   txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
+}
+
+/** Every field of the sprint dictionary, and the surface that prints it. */
+const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
+  id: readable('sprints:sprint'),
+  title: readable('sprints:title'),
+  state: readable('sprints:state'),
+  filed_at: readable('sprints:filed'),
+  version: readable('sprints:v'),
+  start: readable('sprints:start'),
+  end: readable('sprints:end'),
+  closed_at: readable('sprints:closed'),
+  carried: readable('sprints:carried', 'the ids joined by commas, which is the form `explain` already gives a list of ids'),
+  goal: readable('sprints:goal'),
+  extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
 }
 
 /**
@@ -241,7 +257,7 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
     acceptance_criteria: 'a 401 refreshes once|the retry carries the new token',
     points: '5', priority: '2', hours_estimate: '6', parent_id: 'every-epic',
     assignee: 'kim', reporter: 'ravi', reviewer: 'dana', component: 'payments',
-    labels: 'revenue,regression', sprint_id: 'sprint-31', due: '2026-09-30T09:00:00Z',
+    labels: 'revenue,regression', due: '2026-09-30T09:00:00Z',
   })
   await file('bug', 'Checkout drops paid orders', 'every-bug', {
     severity: 'S2', found_in: 'production', fix_confirmed: 'false',
@@ -261,6 +277,18 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   await move('every-held', 'on_hold', { until: '2026-10-15T09:00:00Z' })
   await file('chore', 'Remove OAuth 1 support', 'every-stopped', {})
   await move('every-stopped', 'cancelled', { resolution: 'superseded' })
+
+  // A sprint carrying every field of its own dictionary: opened with a goal, given the spike
+  // (the story is blocked above, and a blocked item fails the ready gate a commit reads), and
+  // closed with the spike still open so the carry-over is recorded.
+  const sprintOpened = await openSprint(apply, clock, ids, {
+    title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
+  })
+  if (!sprintOpened.ok) throw new Error(String(sprintOpened.data['cause']))
+  const committed = await commitItems(apply, clock, ids, { sprint: 'sprint-31', items: ['every-spike'], actor: ACTOR })
+  if (!committed.ok) throw new Error(String(committed.data['cause']))
+  const closed = await closeSprint(apply, clock, ids, { sprint: 'sprint-31', actor: ACTOR })
+  if (!closed.ok) throw new Error(String(closed.data['cause']))
 
   // The bug's own log: a mark, an evidence pointer and a release that names its outcome.
   const marked = await markItem(apply, clock, ids, {
@@ -309,6 +337,10 @@ describe('every persisted field carries a visibility decision', () => {
     )
   })
 
+  it('has one decision per field of the sprint dictionary, and none for a field it has not got', () => {
+    assert.deepEqual(Object.keys(SPRINT_FIELD_DECISIONS).sort(), [...SPRINT_FIELDS].sort())
+  })
+
   it('has one decision per key of the event log', () => {
     assert.deepEqual(
       Object.keys(EVENT_FIELDS).sort(),
@@ -318,7 +350,7 @@ describe('every persisted field carries a visibility decision', () => {
   })
 
   it('names, for every readable decision, a key its command declares', () => {
-    for (const [scope, table] of [['item', ITEM_FIELDS], ['event', EVENT_FIELDS]] as const) {
+    for (const [scope, table] of [['item', ITEM_FIELDS], ['sprint', SPRINT_FIELD_DECISIONS], ['event', EVENT_FIELDS]] as const) {
       for (const [field, decision] of Object.entries(table)) {
         if (decision.kind !== 'readable') continue
         const [command, key] = decision.at.split(':')
@@ -405,6 +437,29 @@ describe('a real record and a real log print what the decisions claim', () => {
       const key = decision.at.split(':')[1] as string
       assert.ok(eventKeys.has(key), `${field} claims ${decision.at} and no log printed ${key}`)
     }
+  })
+
+  it('prints every key and the stored content of every field of the one sprint record', async (t) => {
+    const stored = await rig.store.sprints()
+    assert.ok(stored.ok && stored.value.length === 1, 'the fixture holds one sprint')
+    const sprint = (stored as { value: readonly Sprint[] }).value[0] as unknown as Record<string, unknown>
+    const carried = sprint['carried']
+    assert.deepEqual(carried, ['every-spike'], 'the close recorded the open spike as carried')
+    const printed = agentRenderer.render(await sprints(rig.store, fixedClock(NOW), 'sprint-31'))
+    const keys = printedKeys(printed)
+    let checked = 0
+    for (const [field, decision] of Object.entries(SPRINT_FIELD_DECISIONS)) {
+      if (decision.kind !== 'readable') continue
+      const key = decision.at.split(':')[1] as string
+      if (sprint[field] === undefined) continue
+      assert.ok(keys.has(key), `${field} claims ${decision.at} and the sprint record printed no ${key}`)
+      if (field in CONTENT_HELD_BACK) continue
+      for (const atom of contentOf(sprint[field])) {
+        assert.ok(printed.includes(atom), `sprint-31: ${field} holds ${JSON.stringify(atom)} and sprints printed no such content`)
+        checked += 1
+      }
+    }
+    t.diagnostic(`${checked} stored sprint values checked for content`)
   })
 
   // The assertion the four tests above cannot make. Each of them is satisfied by a key, and

@@ -18,6 +18,7 @@ import { backlog, fileItem, showItem } from '../../src/application/services/item
 import { history } from '../../src/application/services/history.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
 import { relate } from '../../src/application/services/relation.ts'
+import { closeSprint, commitItems, openSprint, sprints } from '../../src/application/services/sprints.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -180,6 +181,26 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     }))
     golden.set('explain-blocked', await explain(demo.store, 'theme-dark'))
     golden.set('show-relations', await showItem(demo.store, clock, 'queue-drain'))
+    // A sprint, opened after every figure above so none of them gains the block `status`
+    // prints for an open sprint: opened, two items committed, one finished, then closed with
+    // the other recorded as carried. `sprints` is read once open and once closed.
+    golden.set('sprint-open', await openSprint(targetFor(demo.store, 'apply'), clock, ids, {
+      title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
+    }))
+    golden.set('sprint-commit', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
+      sprint: 'sprint-31', items: ['webhook-retry', 'avatar-crop'], actor: ACTOR,
+    }))
+    golden.set('sprint-refused', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
+      sprint: 'sprint-31', items: ['theme-dark'], actor: ACTOR,
+    }))
+    golden.set('status-sprint', await status(demo.store, fixedClock('2026-09-09T09:30:00Z')))
+    golden.set('sprints-open', await sprints(demo.store, fixedClock('2026-09-09T09:30:00Z'), 'sprint-31'))
+    for (const target of ['in_progress', 'done'] as const) {
+      await transition(targetFor(demo.store, 'apply'), clock, ids, { id: 'webhook-retry', target, actor: ACTOR })
+    }
+    golden.set('sprint-close', await closeSprint(targetFor(demo.store, 'apply'), clock, ids, { sprint: 'sprint-31', actor: ACTOR }))
+    golden.set('sprints', await sprints(demo.store, clock))
+    golden.set('sprints-closed', await sprints(demo.store, clock, 'sprint-31'))
     return golden
   } finally {
     await demo.dispose()

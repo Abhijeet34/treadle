@@ -31,7 +31,7 @@
 // read surface: `show` has the current state, `explain` has `since` and `from_event`, and
 // this column had the word `state`.
 
-import { isKnownField, type ItemId } from '../../domain/index.ts'
+import { isKnownField, isSprintField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
@@ -176,7 +176,8 @@ function movedBy(event: StoreEvent): readonly string[] {
   const source = after ?? before
   if (source === undefined) return []
   const keys = Object.keys(source)
-  const known = keys.filter((key) => isKnownField(key))
+  // A sprint event names sprint fields; an item event never does, so one filter serves both.
+  const known = keys.filter((key) => isKnownField(key) || isSprintField(key))
   const moves = known.map((key) => move(key, before, after))
   // A key this build does not know is counted rather than printed: it is text from a file
   // that no dictionary bounds, and the count is the part a reader can act on.
@@ -219,7 +220,10 @@ export async function history(
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
-  if (view.value.byId.get(id) === undefined) return notFound('history', workspace, view.value, id)
+  // An id names an item or a sprint; the log is keyed by entity and the rows read the same.
+  if (view.value.byId.get(id) === undefined && view.value.sprintById.get(id) === undefined) {
+    return notFound('history', workspace, view.value, id)
+  }
 
   const events = await store.events({ entity: id })
   if (!events.ok) return storeRefusal('history', 'read', events.error, workspace)

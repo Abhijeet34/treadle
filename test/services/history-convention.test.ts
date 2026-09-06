@@ -28,6 +28,7 @@ import { fileItem } from '../../src/application/services/items.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import { addEvidence, markItem } from '../../src/application/services/marking.ts'
 import { relate } from '../../src/application/services/relation.ts'
+import { commitItems, openSprint, uncommitItems } from '../../src/application/services/sprints.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 
@@ -90,6 +91,9 @@ async function aLogCarryingEveryOp(): Promise<Rig> {
   for (const target of ['ready', 'in_progress', 'in_review'] as const) {
     must(await transition(apply, clock, ids, { id: ID, target, reason: 'fixture', actor: ACTOR }), target)
   }
+  must(await openSprint(apply, clock, ids, { title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', actor: ACTOR }), 'open')
+  must(await commitItems(apply, clock, ids, { sprint: 'sprint-31', items: [ID], actor: ACTOR }), 'commit')
+  must(await uncommitItems(apply, clock, ids, { items: [ID], actor: ACTOR }), 'uncommit')
 
   return {
     store,
@@ -118,7 +122,7 @@ describe('the what column of history has one convention', () => {
 
   it('covers every op this build writes, so the rule is not asserted over one shape', () => {
     assert.deepEqual([...new Set(ops)].sort(), [
-      'item.evidence.add', 'item.file', 'item.mark', 'item.relation.add', 'item.relation.remove', 'item.set', 'item.transition',
+      'item.commit', 'item.evidence.add', 'item.file', 'item.mark', 'item.relation.add', 'item.relation.remove', 'item.set', 'item.transition', 'item.uncommit',
     ])
   })
 
@@ -159,6 +163,8 @@ describe('the what column of history has one convention', () => {
     assert.match(cells[ops.indexOf('item.transition')] as string, /state=[a-z_]+->[a-z_]+/)
     assert.match(cells[ops.indexOf('item.mark')] as string, /priority=\(unset\)->1/)
     assert.match(cells[ops.indexOf('item.file')] as string, /type=bug/)
+    assert.equal(cells[ops.indexOf('item.commit')], 'sprint_id=(unset)->sprint-31')
+    assert.equal(cells[ops.indexOf('item.uncommit')], 'sprint_id=sprint-31->(unset)')
   })
 
   it('reaches the rendered line with no space in the cell, which the row grammar requires', () => {

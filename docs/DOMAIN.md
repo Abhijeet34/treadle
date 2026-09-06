@@ -54,6 +54,11 @@ The set is closed.
 | `P2` | The parent edge would close a cycle, or the stored hierarchy already contains one |
 | `P3` | The hierarchy traversal hit its depth ceiling |
 | `P4` | The id is not an item in this workspace |
+| `I1` | A sprint date is not a calendar day written `YYYY-MM-DD`, or the end is before the start |
+| `I2` | The sprint is closed, and a closed sprint's committed set is a record |
+| `I3` | The item is committed to another open sprint; an item is in one sprint |
+| `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
+| `I5` | The id is not a sprint in this workspace |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |
@@ -167,6 +172,22 @@ The clock is an argument, as everywhere in this layer.
 
 `healthFindings(items, now)` returns `H17` for every overdue item assigned to nobody, in id order, each naming the rule, the record and the instant it saw.
 A due date nobody owns is a date nothing acts on, which is the whole reason the field is worth its bytes.
+
+## Sprints
+
+A sprint is a period with a committed set, and not a work item: it is `open` or `closed`, and nothing else about it moves.
+`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at` and `carried`, the ids of the items still open when it closed.
+`goal` is optional and bounded at `MAX_GOAL`, which is `MAX_REASON`.
+`validateSprint` checks the dictionary; `isCalendarDate` refuses a date the calendar does not have, so `2026-02-30` is `I1` rather than the second of March.
+
+The committed set is not a field.
+An item carries `sprint_id`, so what is committed to an open sprint is what points at it, and `carried` is the one list a close writes because the items it names move on and stop pointing back.
+`carryOver(items)` is what a close records: every committed item whose state is not terminal, in id order, so a cancelled item stays in the set and is not carried.
+
+`dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
+`evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.
+The ready gate is the item's own definition of "can be picked up", and a sprint is where work is picked up, so the same verdict decides both.
+[architecture/adr/0016-sprints.md](architecture/adr/0016-sprints.md) carries every judgement call.
 
 ## Relations
 

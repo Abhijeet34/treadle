@@ -6,6 +6,7 @@ ADR-0009 is the exception: the design phase wrote no record for release and CI, 
 ADR-0012 is the other kind of exception: it records a piece of DR6 that was refused rather than built, so it carries the next free number and leaves ADR-0006 to the seam that shipped.
 ADR-0013 belongs to no design record at all: it answers an incident in this repository's history, so it carries the next free number too.
 ADR-0014 carries the next free number for the same reason ADR-0009 does: the read it reshapes is one the design never priced.
+ADR-0015 carries the next free number because the sprint is DR2's entity built under a design the four absent capabilities share, and that design is not a numbered design record.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -24,6 +25,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0013](0013-a-branch-may-not-remove-a-test-main-has.md) | A pull request may not remove a test the merge base has without declaring it, and the check that says so is required by name outside the workflow file |
 | [ADR-0014](0014-the-view-is-a-projection.md) | The view every command reads holds the fields a scan reads, the one record a command acts on is read on demand, and the shard a write touches is parsed once |
 | [ADR-0015](0015-relations-stored-once-and-the-guard-they-feed.md) | A relation is one stored direction on its source record with the inverse derived on read, the `G2` guard it feeds already existed, and a dangling edge is a finding |
+| [ADR-0016](0016-sprints.md) | A sprint is a period with a committed set, kept in one `sprints.md`, whose close records the carry-over and leaves unfinished work pointing at it |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -63,7 +65,8 @@ They are raised in three places, because each id needs a different thing beside 
 The rest come from `doctor` and from `explain`, the only reads that have the event log and
 the done gate. ADR-0010 argues `H17` and ADR-0011 `H18` to `H21`; `H23` is the log's own
 half of `H20`, added when a hand-written event line was found answering `explain`. ADR-0015
-argues `H24` and `H25`, which need the whole relation graph beside the record.
+argues `H24` and `H25`, which need the whole relation graph beside the record, and `H26`
+came with ADR-0016, for a `sprint_id` written before sprints were records.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -76,6 +79,7 @@ argues `H24` and `H25`, which need the whole relation graph beside the record.
 | `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
 | `H24` | `doctor`, `explain` | A stored relation names an item the store does not hold, so it counts for nothing on any read |
 | `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
+| `H26` | `doctor`, `explain` | An item's `sprint_id` names no sprint record, which no write path produces since ADR-0016 |
 
 ## The CLI's rule ids
 

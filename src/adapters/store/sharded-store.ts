@@ -19,6 +19,7 @@ import {
   type BugSeverity,
   type Resolution,
   type StoredRelation,
+  type Sprint,
   type WorkItem,
   type WorkItemState,
   type WorkItemSummary,
@@ -52,8 +53,9 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
+import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type IndexedSprint, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
+import { decodeSprint, encodeSprint } from './sprint-codec.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 
@@ -61,6 +63,11 @@ import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 export const SCHEMA = 1
 
 export const WORKSPACE_FILE = 'workspace.md'
+/**
+ * Every sprint, in one file beside the shards. A sprint spans months, so a month key would
+ * be a lie about it, and there are few enough that one file is read whole (ADR-0016).
+ */
+export const SPRINTS_FILE = 'sprints.md'
 /** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
 const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'
@@ -244,6 +251,20 @@ export class ShardedStore implements Store {
     return storeOk(items)
   }
 
+  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
+    const fresh = await this.#refresh()
+    if (!fresh.ok) return fresh
+    const sprints: Sprint[] = []
+    for (const row of this.#index.listSprints()) {
+      const parsed = parseRecordSource(row.source, row.line)
+      if (!parsed.ok) return storeFail('INTEGRITY', parsed.rule, `${row.file} line ${row.line}: ${parsed.reason}`, [row.id])
+      const sprint = decodeSprint(parsed.record)
+      if (!sprint.ok) return sprint
+      sprints.push(sprint.value)
+    }
+    return storeOk(sprints)
+  }
+
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
@@ -265,6 +286,7 @@ export class ShardedStore implements Store {
     // 76 MiB one mutation allocated; `#readShard` proves the bytes have not moved before
     // reusing one.
     const writing = new Set(transaction.writes.map((write) => `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`))
+    if ((transaction.sprints ?? []).length > 0) writing.add(SPRINTS_FILE)
     const warm = await this.#refresh(writing)
     if (!warm.ok) return warm
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
@@ -325,7 +347,9 @@ export class ShardedStore implements Store {
   }
 
   async #storeFiles(): Promise<readonly string[]> {
-    const out: string[] = [WORKSPACE_FILE]
+    // The sprint file is named whether or not it exists: the stat that follows skips an
+    // absent one, and a file that was indexed and then removed by hand drops its rows.
+    const out: string[] = [WORKSPACE_FILE, SPRINTS_FILE]
     for (const [dir, ext] of [[ITEMS_DIR, '.md'], [EVENTS_DIR, '.jsonl']] as const) {
       let names: string[]
       try {
@@ -485,6 +509,23 @@ export class ShardedStore implements Store {
       ? { file, line: q.line, rule: q.rule, reason: q.reason }
       : { file, line: q.line, rule: q.rule, reason: q.reason, id: q.id }))
 
+    if (file === SPRINTS_FILE) {
+      const sprints: IndexedSprint[] = []
+      for (const record of parsed.value.records) {
+        const sprint = decodeSprint(record)
+        if (!sprint.ok) {
+          findings.push({ file, line: record.line, rule: sprint.error.rule, reason: sprint.error.message, id: record.id })
+          continue
+        }
+        sprints.push(sprintRowOf(sprint.value, file, record.line, record.source))
+      }
+      if (parsed.value.crlf) {
+        findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
+      }
+      this.#index.replaceSprintFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, sprints, findings)
+      this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
+      return storeOk(false)
+    }
     if (file !== WORKSPACE_FILE) {
       for (const record of parsed.value.records) {
         const item = decodeItem(record)
@@ -654,6 +695,37 @@ export class ShardedStore implements Store {
 
       shards.set(file, withRecord(shard, { ...encoded.value, source, line: 0 }))
       applied.push({ id: write.item.id, version })
+    }
+
+    for (const write of transaction.sprints ?? []) {
+      const shard = shards.get(SPRINTS_FILE) ?? await this.#readShard(SPRINTS_FILE)
+      if (!('chunks' in shard)) return shard
+      shards.set(SPRINTS_FILE, shard)
+
+      const at = shard.chunkById.get(write.sprint.id)
+      const chunk = at === undefined ? undefined : shard.chunks[at]
+      if (chunk !== undefined && chunk.kind === 'quarantine') {
+        return storeFail(
+          'CONFLICT', chunk.quarantine.rule,
+          `${write.sprint.id} is a record ${SPRINTS_FILE} does not serve, so a write cannot say what it is changing: line ${chunk.quarantine.line}: ${chunk.quarantine.reason}`,
+          [write.sprint.id],
+        )
+      }
+      const stored = chunk === undefined ? undefined : chunk.record
+      const conflict = await this.#compareAndSet(write.sprint.id, stored, write.ifVersion)
+      if (conflict !== undefined) return conflict
+
+      const version = (stored === undefined ? 0 : Number(stored.fields.get('version') ?? 0)) + 1
+      const encoded = encodeSprint({ ...write.sprint, version }, stored)
+      if (!encoded.ok) return encoded
+      const source = renderRecord(encoded.value)
+      const back = parseRecordSource(source, 0)
+      if (!back.ok) return storeFail('VALIDATION', 'V4', `${write.sprint.id}: the record as written would not be served back: ${back.reason}`, [write.sprint.id])
+      const served = decodeSprint(back.record)
+      if (!served.ok) return storeFail('VALIDATION', 'V4', `${write.sprint.id}: the record as written would not be served back: ${served.error.message}`, [write.sprint.id])
+
+      shards.set(SPRINTS_FILE, withRecord(shard, { ...encoded.value, source, line: 0 }))
+      applied.push({ id: write.sprint.id, version })
     }
 
     const files = [...shards].map(([file, parsed]) => ({
@@ -879,6 +951,10 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
     relations: item.relations === undefined ? null : JSON.stringify(item.relations),
     source,
   }
+}
+
+export function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
+  return { id: sprint.id, file, line, state: sprint.state, filed_at: sprint.filed_at, source }
 }
 
 /**

@@ -5,7 +5,7 @@
 // what lets a later implementation coordinate differently without a contract change.
 
 import type { DomainErrorCode } from '../../domain/index.ts'
-import type { Instant, ItemId, WorkItem, WorkItemState, WorkItemSummary, WorkItemType } from '../../domain/index.ts'
+import type { Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType } from '../../domain/index.ts'
 
 /**
  * The domain's three codes plus the five a store can produce on its own. Widening a
@@ -98,9 +98,17 @@ export type ItemWrite = {
   readonly ifVersion?: number
 }
 
+/** One sprint write, under the same compare-and-set rule as an item's. */
+export type SprintWrite = {
+  readonly sprint: Sprint
+  readonly ifVersion?: number
+}
+
 export type StoreTransaction = {
   readonly txn: string
   readonly writes: readonly ItemWrite[]
+  /** Sprint records, which live in one file beside the shards and land in the same journal. */
+  readonly sprints?: readonly SprintWrite[]
   readonly events: readonly StoreEvent[]
 }
 
@@ -157,6 +165,8 @@ export interface Store {
    * record's own as `list` would serve it, never a cached approximation of it.
    */
   summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
+  /** Every sprint the store holds, in the order they were opened. There are few, so no query. */
+  sprints(): Promise<StoreResult<readonly Sprint[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
   /** All-or-nothing: every write lands or none does, under the store's own serialisation. */
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>

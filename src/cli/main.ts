@@ -20,6 +20,7 @@ import { history } from '../application/services/history.ts'
 import { explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { transition } from '../application/services/lifecycle.ts'
+import { closeSprint, commitItems, openSprint, reopenSprint, sprints, uncommitItems } from '../application/services/sprints.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
@@ -420,6 +421,40 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       return validation('relation', `relation ${verb} needs an id, a kind and the other id`, ['treadle help relation'])
     }
     return relate(target, systemClock, randomIds, { verb: verb as RelationVerb, id: entity, kind, other, actor })
+  }
+
+  if (command === 'sprints') return sprints(store, systemClock, operands[0])
+
+  if (command === 'sprint') {
+    // Five verbs, each named: the read is `sprints`, so nothing here is reached by omission.
+    const [verb, first, ...rest] = operands
+    if (verb === 'open') {
+      if (first === undefined) return validation('sprint', 'sprint open needs a title in quotes', ['treadle help sprint'])
+      const end = flag(flags, 'end')
+      if (end === undefined) return validation('sprint', 'sprint open needs --end <date>, the last day of the sprint', ['treadle help sprint'])
+      const chosen = flag(flags, 'id')
+      const start = flag(flags, 'start')
+      const goal = flag(flags, 'goal')
+      return openSprint(target, systemClock, randomIds, {
+        title: first, end, actor,
+        ...(chosen === undefined ? {} : { id: chosen }),
+        ...(start === undefined ? {} : { start }),
+        ...(goal === undefined ? {} : { goal }),
+      })
+    }
+    if (verb === 'commit') {
+      if (first === undefined) return validation('sprint', 'sprint commit needs a sprint id and then one or more item ids', ['treadle help sprint'])
+      return commitItems(target, systemClock, randomIds, { sprint: first, items: rest, actor })
+    }
+    if (verb === 'uncommit') return uncommitItems(target, systemClock, randomIds, { items: first === undefined ? [] : [first, ...rest], actor })
+    if (verb === 'close' || verb === 'reopen') {
+      if (first === undefined) return validation('sprint', `sprint ${verb} needs the id of one sprint`, ['treadle sprints'])
+      const request = { sprint: first, actor }
+      return verb === 'close'
+        ? closeSprint(target, systemClock, randomIds, request)
+        : reopenSprint(target, systemClock, randomIds, request)
+    }
+    return validation('sprint', `sprint takes one of open, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
   }
 
   if (command === 'transition') {
