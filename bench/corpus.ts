@@ -268,10 +268,18 @@ function relationsFor(
 ): { readonly byIndex: ReadonlyMap<number, StoredRelation[]>; readonly chain: number } {
   const byIndex = new Map<number, StoredRelation[]>()
   const duplicated = new Set<number>()
-  const add = (index: number, relation: StoredRelation): void => {
+  // The impediment pass and the chain pass can reach for the same edge, and a record holding
+  // one twice is a store refusal rather than a shrug. An edge already written is not an edge
+  // written, so `written` only counts what landed.
+  const already = new Set<string>()
+  const add = (index: number, relation: StoredRelation): boolean => {
+    const key = `${index}:${relation.kind}:${relation.target}`
+    if (already.has(key)) return false
+    already.add(key)
     const held = byIndex.get(index)
     if (held === undefined) byIndex.set(index, [relation])
     else held.push(relation)
+    return true
   }
   const idAt = (index: number): ItemId | undefined => items[index]?.id
   let written = 0
@@ -279,8 +287,7 @@ function relationsFor(
   for (const index of impediments) {
     const target = idAt(index + 1 + Math.floor(next() * 8))
     if (target === undefined) throw new Error(`impediment at index ${index} has nothing to block`)
-    add(index, { kind: 'blocks', target })
-    written += 1
+    if (add(index, { kind: 'blocks', target })) written += 1
   }
 
   // Chains of eight, so the walk from any node has somewhere to go without approaching the
@@ -293,16 +300,14 @@ function relationsFor(
       for (let step = 0; step < chain && written < edges; step += 1) {
         const target = idAt(at + step + 1)
         if (target === undefined) break
-        add(at + step, { kind: 'blocks', target })
-        written += 1
+        if (add(at + step, { kind: 'blocks', target })) written += 1
       }
       at += chain + 1
       continue
     }
     if (roll < 0.7 && !duplicated.has(at)) {
       const target = idAt(at + 1 + Math.floor(next() * 32))
-      if (target !== undefined) {
-        add(at, { kind: 'duplicates', target })
+      if (target !== undefined && add(at, { kind: 'duplicates', target })) {
         duplicated.add(at)
         written += 1
       }
@@ -311,10 +316,7 @@ function relationsFor(
     }
     // Symmetric, so the store holds it once on the lower id, which is the lower index here.
     const target = idAt(at + 1 + Math.floor(next() * 64))
-    if (target !== undefined) {
-      add(at, { kind: 'relates_to', target })
-      written += 1
-    }
+    if (target !== undefined && add(at, { kind: 'relates_to', target })) written += 1
     at += 3
   }
 
