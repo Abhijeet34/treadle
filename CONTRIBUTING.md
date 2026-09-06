@@ -63,6 +63,12 @@ Removes-test: carries the five components of each row, and the weights that mult
 One trailer covers one test.
 A trailer that names a title nothing in your branch removes fails too, so the declaration cannot be written ahead of the removal or left behind after it.
 
+**No harness-specific instruction file at the repository root.**
+`AGENTS.md` is the cross-harness convention and carries the whole of it; every harness that looks for another name can be pointed at that one.
+A root file named for one product says which harness the project is really for, and this one has been added twice in good faith and removed once, the second arrival through a rebase conflict.
+`test/architecture/harness-instruction-files.test.ts` names the files it refuses, and [docs/architecture/adr/0019-no-harness-specific-instruction-file.md](docs/architecture/adr/0019-no-harness-specific-instruction-file.md) argues the rule and the list.
+Keep instructions your own harness needs outside the tree.
+
 **No em dashes.**
 Use a plain hyphen or a new sentence.
 
