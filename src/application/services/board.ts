@@ -9,7 +9,7 @@
 // a column is capped, and the row a reader came for must be inside the cap. ADR-0018 argues
 // each of those against the alternatives.
 
-import { dayOfSprint, type ItemId, type WorkItemState, type WorkItemSummary } from '../../domain/index.ts'
+import { sprintDay, type ItemId, type WorkItemState, type WorkItemSummary } from '../../domain/index.ts'
 import { errorResult, okResult, type Block, type ColumnSpec, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { Store } from '../ports/store.ts'
@@ -109,8 +109,7 @@ function scopeOf(view: WorkspaceView, request: BoardRequest, workspace: string):
 function scopeLine(view: WorkspaceView, id: string, now: string): string {
   const sprint = view.sprintById.get(id)
   if (sprint === undefined) return id
-  const at = dayOfSprint(sprint, now)
-  return `${id} ${sprint.state} day ${at.day}/${at.days}`
+  return `${id} ${sprint.state} day ${sprintDay(sprint, now)}`
 }
 
 export async function board(store: Store, clock: Clock, request: BoardRequest): Promise<ResultObject> {

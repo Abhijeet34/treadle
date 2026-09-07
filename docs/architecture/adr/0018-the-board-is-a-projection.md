@@ -49,7 +49,7 @@ The cell does not carry the blocker's own type or severity, because that is the 
 
 ### The open sprint is the default scope
 
-With no flag the board is the one open sprint, `scope <id> <state> day n/m` says so, and a `whole` line carries `treadle board --all` for the reader who wanted the workspace.
+With no flag the board is the one open sprint, `scope <id> <state> day <sprintDay>` says so ([ADR-0016](0016-sprints.md) owns the token's shape), and a `whole` line carries `treadle board --all` for the reader who wanted the workspace.
 The alternative, the whole workspace by default, shows a team its history mixed with its current work, and `next` already weights membership of an open sprint for the same reason.
 
 `--sprint <id>` is the backlog's own filter, so a closed sprint's board is what still points at it and `sprints <id>` carries what moved on; the two are the same set until the carry-over is committed onward, which is what ADR-0016 asks a team to do.

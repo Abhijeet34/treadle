@@ -221,6 +221,8 @@ A sprint an older build closed carries no `points`, and everything about it read
 [ADR-0023](architecture/adr/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) carries the argument.
 
 `dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
+`sprintDay(sprint, now)` is what a read surface prints from that pair: `3/14` inside the window, and outside it the distance from the boundary as one token, `ended+967d/14` or `starts+14d/12`.
+It is one token because `status` prints it in a row cell that is not the last one and the row grammar splits on spaces, and it is a distance because `day 981/14` is arithmetic no reader can act on ([ADR-0016](architecture/adr/0016-sprints.md), STR-8).
 `evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.
 A `draft` item whose fields are complete enters a sprint, and that is the decision rather than an omission: planning a sprint with work nobody has refined yet is ordinary, and `file --sprint` files in `draft` by construction, so refusing it would make that flag refuse every item it can file.
 What the tool owed the reader instead is the list, because `next` ranks `ready` only.

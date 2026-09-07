@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, isSafeText, shellWord, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, findUnsafeCharacter, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -41,6 +41,7 @@ import { Diagnostics, type Level } from './diagnostics.ts'
 import { exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
 import { commandNamed } from './inventory.ts'
+import { operandRefusal } from './operands.ts'
 import { FILTER_FLAGS, parse, presentationFlags, type FilterFlag } from './parse.ts'
 import { checkRuntime } from './runtime.ts'
 
@@ -128,6 +129,11 @@ const BOUNDED_ELSEWHERE = new Set(['desc', 'goal', 'reason', 'set', 'actor', 'wo
  * stdout, because the value no record could carry came back in the `filter` and `narrowest`
  * lines and in the `page` line built from them. Refusing it here bounds all four and every
  * later reader of a filter, rather than one guard per line that prints one.
+ *
+ * The safe-line rule is asked of every flag on every command for the same reason G2 puts one
+ * on every operand: it was asked of the eight filters alone, and `--id`, `--cursor` and
+ * `--explain-absence` reached a scalar line unbounded on five commands. `backlog --cursor
+ * $'a\nb'` printed `err INTERNAL` at exit 1 out of the renderer's invariant.
  */
 function flagValueRefusal(
   flags: Readonly<Record<string, unknown>>, command: string | undefined,
@@ -144,12 +150,28 @@ function flagValueRefusal(
     )
   }
   for (const [name, value] of Object.entries(flags)) {
-    if (typeof value !== 'string' || BOUNDED_ELSEWHERE.has(name) || value.length <= MAX_LINE) continue
-    return validation(
-      command ?? 'treadle',
-      `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
-      help,
-    )
+    if (BOUNDED_ELSEWHERE.has(name)) continue
+    // The length bound reads a string flag and the safe-line bound reads a repeatable one
+    // too. Widening the length bound to a repeatable flag would preempt `file --label`'s own
+    // dictionary refusal, which names the slug rule rather than a line length; the safe-line
+    // bound has no such sibling, because a delimiter is refused by no field dictionary
+    // before the renderer has already thrown on it.
+    if (typeof value === 'string' && value.length > MAX_LINE) {
+      return validation(
+        command ?? 'treadle',
+        `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
+        help,
+      )
+    }
+    for (const one of valuesOf(flags, name)) {
+      const found = findUnsafeCharacter(one, 'line')
+      if (found === undefined) continue
+      return validation(
+        command ?? 'treadle',
+        `--${name} carries ${found.label} at character ${found.at + 1}, and no field of a record holds one: a value on this line is a single line with no control or bidi override characters`,
+        help,
+      )
+    }
   }
   // The two rules below are about a filter's value rather than any flag's, so they are asked
   // of the two commands that filter and of nothing else: on `file` and `sprint set` the same
@@ -163,20 +185,13 @@ function flagValueRefusal(
   // and it is closed in the same place, for every filter at once rather than per line printed.
   for (const name of FILTER_FLAGS) {
     for (const value of valuesOf(flags, name)) {
-      // The bound above reads a string flag, so a repeatable one is checked here instead of
-      // being widened there: widening it would preempt `file --label`'s own dictionary
-      // refusal, which names the slug rule rather than a line length.
-      if (value.length > MAX_LINE) {
-        return validation(
-          command,
-          `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
-          help,
-        )
-      }
-      if (isSafeText(value, 'line')) continue
+      // The length bound above reads a string flag, so a repeatable one is bounded here
+      // instead of there, for the reason that bound's own comment gives. The safe-line half
+      // of this loop moved into it, because it now covers every flag rather than these eight.
+      if (value.length <= MAX_LINE) continue
       return validation(
         command,
-        `--${name} carries a character no record's field may hold, so nothing could match it: a filter is a single line with no control or bidi override characters`,
+        `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
         help,
       )
     }
@@ -348,6 +363,12 @@ async function execute(env: Environment): Promise<number> {
 
   const badFlag = flagValueRefusal(flags, command)
   if (badFlag !== undefined) return emit(env, badFlag, flags)
+
+  // Beside its sibling above, and for the same reason: both bound a caller's word before any
+  // service reads it, and both run before the workspace is resolved so that a line no store
+  // could answer is refused by what it says rather than by where it was run.
+  const badOperand = operandRefusal(command, operands)
+  if (badOperand !== undefined) return emit(env, badOperand, flags)
 
   if (command === 'help' || flags['help'] === true) {
     const topic = command === 'help' ? operands[0] : command

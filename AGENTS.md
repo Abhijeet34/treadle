@@ -251,6 +251,12 @@ Before hand-checking any of these, run the suite: it already checks them.
   indexed scores are the same list. Delete it and the property that ADR-0021's index is
   correct has nothing left holding it. Read what the test does with the symbol before
   deciding, because a missing wire and dead code look identical to a grep.
+- A command's operands are bounded by the usage lines it declares in `src/cli/inventory.ts`,
+  not by a list anyone maintains. `<id>`, `<sprint>` and `<other>` in a usage line are what
+  make `src/cli/operands.ts` refuse a delimiter in that position before any service reads it,
+  so a new command with `<id>` in its usage is guarded when it is written; a new placeholder
+  of its own fails `test/cli/operand-guard.test.ts`, which also refuses an entity operand no
+  line in that file poisons. Adding a command means writing its usage before its dispatch arm.
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
   filesystem. `test/security/f1-f7-no-execution.test.ts` and

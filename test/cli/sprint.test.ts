@@ -114,8 +114,10 @@ describe('a sprint from open to close, at the command surface', () => {
     assert.doesNotMatch(status.out, /^absent_features/m, 'every feature it named has landed')
     assert.match(status.out, /^~sprints 2 2$/m)
     assert.match(status.out, /^#id day items pts "title$/m)
-    assert.match(status.out, /^sprint-31 -?\d+\/12 0\/3 0\/10 Sprint 31$/m)
-    assert.match(status.out, /^sprint-32 -?\d+\/12 0\/0 0\/0 Sprint 32$/m)
+    // The day cell is one token in every case: `3/12` inside the window, and the distance
+    // from the boundary outside it, which is what sprint-32 sits on (STR-8).
+    assert.match(status.out, /^sprint-31 \d+\/12 0\/3 0\/10 Sprint 31$/m)
+    assert.match(status.out, /^sprint-32 starts\+\d+d\/12 0\/0 0\/0 Sprint 32$/m)
     await insideEveryWidth(['status'])
   })
 
@@ -514,5 +516,70 @@ describe('a sprint says which of its committed work is not groomed yet', () => {
     assert.doesNotMatch(record.out, /^not_ready /m)
     assert.doesNotMatch((await cli(['status'])).out, /^not_ready /m)
     assert.match((await cli(['next', '--limit', '20'])).out, /^deploy-key /m)
+  })
+})
+
+// STR-8: a sprint whose window is not around today reported `day 981/14` on every read.
+//
+// Day 981 of a 14-day sprint is arithmetic rather than a day, and it reads as a defect in
+// the tool rather than as the `--start` typed with the wrong year that it usually is. The
+// three reads print the distance from the boundary instead, in one token because `status`
+// prints it in a row cell that is not the last and the row grammar splits on spaces.
+describe('a sprint window that is not around today reports a distance, not a day number', () => {
+  /** A UTC calendar day this many days from today, which is what a sprint boundary is. */
+  const day = (offset: number): string =>
+    new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10)
+
+  let demo: Demo
+  before(async () => { demo = await aDemoWorkspace() })
+  after(async () => { await demo.dispose() })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
+
+  it('says so when a window that has already closed is opened, and every read then agrees', async () => {
+    const opened = await cli(['sprint', 'open', 'Last year', '--id', 'last-year', '--start', '2024-01-01', '--end', '2024-01-14'])
+    assert.equal(opened.code, 0, opened.err)
+    assert.match(opened.out, /^note this sprint's window closed on 2024-01-14, \d+ days ago, so every read reports it as ended\+\d+d\/14/m, opened.out)
+    const ended = /ended\+(\d+)d\/14/.exec(opened.out)?.[1]
+    assert.ok(ended !== undefined, opened.out)
+
+    const listed = await cli(['sprints', 'last-year'])
+    assert.equal(listed.code, 0, listed.err)
+    assert.match(listed.out, new RegExp(`^day ended\\+${ended}d/14$`, 'm'), listed.out)
+
+    const overview = await cli(['status'])
+    assert.equal(overview.code, 0, overview.err)
+    assert.match(overview.out, new RegExp(`^last-year ended\\+${ended}d/14 `, 'm'), overview.out)
+
+    const board = await cli(['board', '--sprint', 'last-year'])
+    assert.equal(board.code, 0, board.err)
+    assert.match(board.out, new RegExp(`^scope last-year open day ended\\+${ended}d/14$`, 'm'), board.out)
+  })
+
+  it('reports a window that has not opened yet the same way, and says nothing about it', async () => {
+    const opened = await cli(['sprint', 'open', 'Next year', '--id', 'next-year', '--start', '2099-01-01', '--end', '2099-01-14'])
+    assert.equal(opened.code, 0, opened.err)
+    // Opening next week's sprint is what a team does on purpose, so there is no note: only
+    // the day cell has to answer, and `-1211/14` was not an answer.
+    assert.doesNotMatch(opened.out, /^note /m, opened.out)
+    const listed = await cli(['sprints', 'next-year'])
+    assert.match(listed.out, /^day starts\+\d+d\/14$/m, listed.out)
+    assert.match((await cli(['status'])).out, /^next-year starts\+\d+d\/14 /m)
+    assert.match((await cli(['board', '--sprint', 'next-year'])).out, /^scope next-year open day starts\+\d+d\/14$/m)
+  })
+
+  it('leaves a window around today as the day of it, which is the reading that was never wrong', async () => {
+    const opened = await cli(['sprint', 'open', 'This week', '--id', 'this-week', '--start', day(-3), '--end', day(10)])
+    assert.equal(opened.code, 0, opened.err)
+    assert.doesNotMatch(opened.out, /^note /m, opened.out)
+    const listed = await cli(['sprints', 'this-week'])
+    assert.equal(listed.code, 0, listed.err)
+    assert.match(listed.out, /^day 4\/14$/m, listed.out)
+    assert.match((await cli(['status'])).out, /^this-week 4\/14 /m)
+  })
+
+  it('says it again when an edit moves a window off the clock, from the same sentence', async () => {
+    const moved = await cli(['sprint', 'set', 'this-week', '--start', '2024-02-01', '--end', '2024-02-14'])
+    assert.equal(moved.code, 0, moved.err)
+    assert.match(moved.out, /^note this sprint's window closed on 2024-02-14, \d+ days ago, so every read reports it as ended\+\d+d\/14/m, moved.out)
   })
 })

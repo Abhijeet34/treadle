@@ -69,8 +69,14 @@ A committed set that shrank on every cancellation would make the commitment mean
 `start` and `end` are written `YYYY-MM-DD` and are refused unless they name a real day (`2026-02-30` is refused rather than read as the second of March, rule `I1`) and `end` is on or after `start`.
 A sprint boundary is a planning fact, "Monday to the Friday after next", not an instant, and an instant would put the same start at 01:00 for one reader and 19:00 the previous day for another.
 The day is read in UTC because every instant the store writes is UTC, and a `day` line that differed between two machines in two zones is the disagreement the rule exists to remove.
-`day n/m` is 1 on `start` and `m` on `end`, both inclusive, and is not clamped: `day 16/12` is the fact a reader of an overrunning sprint needs, and `day 0/12` says the sprint starts tomorrow.
+`day n/m` is 1 on `start` and `m` on `end`, both inclusive, and the arithmetic behind it is not clamped.
 `--start` defaults to the UTC date of the clock; `--end` is required, because the length of a sprint is the one thing a tool cannot guess for a team.
+
+This record originally printed that arithmetic whole, on the reading that `day 16/12` is the fact a reader of an overrunning sprint needs and `day 0/12` says the sprint starts tomorrow.
+That is right at those sizes and wrong at the sizes a mistyped year reaches: round six's STR-8 measured a sprint dated 2024 opening in 2026 and reading `day 981/14` on `status`, `sprints` and `board` alike, which is a distance wearing a day's clothes.
+The reading is therefore narrowed rather than reversed: inside the window the day is still the day, and outside it every read prints the distance from the boundary as one token, `ended+967d/14` or `starts+14d/12`.
+No threshold picks between the two forms, because `ended+2d` and `ended+967d` are the same sentence at two sizes and any cut-off between them would be a number this record could not defend.
+`sprintDay` in `src/domain/sprint.ts` is the one home; `dayOfSprint` still returns the unclamped pair, which is what the note on `sprint open` and `sprint set` reads to decide whether to speak at all.
 
 ### What may enter a sprint
 

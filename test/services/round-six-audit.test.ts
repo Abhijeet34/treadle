@@ -162,7 +162,7 @@ describe('SEAM-7 and STR-8: a sprint reports what moved and says when its window
     const opened = must(await cli([
       'sprint', 'open', 'Old sprint', '--id', 'old-sprint', '--start', '2026-01-01', '--end', '2026-01-14',
     ]), 'open')
-    assert.match(opened.out, /^note this sprint's window closed on 2026-01-14, so it opens at day \d+ of 14/m, opened.out)
+    assert.match(opened.out, /^note this sprint's window closed on 2026-01-14, \d+ days ago, so every read reports it as ended\+\d+d\/14/m, opened.out)
   })
 })
 

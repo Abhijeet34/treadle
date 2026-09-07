@@ -150,6 +150,7 @@ export {
   membersOf,
   dateOf,
   dayOfSprint,
+  sprintDay,
   evaluateCommit,
   isCalendarDate,
   isSprintField,

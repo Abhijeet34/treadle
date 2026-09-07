@@ -114,5 +114,5 @@ The set is closed.
 | Id | Rule |
 |---|---|
 | `C1` | The invocation is not usable as written: a missing operand, a value outside a closed set, or two flags that ask different questions |
-| `C2` | A named field or column is not one this command has |
+| `C2` | A named field or column is not one this command has, or is named more than once in a set printed once |
 | `C3` | A column set names two free-text columns, which no row ordering can render unambiguously |
