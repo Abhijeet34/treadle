@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, shellWord, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, isSafeText, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -151,16 +151,34 @@ function flagValueRefusal(
       help,
     )
   }
+  // The two rules below are about a filter's value rather than any flag's, so they are asked
+  // of the two commands that filter and of nothing else: on `file` and `sprint set` the same
+  // flag names a field, and the field dictionary already refuses it with a better sentence.
+  if (command !== 'backlog' && command !== 'board') return undefined
+
+  // A filter value comes back in the `filter`, `narrowest` and `page` lines, and the agent
+  // rendering treats a newline as a record delimiter, so a value carrying one threw a render
+  // invariant out of a read: `backlog --assignee $'kim\nfake'` printed `err INTERNAL` and
+  // exited 1 on the tree before this one. It is the same class the length bound above closes
+  // and it is closed in the same place, for every filter at once rather than per line printed.
+  for (const name of FILTER_FLAGS) {
+    const value = flag(flags, name)
+    if (value === undefined || isSafeText(value, 'line')) continue
+    return validation(
+      command,
+      `--${name} carries a character no record's field may hold, so nothing could match it: a filter is a single line with no control or bidi override characters`,
+      help,
+    )
+  }
+
   // `--title` is the one filter that matches on words rather than on a whole value, so a
   // value with no word in it is the one filter value that would select everything instead of
   // nothing. Every other filter compares a value a record either carries or does not, and an
-  // empty one there matches nothing and says so through `narrowest`. Scoped to the two lists
-  // that filter, because `sprint set --title` writes a field and is held to that field's own
-  // check, as every other value-writing flag in BOUNDED_ELSEWHERE is.
-  const title = command === 'backlog' || command === 'board' ? flag(flags, 'title') : undefined
+  // empty one there matches nothing and says so through `narrowest`.
+  const title = flag(flags, 'title')
   if (title !== undefined && title.trim().length === 0) {
     return validation(
-      command ?? 'treadle',
+      command,
       '--title searches titles for the words it is given, and this value has none',
       help,
     )
@@ -536,6 +554,15 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
 
   if (command === 'remove') {
     if (id === undefined) return validation('remove', 'remove needs the id of one item', ['treadle backlog'])
+    // Every other single-entity command drops an operand past the first, which costs a
+    // re-run. Here it would cost a record: `remove a b` removed `a`, exited 0, and left `b`
+    // filed, and no line of that answer says the second id was dropped. One id, named.
+    // A.6: the ids are the caller's own unvalidated words, so the count reaches the cause
+    // and neither of them reaches a fix line.
+    if (operands.length > 1) {
+      return validation('remove', `remove takes one id and this line names ${operands.length}; a removal is confirmed one record at a time`,
+        ['treadle remove <id> --reason "<why>" --yes'])
+    }
     const reason = flag(flags, 'reason')
     return removeItem(target, systemClock, randomIds, {
       id, ...(reason === undefined ? {} : { reason }), confirmed: flags['yes'] === true, actor,

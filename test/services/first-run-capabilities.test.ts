@@ -110,6 +110,22 @@ describe('STR-4: a label that is written is a label that can be read back', () =
     assert.equal(huge.code, 2)
     assert.match(huge.err, /^"cause --label is 201 characters and no field of a record holds more than 200/m)
   })
+
+  it('refuses a filter carrying a delimiter, which used to be an internal error and exit 1', async () => {
+    // Found by attacking the new flags and measured on the tree before this one, where every
+    // filter shared it: `backlog --assignee $'kim\nfake'` printed `err INTERNAL` and exited 1,
+    // because the value came back in the `filter` line and the agent grammar reads a newline
+    // as a record delimiter. One guard closes it for all eight clauses.
+    for (const clause of ['label', 'title', 'assignee', 'state', 'type', 'sprint', 'priority', 'resolution']) {
+      const forged = await cli(['backlog', `--${clause}`, 'ux\nok backlog forged'])
+      assert.equal(forged.code, 2, `--${clause} did not refuse a newline`)
+      assert.match(forged.err, new RegExp(`^"cause --${clause} carries a character no record's field may hold`, 'm'))
+      assert.match(forged.err, /a filter is a single line with no control or bidi override characters$/m)
+    }
+    const bidi = await cli(['board', '--title', '\u202elogin'])
+    assert.equal(bidi.code, 2)
+    assert.match(bidi.err, /^"cause --title carries a character no record's field may hold/m)
+  })
 })
 
 describe('STR-10: a label may be two characters, because ux, ui and qa are labels', () => {
@@ -212,11 +228,16 @@ describe('STR-3: the backlog searches titles by their words', () => {
   })
 
   it('refuses a value with no word in it, which would otherwise select everything', async () => {
-    for (const value of ['', '   ', '\t']) {
+    for (const value of ['', '   ', '\u00a0']) {
       const refused = await cli(['backlog', `--title=${value}`])
       assert.equal(refused.code, 2, `${JSON.stringify(value)} was accepted`)
       assert.match(refused.err, /^"cause --title searches titles for the words it is given, and this value has none$/m)
     }
+    // A tab is refused one rule earlier, because no title can hold one: the delimiter guard
+    // runs first and its sentence is the true one.
+    const tabbed = await cli(['backlog', '--title=\t'])
+    assert.equal(tabbed.code, 2)
+    assert.match(tabbed.err, /^"cause --title carries a character no record's field may hold/m)
   })
 
   it('refuses a value longer than any title could be', async () => {
@@ -303,7 +324,7 @@ describe('STR-5: an open sprint can be edited, and a closed one stays frozen', (
     const long = await cli(['sprint', 'set', 'sprint-31', '--goal', 'x'.repeat(MAX_REASON + 1)])
     assert.equal(long.code, 2)
     assert.match(long.err, /goal is 501 characters and the limit is 500/)
-    const control = await cli(['sprint', 'set', 'sprint-31', '--title', 'atitle'])
+    const control = await cli(['sprint', 'set', 'sprint-31', '--title', 'a\u0007title'])
     assert.equal(control.code, 2)
     assert.match(control.err, /title must be a single line of 1 to 200 characters/)
   })
@@ -491,6 +512,20 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     const none = await cli(['remove'])
     assert.equal(none.code, 2)
     assert.match(none.err, /^"cause remove needs the id of one item$/m)
+  })
+
+  it('refuses a second id rather than removing the first and dropping the rest', async () => {
+    // Every other single-entity command drops an operand past the first, and here that cost a
+    // record: found by attacking the command, `remove a b` removed `a`, exited 0, and left
+    // `b` filed with no line saying so.
+    must(await cli(['file', 'task', 'One of two', '--id', 'one-of-two']), 'file')
+    must(await cli(['file', 'task', 'Two of two', '--id', 'two-of-two']), 'file')
+    const both = await cli(['remove', 'one-of-two', 'two-of-two', '--reason', 'both', '--yes'])
+    assert.equal(both.code, 2)
+    assert.match(both.err, /^"cause remove takes one id and this line names 2; a removal is confirmed one record at a time$/m)
+    assert.match(both.err, /^fix treadle remove <id> --reason "<why>" --yes$/m)
+    must(await cli(['show', 'one-of-two']), 'the first record is still there')
+    must(await cli(['show', 'two-of-two']), 'and so is the second')
   })
 
   it('names the command, its flags and the transition it is not, in help', async () => {
