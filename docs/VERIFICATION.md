@@ -172,7 +172,7 @@ ok history demo
 item pay-hook
 sort at desc
 ~events 4 4
-#at kind op what "by
+#at kind op "what "by
 2026-09-05T12:10:07Z human item.transition state kim
 2026-09-05T12:10:07Z human item.transition state ravi
 2026-09-05T12:10:07Z agent item.mark severity agent-7

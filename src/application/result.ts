@@ -157,8 +157,9 @@ export type OkInput = {
   /**
    * The verdict the exit status is read from, `OK` unless the command's answer is itself a
    * verdict on the store. `doctor` is that command: it answers with the findings table and
-   * exits `INTEGRITY` when the table is not empty, so a script asks "is my store intact"
-   * from the status alone. `ok` stays true, because the command produced its answer.
+   * exits `INTEGRITY` when a row on it hides a record, printing a `serving` line and exiting
+   * `OK` when every row reports content the store still serves, so a script asks "is my store
+   * intact" from the status alone. `ok` stays true, because the command produced its answer.
    */
   readonly code?: ResultCode
   readonly data: ResultData
