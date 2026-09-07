@@ -74,7 +74,12 @@ jobs:
         if: always()
         run: |
           set -uo pipefail
-          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || true)
+          # The largest count in the log, not the last. A test that runs `node --test` in a
+          # child prints that child's own TAP summary, and on windows-2025 the security suite's
+          # nested `# tests 215` landed after the run's own `tests 1728`: `tail -1` read the
+          # child and failed a green job for running 215 tests. The run's own count is always
+          # the largest, because every nested set is a subset of it.
+          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | sort -n | tail -1 || true)
           if [ -z "${ran:-}" ]; then
             echo "::error::${{ matrix.os }}: the suite reported no test count, so nothing here is evidence" >&2
             echo "${{ matrix.os }} - NO VERDICT: the suite never reported a test count" >> "$GITHUB_STEP_SUMMARY"

@@ -53,7 +53,7 @@ node bin/treadle.js status
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 1,734 tests in 162 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 3.45.
+The suite ran 1,747 tests in 162 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 3.45.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 

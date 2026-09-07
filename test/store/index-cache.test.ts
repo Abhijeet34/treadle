@@ -5,6 +5,8 @@
 // and in a loop, and asserts the answers never move.
 
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
+import { realpathSync } from 'node:fs'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
@@ -14,6 +16,24 @@ import { renderEvent } from '../../src/adapters/store/index.ts'
 import type { Store, StoreEvent } from '../../src/application/ports/store.ts'
 
 const DELETIONS = 10
+
+/** `lsof` is how an open handle is counted here; Windows has neither it nor this test's point. */
+const LSOF: string | false = process.platform === 'win32'
+  ? 'lsof is not a Windows tool; the same defect shows there as EBUSY on the rebuild itself'
+  : false
+
+/**
+ * Rows of this process's open-file table naming exactly `file`. The path is the last field of
+ * an `lsof` row, and matching a substring would count the `-wal` and `-shm` files WAL mode
+ * keeps beside the database.
+ */
+function openHandlesOn(file: string): number {
+  // Through `realpath`, because `lsof` reports the resolved path and a temporary directory
+  // under `/tmp` on macOS is a symlink into `/private/tmp`.
+  const real = realpathSync(file)
+  const out = execFileSync('lsof', ['-p', String(process.pid)], { encoding: 'utf8' })
+  return out.split('\n').filter((line) => line.trim().split(/\s+/).at(-1) === real).length
+}
 
 async function snapshot(store: Store): Promise<string> {
   const items = await store.list()
@@ -47,6 +67,29 @@ describe('the index is a cache and deleting it is always harmless', () => {
         assert.equal(await snapshot(workspace.store), reference, `answers moved after deletion ${i + 1}`)
       }
       assert.ok(await stat(path.join(index, 'index.sqlite')), 'the index rebuilds itself')
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  // The handle a failed open used to leave behind. `new DatabaseSync` returns on a file of
+  // arbitrary bytes and the header is only read by the first statement, so the `file is not a
+  // database` throw left an open connection to the very file the rebuild then deletes. POSIX
+  // unlinks it anyway and the cost is one leaked descriptor per corrupt open; Windows answers
+  // `EBUSY`, the retry reads the same bytes, and `status` exited 6 with `S13` over a cache this
+  // tool documents as always rebuildable (windows-2025, run 34110894767).
+  it('holds no descriptor on an index it could not open', { skip: LSOF }, async () => {
+    const workspace = await aWorkspace()
+    try {
+      await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [anEvent()] })
+      await workspace.store.close()
+      const file = path.join(workspace.root, '.index', 'index.sqlite')
+      await writeFile(file, 'not a database, not even close')
+
+      const before = openHandlesOn(file)
+      const items = await workspace.store.list()
+      assert.ok(items.ok, items.ok ? '' : items.error.message)
+      assert.equal(openHandlesOn(file) - before, 1, 'the rebuilt index is one handle, not two')
     } finally {
       await workspace.dispose()
     }
