@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
+import { checkRuntime } from '../../src/cli/runtime.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BUNDLE = 'dist/treadle.js'
@@ -218,10 +219,10 @@ describe('the published package is the bundle and nothing else', () => {
     // not look here. Derived from the manifest rather than restated, so there is no sixth
     // literal to keep in step.
     const declared = (manifest.engines?.node ?? '').replace(/^>=/, '')
-    const source = readFileSync(path.join(ROOT, 'src', 'cli', 'runtime.ts'), 'utf8')
-    const named = /^export const DECLARED_FLOOR = '([^']+)'$/m.exec(source)?.[1]
-    assert.equal(named, declared,
-      `src/cli/runtime.ts names ${String(named)} as the supported floor while package.json declares ${declared}`)
+    const result = checkRuntime('23.0.0')
+    assert.equal(result.ok, false)
+    assert.match((result as { cause: string }).cause, new RegExp(declared.replaceAll('.', '\\.')),
+      `checkRuntime's refusal must name ${declared}, the floor package.json declares`)
   })
 })
 
