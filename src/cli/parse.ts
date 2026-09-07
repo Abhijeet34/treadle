@@ -76,6 +76,11 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     assignee: { type: 'string' },
     priority: { type: 'string' },
     resolution: { type: 'string' },
+    // Repeatable, and every one has to hold. `file --label` already repeats, so a caller who
+    // learned it there would otherwise write `backlog --label a --label b` and silently get
+    // `b` alone; and an item carries a list, so "carrying both" is the question to ask of it.
+    label: { type: 'string', multiple: true },
+    title: { type: 'string' },
   },
   board: {
     state: { type: 'string' },
@@ -84,6 +89,8 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     assignee: { type: 'string' },
     priority: { type: 'string' },
     resolution: { type: 'string' },
+    label: { type: 'string', multiple: true },
+    title: { type: 'string' },
     all: { type: 'boolean' },
   },
   transition: {
@@ -101,11 +108,15 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   },
   evidence: {},
   relation: {},
+  remove: { reason: { type: 'string' } },
   sprint: {
     id: { type: 'string' },
     start: { type: 'string' },
     end: { type: 'string' },
     goal: { type: 'string' },
+    // `sprint set` writes the title a later `sprint open` would have taken as its operand:
+    // an operand there would read as a second sprint id beside the one being edited.
+    title: { type: 'string' },
   },
   sprints: {},
   doctor: {},
@@ -117,8 +128,13 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   version: {},
 }
 
-/** Filter flags, in the order they were written, so a tie names the first one (A.4). */
-export const FILTER_FLAGS = ['state', 'type', 'sprint', 'assignee', 'priority', 'resolution'] as const
+/**
+ * Filter flags, in the order they were written, so a tie names the first one (A.4). `label`
+ * and `title` are appended rather than placed, because this order is what a line that names
+ * no flag falls back to and moving an existing entry would change which clause an existing
+ * caller's `narrowest` and `--explain-absence` lines name.
+ */
+export const FILTER_FLAGS = ['state', 'type', 'sprint', 'assignee', 'priority', 'resolution', 'label', 'title'] as const
 export type FilterFlag = (typeof FILTER_FLAGS)[number]
 
 export type Parsed = {

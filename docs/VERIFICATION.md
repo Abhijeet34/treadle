@@ -23,7 +23,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A hand edit during an operation is handled | 12 trials: 6 broken records quarantined and reported as findings with the record either side still serving, 6 concurrent edits leaving a shard that still parses, 0 stores left unreadable | Proven |
 | Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
 | The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 16 golden objects through 4 renderers, 64 renderings, the fourth written against 2 types and no code | Proven |
-| No network egress | 19 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
+| No network egress | 20 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.54% lines and 89.81% branches against a 90/85 gate; every one of the 7 named files over its 95/90 bar | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 0 failures, and the same test count in all 20, which is the condition `scripts/flake.ts` fails on if it moves; 50.9 s to 84.5 s each, 1,437 s in total | Proven |
 | One regression test per closed security finding | 12 closed findings, each mapped to a named test that names the finding and carries assertions, 201 assertions passing across the 12 files in one child run; 1 open finding naming the layer it waits on | Proven |
@@ -107,7 +107,7 @@ Writing those tests is what found the crash below.
 It also fails if the test count moves between runs, because a suite that decides at runtime how much to check would pass while checking nothing.
 
 Measured on the branch that added this section: 20 of 20 runs completed, 20 green, 0 failed, a test count that did not move across the 20, and 1,147 s in total.
-The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06 and 1,499, then 1,750, on 2026-09-07 as two rounds of audit fixes landed.
+The count itself is deliberately not repeated here, because the paragraph above says a number that measures the size of the tree rots into a false statement on the next commit, and this one did: it read 757 for six pull requests after the suite had grown past it, where `node --test "test/**/*.test.ts"` reported 1,146 on 2026-09-06 and 1,499, then 1,750, then 1,819, on 2026-09-07 as two rounds of audit fixes and the first-run capabilities landed.
 That command is the number's only authority, and it is one line to run.
 What the gate asserts is zero failures and a count that does not move within a run set, which is the part a later commit cannot make false.
 Individual runs ranged from 49.8 s to 88.6 s, which is a 1.78x spread on a shared machine and is the reason the fuzzer's time bound is generous rather than tight.

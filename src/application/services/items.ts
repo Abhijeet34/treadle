@@ -51,6 +51,9 @@ export const ITEM_COLUMNS: readonly ColumnSpec[] = [
   { name: 'assignee', text: true },
   { name: 'title', text: true },
   { name: 'sev' },
+  // Comma-joined and never spaced, so it is not a free-text column under F3 and can sit in
+  // the same row as `title`; a label carries no space by its own slug rule.
+  { name: 'labels' },
 ]
 
 /**
@@ -635,21 +638,56 @@ export async function showItem(
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */
 export type Filter = {
-  readonly field: 'state' | 'type' | 'sprint' | 'assignee' | 'priority' | 'resolution'
+  readonly field: 'state' | 'type' | 'sprint' | 'assignee' | 'priority' | 'resolution' | 'label' | 'title'
   readonly value: string
 }
 
+/**
+ * The value a clause is compared against, for the six clauses that compare one stored scalar
+ * for equality. `label` and `title` are not among them: a label is one entry of a list and a
+ * title is matched by its words, so both answer through `holds` below and print what the item
+ * carries here, which is what `--explain-absence` reads back as "got".
+ */
 function fieldOf(item: WorkItemSummary, field: Filter['field']): string | undefined {
   if (field === 'state') return item.state
   if (field === 'type') return item.type
   if (field === 'sprint') return item.sprint_id
   if (field === 'assignee') return item.assignee
   if (field === 'resolution') return item.resolution
+  if (field === 'label') return item.labels === undefined || item.labels.length === 0 ? undefined : item.labels.join(',')
+  if (field === 'title') return item.title
   return item.priority === undefined ? undefined : String(item.priority)
 }
 
+/**
+ * The words `--title` searches for. Splitting on whitespace is what makes the flag
+ * order-independent, so a caller who types the two words the other way round gets the same
+ * list rather than an empty one, and it is why `help backlog` states the rule.
+ */
+function termsOf(value: string): readonly string[] {
+  return value.toLowerCase().split(/\s+/).filter((word) => word.length > 0)
+}
+
+/**
+ * Whether one clause holds of one item. `label` is membership of the stored list, and
+ * `title` is every word of the value as a substring of the case-folded title; every other
+ * clause is the equality it always was.
+ */
+function holds(item: WorkItemSummary, filter: Filter): boolean {
+  if (filter.field === 'label') return (item.labels ?? []).includes(filter.value)
+  if (filter.field === 'title') {
+    const title = item.title.toLowerCase()
+    const terms = termsOf(filter.value)
+    // A value of nothing but whitespace has no term to fail on, so every title would match
+    // it; `flagValueRefusal` refuses one before a filter is built, and this is the second
+    // half of that rule rather than a silent answer to a search that named nothing.
+    return terms.length > 0 && terms.every((word) => title.includes(word))
+  }
+  return fieldOf(item, filter.field) === filter.value
+}
+
 export function matches(item: WorkItemSummary, filters: readonly Filter[]): boolean {
-  return filters.every((filter) => fieldOf(item, filter.field) === filter.value)
+  return filters.every((filter) => holds(item, filter))
 }
 
 const NO_PRIORITY = 6
@@ -673,6 +711,7 @@ export function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
     else if (column === 'assignee') row[column] = item.assignee ?? null
     else if (column === 'title') row[column] = item.title
     else if (column === 'sev') row[column] = item.severity ?? null
+    else if (column === 'labels') row[column] = item.labels === undefined || item.labels.length === 0 ? null : item.labels.join(',')
     else row[column] = null
   }
   return row
@@ -835,7 +874,7 @@ export function sprintScope(
 export function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Filter[]): string | undefined {
   let best: { readonly filter: Filter; readonly hits: number } | undefined
   for (const filter of filters) {
-    const hits = items.filter((item) => fieldOf(item, filter.field) === filter.value).length
+    const hits = items.filter((item) => holds(item, filter)).length
     if (best === undefined || hits < best.hits) best = { filter, hits }
   }
   return best === undefined ? undefined : `${best.filter.field} ${best.filter.value} ${best.hits}`
@@ -850,10 +889,9 @@ export function absence(
     return { absent: id, clause: `unknown searched ${view.items.length}`, store: view.identity.path ?? view.identity.id }
   }
   for (const filter of filters) {
+    if (holds(item, filter)) continue
     const got = fieldOf(item, filter.field)
-    if (got !== filter.value) {
-      return { absent: id, clause: `${filter.field} want ${filter.value} got ${got ?? '-'}` }
-    }
+    return { absent: id, clause: `${filter.field} want ${filter.value} got ${got ?? '-'}` }
   }
   return { absent: id, clause: 'none; it matched every clause' }
 }
@@ -902,10 +940,16 @@ export function notFound(
   command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
   if (view.sprintById.has(id)) {
+    // `set` is the one command whose caller was reaching for a sprint's own field editor, so
+    // it gets the line that does what they meant. The other callers of this refusal were
+    // reading, and the two reads below are what they wanted.
+    const instead = command === 'set'
+      ? [`treadle sprint set ${id} --goal "<text>"`, `treadle sprints ${id}`]
+      : [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`]
     return errorResult({
       code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
       cause: `${id} is a sprint here, not an item, and ${command} takes an item id`,
-      fix: [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`],
+      fix: instead,
     })
   }
   const held = view.items.length

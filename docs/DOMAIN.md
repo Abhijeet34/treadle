@@ -51,12 +51,13 @@ The set is closed.
 | `R3` | The relation traversal hit its depth ceiling |
 | `R4` | An item already duplicates another, and a duplicate has one original |
 | `R5` | A `blocks` edge out of a done or cancelled item would block nothing |
+| `R6` | A record would be removed while another record still names it: a closed sprint's frozen member list, a stored relation edge, or a child's parent |
 | `P1` | The parent and child types are not an allowed pair |
 | `P2` | The parent edge would close a cycle, or the stored hierarchy already contains one |
 | `P3` | The hierarchy traversal hit its depth ceiling |
 | `P4` | The id is not an item in this workspace |
 | `I1` | A sprint date is not a calendar day written `YYYY-MM-DD`, or the end is before the start |
-| `I2` | The sprint is closed, and a closed sprint's committed set is a record; a reopen that would drop a carried item since committed onward is refused under the same rule |
+| `I2` | The sprint is closed, and a closed sprint's committed set is a record; a reopen that would drop a carried item since committed onward, and a `sprint set` that would edit the record its tally was counted over, are refused under the same rule |
 | `I3` | The item is committed to another open sprint; an item is in one sprint |
 | `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
 | `I5` | The id is not a sprint in this workspace, is already taken by a record of the kind being created, names a sprint where an item was wanted, or names an item where a sprint was wanted |

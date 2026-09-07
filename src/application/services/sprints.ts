@@ -244,6 +244,113 @@ export async function openSprint(
   return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId } })
 }
 
+/** The fields `sprint set` writes, in the order a `set` line reports them. */
+export const SPRINT_SET_FIELDS = ['title', 'goal', 'start', 'end'] as const
+export type SprintSetField = (typeof SPRINT_SET_FIELDS)[number]
+
+export type SprintSetRequest = {
+  readonly sprint: string
+  /** Only the fields the caller named; an empty string clears one, as `set` does on an item. */
+  readonly fields: Partial<Readonly<Record<SprintSetField, string>>>
+  readonly actor: Actor
+}
+
+/**
+ * The four fields a sprint carries that a person writes: its title, its goal and its two
+ * dates. They were fixed at `open`, so a typo in a goal was permanent and `set` refused the
+ * id with `I5` because `set` takes an item.
+ *
+ * While the sprint is open they move like any other field, through one event. Once it is
+ * closed they do not: the record is what `sprints` reads its tally off, the captain decision
+ * `closed-sprint-member-set` and ADR-0022 make that record frozen, and the way back is
+ * `reopen`, which already clears every frozen field and is already refused where reopening
+ * would drop a member. This adds no second door into a closed record.
+ */
+export async function setSprint(
+  target: Target, clock: Clock, ids: IdGenerator, request: SprintSetRequest,
+): Promise<ResultObject> {
+  const { store, mode } = target
+  const view = await readWorkspace(store)
+  if (!view.ok) return storeRefusal('sprint', 'mutate', view.error, undefined)
+  const workspace = view.value.identity.id
+  const sprint = view.value.sprintById.get(request.sprint)
+  if (sprint === undefined) return noSprint('sprint', 'mutate', workspace, view.value, request.sprint)
+
+  const named = SPRINT_SET_FIELDS.filter((field) => request.fields[field] !== undefined)
+  if (named.length === 0) {
+    return refusal(workspace, 'C1', sprint.id,
+      `sprint set writes one or more of ${SPRINT_SET_FIELDS.join(', ')}, and none was given`,
+      [`treadle sprint set ${sprint.id} --goal "<text>"`])
+  }
+  if (sprint.state === 'closed') {
+    return errorResult({
+      code: 'GUARD_REFUSED', command: 'sprint', workspace, effect: 'mutate', rule: 'I2', entity: sprint.id,
+      cause: `${sprint.id} is closed, and a closed sprint's record is what its tally was counted over; reopen it to change ${named.join(', ')}`,
+      fix: [`treadle sprints ${sprint.id}`, `treadle sprint reopen ${sprint.id}`],
+    })
+  }
+
+  const draft: Record<string, unknown> = { ...sprint }
+  for (const field of named) {
+    const value = request.fields[field] as string
+    // The clearing syntax `set` uses on an item, held to the same rule: only an optional
+    // field can be cleared, and a required one names the write that would fill it instead.
+    if (value === '') {
+      if (field === 'goal') { delete draft['goal']; continue }
+      return refusal(workspace, 'V4', sprint.id, `${field} cannot be cleared; a sprint needs it`,
+        [`treadle sprint set ${sprint.id} --${field} <value>`])
+    }
+    draft[field] = value
+  }
+  const after = draft as unknown as Sprint
+  const valid = validateSprint(after)
+  if (!valid.ok) {
+    return refusal(workspace, valid.error.rule ?? 'V4', sprint.id, valid.error.message, ['treadle help sprint'])
+  }
+
+  const shown = (value: unknown): string => (value === undefined ? '-' : echoed(String(value)))
+  const set = SPRINT_SET_FIELDS
+    .filter((field) => sprint[field] !== after[field])
+    .map((field) => `${field} ${shown(sprint[field])} -> ${shown(after[field])}`)
+  if (set.length === 0) {
+    return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
+  }
+  const data: Record<string, Value> = { sprint: sprint.id, state: sprint.state, v: `${sprint.version} -> ${sprint.version + 1}`, set }
+  // Moving a window a sprint is already past is the same fact `open` prints, from the same
+  // reading, so the same sentence: a `--end` typed with the wrong year is caught here too.
+  const now = clock.now()
+  const where = dayOfSprint(after, now)
+  if (where.day > where.days) {
+    data['note'] = `this sprint's window closed on ${after.end}, so it is at day ${where.day} of ${where.days}; check --start and --end if that is not what you meant`
+  }
+  if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: sprint.id, state: sprint.state })
+
+  const txn = ids.txn()
+  const eventId = ids.event()
+  const moved = SPRINT_SET_FIELDS.filter((field) => sprint[field] !== after[field])
+  const side = (record: Sprint): Record<string, string> => {
+    const out: Record<string, string> = {}
+    // The two dates travel verbatim and the two prose fields as their size, which is the rule
+    // `auditedSnapshot` already applies to an item's prose: a 2,000-character goal in the log
+    // duplicates the record it was copied from.
+    for (const field of moved) {
+      const value = record[field]
+      out[field] = value === undefined ? '-' : field === 'start' || field === 'end' ? value : `${value.length} chars`
+    }
+    return out
+  }
+  const applied = await store.apply({
+    txn, writes: [], sprints: [{ sprint: after, ifVersion: sprint.version }],
+    events: [makeEvent({
+      id: eventId, at: now, actor: request.actor, entity: sprint.id, entityKind: 'sprint', op: 'sprint.set',
+      before: side(sprint), after: side(after), txn, command: 'sprint',
+    })],
+  })
+  if (!applied.ok) return storeRefusal('sprint', 'mutate', applied.error, workspace)
+  if (mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0 } })
+  return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId } })
+}
+
 export type CommitRequest = {
   readonly sprint: string
   readonly items: readonly ItemId[]

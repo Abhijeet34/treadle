@@ -309,7 +309,18 @@ Before hand-checking any of these, run the suite: it already checks them.
   `COMMAND_OPTIONS` in `src/cli/parse.ts`, a branch in `dispatch`, and an invocation in the
   two tables in `test/security/no-egress.test.ts` and
   `test/security/f1-no-execution-at-runtime.test.ts`, which assert they exercise every
-  command the inventory names.
+  command the inventory names. Four documents move with it and each has a test:
+  `README.md`'s "runs N commands" sentence and its implemented-commands Status row,
+  `docs/VERIFICATION.md`'s egress row, which spells the command count, and
+  `test/render/human.snapshot.txt`, refreshed with `TREADLE_SNAPSHOT=update node --test
+  test/render/human-layout.test.ts` rather than by hand. Adding `remove` failed all four
+  before it passed.
+- A rule id is a string literal, and the table that documents it is enforced against the
+  code by scan. `test/architecture/documented-numbers.test.ts` reads every `'<G|T|R|P|I|V><n>'`
+  literal in `src/domain` and `src/application` and requires exactly that set in
+  `docs/DOMAIN.md`'s "Rule ids" table, in both directions; the `H` ids are held the same way
+  against `docs/architecture/adr/README.md`. So a new refusal either reuses an id whose
+  published sentence is already true of it or adds a row in the same commit.
 - No prose a dependency wrote reaches an output surface. `node:util`'s `parseArgs` was the
   one source of it: its `cause` explained a `--` convention this tool does not document and
   its three-line message rendered `cause` as a counted block rather than a marked scalar.

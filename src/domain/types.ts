@@ -112,6 +112,10 @@ export const SUMMARY_FIELDS = [
   'priority', 'points', 'parent_id', 'assignee', 'sprint_id', 'resolution', 'due', 'severity',
   // The relation graph is read off every item on every read, so the edges are a scan field.
   'relations',
+  // `backlog --label` filters on this and `--fields +labels` prints it, and both are reads
+  // over the whole workspace, so it is a scan field like the rest rather than a per-record
+  // fetch: filtering it any other way would read every record whole to answer one list.
+  'labels',
 ] as const
 
 export type WorkItemSummary = Pick<WorkItem, (typeof SUMMARY_FIELDS)[number]>

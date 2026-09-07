@@ -12,6 +12,7 @@ ADR-0018 is the fourth of them, the board.
 ADR-0019 belongs to no design record either: like ADR-0013 it answers an incident in this repository's own history, so it carries the next free number.
 ADR-0021 carries the next free number for ADR-0014's reason: it reshapes two commands the design never priced, found the first time the corpus carried a relation graph.
 ADR-0022 carries the next free number because it answers one audit's findings across four of the records above rather than belonging to any one of them.
+ADR-0024 carries the next free number for the same reason, over a second audit's findings and one captain decision about which of them to build.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -38,6 +39,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md) | `doctor` is fed one record and one event at a time through two streaming reads on the store seam, `next` ranks off one index over the graph, and both are gated as a ratio to the read every command performs |
 | [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) | A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time |
 | [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) | A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked |
+| [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and the label, title-word and open-sprint readers that were missing |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.

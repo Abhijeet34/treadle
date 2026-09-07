@@ -50,6 +50,7 @@ import {
   renderHeader,
   renderRecord,
   withRecord,
+  withoutRecord,
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
@@ -759,6 +760,26 @@ export class ShardedStore implements Store {
       applied.push({ id: write.item.id, version })
     }
 
+    for (const removal of transaction.removes ?? []) {
+      await yieldToLoop()
+      // The record's own shard, found through the index rather than from its `filed_at`: the
+      // caller hands in an id and a version, not a record, and a record never moves between
+      // shards, so the row is the one place that knows which file holds it.
+      const row = this.#index.itemRow(removal.id)
+      if (row === undefined) {
+        return storeFail('CONFLICT', 'S10', `${removal.id} is not in the store, so version ${removal.ifVersion} cannot be matched`, [removal.id], { expected: removal.ifVersion })
+      }
+      const shard = shards.get(row.file) ?? await this.#readShard(row.file)
+      if (!('chunks' in shard)) return shard
+      shards.set(row.file, shard)
+
+      const resolved = this.#resolve(removal.id, row.file, shard, findings)
+      if (!resolved.ok) return resolved
+      const conflict = await this.#compareAndSet(removal.id, resolved.value, removal.ifVersion)
+      if (conflict !== undefined) return conflict
+      shards.set(row.file, withoutRecord(shard, removal.id))
+    }
+
     for (const write of transaction.sprints ?? []) {
       const shard = shards.get(SPRINTS_FILE) ?? await this.#readShard(SPRINTS_FILE)
       if (!('chunks' in shard)) return shard
@@ -1011,6 +1032,7 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
     due: item.due ?? null,
     severity: item.severity ?? null,
     relations: item.relations === undefined ? null : JSON.stringify(item.relations),
+    labels: item.labels === undefined ? null : JSON.stringify(item.labels),
     source,
   }
 }
@@ -1040,6 +1062,7 @@ export function summaryOf(row: SummaryRow, intern: (value: string) => string = (
     ...(row.due === null ? {} : { due: row.due }),
     ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),
     ...(row.relations === null ? {} : { relations: JSON.parse(row.relations) as readonly StoredRelation[] }),
+    ...(row.labels === null ? {} : { labels: JSON.parse(row.labels) as readonly string[] }),
   }
 }
 

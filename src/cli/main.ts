@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, shellWord, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, isSafeText, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -20,8 +20,9 @@ import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
 import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
+import { removeItem } from '../application/services/removal.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import { closeSprint, commitItems, openSprint, reopenSprint, sprints, uncommitItems } from '../application/services/sprints.ts'
+import { SPRINT_SET_FIELDS, closeSprint, commitItems, openSprint, reopenSprint, setSprint, sprints, uncommitItems, type SprintSetField } from '../application/services/sprints.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
@@ -150,6 +151,49 @@ function flagValueRefusal(
       help,
     )
   }
+  // The two rules below are about a filter's value rather than any flag's, so they are asked
+  // of the two commands that filter and of nothing else: on `file` and `sprint set` the same
+  // flag names a field, and the field dictionary already refuses it with a better sentence.
+  if (command !== 'backlog' && command !== 'board') return undefined
+
+  // A filter value comes back in the `filter`, `narrowest` and `page` lines, and the agent
+  // rendering treats a newline as a record delimiter, so a value carrying one threw a render
+  // invariant out of a read: `backlog --assignee $'kim\nfake'` printed `err INTERNAL` and
+  // exited 1 on the tree before this one. It is the same class the length bound above closes
+  // and it is closed in the same place, for every filter at once rather than per line printed.
+  for (const name of FILTER_FLAGS) {
+    for (const value of valuesOf(flags, name)) {
+      // The bound above reads a string flag, so a repeatable one is checked here instead of
+      // being widened there: widening it would preempt `file --label`'s own dictionary
+      // refusal, which names the slug rule rather than a line length.
+      if (value.length > MAX_LINE) {
+        return validation(
+          command,
+          `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
+          help,
+        )
+      }
+      if (isSafeText(value, 'line')) continue
+      return validation(
+        command,
+        `--${name} carries a character no record's field may hold, so nothing could match it: a filter is a single line with no control or bidi override characters`,
+        help,
+      )
+    }
+  }
+
+  // `--title` is the one filter that matches on words rather than on a whole value, so a
+  // value with no word in it is the one filter value that would select everything instead of
+  // nothing. Every other filter compares a value a record either carries or does not, and an
+  // empty one there matches nothing and says so through `narrowest`.
+  const title = flag(flags, 'title')
+  if (title !== undefined && title.trim().length === 0) {
+    return validation(
+      command,
+      '--title searches titles for the words it is given, and this value has none',
+      help,
+    )
+  }
   return undefined
 }
 
@@ -158,10 +202,17 @@ function filtersOf(
   flags: Readonly<Record<string, unknown>>, order: readonly FilterFlag[],
 ): readonly Filter[] {
   const written = order.length > 0 ? order : FILTER_FLAGS
-  return written.flatMap((name) => {
-    const value = flag(flags, name)
-    return value === undefined ? [] : [{ field: name, value } as Filter]
-  })
+  return written.flatMap((name) => valuesOf(flags, name).map((value) => ({ field: name, value } as Filter)))
+}
+
+/**
+ * Every value a filter flag was given, in the order written. All but `--label` take one, and
+ * `--label` repeats into one clause per label, so `matches` ands them like any other pair.
+ */
+function valuesOf(flags: Readonly<Record<string, unknown>>, name: string): readonly string[] {
+  const value = flags[name]
+  if (typeof value === 'string') return [value]
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 }
 
 function fieldsOf(flags: Readonly<Record<string, unknown>>, fallback: readonly string[]): readonly string[] {
@@ -519,6 +570,23 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return relate(target, systemClock, randomIds, { verb: verb as RelationVerb, id: entity, kind, other, actor })
   }
 
+  if (command === 'remove') {
+    if (id === undefined) return validation('remove', 'remove needs the id of one item', ['treadle backlog'])
+    // Every other single-entity command drops an operand past the first, which costs a
+    // re-run. Here it would cost a record: `remove a b` removed `a`, exited 0, and left `b`
+    // filed, and no line of that answer says the second id was dropped. One id, named.
+    // A.6: the ids are the caller's own unvalidated words, so the count reaches the cause
+    // and neither of them reaches a fix line.
+    if (operands.length > 1) {
+      return validation('remove', `remove takes one id and this line names ${operands.length}; a removal is confirmed one record at a time`,
+        ['treadle remove <id> --reason "<why>" --yes'])
+    }
+    const reason = flag(flags, 'reason')
+    return removeItem(target, systemClock, randomIds, {
+      id, ...(reason === undefined ? {} : { reason }), confirmed: flags['yes'] === true, actor,
+    })
+  }
+
   if (command === 'sprints') return sprints(store, systemClock, operands[0])
 
   if (command === 'sprint') {
@@ -538,6 +606,15 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
         ...(goal === undefined ? {} : { goal }),
       })
     }
+    if (verb === 'set') {
+      if (first === undefined) return validation('sprint', 'sprint set needs the id of one sprint', ['treadle sprints'])
+      const fields: Partial<Record<SprintSetField, string>> = {}
+      for (const field of SPRINT_SET_FIELDS) {
+        const value = flag(flags, field)
+        if (value !== undefined) fields[field] = value
+      }
+      return setSprint(target, systemClock, randomIds, { sprint: first, fields, actor })
+    }
     if (verb === 'commit') {
       if (first === undefined) return validation('sprint', 'sprint commit needs a sprint id and then one or more item ids', ['treadle help sprint'])
       return commitItems(target, systemClock, randomIds, { sprint: first, items: rest, actor })
@@ -550,7 +627,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
         ? closeSprint(target, systemClock, randomIds, request)
         : reopenSprint(target, systemClock, randomIds, request)
     }
-    return validation('sprint', `sprint takes one of open, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
+    return validation('sprint', `sprint takes one of open, set, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
   }
 
   if (command === 'transition') {

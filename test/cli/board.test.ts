@@ -136,7 +136,7 @@ describe('the board at the command surface', () => {
     const unknown = await cli(['board', '--fields', 'nope', '--out', 'agent'])
     assert.equal(unknown.code, 2)
     assert.match(unknown.err, /^rule C2$/m)
-    assert.match(unknown.err, /^"cause nope is not a column of this list; the columns are id, type, state, pts, pri, sprint, assignee, title, sev, blocked$/m)
+    assert.match(unknown.err, /^"cause nope is not a column of this list; the columns are id, type, state, pts, pri, sprint, assignee, title, sev, labels, blocked$/m)
     const two = await cli(['board', '--fields', 'id,title,assignee', '--out', 'agent'])
     assert.equal(two.code, 2)
     assert.match(two.err, /^rule C3$/m)
