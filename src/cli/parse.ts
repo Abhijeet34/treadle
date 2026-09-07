@@ -255,6 +255,40 @@ function flagFault(
   return undefined
 }
 
+/**
+ * A single-valued flag written more than once, as a refusal (G1).
+ *
+ * `parseArgs` keeps the last value and drops the rest without a word, so `backlog --state
+ * draft --state ready` answered about `ready` alone and no line of that answer said `draft`
+ * had been read and thrown away. It is the same fault as an id the renderer could not carry:
+ * the line says two things, the tool can represent one, and it picks in silence. A repeat is
+ * refused rather than and-ed or or-ed, because what a caller meant by two states is not
+ * knowable from the line and a wrong guess is worse than a question.
+ *
+ * A repeatable flag is exempt by its own option table entry: `--label`, `--set`, `--override`
+ * and `-v` each mean something as a repeat, and that is declared where the flag is declared
+ * rather than listed again here. A boolean is exempt too, because writing `--yes --yes`
+ * discards no value: this refuses a dropped argument, not a redundant token.
+ */
+function repeatRefusal(
+  argv: readonly string[], options: OptionConfig, command: string | undefined,
+): ParseFailure | undefined {
+  const seen = new Set<string>()
+  for (const token of flagTokens(argv, options)) {
+    const config = options[token.name] as { type?: string; multiple?: boolean } | undefined
+    if (config === undefined || config.type !== 'string' || config.multiple === true) continue
+    if (seen.has(token.name)) {
+      return {
+        ok: false,
+        cause: `${token.raw} takes one value and this line writes it more than once; the last would silently replace the first`,
+        fix: [command === undefined ? 'treadle help' : `treadle help ${command}`],
+      }
+    }
+    seen.add(token.name)
+  }
+  return undefined
+}
+
 /** A `parseArgs` throw as a refusal of this tool's own, never as the message it threw. */
 function flagRefusal(
   argv: readonly string[], options: OptionConfig, command: string | undefined,
@@ -306,7 +340,7 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
     // with no command word there is no second pass to catch it. Without this the invariant
     // at the top of the file held for every line but the shortest one: `treadle --nope` ran
     // the default command and said nothing about the flag it dropped.
-    const fault = flagFault(argv, GLOBAL_OPTIONS, undefined)
+    const fault = flagFault(argv, GLOBAL_OPTIONS, undefined) ?? repeatRefusal(argv, GLOBAL_OPTIONS, undefined)
     if (fault !== undefined) return fault
     return {
       ok: true,
@@ -354,6 +388,9 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
       fix: [`treadle help ${command}`],
     }
   }
+
+  const repeated = repeatRefusal(argv, { ...GLOBAL_OPTIONS, ...(COMMAND_OPTIONS[command] ?? {}) }, command)
+  if (repeated !== undefined) return repeated
 
   if (passed.has('dry-run') && passed.has('preview')) {
     // The caller's own line with one of the two flags taken off, operands and all: a fix that

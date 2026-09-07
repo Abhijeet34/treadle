@@ -747,6 +747,18 @@ export function columnRefusal(
       fix: [`treadle help ${command}`],
     })
   }
+  // G4, and the same rule the CLI's repeated-flag refusal takes one layer up: a line that
+  // says one thing twice is answered once, and picking in silence is what makes it a defect.
+  // `--fields id,id` printed the id column twice, which is honest and useless, and `--fields
+  // +id` did it by adding a default column the caller could not see in their own line.
+  const twice = columns.find((name, at) => columns.indexOf(name) !== at)
+  if (twice !== undefined) {
+    return errorResult({
+      code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C2',
+      cause: `${twice} is named twice and a column is printed once; a row is read by position, so a repeat moves every field after it`,
+      fix: [`treadle ${command} --fields ${[...new Set(columns)].join(',')}`],
+    })
+  }
   const free = columns.filter((name) => known.some((column) => column.name === name && column.text === true))
   if (free.length > 1) {
     return errorResult({
