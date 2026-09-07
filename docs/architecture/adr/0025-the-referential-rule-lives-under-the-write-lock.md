@@ -38,8 +38,13 @@ A refusal at that point has written nothing, which is why it sits before the wri
 A removal is refused when a record this transaction leaves behind names the removed id: a child's `parent_id`, a stored relation edge, or a closed sprint's committed set - read both as the frozen `carried` and `finished` lists this build writes and as the `sprint_id` a sprint closed by an older build left its members pointing at.
 The transaction's own effects are answered first, so a referrer it also removes leaves nothing behind and one it rewrites is judged as this transaction leaves it.
 
-An item write carrying `parent_id` is refused with `S10` when the parent is not in the store, using the sentence that rule already uses for a removal of a record that is not there.
+An item write is refused with `S10` when it INTRODUCES a `parent_id` the store does not hold, using the sentence that rule already uses for a removal of a record that is not there.
 That closes C without teaching `set` and `file` a read set they do not have, and it covers the hand-built and `migrate` paths that a service-layer read set would leave open.
+
+"Introduces" is the whole rule, and the first draft did not have it.
+Watching the reference rather than the write that creates one refused every write to a record whose parent had already gone: `treadle set child-task assignee=kim` answered `CONFLICT rule S10` with `fix treadle show parent-story` over a record that is not there, and the remedy `H30` prints is itself a write to that record.
+So a write whose `parent_id` is what the store already holds for that record passes, exactly as a record carrying an `H24` edge is still writable, and only a new or changed parent is checked.
+The one exception is a transaction that removes the parent itself: an unchanged `parent_id` is refused there, because that transaction is what creates the dangle.
 
 `R6` stays exactly as it is.
 It fires first, with the friendlier cause and the fix lines, in the ordinary case where the neighbour was already there; `S17` is what answers the case `R6` cannot see.

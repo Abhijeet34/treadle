@@ -132,6 +132,8 @@ export class OverlayStore implements Store {
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     const staged = new Map<string, WorkItem>()
     const applied: AppliedWrite[] = []
+    /** Each written record's parent before this transaction, which is what says whether the write introduces one. */
+    const parentWas = new Map<string, string | undefined>()
     // A dry run refuses what the real write would refuse, which is why this reads the base
     // store's findings rather than assuming a clean store (ADR-0006).
     const findings = await this.findings()
@@ -153,6 +155,7 @@ export class OverlayStore implements Store {
         .then((r) => (r.ok ? r.value : undefined))
       const conflict = compareAndSet(write.item.id, current, write.ifVersion)
       if (conflict !== undefined) return conflict
+      if (!parentWas.has(write.item.id)) parentWas.set(write.item.id, current?.parent_id)
 
       // The sharded store carries a stored record's unknown field keys forward; the
       // overlay carries them from the item it is layering over, so a dry run diffs the
@@ -199,7 +202,7 @@ export class OverlayStore implements Store {
     // The same referential rule the sharded store runs under its write lock (ADR-0025), so a
     // dry run refuses what the real write would. It reads the merged summaries and the merged
     // sprints, which already carry this layer's own writes over the base store's rows.
-    const dangling = await this.#referentialRefusal(transaction, staged, stagedSprints)
+    const dangling = await this.#referentialRefusal(transaction, staged, stagedSprints, parentWas)
     if (dangling !== undefined) return dangling
 
     for (const [id, item] of staged) this.#items.set(id, item)
@@ -220,6 +223,7 @@ export class OverlayStore implements Store {
     transaction: StoreTransaction,
     staged: ReadonlyMap<string, WorkItem>,
     stagedSprints: ReadonlyMap<string, Sprint>,
+    parentWas: ReadonlyMap<string, string | undefined>,
   ): Promise<StoreResult<never> | undefined> {
     const removed = new Set((transaction.removes ?? []).map((removal) => removal.id))
     const items = await this.summaries()
@@ -231,6 +235,7 @@ export class OverlayStore implements Store {
       const parent = item.parent_id
       if (parent === undefined) continue
       if (!removed.has(parent) && held.has(parent)) continue
+      if (!removed.has(parent) && parentWas.get(item.id) === parent) continue
       return parentMissing(parent, item.id)
     }
 

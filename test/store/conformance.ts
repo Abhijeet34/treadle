@@ -421,6 +421,27 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('refuses a write that keeps a parent the same transaction removes', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'parent-story', type: 'story' }) },
+            { item: anItem({ id: 'child-task', parent_id: 'parent-story' }) },
+          ],
+          events: [],
+        })
+        const refused = await store.apply({
+          txn: 't2',
+          writes: [{ item: anItem({ id: 'child-task', parent_id: 'parent-story', assignee: 'kim' }), ifVersion: 1 }],
+          removes: [{ id: 'parent-story', ifVersion: 1 }],
+          events: [],
+        })
+        assert.equal(refused.ok, false, 'the transaction would leave the child naming a record it took out')
+        assert.equal(refused.ok ? '' : refused.error.rule, 'S10')
+      })
+    })
+
     it('allows a write whose parent the same transaction files', async () => {
       await withStore(async (store) => {
         const together = await store.apply({

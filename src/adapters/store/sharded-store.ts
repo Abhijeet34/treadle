@@ -754,10 +754,16 @@ export class ShardedStore implements Store {
     // deliberately not checked on a write: an edge naming a record the store does not hold is
     // `H24`, a state a hand edit may legitimately produce, and refusing it here would refuse
     // to write back any file that already carries one.
+    //
+    // The same reasoning bounds this check to the write that INTRODUCES the reference. A
+    // record whose parent has already gone is `H30`, and refusing every write to it made
+    // `set <child> assignee=kim` answer `CONFLICT` with a fix line naming a record that is
+    // not there, while the remedy the finding prints is itself a write to that record.
     for (const write of transaction.writes) {
       const parent = write.item.parent_id
-      if (parent === undefined) continue
-      if (written.has(parent) || (!removed.has(parent) && this.#index.versionOf(parent) !== undefined)) continue
+      if (parent === undefined || written.has(parent)) continue
+      if (!removed.has(parent) && this.#index.versionOf(parent) !== undefined) continue
+      if (!removed.has(parent) && this.#index.itemRow(write.item.id)?.parent === parent) continue
       return parentMissing(parent, write.item.id)
     }
 

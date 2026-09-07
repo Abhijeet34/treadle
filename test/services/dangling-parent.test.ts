@@ -67,6 +67,20 @@ describe('a parent_id naming a record the store does not hold', () => {
     assert.match(run.out, /^H30 /m, run.out)
   })
 
+  // The store refuses to create this state, so no transaction can reach it and the
+  // conformance suite cannot build it; a hand edit can, and every write to the record after
+  // it would be refused if the rule watched the reference rather than the write that
+  // introduces one - including `set <child> parent_id=`, which is the remedy H30 prints.
+  // `--dry-run` asks the overlay store the same question, so both implementations answer here.
+  it('does not stop the record being edited, which the remedy itself is a write to', async () => {
+    const dry = await cli(['set', 'child-task', 'assignee=kim', '--dry-run'])
+    assert.equal(dry.code, 0, dry.err)
+    const edit = await cli(['set', 'child-task', 'assignee=kim'])
+    assert.equal(edit.code, 0, edit.err)
+    const still = await cli(['doctor'])
+    assert.match(still.out, /^H30 child-task parent_id /m, 'the finding survives an unrelated edit')
+  })
+
   it('is cleared by the line the detail names, and doctor is clean after it', async () => {
     assert.equal((await cli(['set', 'child-task', 'parent_id='])).code, 0)
     const run = await cli(['doctor'])

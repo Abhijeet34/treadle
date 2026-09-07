@@ -22,8 +22,10 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 
 import { readWorkspace } from '../../src/application/services/context.ts'
 import { setFields } from '../../src/application/services/editing.ts'
+import { transition } from '../../src/application/services/lifecycle.ts'
 import { relate } from '../../src/application/services/relation.ts'
 import { removeItem } from '../../src/application/services/removal.ts'
+import { closeSprint, commitItems, openSprint } from '../../src/application/services/sprints.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
 import { sequentialIds } from '../../src/adapters/ids.ts'
 import { openWorkspace } from '../../src/adapters/store/index.ts'
@@ -141,5 +143,134 @@ describe('a removal and the neighbour written under it', () => {
     if (!view.ok) return
     assert.equal(view.value.byId.get('onboard-copy')?.parent_id, undefined, 'the refused write left no parent behind')
     assert.equal(view.value.byId.has('auth-refresh'), false)
+  })
+})
+
+/**
+ * The cases the three above do not reach, each aimed at the new rule rather than at the
+ * defect it closed: the orders it must refuse, the orders it must still allow, and the two
+ * places its own shortcuts could hide a referrer.
+ */
+describe('the referential rule under the orders that attack it', () => {
+  let demo: Demo
+  let second: Store
+  beforeEach(async () => {
+    demo = await aDemoWorkspace()
+    const opened = await openWorkspace(demo.root)
+    if (!opened.ok) throw new Error(opened.error.message)
+    second = opened.value
+  })
+  afterEach(async () => { await second.close(); await demo.dispose() })
+
+  const apply = (store: Store, seed: number) => [targetFor(store, 'apply'), fixedClock(NOW), sequentialIds(seed)] as const
+
+  /** One sprint holding one done item, which is the state a close freezes into a record. */
+  async function aSprintHolding(id: string): Promise<void> {
+    const [target, clock, ids] = apply(demo.store, 600)
+    const opened = await openSprint(target, clock, ids, { title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', actor: ACTOR })
+    assert.equal(opened.ok, true, String(opened.data['cause']))
+    const committed = await commitItems(target, clock, ids, { sprint: 'sprint-31', items: [id], actor: ACTOR })
+    assert.equal(committed.ok, true, String(committed.data['cause']))
+    for (const to of ['in_progress', 'done'] as const) {
+      const moved = await transition(target, clock, ids, { id, target: to, actor: ACTOR })
+      assert.equal(moved.ok, true, String(moved.data['cause']))
+    }
+  }
+
+  it('refuses a removal that a sprint close froze a member set around', async () => {
+    await aSprintHolding('avatar-crop')
+    const first = gated(demo.store)
+    // An open sprint's committed set is derived, so this removal is legal when it is decided.
+    const early = removeItem(...apply(first.store, 700), { id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    await first.reached
+    const closed = await closeSprint(...apply(second, 800), { sprint: 'sprint-31', actor: ACTOR })
+    assert.equal(closed.ok, true, String(closed.data['cause']))
+    first.release()
+    const refused = await early
+
+    assert.equal(refused.ok, false, 'the close wrote a frozen member set naming this record')
+    assert.equal(refused.data['rule'], 'S17')
+    assert.equal(refused.data['cause'],
+      'sprint-31 is closed and counts avatar-crop in its committed set, written after this removal was decided; retry so the decision reads what is there now')
+  })
+
+  it('allows a removal that a sprint commit lands under, because an open set is derived', async () => {
+    await aSprintHolding('avatar-crop')
+    const first = gated(demo.store)
+    const early = removeItem(...apply(first.store, 700), { id: 'webhook-retry', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    await first.reached
+    const committed = await commitItems(...apply(second, 800), { sprint: 'sprint-31', items: ['webhook-retry'], actor: ACTOR })
+    assert.equal(committed.ok, true, String(committed.data['cause']))
+    first.release()
+    const removed = await early
+
+    // The record it was committed to still exists and its membership is recomputed from what
+    // points at it, so nothing is left naming a record that is not there.
+    assert.equal(removed.ok, false, 'the commit bumped the version this removal was decided against')
+    assert.equal(removed.data['rule'], 'S10', String(removed.data['cause']))
+    const again = await removeItem(...apply(second, 900), { id: 'webhook-retry', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    assert.equal(again.ok, true, String(again.data['cause']))
+  })
+
+  it('lets one of two simultaneous removals of one record land, and refuses the other', async () => {
+    const first = gated(demo.store)
+    const early = removeItem(...apply(first.store, 700), { id: 'csv-export', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    await first.reached
+    const late = await removeItem(...apply(second, 800), { id: 'csv-export', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    assert.equal(late.ok, true, String(late.data['cause']))
+    first.release()
+    const refused = await early
+
+    assert.equal(refused.ok, false, 'the record had already left the store')
+    assert.equal(refused.data['rule'], 'S10')
+    const events = await second.events({ entity: 'csv-export' })
+    assert.equal(events.ok && events.value.filter((event) => event.op === 'item.remove').length, 1,
+      'one removal, one item.remove event')
+  })
+
+  it('refuses a removal a retitle landed under, and the record keeps the new title', async () => {
+    const first = gated(demo.store)
+    const early = removeItem(...apply(first.store, 700), { id: 'csv-export', reason: 'filed twice', confirmed: true, actor: ACTOR })
+    await first.reached
+    const renamed = await setFields(...apply(second, 800), { id: 'csv-export', assignments: ['title=Export a filtered list to TSV'], actor: ACTOR })
+    assert.equal(renamed.ok, true, String(renamed.data['cause']))
+    first.release()
+    const refused = await early
+
+    assert.equal(refused.ok, false, 'the record moved under a removal decided against its old version')
+    assert.equal(refused.data['rule'], 'S10')
+    const view = await readWorkspace(second)
+    assert.equal(view.ok, true)
+    if (!view.ok) return
+    assert.equal(view.value.byId.get('csv-export')?.title, 'Export a filtered list to TSV')
+  })
+
+  it('sees the second child when the transaction removes the first, which one row would hide', async () => {
+    // The lookup answers with one row, so a transaction that takes out the child it happens
+    // to return must not be able to walk past a second one. Reached through the store, which
+    // is the only caller that can name two removals in one transaction.
+    for (const [at, child] of ['onboard-copy', 'avatar-crop'].entries()) {
+      // A fresh seed per write: two `set`s off one sequential generator mint the same event
+      // id, which is `S14` and makes the read below fail for a reason this test is not about.
+      const set = await setFields(...apply(demo.store, 600 + at * 10), { id: child, assignments: ['parent_id=auth-refresh'], actor: ACTOR })
+      assert.equal(set.ok, true, String(set.data['cause']))
+    }
+    const view = await readWorkspace(demo.store)
+    assert.equal(view.ok, true)
+    if (!view.ok) return
+    const versionOf = (id: string): number => view.value.byId.get(id)?.version as number
+    const refused = await demo.store.apply({
+      txn: 'txn-attack',
+      writes: [],
+      removes: [
+        { id: 'onboard-copy', ifVersion: versionOf('onboard-copy') },
+        { id: 'auth-refresh', ifVersion: versionOf('auth-refresh') },
+      ],
+      events: [],
+    })
+    assert.equal(refused.ok, false, 'avatar-crop still names auth-refresh as its parent')
+    if (refused.ok) return
+    assert.equal(refused.error.rule, 'S17')
+    assert.deepEqual(refused.error.entities, ['auth-refresh', 'avatar-crop'])
   })
 })
