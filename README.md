@@ -46,10 +46,14 @@ The build prints the byte count and the margin every time it runs, and `.github/
 ## Quick start
 
 ```bash
+export TREADLE_ACTOR=your-name   # and TREADLE_ACTOR_KIND=agent when an agent runs it
 node bin/treadle.js init
 node bin/treadle.js file story "Field edits"
 node bin/treadle.js status
 ```
+
+`TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
+Neither is required and nothing prompts for one, so a workspace run without either has `unknown` against every event, which `treadle history <id>` then reads back for as long as the log lives.
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
