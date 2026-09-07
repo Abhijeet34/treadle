@@ -29,6 +29,7 @@ import {
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { decodeSprint, encodeSprint } from './sprint-codec.ts'
+import { parentMissing, stillNamed, type Referrer } from './referential.ts'
 
 function matches(item: WorkItemSummary, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
@@ -195,11 +196,55 @@ export class OverlayStore implements Store {
       dropped.push(removal.id)
     }
 
+    // The same referential rule the sharded store runs under its write lock (ADR-0025), so a
+    // dry run refuses what the real write would. It reads the merged summaries and the merged
+    // sprints, which already carry this layer's own writes over the base store's rows.
+    const dangling = await this.#referentialRefusal(transaction, staged, stagedSprints)
+    if (dangling !== undefined) return dangling
+
     for (const [id, item] of staged) this.#items.set(id, item)
     for (const id of dropped) { this.#items.delete(id); this.#removed.add(id) }
     for (const [id, sprint] of stagedSprints) this.#sprints.set(id, sprint)
     this.#events.push(...transaction.events)
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
+  }
+
+  /**
+   * The rule ADR-0025 puts in the sharded store's critical section, decided here over the
+   * arrays this layer already merges. Every id the transaction touches answers from the
+   * transaction rather than from the store beneath it: a record it removes leaves nothing
+   * behind, and one it writes is judged by the parent loop above rather than by the row the
+   * base store still holds.
+   */
+  async #referentialRefusal(
+    transaction: StoreTransaction,
+    staged: ReadonlyMap<string, WorkItem>,
+    stagedSprints: ReadonlyMap<string, Sprint>,
+  ): Promise<StoreResult<never> | undefined> {
+    const removed = new Set((transaction.removes ?? []).map((removal) => removal.id))
+    const items = await this.summaries()
+    if (!items.ok) return items
+    const held = new Set(items.value.map((item) => item.id))
+    for (const id of staged.keys()) held.add(id)
+
+    for (const item of staged.values()) {
+      const parent = item.parent_id
+      if (parent === undefined) continue
+      if (!removed.has(parent) && held.has(parent)) continue
+      return parentMissing(parent, item.id)
+    }
+
+    if (removed.size === 0) return undefined
+    const sprints = await this.sprints()
+    if (!sprints.ok) return sprints
+    const closed = sprints.value
+      .map((sprint) => stagedSprints.get(sprint.id) ?? sprint)
+      .filter((sprint) => sprint.state === 'closed')
+    for (const id of removed) {
+      const referrer = referrerIn(id, items.value, staged, removed, closed)
+      if (referrer !== undefined) return stillNamed(id, referrer)
+    }
+    return undefined
   }
 
   async close(): Promise<void> {
@@ -222,6 +267,34 @@ function compareAndSet(
   }
   if (current.version === ifVersion) return undefined
   return storeFail('CONFLICT', 'S10', `${id} is at version ${current.version} and the write named ${ifVersion}`, [id], { expected: ifVersion, actual: current.version })
+}
+
+/**
+ * The first record left naming `id` after this transaction, in the order the sharded store
+ * asks the same three questions: a child's parent, a stored relation edge, then a closed
+ * sprint's committed set, read as its frozen lists and as the `sprint_id` an older build's
+ * close left pointing at it.
+ */
+function referrerIn(
+  id: string,
+  items: readonly WorkItemSummary[],
+  staged: ReadonlyMap<string, WorkItem>,
+  removed: ReadonlySet<string>,
+  closed: readonly Sprint[],
+): Referrer | undefined {
+  const left = items.filter((item) => !removed.has(item.id) && !staged.has(item.id))
+  const child = left.find((item) => item.parent_id === id)
+  if (child !== undefined) return { kind: 'parent', id: child.id }
+  for (const item of left) {
+    const edge = (item.relations ?? []).find((relation) => relation.target === id)
+    if (edge !== undefined) return { kind: 'relation', id: item.id, relation: edge.kind }
+  }
+  const member = items.find((item) => item.id === id)
+  for (const sprint of closed) {
+    const frozen = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
+    if (frozen.includes(id) || member?.sprint_id === sprint.id) return { kind: 'sprint', id: sprint.id }
+  }
+  return undefined
 }
 
 /** The same encode, render, parse and decode the sharded store's write path runs. */

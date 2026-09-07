@@ -332,6 +332,109 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    // ADR-0025's referential rule. Both implementations answer it, because `--dry-run` must
+    // refuse what the real write would: the overlay decides it over the arrays it merges and
+    // the sharded store over two index lookups under its write lock, and the sentence a
+    // caller reads is one file shared by both.
+    it('removes a record nothing names, and reports the removal', async () => {
+      await withStore(async (store) => {
+        await store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
+        const gone = await store.apply({ txn: 't2', writes: [], removes: [{ id: 'item-one', ifVersion: 1 }], events: [] })
+        assert.ok(gone.ok, gone.ok ? '' : gone.error.message)
+        const found = await store.get('item-one')
+        assert.equal(found.ok && found.value, undefined)
+      })
+    })
+
+    it('refuses a removal a child would be left naming, and the record stays', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'parent-story', type: 'story' }) },
+            { item: anItem({ id: 'child-task', parent_id: 'parent-story' }) },
+          ],
+          events: [],
+        })
+        const refused = await store.apply({ txn: 't2', writes: [], removes: [{ id: 'parent-story', ifVersion: 1 }], events: [] })
+        assert.equal(refused.ok, false)
+        if (refused.ok) return
+        assert.equal(refused.error.code, 'CONFLICT')
+        assert.equal(refused.error.rule, 'S17')
+        assert.deepEqual(refused.error.entities, ['parent-story', 'child-task'])
+        const found = await store.get('parent-story')
+        assert.equal(found.ok && found.value?.id, 'parent-story')
+      })
+    })
+
+    it('refuses a removal an edge would be left naming, and names the kind', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'blocked-task' }) },
+            { item: anItem({ id: 'blocker-task', relations: [{ kind: 'blocks', target: 'blocked-task' }] }) },
+          ],
+          events: [],
+        })
+        const refused = await store.apply({ txn: 't2', writes: [], removes: [{ id: 'blocked-task', ifVersion: 1 }], events: [] })
+        assert.equal(refused.ok, false)
+        if (refused.ok) return
+        assert.equal(refused.error.rule, 'S17')
+        assert.match(refused.error.message, /^blocker-task blocks blocked-task, written after this removal was decided; /)
+      })
+    })
+
+    it('allows a removal whose only referrer the same transaction removes', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'parent-story', type: 'story' }) },
+            { item: anItem({ id: 'child-task', parent_id: 'parent-story' }) },
+          ],
+          events: [],
+        })
+        const both = await store.apply({
+          txn: 't2',
+          writes: [],
+          removes: [{ id: 'child-task', ifVersion: 1 }, { id: 'parent-story', ifVersion: 1 }],
+          events: [],
+        })
+        assert.ok(both.ok, both.ok ? '' : both.error.message)
+      })
+    })
+
+    it('refuses a write naming a parent the store does not hold', async () => {
+      await withStore(async (store) => {
+        const refused = await store.apply({
+          txn: 't1',
+          writes: [{ item: anItem({ id: 'child-task', parent_id: 'never-filed' }) }],
+          events: [],
+        })
+        assert.equal(refused.ok, false)
+        if (refused.ok) return
+        assert.equal(refused.error.rule, 'S10')
+        assert.equal(refused.error.message, 'never-filed is not in the store, so child-task cannot name it as its parent; retry so the decision reads what is there now')
+        const found = await store.get('child-task')
+        assert.equal(found.ok && found.value, undefined)
+      })
+    })
+
+    it('allows a write whose parent the same transaction files', async () => {
+      await withStore(async (store) => {
+        const together = await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'child-task', parent_id: 'parent-story' }) },
+            { item: anItem({ id: 'parent-story', type: 'story' }) },
+          ],
+          events: [],
+        })
+        assert.ok(together.ok, together.ok ? '' : together.error.message)
+      })
+    })
+
     it('carries an unknown field key through a mutation', async () => {
       await withStore(async (store) => {
         const extra = new Map([['a_field_from_2027', 'kept']])

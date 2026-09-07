@@ -36,7 +36,7 @@ import {
   readyVerdict,
   type WorkspaceView,
 } from './context.ts'
-import { auditImpediment, auditItem, auditRelationsOf } from './doctor.ts'
+import { auditImpediment, auditItem, auditParentOf, auditRelationsOf } from './doctor.ts'
 import { invocation, notFound } from './items.ts'
 import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
@@ -414,6 +414,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
   const audit = [
     ...auditItem(item, log, new Set(view.value.sprintById.keys())),
+    ...auditParentOf(new Set(view.value.byId.keys()), item),
     ...auditRelationsOf(new Set(view.value.byId.keys()), item),
     ...auditImpediment(item),
   ]

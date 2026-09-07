@@ -57,6 +57,7 @@ import {
 import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type IndexedSprint, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { decodeSprint, encodeSprint } from './sprint-codec.ts'
+import { parentMissing, stillNamed, type Referrer } from './referential.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 import { setImmediate as yieldToLoop } from 'node:timers/promises'
@@ -757,11 +758,7 @@ export class ShardedStore implements Store {
       const parent = write.item.parent_id
       if (parent === undefined) continue
       if (written.has(parent) || (!removed.has(parent) && this.#index.versionOf(parent) !== undefined)) continue
-      return storeFail(
-        'CONFLICT', 'S10',
-        `${parent} is not in the store, so ${write.item.id} cannot name it as its parent; retry so the decision reads what is there now`,
-        [parent, write.item.id],
-      )
+      return parentMissing(parent, write.item.id)
     }
 
     if (removed.size === 0) return undefined
@@ -772,31 +769,27 @@ export class ShardedStore implements Store {
     const sprints = this.#closedSprints(transaction)
     for (const id of removed) {
       const referrer = this.#referrerOf(id, touched, sprints)
-      if (referrer === undefined) continue
-      return storeFail('CONFLICT', 'S17', `${referrer.clause}, written after this removal was decided; retry so the decision reads what is there now`, [id, referrer.id])
+      if (referrer !== undefined) return stillNamed(id, referrer)
     }
     return undefined
   }
 
   /**
-   * The first record this transaction would leave naming `id`, as the clause a refusal reads,
-   * or `undefined`. The three kinds are the three ways one record holds another's id: a
-   * child's parent, a stored relation edge, and a closed sprint's committed set - which is
-   * read both as the frozen `carried` and `finished` lists this build writes and as the
-   * `sprint_id` a sprint closed by an older build left its members pointing at.
+   * The first record this transaction would leave naming `id`, or `undefined`. The three
+   * kinds are the three ways one record holds another's id: a child's parent, a stored
+   * relation edge, and a closed sprint's committed set - which is read both as the frozen
+   * `carried` and `finished` lists this build writes and as the `sprint_id` a sprint closed
+   * by an older build left its members pointing at.
    */
-  #referrerOf(
-    id: string, skip: readonly string[], sprints: readonly Sprint[],
-  ): { readonly id: string; readonly clause: string } | undefined {
+  #referrerOf(id: string, skip: readonly string[], sprints: readonly Sprint[]): Referrer | undefined {
     const child = this.#index.childOf(id, skip)
-    if (child !== undefined) return { id: child, clause: `${child} has ${id} as its parent` }
+    if (child !== undefined) return { kind: 'parent', id: child }
     const edge = this.#index.relationTo(id, skip)
-    if (edge !== undefined) return { id: edge.id, clause: `${edge.id} ${edge.kind} ${id}` }
+    if (edge !== undefined) return { kind: 'relation', id: edge.id, relation: edge.kind }
     const row = this.#index.itemRow(id)
     for (const sprint of sprints) {
       const frozen = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
-      if (!frozen.includes(id) && row?.sprint !== sprint.id) continue
-      return { id: sprint.id, clause: `${sprint.id} is closed and counts ${id} in its committed set` }
+      if (frozen.includes(id) || row?.sprint === sprint.id) return { kind: 'sprint', id: sprint.id }
     }
     return undefined
   }
