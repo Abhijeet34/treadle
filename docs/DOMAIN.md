@@ -60,7 +60,7 @@ The set is closed.
 | `I2` | The sprint is closed, and a closed sprint's committed set is a record; a reopen that would drop a carried item since committed onward, and a `sprint set` that would edit the record its tally was counted over, are refused under the same rule |
 | `I3` | The item is committed to another open sprint; an item is in one sprint |
 | `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
-| `I5` | The id is not a sprint in this workspace, is already taken by a record of the kind being created, names a sprint where an item was wanted, or names an item where a sprint was wanted |
+| `I5` | The id is not a sprint in this workspace, is already taken by a record of the kind being created, names a sprint where an item was wanted, names an item where a sprint was wanted, or names an event where a transaction was wanted |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |

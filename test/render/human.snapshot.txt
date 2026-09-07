@@ -565,7 +565,7 @@ commands  20 of 20
   doctor      read    no        Report what the stored files say that no writ…
   next        read    yes       Rank what to pick up, and print the component…
   explain     read    no        Say why one item is where it is, and what eac…
-  history     read    yes       List every recorded change to one item, newes…
+  history     read    yes       List every recorded change to one record, or …
   status      read    no        Orient a caller in the workspace in one call.
   help        read    no        Print the command inventory, or one command's…
   version     read    no        Print the tool version, the store schema vers…
@@ -603,7 +603,7 @@ commands  20 of 20
   doctor      read    no        Report what the stored files say that no write path would have accepted.
   next        read    yes       Rank what to pick up, and print the components and weights that produced the order.
   explain     read    no        Say why one item is where it is, and what each legal next move needs.
-  history     read    yes       List every recorded change to one item, newest first, with who made it.
+  history     read    yes       List every recorded change to one record, or every event one transaction wrote, newest first.
   status      read    no        Orient a caller in the workspace in one call.
   help        read    no        Print the command inventory, or one command's contract, flags and examples.
   version     read    no        Print the tool version, the store schema version and the agent contract version.
@@ -1515,6 +1515,44 @@ sprint  acme-platform  2 changed  txn t0907
   committed  webhook-retry - -> sprint-31
   committed  avatar-crop - -> sprint-31
   events  2 item.commit
+
+### history-txn @ 60
+history  acme-platform
+  sort  at desc
+  transaction  t0907
+
+events  2 of 2
+  AT                    KIND   OP           WHAT
+  2026-09-04T09:30:00Z  human  item.commit
+    entity=avatar-crop,sprint_id=(unset)->sprint-31
+    dana
+  2026-09-04T09:30:00Z  human  item.commit
+    entity=webhook-retry,sprint_id=(unset)->sprint-31
+    dana
+
+### history-txn @ 80
+history  acme-platform
+  sort  at desc
+  transaction  t0907
+
+events  2 of 2
+  AT                    KIND   OP           WHAT
+  2026-09-04T09:30:00Z  human  item.commit
+    entity=avatar-crop,sprint_id=(unset)->sprint-31
+    dana
+  2026-09-04T09:30:00Z  human  item.commit
+    entity=webhook-retry,sprint_id=(unset)->sprint-31
+    dana
+
+### history-txn @ 200
+history  acme-platform
+  sort  at desc
+  transaction  t0907
+
+events  2 of 2
+  AT                    KIND   OP           WHAT                                               BY
+  2026-09-04T09:30:00Z  human  item.commit  entity=avatar-crop,sprint_id=(unset)->sprint-31    dana
+  2026-09-04T09:30:00Z  human  item.commit  entity=webhook-retry,sprint_id=(unset)->sprint-31  dana
 
 ### sprint-refused @ 60
 theme-dark is not ready to be worked: DOR3 blocked by

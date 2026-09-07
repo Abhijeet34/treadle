@@ -1,6 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 // The read that answers "who changed this, and when": one row per recorded change to one
-// item, newest first.
+// item, newest first, or to one transaction.
+//
+// TWO SCOPES, NEVER BOTH. An id is every change to one record across every command; `--txn`
+// is every change one command made across every record. An intersection of the two is a
+// third question nobody asked and the line is refused, exactly as `board --all --sprint`
+// is. The transaction-scoped read is what spends the id a mutation hands back on its own
+// envelope: `sprint commit s a b c` answers `ok sprint <ws> tj0vksb 3`, and until this flag
+// the only reading of that 3 was one item at a time or the JSONL by hand.
 //
 // Every write already appended an event carrying an actor, and until this command nothing
 // printed one, so the audit trail the tool kept was unanswerable through the tool.
@@ -38,10 +45,10 @@
 // block of its own keyed on `at` and `op`, which the table above prints.
 
 import { MAX_REASON, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
-import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
+import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
-import { DEFAULT_LIMIT, invocation, notFound } from './items.ts'
+import { DEFAULT_LIMIT, invocation, notFound, type CarriedFlag } from './items.ts'
 import { AUDITED_FIELDS } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -49,7 +56,7 @@ export const HISTORY_SHAPE: ResultShape = {
   command: 'history',
   version: 1,
   effect: 'read',
-  summary: 'List every recorded change to one item, newest first, with who made it.',
+  summary: 'List every recorded change to one record, or every event one transaction wrote, newest first.',
   properties: [
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
@@ -60,6 +67,11 @@ export const HISTORY_SHAPE: ResultShape = {
     // allows and moves nothing already declared: the sentence that says the record this
     // history belongs to is no longer in the store.
     { kind: 'scalar', key: 'note', type: 'string' },
+    // `transaction` and not `txn`, which is the one name symmetry with the flag argues for:
+    // the envelope already carries a `txn` field meaning the transaction this command wrote,
+    // which on a read is always null, and two keys of one object that mean opposite halves
+    // of the same word is a trap laid for the reader who reaches for either.
+    { kind: 'scalar', key: 'transaction', type: 'string' },
     {
       kind: 'block',
       key: 'events',
@@ -90,9 +102,17 @@ const MAX_CELL = 200
  * A value from a stored event as a non-final row cell. A cell that carries whitespace would
  * split into two fields and move every value after it, so it is reported absent instead:
  * `doctor` is the surface for a file that says something no write path would have accepted.
+ *
+ * A value opening with `(` is reported absent for the second reason `side` gives: the markers
+ * below are parenthesised, and a committed log a hand edit can reach must not be able to forge
+ * one. Measured on a hand-edited log, an event whose entity was the literal string `(unset)`
+ * printed `entity=(unset)` in the transaction-scoped `what` cell, which reads as the log
+ * having recorded no entity at all. The bound is here rather than at that one caller because
+ * the invariant is stated over the whole cell vocabulary, not over one part of it.
  */
 function cell(value: unknown): string {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_CELL && !/\s/.test(value)
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_CELL
+    && !/\s/.test(value) && !value.startsWith('(')
     ? value
     : '-'
 }
@@ -247,9 +267,16 @@ function movedBy(event: StoreEvent): readonly string[] {
 /**
  * What one event recorded: the fields it moved, then the two facts that are not fields.
  * The cell is bounded like every other, and a name dropped to stay inside it is counted.
+ *
+ * `named` leads the cell with `entity=<id>` under the transaction-scoped read, where the
+ * record is the one fact that tells two rows of the same op apart and is on no column of
+ * its own: the three `item.commit` rows of one `sprint commit` each render
+ * `sprint_id=(unset)->sprint-31` and nothing else. It leads rather than trails because the
+ * bound below drops the tail, and the row's own identity is not what a reader can spare.
+ * The entity-scoped read never carries it: there it is the `item` scalar, constant per row.
  */
-function whatOf(event: StoreEvent): string {
-  const parts = [...movedBy(event)]
+function whatOf(event: StoreEvent, named: boolean): string {
+  const parts = named ? [`entity=${cell(event.entity)}`, ...movedBy(event)] : [...movedBy(event)]
   if (typeof event.outcome === 'string') parts.push(`outcome=${cell(event.outcome)}`)
   parts.push(...overridden(event))
   if (parts.length === 0) return '-'
@@ -285,36 +312,93 @@ function why(value: unknown): string {
   return isSafeText(value, 'line') ? value : UNKNOWN
 }
 
+/**
+ * The one thing the read is scoped to. A union rather than two optional fields, so "an id or
+ * a transaction, never both" is a shape this service cannot be handed a violation of; the
+ * line that writes both is refused in `src/cli/main.ts`, where both are in hand.
+ */
+export type HistoryScope =
+  | { readonly kind: 'item'; readonly id: ItemId }
+  | { readonly kind: 'txn'; readonly txn: string }
+
 export type HistoryRequest = {
+  readonly scope: HistoryScope
   readonly limit: number
   /** The event id to resume at, which is the id the previous page's `page` line named. */
   readonly cursor?: string
 }
 
+/**
+ * An id that named no transaction, told apart by one streaming pass over the log. Only this
+ * path pays for the pass, and it buys the distinction that makes the refusal worth reading:
+ * a caller who reached for an event id gets the transaction that wrote it rather than a
+ * dead end, which is `notFound`'s "is a sprint here, not an item" over the log's two ids.
+ *
+ * An empty answer and a wrong id must not look the same, so neither ends as `~events 0 0`.
+ */
+async function noTransaction(
+  store: Store, workspace: string, txn: string,
+): Promise<ResultObject> {
+  let held = 0
+  let named: StoreEvent | undefined
+  const scanned = await store.eachEvent({}, (event) => {
+    held += 1
+    if (event.id === txn) named = event
+  })
+  if (!scanned.ok) return storeRefusal('history', 'read', scanned.error, workspace)
+  if (named !== undefined) {
+    return errorResult({
+      code: 'NOT_FOUND', command: 'history', workspace, effect: 'read', rule: 'I5', entity: txn,
+      cause: `${txn} is an event here, not a transaction, and --txn takes the transaction a write recorded under`,
+      fix: [invocation('history', [], [['txn', named.txn]]), invocation('history', [named.entity], [])],
+    })
+  }
+  return errorResult({
+    code: 'NOT_FOUND', command: 'history', workspace, effect: 'read', entity: txn,
+    cause: `${txn} names no transaction here; this log holds ${held} ${held === 1 ? 'event' : 'events'}, and a write's own result is what carries the transaction id it wrote under`,
+    // The list of records, which is what `notFound` answers an unknown id with. There is no
+    // listing of transactions to point at and building one is a command of its own, so the
+    // line offered is the other scope's: these are the ids `history <id>` reads.
+    fix: ['treadle backlog'],
+  })
+}
+
 export async function history(
-  store: Store, id: ItemId, request: HistoryRequest,
+  store: Store, request: HistoryRequest,
 ): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
-  // An id names an item or a sprint; the log is keyed by entity and the rows read the same.
-  const held = view.value.byId.has(id) || view.value.sprintById.has(id)
+  const scope = request.scope
+  /** An id names an item or a sprint; the log is keyed by entity and the rows read the same. */
+  const carried = (entity: string): boolean =>
+    view.value.byId.has(entity) || view.value.sprintById.has(entity)
 
-  const events = await store.events({ entity: id })
+  const events = await store.events(
+    scope.kind === 'txn' ? { txn: scope.txn } : { entity: scope.id })
   if (!events.ok) return storeRefusal('history', 'read', events.error, workspace)
-  // A record `remove` took out still has its whole history, because the log is keyed by
-  // entity id rather than by a record existing, and refusing here would make a removal erase
-  // the trail it is supposed to leave intact (ADR-0024). An id with neither a record nor an
-  // event is the absence `notFound` has always answered.
-  if (!held && events.value.length === 0) return notFound('history', 'read', workspace, view.value, id)
+  if (scope.kind === 'txn') {
+    // A transaction exists only as the events it wrote, so nothing selected is an id this log
+    // has never carried rather than a transaction that changed nothing.
+    if (events.value.length === 0) return noTransaction(store, workspace, scope.txn)
+  } else if (!carried(scope.id) && events.value.length === 0) {
+    // A record `remove` took out still has its whole history, because the log is keyed by
+    // entity id rather than by a record existing, and refusing here would make a removal erase
+    // the trail it is supposed to leave intact (ADR-0024). An id with neither a record nor an
+    // event is the absence `notFound` has always answered.
+    return notFound('history', 'read', workspace, view.value, scope.id)
+  }
   // The store returns the log in the order it was written; the question this command answers
   // is almost always about the most recent change, so the newest is the first row.
   const ordered = [...events.value].reverse()
 
+  const scoping: readonly CarriedFlag[] = scope.kind === 'txn' ? [['txn', scope.txn]] : []
   const line = (cursor?: string): string =>
-    invocation('history', [id], [['limit', request.limit === DEFAULT_LIMIT ? undefined : String(request.limit)], ['cursor', cursor]])
+    invocation('history', scope.kind === 'txn' ? [] : [scope.id],
+      [...scoping, ['limit', request.limit === DEFAULT_LIMIT ? undefined : String(request.limit)], ['cursor', cursor]])
+  const named = scope.kind === 'txn' ? scope.txn : scope.id
   const from = request.cursor === undefined ? 0 : ordered.findIndex((event) => event.id === request.cursor)
-  if (from < 0) return unknownCursor('history', workspace, id, request.cursor as string, line())
+  if (from < 0) return unknownCursor('history', workspace, named, request.cursor as string, line())
   const page = ordered.slice(from, from + request.limit)
 
   const block: Block = {
@@ -325,21 +409,32 @@ export async function history(
       at: cell(event.at),
       kind: cell(event.actor_kind),
       op: cell(event.op),
-      what: whatOf(event),
+      what: whatOf(event, scope.kind === 'txn'),
       by: event.actor,
     })),
   }
 
-  const gone = !held
-    ? 'no record here carries this id now; these are the events it earned while it did'
-    : undefined
+  // The same fact under both scopes: a row here names a record `show` will not find, and the
+  // reader is told once rather than being left to discover it one follow-up read at a time.
+  // The transaction-scoped count is over distinct entities and not over rows, because one
+  // removal writes one event and a reader counting rows would read it as one record either way.
+  const absent = scope.kind === 'txn'
+    ? new Set(ordered.map((event) => event.entity).filter((entity) => !carried(entity)))
+    : new Set(carried(scope.id) ? [] : [scope.id])
+  const gone = absent.size === 0
+    ? undefined
+    : scope.kind === 'txn'
+      ? `${absent.size} of the records these rows name ${absent.size === 1 ? 'is' : 'are'} no longer here; the entity in each what cell names ${absent.size === 1 ? 'it' : 'them'}, and the log keeps every event ${absent.size === 1 ? 'it' : 'they'} earned`
+      : 'no record here carries this id now; these are the events it earned while it did'
 
   const recorded = page
     .filter((event) => event.reason !== undefined)
     .map((event): Row => ({ at: cell(event.at), op: cell(event.op), why: why(event.reason) }))
 
-  const data: Record<string, Value> = { item: id, sort: 'at desc' }
-  if (ordered.length === 0) data['none'] = `${id} has no recorded change`
+  const data: Record<string, Value> = scope.kind === 'txn'
+    ? { sort: 'at desc', transaction: scope.txn }
+    : { item: scope.id, sort: 'at desc' }
+  if (ordered.length === 0) data['none'] = `${named} has no recorded change`
 
   const remaining = ordered.length - (from + page.length)
   if (remaining > 0) {

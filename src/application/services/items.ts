@@ -66,7 +66,7 @@ export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'pts', 'sev', 'ti
 /** The page size every list defaults to; `next` has its own, smaller one. */
 export const DEFAULT_LIMIT = 9
 
-type CarriedFlag = readonly [name: string, value: string | true | undefined]
+export type CarriedFlag = readonly [name: string, value: string | true | undefined]
 
 /**
  * A command line the reader runs as printed, carrying every flag that shaped this answer.

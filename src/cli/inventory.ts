@@ -255,10 +255,14 @@ export const COMMANDS: readonly Command[] = [
     name: 'history', shape: HISTORY_SHAPE, effect: 'read', record: 'list',
     omits: false, pageable: true, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle history <id> [--limit <n>] [--cursor <event>]'],
+    usage: [
+      'treadle history <id> [--limit <n>] [--cursor <event>]',
+      'treadle history --txn <txn> [--limit <n>] [--cursor <event>]',
+    ],
     examples: [
       ['treadle history checkout-500', 'who changed this item, what they moved and when'],
       ['treadle history checkout-500 --limit 1', 'the most recent change alone'],
+      ['treadle history --txn tj0vksb', 'the other scope: every event one command wrote, whichever records it touched, under the transaction id that command returned; an id and --txn are two questions and the line takes one of them'],
     ],
   },
   {

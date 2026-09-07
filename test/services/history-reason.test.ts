@@ -45,7 +45,7 @@ describe('a reason the log records is a reason a reading returns', () => {
   after(async () => { await demo.dispose() })
 
   it('lists the reasons in the order of the events they came from', async () => {
-    const result = await history(demo.store, id, { limit: 50 })
+    const result = await history(demo.store, { scope: { kind: 'item', id }, limit: 50 })
     assert.equal(result.ok, true)
     const events = result.data['events'] as { rows: readonly Record<string, unknown>[] }
     const reasons = result.data['reasons'] as { rows: readonly Record<string, unknown>[] }
@@ -64,7 +64,7 @@ describe('a reason the log records is a reason a reading returns', () => {
     ['agent', agentRenderer], ['human', humanRenderer], ['json', jsonRenderer],
   ] as const) {
     it(`returns it in the ${name} rendering of history`, async () => {
-      const result = await history(demo.store, id, { limit: 50 })
+      const result = await history(demo.store, { scope: { kind: 'item', id }, limit: 50 })
       assert.equal(result.ok, true)
       const text = renderer.render(result, { width: 200 })
       assert.ok(
@@ -110,7 +110,7 @@ describe('a reason a hand edit made unprintable is marked, never printed', () =>
   after(async () => { await demo.dispose() })
 
   it('prints one row per recorded reason and no unprintable value in any rendering', async () => {
-    const result = await history(demo.store, id, { limit: 200 })
+    const result = await history(demo.store, { scope: { kind: 'item', id }, limit: 200 })
     assert.equal(result.ok, true, String(result.data['cause']))
     const reasons = result.data['reasons'] as { rows: readonly Record<string, unknown>[] }
     const marked = reasons.rows.filter((row) => row['why'] === '(?)')

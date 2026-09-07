@@ -111,6 +111,7 @@ export class OverlayStore implements Store {
     if (!base.ok) return base
     const all = [...base.value, ...this.#events].filter((event) => {
       if (query.entity !== undefined && event.entity !== query.entity) return false
+      if (query.txn !== undefined && event.txn !== query.txn) return false
       if (query.from !== undefined && event.at < query.from) return false
       if (query.to !== undefined && event.at >= query.to) return false
       return true

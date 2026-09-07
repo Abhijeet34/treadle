@@ -14,7 +14,7 @@ import { errorResult, okResult, type ResultObject } from '../application/result.
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { setFields } from '../application/services/editing.ts'
-import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, showItem, type Filter } from '../application/services/items.ts'
+import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, invocation, showItem, type Filter } from '../application/services/items.ts'
 import { DEFAULT_BOARD_COLUMNS, board } from '../application/services/board.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
@@ -522,9 +522,29 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return explain(store, id)
   }
   if (command === 'history') {
-    if (id === undefined) return validation('history', 'history needs the id of one item', ['treadle backlog'])
+    const txn = flag(flags, 'txn')
+    // The two scopes are one question each and their intersection is a third nobody asked,
+    // so the line is refused rather than answered, as `board --all --sprint` is. Both
+    // readings are printed as the lines that give them, which is what the caller runs next.
+    if (id !== undefined && txn !== undefined) {
+      return validation(
+        'history',
+        '--txn and an id ask different questions: an id is every change to one record, --txn is every change one command made',
+        [invocation('history', [id], []), invocation('history', [], [['txn', txn]])],
+      )
+    }
+    // `--txn=` reached the store as an empty transaction id and came back as a refusal that
+    // named nothing: `cause  names no transaction here`, with no `entity` line at all,
+    // because the renderer drops an empty scalar. No id is a shorter line than a wrong one.
+    if (txn !== undefined && txn.length === 0) {
+      return validation('history', '--txn needs the transaction id a write returned, and this line gives it no value', ['treadle help history'])
+    }
+    if (id === undefined && txn === undefined) {
+      return validation('history', 'history needs the id of one record, or --txn with the transaction id a write returned', ['treadle backlog'])
+    }
     const cursor = flag(flags, 'cursor')
-    return history(store, id, {
+    return history(store, {
+      scope: txn === undefined ? { kind: 'item', id: id as string } : { kind: 'txn', txn },
       limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),
       ...(cursor === undefined ? {} : { cursor }),
     })

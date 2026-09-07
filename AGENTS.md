@@ -559,6 +559,7 @@ Where a field's content does not fit `show`'s A.3 byte budget it goes behind `--
 
 The `what` column of `history` has one convention and a new op inherits it: every part is `name=value` or `name=from->to`, never a bare name, and a side the log did not record printably is one of the three markers `(unset)`, `(text:<n>)` and `(?)`.
 It is stated in the header of `src/application/services/history.ts`, beside the `VALUE_OF_OP` table an append-shaped op adds itself to, and `test/services/history-convention.test.ts` holds it over every op the build writes.
+`history` reads under two scopes and never both at once, an id or `--txn`, and the transaction-scoped one leads that cell with `entity=<id>` because its rows span records and no column carries the record; the entity-scoped one never does, where the entity is the `item` scalar.
 
 ## The extension surface is closed, and closing it was the decision
 
