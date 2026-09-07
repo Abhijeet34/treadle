@@ -105,6 +105,20 @@ export async function initWorkspace(
     })
   }
 
+  // A workspace above this one is almost always a mistake and never a silent one. `init` in a
+  // subdirectory of a workspace made a second store at `sub/.work`, said nothing about the one
+  // a level up, and every command run from `sub` then answered from the empty new store:
+  // `resolveStore` walks up and stops at the nearest, so the backlog forks and nobody is told.
+  // The walk starts at the parent, because `root` is not a workspace on this branch.
+  const above = await resolveStore(path.dirname(root))
+  if (above !== undefined && request.yes !== true) {
+    return errorResult({
+      code: 'VALIDATION', command: 'init', workspace: '-', effect: 'mutate', rule: 'C1',
+      cause: `${above} is already a workspace above this directory, and every command run here would answer from the new one instead`,
+      fix: [`treadle status --workspace ${above}`, 'treadle init --yes'],
+    })
+  }
+
   if (await nonEmpty(root) && request.yes !== true) {
     return errorResult({
       code: 'VALIDATION', command: 'init', workspace: '-', effect: 'mutate', rule: 'C1',

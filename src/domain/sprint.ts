@@ -14,7 +14,7 @@
 // argument for the tally.
 
 import { fail, ok, type DomainError, type Failure, type Result } from './errors.ts'
-import { MAX_REASON, isInstant } from './fields.ts'
+import { MAX_REASON, isCalendarDate, isInstant } from './fields.ts'
 import { validateFieldKeys } from './record.ts'
 import { isSafeText } from './text.ts'
 import { isTerminal, type GateVerdict, type Instant, type ItemId, type WorkItemSummary } from './types.ts'
@@ -93,25 +93,13 @@ export const SPRINT_FIELDS = [
 ] as const
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
-const DATE = /^\d{4}-\d{2}-\d{2}$/
 const DAY_MS = 86_400_000
 
-const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
-
-/**
- * A real calendar date. The shape alone lets `2026-02-30` through, and `Date.parse` then
- * reads it as the second of March; a sprint boundary that two people read differently is
- * the failure the date rule exists to prevent, so a date names the day it denotes or is
- * refused. Checked against the calendar rather than through a `Date`, because this layer
- * touches no clock and the layering test reads the constructor as one.
- */
-export function isCalendarDate(value: unknown): value is CalendarDate {
-  if (typeof value !== 'string' || !DATE.test(value)) return false
-  const [year, month, day] = value.split('-').map(Number) as [number, number, number]
-  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
-  const days = month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1]
-  return days !== undefined && day >= 1 && day <= days
-}
+// `isCalendarDate` moved to `fields.ts`, which is where `isInstant` lives and where a day
+// written into an instant field is widened; this file already imports from there, so one
+// direction and one copy. It is re-exported here because the sprint rules are its first
+// caller and `domain/index.ts` names it beside them.
+export { isCalendarDate } from './fields.ts'
 
 /** The UTC calendar date of an instant, which is the day a sprint boundary is compared on. */
 export function dateOf(instant: Instant): CalendarDate {

@@ -109,13 +109,18 @@ function fitLine(line: string, width: number): readonly string[] {
   for (const word of line.trimStart().split(' ').flatMap((piece) => splitToWidth(piece, room))) {
     const candidate = current.trimEnd().length === 0 ? `${current}${word}` : `${current} ${word}`
     if (displayWidth(candidate) > width && current.trim().length > 0) {
-      out.push(current)
+      out.push(current.trimEnd())
       current = `${indent}${word}`
     } else {
       current = candidate
     }
   }
-  out.push(current)
+  // Trimmed, and a continuation carrying only padding is not emitted at all. A table row is
+  // padded to its column widths before it reaches here and a run of pad splits into empty
+  // words, so every line broken mid-row ended in the pad it broke on: fourteen such lines
+  // across three probe runs, and the macos-15 snapshot failure was one of them, `'  store '`
+  // where the store path had moved to the next line.
+  if (current.trim().length > 0) out.push(current.trimEnd())
   return out
 }
 
@@ -125,7 +130,7 @@ function wrap(text: string, width: number, indent: string): readonly string[] {
     let line = ''
     for (const word of paragraph.split(' ')) {
       if (line.length > 0 && displayWidth(`${line} ${word}`) + indent.length > width) {
-        out.push(`${indent}${line}`)
+        out.push(`${indent}${line}`.trimEnd())
         line = word
       } else {
         line = line.length === 0 ? word : `${line} ${word}`

@@ -96,6 +96,9 @@ It downloads the tarball from the release and checks it against `SHA256SUMS` bef
 Each of these stops publication on its own, and all three are closed today.
 
 1. **`"private": true` in `package.json`.** npm itself refuses to publish it. The preflight names this one explicitly, so a refusal reads as the gate holding rather than as a broken workflow.
+   Where the refusal comes from is worth knowing before anyone tests the gate: npm 11.19's CLI checks `private` only for a workspace publish, and for this package the refusal is raised by `libnpmpublish` after authentication and the registry version query.
+   So `npm publish --dry-run` prints `+ treadle@0.1.0` and exits 0 with no mention of `private`, and `npm publish` against an unreachable registry reaches `ENEEDAUTH` first.
+   Measured 2026-09-07. A dry run is not a test of this interlock; removing the field and watching the real publish fail is, and nobody should run that.
 2. **`NPM_PUBLISH_ENABLED`**, a repository variable rather than a secret or a default. Unset, the publish job is visibly skipped and the release ends at the GitHub release and its three assets.
 3. **The `npm-publish` environment**, configured to require a reviewer. The job stops and waits for a person before it can reach the registry.
 
@@ -104,6 +107,13 @@ There is no npm token anywhere in this repository, in any secret, at any scope.
 It passes no `--provenance` flag, because trusted publishing generates provenance itself and the flag turns a provenance-ineligible publish into a failed release rather than an unattested one.
 
 When the name clears, opening the gate is: remove `"private": true`, register treadle's trusted publisher on npm against `Abhijeet34/treadle` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
+
+Four sentences in the tree stop being true on the same day and none of them is code, so they belong on this list rather than in a later reader's surprise:
+`README.md`'s "Nothing is published yet" and its `npm publish` refusal paragraph, `README.md`'s "Blocked on a name clearance that has not run" status row, this file's own "Nothing has been released" opening, and the quick start, which becomes `npm install -g treadle` and `treadle init` where today it is `node bin/treadle.js init` against a clone.
+
+One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
+Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
+The workflow's own path is already closed by construction - the `publish` job downloads the attested tarball the `artifacts` job packed one step after `npm run build` and `release-preflight`, and verifies it against `SHA256SUMS` - and `scripts/check-dist-fresh.ts` explains why a `prepack` hook cannot be the answer here.
 
 ## Rolling back
 
@@ -151,7 +161,8 @@ Mark the GitHub release as a pre-release or edit its notes to say it is withdraw
 It clones this repository into a temporary directory, signs real tags in the clone, and drives the release preflight against each one.
 It pushes nothing and never touches the real repository, which is why it is a script anyone can run rather than a workflow.
 
-Eight scenarios, all passing on 2026-09-05, re-run after this branch rebased onto #7: the signed annotated tag the release path accepts, five it refuses (lightweight, unsigned, wrong version, off the released branch, no bundle built), the publication interlock refusing a publish, and the hotfix path branched from the released tag, landed and tagged again.
+Eight scenarios, all passing on 2026-09-07 and first on 2026-09-05: the signed annotated tag the release path accepts, five it refuses (lightweight, unsigned, wrong version, off the released branch, no bundle built), the publication interlock refusing a publish, and the hotfix path branched from the released tag, landed and tagged again.
+Re-run on 2026-09-07 because the preflight had gained its bundle-freshness and runtime-floor clauses since the first run, and a drill that predates the gate it rehearses proves nothing about it.
 
 ```text
 drill: 8 passed, 0 failed

@@ -29,6 +29,7 @@ import {
   blockedByThisIndex,
   doneVerdict,
   hasReviewStep,
+  hidesContent,
   notGroomed,
   readWorkspace,
   wholeItem,
@@ -475,7 +476,11 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       store: view.value.identity.path ?? workspace,
       items: view.value.items.length,
       points: view.value.items.reduce((sum, item) => sum + (item.points ?? 0), 0),
-      findings: findings.ok ? findings.value.length : 0,
+      // The same predicate `doctor` subtracts by, so the two calls count one set rather than
+      // two. Without it, a store whose only finding is an `H16` printed `findings 1` here
+      // while `doctor` served every record and exited 0, and the `audit` line below defines
+      // this number as a record the store cannot serve.
+      findings: findings.ok ? findings.value.filter(hidesContent).length : 0,
       // Both lines are absent when there is nothing to say, which is what keeps the
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),

@@ -14,6 +14,7 @@ import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { COMMAND_OPTIONS, GLOBAL_OPTIONS } from '../../src/cli/parse.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { runCli } from '../helpers/cli-run.ts'
+import { POSIX_MODES } from '../helpers/platform.ts'
 
 /** 69 bytes, which is the length that first showed `show` cutting a title at 64 cells. */
 const LONG_TITLE = 'A title that runs to sixty nine bytes in total, which is over the cut'
@@ -559,7 +560,9 @@ describe('the defects the second adversarial pass found by using the tool', () =
   })
 
   describe('a nearer workspace the walk cannot read is a refusal, not a step past it', () => {
-    it('exits 6 with S13 naming the unreadable directory, rather than answering from the parent', { skip: process.getuid?.() === 0 }, async () => {
+    const UNREADABLE = POSIX_MODES
+      || (process.getuid?.() === 0 ? 'root reads a directory whose mode is 0o000 anyway' : false)
+    it('exits 6 with S13 naming the unreadable directory, rather than answering from the parent', { skip: UNREADABLE }, async () => {
       const inner = path.join(demo.root, 'inner')
       const nested = path.join(inner, '.work')
       await mkdir(nested, { recursive: true })

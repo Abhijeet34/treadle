@@ -16,6 +16,7 @@ import { fixedClock } from '../../src/adapters/clock.ts'
 import { sequentialIds } from '../../src/adapters/ids.ts'
 import { initWorkspace, resolveStore, workspaceIdFor, WORKSPACE_DIR } from '../../src/adapters/workspace.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
+import { POSIX_MODES } from '../helpers/platform.ts'
 
 const ACTOR: Actor = { id: 'dana', kind: 'human' }
 const CLOCK = fixedClock('2026-09-04T09:30:00Z')
@@ -74,7 +75,9 @@ describe('init on a directory that already holds files', () => {
       assert.equal(refused.ok, false)
       assert.equal(refused.code, 'VALIDATION')
       assert.equal(refused.data['rule'], 'C1')
-      assert.match(String(refused.data['cause']), new RegExp(at.replaceAll('/', '\\/')))
+      // The path is a literal in the cause, not a pattern: on Windows every separator in it
+      // is a backslash and a regex built from it reads them as escapes.
+      assert.ok(String(refused.data['cause']).includes(at), `the cause does not name ${at}`)
       assert.deepEqual(refused.data['fix'], ['treadle init --yes'])
     } finally {
       await rm(at, { recursive: true, force: true })
@@ -112,7 +115,7 @@ describe('init where the workspace cannot be created', () => {
     }
   })
 
-  it('reports the first event failing to land, and does not claim success', async () => {
+  it('reports the first event failing to land, and does not claim success', { skip: POSIX_MODES }, async () => {
     const parent = await aDirectory()
     const at = path.join(parent, WORKSPACE_DIR)
     try {

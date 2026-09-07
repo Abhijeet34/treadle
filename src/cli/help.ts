@@ -35,6 +35,7 @@ const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
   '--dry-run A': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
   '--preview A': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
   '--actor A': 'accepted and ignored: this command records no event, so no actor is attributed',
+  '--actor S': 'supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and the default is unknown',
   '--color A': 'accepted and ignored: no rendering emits colour at all, so there is no colour to switch',
   '--width S': `supported: it lays the human rendering out at that many display cells, clamped to ${MIN_WIDTH} to ${MAX_WIDTH}`,
   '--contract S': `supported: it prints the ${CONTRACT} line grammar and runs no command`,

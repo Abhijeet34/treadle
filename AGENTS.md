@@ -35,13 +35,16 @@ tests use. `npm run build` bundles that same entry file to `dist/treadle.js` wit
 that bundle is what `bin` points at and `files` ships: no source reaches the tarball. Change
 the entry file, not one of the two.
 
-`bin/treadle.js`'s shebang is load-bearing and carries the reason in its own header: it starts
-node with `--stack-size`, because the default V8 stack is smaller than an argv block execve
-will carry and the process dies before any line of this tool runs. `scripts/build.ts` reads
-that line rather than spelling a second copy. The consequence to know: `node dist/treadle.js`
-bypasses the shebang and is not the shipped interface, so reproduce an argument-size question
-against the executable itself. `docs/architecture/adr/0009-release-and-supply-chain.md`
-carries why, and `docs/RELEASING.md` carries how a release happens and how to roll one back.
+`bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way. `scripts/build.ts`
+reads that line rather than spelling a second copy, and `scripts/shebang.ts`'s
+`portabilityProblem` refuses an `env` option or a node flag on it: both need `env -S`, which
+BusyBox does not have, and the day the line carried `-S node --stack-size=3072` the installed
+tool answered `env: unrecognized option: S` and exited 1 on `node:24-alpine`. The cost is one
+platform limit rather than a crash protection: on macOS an argv-plus-environment block over
+about 984 KiB kills the process inside Node's own bootstrap, which no code here can catch.
+`docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
+measurements; `docs/architecture/adr/0009-release-and-supply-chain.md` carries the release
+design, and `docs/RELEASING.md` how a release happens and how to roll one back.
 
 Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
 the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release
@@ -546,6 +549,18 @@ GitHub bills a macOS minute at about 10x a Linux one and a Windows minute at abo
 Put macOS and Windows coverage on a weekly `schedule:` plus `workflow_dispatch`, and on the release path when the project ships per-platform artifacts.
 Do not add a `macos-*` or `windows-*` runner to a job that runs on `pull_request`.
 Never add `cancel-in-progress` to a release, publish, or scheduled workflow: cancelling a publish mid-flight causes real damage, and a superseded scheduled run is the only record of its own result.
+
+`cross-platform.yml` is that weekly matrix, `release.yml` gates `artifacts` on it, and its `installed` job is the only thing anywhere that runs the packed tarball's own binary rather than the suite from a checkout.
+Dispatch it by hand (`gh-axi workflow run cross-platform.yml --ref <branch>`) whenever a branch touches the store, a path, the shebang, or the human rendering: `ci.yml` is Linux and cannot see any of them, and the first run this workflow ever had was red on two platforms.
+
+## Writing a test that will run on Windows
+
+Three quarters of what a Windows job reports is the suite asserting POSIX at it, so the rules are short.
+Compare paths through `node:path` and never against a literal `/`, and never build a regex out of a path.
+`test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
+Where the invariant can be expressed in what Windows does have, express it: `deleteIndex` in `test/helpers/store-fixtures.ts` removes the index between two opens rather than under a live handle, because Windows will not unlink a file another handle holds.
+That last rule is a production rule too: close a `DatabaseSync` on every path out of the function that opened it, including the throwing ones, or the store cannot rebuild its own cache on Windows.
+The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md`, the shipped schemas and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
 
 ## Maintaining this file
 

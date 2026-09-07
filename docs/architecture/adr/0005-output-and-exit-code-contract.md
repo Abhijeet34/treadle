@@ -67,6 +67,11 @@ No environment variable and no workspace key changes it, which DR5 refused for t
 Line 1 is the envelope: `ok <command> <workspace>` for a read, `ok <command> <workspace> <txn|-> <changed>` for a mutation, `err <CODE> <workspace>` for a refusal.
 The envelope's arity is how a caller reads the effect class without parsing the command word.
 
+An `ok` envelope carries its code as a last field when that code is not `OK`, which today means `ok doctor <workspace> INTEGRITY` and nothing else.
+Added 2026-09-07, because the sixth contract rule below - "the exit status is a function of the code on line 1 and of nothing else" - was false without it: `doctor` over a store holding a hidden record printed `ok doctor <workspace>` on line 1 and exited 7, so an agent that followed the rule as written predicted 0.
+`OK` itself is never printed: it is what every other `ok` line already means, and printing it would cost every read a field that says nothing.
+The field goes last, after the mutate form's own two, so no position a caller already reads moves.
+
 | Kind | Trust | Shape |
 |---|---|---|
 | scalar | tool | `<key> <value>` |

@@ -4,6 +4,7 @@
 
 import {
   ALLOWED_PARENT_PAIRS,
+  asInstant,
   canonicalField,
   daysOverdue,
   evaluateCommit,
@@ -239,18 +240,26 @@ function slugHead(base: string): string {
 }
 
 /**
- * A readable id a person reviewing the file recognises, deduped against what is stored.
- * `kind` is the word a too-short title is prefixed with: the item's type, or `sprint`.
+ * A readable id a person reviewing the file recognises, deduped against what is stored, or
+ * undefined when the title carries nothing an id can be made of. `kind` is the word a
+ * too-short title is prefixed with: the item's type, or `sprint`.
+ *
+ * The undefined case is a title whose every character folds away: NFKD handles Latin
+ * diacritics, so `Ünïcödé ✨ only` becomes `u-ni-co-de-only`, and a script it cannot fold
+ * leaves nothing at all. That used to fall through to `${kind}-item`, trimmed to the type
+ * name, so a wholly non-Latin title filed as `task` and the next one as `task-2`: two ids
+ * naming their type rather than their item, indistinguishable to everyone who reads them.
+ * The caller refuses and names `--id`, which is the one thing that can carry the intent.
  */
-export function slugFor(title: string, kind: string, taken: ReadonlySet<string>): ItemId {
+export function slugFor(title: string, kind: string, taken: ReadonlySet<string>): ItemId | undefined {
   const base = slugHead(title
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(SLUG_TRIM, ''))
     .replace(SLUG_TRIM, '')
-  let head = base.length >= 3 ? base : `${kind}-${base}`.replace(SLUG_TRIM, '')
-  if (head.length < 3) head = `${kind}-item`
+  if (base.length === 0) return undefined
+  const head = base.length >= 3 ? base : `${kind}-${base}`.replace(SLUG_TRIM, '')
   if (!taken.has(head)) return head
   for (let n = 2; ; n += 1) {
     const candidate = `${head}-${n}`
@@ -286,6 +295,8 @@ const CRITERIA_TICK = /^\[([ x])\] /
  */
 export function coerce(name: string, value: string): unknown {
   if (value === '') return undefined
+  // `due` is a day to everyone who writes one; `asInstant` carries the rule and its why.
+  if (name === 'due') return asInstant(value)
   if (INT_FIELDS.has(name)) return Number.isInteger(Number(value)) ? Number(value) : value
   if (name === 'fix_confirmed') return value === 'true' ? true : value === 'false' ? false : value
   if (LIST_FIELDS.has(name)) return value.split(',').filter((part) => part.length > 0)
@@ -334,6 +345,13 @@ export async function fileItem(
   const now = clock.now()
   const spoken = namedByRecord(view.value)
   const id = request.id ?? slugFor(request.title, request.type, new Set([...view.value.byId.keys(), ...view.value.sprintById.keys(), ...spoken.keys()]))
+  if (id === undefined) {
+    return errorResult({
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'C1', entity: request.type,
+      cause: 'no character of this title becomes part of an id, so the id would name the type and nothing else; name one with --id',
+      fix: [`treadle file ${request.type} "<title>" --id <slug>`],
+    })
+  }
   // An id another record still names is not free, whatever the store no longer holds under
   // it. A record deleted by hand leaves its `blocks` edges and its sprint's `members` and
   // `carried` lists pointing at the id, and refiling the title reissued it: the new draft

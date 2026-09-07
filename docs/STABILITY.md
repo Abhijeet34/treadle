@@ -95,6 +95,47 @@ A release never ships with a floor on a line that reaches end of life within six
 
 Raising the floor is a breaking change and gets a minor bump and a release note.
 
+## The supported userlands, and the macOS argument-block limit
+
+`bin/treadle.js` and the shipped bundle open with `#!/usr/bin/env node`, which every POSIX
+userland runs, BusyBox included.
+That is a support statement: `node:24-alpine` is the smallest official Node image and the one a
+container-based agent reaches for first, and a tool whose first command prints
+`env: unrecognized option: S` has failed before it started.
+`scripts/shebang.ts`'s `portabilityProblem` holds the line and
+`test/cli/oversized-argument.test.ts` asserts it on every platform.
+
+The cost of that line is one platform limit, stated here rather than defended by a flag.
+
+On macOS the kernel places argv and the environment at the top of the main thread's stack and
+V8 sets its own limit `--stack-size` KiB below that top, so a block larger than the default
+984 KiB leaves the isolate with no stack and the process dies inside Node's bootstrap:
+`RangeError: Maximum call stack size exceeded` at `<anonymous_script>:0`, exit 7, before the
+first line of this tool runs.
+Measured 2026-09-07 on Node 24.11.1: eleven arguments of 90,000 characters, a 990,547 byte
+block, crash; the same block delivered as eleven environment variables behind a short command
+line crashes identically; and `node /dev/null "$(cat 1mb)"` crashes with an empty script, which
+is what places the fault in the runtime's startup rather than in any code here.
+
+Three consequences follow, and none of them is fixable in this package:
+
+- No check at an entry point can fire, because on the crashing platform the entry point is
+  never evaluated.
+- A wrapper that re-executes node with a larger stack receives the same block and dies before
+  it can exec.
+- `NODE_OPTIONS=--stack-size=3072` is refused by Node itself, so the environment cannot carry
+  the flag either.
+
+Linux does not charge the block against the stack: CI run 34106349134 answered, typed, behind
+4,140,820 bytes of argv and 4,142,278 bytes of environment under the default stack.
+Windows caps a whole command line at 32,767 characters, far below the limit.
+
+What holds everywhere is the bound on the value rather than on the block: `MAX_CAUSE` and
+`MAX_LINE` bound what a refusal prints and the field dictionary bounds what a value may be, so
+any argument this tool actually reads is a typed refusal with no stack trace.
+If a workflow genuinely needs to pass a megabyte on macOS, pass it through a file and a field
+the dictionary sizes, or run node with `--stack-size=3072` yourself.
+
 ## Deprecation
 
 Anything on its way out is deprecated for at least one minor release before it goes.

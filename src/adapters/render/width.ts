@@ -65,24 +65,51 @@ export function displayWidth(value: string): number {
   return total
 }
 
+/** `a=1,b=2` as `['a=1,', 'b=2']`, the comma kept on the part it closes; no comma is one part. */
+function commaParts(value: string): readonly string[] {
+  const parts = value.split(',')
+  return parts
+    .map((part, index) => (index < parts.length - 1 ? `${part},` : part))
+    .filter((part) => part.length > 0)
+}
+
 /**
- * `value` cut into pieces of at most `cells` each, at cluster boundaries, for a word that has
- * no space to break at. An empty value is one empty piece, so a caller splitting on spaces
- * keeps the run of spaces it split.
+ * `value` cut into pieces of at most `cells` each, for a word that has no space to break at.
+ * An empty value is one empty piece, so a caller splitting on spaces keeps the run of spaces
+ * it split.
+ *
+ * A comma is preferred to a cluster boundary where one is available. The one unbreakable word
+ * this renderer meets in practice is `history`'s `what` cell, which joins `field=from->to`
+ * pairs with commas: about 150 characters for a sprint close, and cut at the cell boundary it
+ * read `...,do` / `ne=(unset)->1`. Breaking after a comma keeps every pair whole and costs a
+ * cluster split only for a part that is itself wider than the room.
  */
 export function splitToWidth(value: string, cells: number): readonly string[] {
   const out: string[] = []
   let piece = ''
   let width = 0
-  for (const { segment } of SEGMENTER.segment(value)) {
-    const next = clusterWidth(segment)
-    if (width + next > cells && piece.length > 0) {
+  for (const part of commaParts(value)) {
+    const partWidth = displayWidth(part)
+    if (piece.length > 0 && width + partWidth > cells) {
       out.push(piece)
       piece = ''
       width = 0
     }
-    piece += segment
-    width += next
+    if (partWidth <= cells) {
+      piece += part
+      width += partWidth
+      continue
+    }
+    for (const { segment } of SEGMENTER.segment(part)) {
+      const next = clusterWidth(segment)
+      if (width + next > cells && piece.length > 0) {
+        out.push(piece)
+        piece = ''
+        width = 0
+      }
+      piece += segment
+      width += next
+    }
   }
   if (piece.length > 0 || out.length === 0) out.push(piece)
   return out

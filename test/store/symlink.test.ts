@@ -91,7 +91,12 @@ describe('no path at or below the workspace root is followed as a symbolic link'
       const opened = await openWorkspace(link)
       assert.ok(!opened.ok, 'a linked root was opened')
       assert.equal(opened.error.rule, 'S15')
-      assert.match(opened.error.message, new RegExp(`^the workspace directory ${link.replaceAll('.', '\\.')} is a symbolic link to `))
+      // The path is a literal, not a pattern: escaping only its dots left every Windows
+      // separator reading as an escape, so the two sides are compared as strings.
+      assert.ok(
+        opened.error.message.startsWith(`the workspace directory ${link} is a symbolic link to `),
+        opened.error.message,
+      )
       assert.equal(await readFile(path.join(workspace.root, 'workspace.md'), 'utf8').then((t) => t.length > 0), true, 'the real workspace is untouched')
     } finally {
       await rm(outside, { recursive: true, force: true })

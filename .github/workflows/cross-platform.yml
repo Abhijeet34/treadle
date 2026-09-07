@@ -1,12 +1,16 @@
 # SPDX-License-Identifier: Apache-2.0
-# The macOS and Windows coverage ci.yml deliberately does not carry. AGENTS.md, "CI runner
-# platforms": a pull request runs Linux only, because GitHub bills a macOS minute at about 10x
-# a Linux one and a Windows minute at about 1.67x against the same allowance.
+# The macOS and Windows coverage ci.yml deliberately does not carry, plus the two userlands no
+# checkout ever exercises. AGENTS.md, "CI runner platforms": a pull request runs Linux only,
+# because GitHub bills a macOS minute at about 10x a Linux one and a Windows minute at about
+# 1.67x against the same allowance.
 #
 # What only these runners can find, for this product: the store's advisory lock and its atomic
 # rename are `node:fs` primitives whose failure modes differ per platform, path handling is a
 # store concern on a tool whose whole state is files, and the terminal width and encoding the
 # human rendering measures against are not the same three things anywhere.
+#
+# And what only the `installed` job below can find: every job here runs the suite from a
+# checkout, so none of them ever starts the shipped bundle through its own shebang.
 #
 # No `concurrency` block at all: cancelling a scheduled or release run discards the only
 # record of its own result, and AGENTS.md forbids cancel-in-progress on either.
@@ -29,7 +33,7 @@ jobs:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     # A backstop the step timeout below should always reach first.
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       # One red platform should not hide the state of the others.
       fail-fast: false
@@ -54,8 +58,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Windows gets its own bound. The suite spawns a real child process for a large part of
+      # its CLI and durability coverage, and that is where Windows is slowest and least
+      # predictable: measured 2026-09-07 on the same tree within one hour, run 34123933241
+      # finished this step in 6.4 minutes and run 34125065085 was killed at 15 with the same
+      # suites reporting 16 to 22 seconds each rather than 2 to 5. A timeout is here to stop a
+      # hang, not to price a slow runner, so it is set where a hang is still obvious.
       - name: Test
-        timeout-minutes: 15
+        timeout-minutes: ${{ matrix.os == 'windows-2025' && 30 || 15 }}
         run: npm test 2>&1 | tee "$RUNNER_TEMP/test.log"
 
       - name: Build the bundle and weigh it against DR1
@@ -70,7 +80,12 @@ jobs:
         if: always()
         run: |
           set -uo pipefail
-          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | tail -1 || true)
+          # The largest count in the log, not the last. A test that runs `node --test` in a
+          # child prints that child's own TAP summary, and on windows-2025 the security suite's
+          # nested `# tests 215` landed after the run's own `tests 1728`: `tail -1` read the
+          # child and failed a green job for running 215 tests. The run's own count is always
+          # the largest, because every nested set is a subset of it.
+          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | sort -n | tail -1 || true)
           if [ -z "${ran:-}" ]; then
             echo "::error::${{ matrix.os }}: the suite reported no test count, so nothing here is evidence" >&2
             echo "${{ matrix.os }} - NO VERDICT: the suite never reported a test count" >> "$GITHUB_STEP_SUMMARY"
@@ -79,8 +94,61 @@ jobs:
           # A floor far below the suite's real size, so it catches a run that matched no
           # files or a small fraction of them and never fails on a test being deleted.
           if [ "$ran" -lt 500 ]; then
-            echo "::error::${{ matrix.os }} ran only $ran tests; the suite is over 650" >&2
+            echo "::error::${{ matrix.os }} ran only $ran tests; the suite was 1,734 on 2026-09-07" >&2
             echo "${{ matrix.os }} - ran $ran tests, which is short" >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           echo "${{ matrix.os }} - ran $ran tests" >> "$GITHUB_STEP_SUMMARY"
+
+  # The tool as a user installs it, on the two userlands the shebang has to satisfy. The three
+  # matrix jobs above all run the suite from a checkout, so none of them ever executes the
+  # shipped bundle through its own first line, and that is exactly where the regression this
+  # job exists for lived: `#!/usr/bin/env -S node --stack-size=3072` shipped on 2026-09-07 and
+  # `treadle version` answered `env: unrecognized option: S` and exited 1 on node:24-alpine,
+  # the smallest official Node image. `release.yml` gates `artifacts` on this workflow, so a
+  # tool that cannot start on BusyBox cannot reach a release.
+  #
+  # The tarball is packed here rather than downloaded, because the release's own smoke job runs
+  # after `npm publish` and a first-start failure has to be caught long before that.
+  installed:
+    name: installed on ${{ matrix.image }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # BusyBox and glibc: the two `env` implementations a POSIX userland ships.
+        image: [node:24-alpine, node:24-trixie-slim]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build and pack the tarball a user would install
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/check-dist-fresh.ts
+          mkdir -p pack
+          npm pack --ignore-scripts --pack-destination pack
+          ls -l pack
+
+      - name: Install it and run the happy path
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
+            set -eu
+            npm install --global --ignore-scripts /pack/treadle-*.tgz >/dev/null 2>&1
+            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadle/dist/treadle.js)"
+            treadle version
+            mkdir -p /tmp/ws && cd /tmp/ws
+            treadle init --name installed-smoke
+            treadle file story "The installed binary filed this"
+            treadle status | head -1 | grep -q "^ok "
+            echo "the packed tarball installs and answers on this userland"
+          '

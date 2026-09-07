@@ -48,7 +48,9 @@ describe('nothing generates an artefact, which is what closes F11', () => {
   it('has the writers the store needs and no others', () => {
     const found = sources(SRC)
       .filter((file) => specifiersOf(file).some((spec) => FILESYSTEM.test(spec)))
-      .map((file) => path.relative(ROOT, file))
+      // Repository-relative and always with `/`, so the allowlist above is one list rather
+      // than one per platform separator.
+      .map((file) => path.relative(ROOT, file).replaceAll(path.sep, '/'))
       .sort()
     assert.deepEqual(found, [...WRITERS].sort(), CONTRACT)
   })

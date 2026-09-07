@@ -18,12 +18,17 @@ Node.js 24.15 or newer.
 The floor is the oldest Node.js release line still inside its official support window at release time, and it is reviewed at every Node LTS transition rather than when something breaks.
 A release never ships with a floor on a line that reaches end of life within six months of that release date.
 
+Linux, macOS and Windows, and any POSIX userland including BusyBox: the executable opens with `#!/usr/bin/env node` and asks for nothing a userland may not have.
+One platform limit is worth knowing before you meet it. On macOS an argument block over roughly 984 KiB kills the process inside Node's own startup, before treadle runs at all, because the kernel puts argv and the environment on the stack V8 measures its limit against.
+No workflow produces one by accident and no code here can catch it; [docs/STABILITY.md](docs/STABILITY.md) carries the measurement and the two ways round it.
+
 The published package has zero runtime dependencies, and that is a budget rather than a coincidence: the index is `node:sqlite`, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
 
 ## Install
 
 Nothing is published yet.
 Publication is gated on a name clearance that has not run, so `package.json` carries `"private": true` and `npm publish` refuses.
+That refusal comes from the registry client after authentication rather than from a local check, so `npm publish --dry-run` prints `+ treadle@0.1.0` and says nothing about it; [docs/RELEASING.md](docs/RELEASING.md) carries the measurement.
 The release machinery is built and has never been fired; [docs/RELEASING.md](docs/RELEASING.md) says what opens it.
 Clone the repository to work on it.
 
@@ -48,7 +53,7 @@ node bin/treadle.js status
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 1,499 tests in 110 seconds on Node 24.11.1 on 2026-09-07, on a shared machine that was loaded throughout.
+The suite ran 1,750 tests in 162 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 3.45.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 

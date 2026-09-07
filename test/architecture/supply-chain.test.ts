@@ -58,8 +58,11 @@ describe('F13 control one: install-time scripts are off', () => {
   // rather than reading the file a second time: a config npm ignores would still pass a text
   // match.
   it('npm actually reads ignore-scripts=true from the committed .npmrc', () => {
+    // npm is a `.cmd` shim on Windows, and since the CVE-2024-27980 mitigation Node refuses to
+    // spawn one without a shell (`spawnSync npm.cmd EINVAL`). Every argument here is a literal,
+    // so the shell has nothing to interpret that this file did not write.
     const value = execFileSync('npm', ['config', 'get', 'ignore-scripts'], {
-      cwd: ROOT, encoding: 'utf8',
+      cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32',
     }).trim()
     assert.equal(value, 'true')
   })

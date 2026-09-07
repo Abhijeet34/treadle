@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, canonicalField, shellWord, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -572,7 +572,8 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       id,
       target: targetState as WorkItemState | 'resume',
       ...(reason === undefined ? {} : { reason }),
-      ...(until === undefined ? {} : { until }),
+      // A hold's end is a day like a due date, and `asInstant` is where that rule lives.
+      ...(until === undefined ? {} : { until: asInstant(until) }),
       ...(resolution === undefined ? {} : { resolution }),
       ...(outcome === undefined ? {} : { outcome }),
       ...(Array.isArray(overrides) ? { overrides: overrides as readonly GuardId[] } : {}),

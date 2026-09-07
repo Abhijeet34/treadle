@@ -298,6 +298,22 @@ export class IndexCache {
 
   #openFresh(): DatabaseSync {
     const db = new DatabaseSync(this.#file)
+    try {
+      return this.#prepareFresh(db)
+    } catch (error) {
+      // The handle is open by the time any statement can fail: `new DatabaseSync` returns on a
+      // file of arbitrary bytes and the header is only read by the first statement, so the
+      // `file is not a database` throw below leaves an open connection to the very file
+      // `#open` then tries to delete. On POSIX that unlink succeeds anyway and the leak is one
+      // descriptor per corrupt open; on Windows it is `EBUSY`, the retry reads the same bytes,
+      // and a cache the tool documents as always rebuildable answered `S13` exit 6 instead
+      // (measured on windows-2025 in run 34110894767, `found-by-use.test.ts:532`).
+      try { db.close() } catch { /* already closed by the failure itself */ }
+      throw error
+    }
+  }
+
+  #prepareFresh(db: DatabaseSync): DatabaseSync {
     // The busy timeout is armed before anything that can meet another process's lock, and
     // the journal-mode switch is the first such statement: it takes an exclusive lock on a
     // database that is not yet in WAL, which is every database on the run that creates it.

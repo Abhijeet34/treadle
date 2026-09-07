@@ -54,7 +54,11 @@ export function staleAgainst(root: string): string | undefined {
     return undefined
   }
   const newest = newestUnder(path.join(root, 'src'))
-  return newest === undefined || newest.at <= built ? undefined : path.relative(root, newest.file)
+  if (newest === undefined || newest.at <= built) return undefined
+  // Repository-relative and always with `/`, so the sentence below reads the same on every
+  // platform: it already names `dist/treadle.js` that way, and a Windows run put
+  // `src\cli\main.ts` in the other half of the same line.
+  return path.relative(root, newest.file).replaceAll(path.sep, '/')
 }
 
 /** One line per problem; an empty array means the tarball may be built from this tree. */
@@ -65,10 +69,12 @@ export function distProblems(root: string): readonly string[] {
   } catch {
     return ['dist/treadle.js does not exist; run npm run build, which the release workflow runs before its preflight']
   }
-  // esbuild writes 0644, and a shebang the kernel never reads is a shebang that does nothing:
-  // the bundle chooses the runtime's stack size on that line, so a bundle without the bit runs
-  // under the default and crashes on an argument the shipped one refuses.
-  if ((mode & 0o111) === 0) {
+  // esbuild writes 0644, and a shebang no kernel reads is a shebang that does nothing: the
+  // bundle names its interpreter on that line, and `npm install -g` links the bin straight at
+  // it. Windows has no execute bit, `stat().mode` reads 0o666 for every file there, and npm
+  // generates `.cmd`, `.ps1` and sh shims that name the interpreter themselves, so the clause
+  // is asserted where it is real. Without this, `check-dist-fresh` refused every Windows tree.
+  if (process.platform !== 'win32' && (mode & 0o111) === 0) {
     return ['dist/treadle.js is not executable, so the kernel never reads its shebang; run npm run build']
   }
   if (newestUnder(path.join(root, 'src')) === undefined) {

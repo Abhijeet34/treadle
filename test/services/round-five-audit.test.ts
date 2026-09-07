@@ -155,7 +155,9 @@ describe('a closed sprint\'s committed set is a record, and every number is coun
   it('carries the frozen tally into the close event, so the log alone recovers it', async () => {
     const log = await cli(['history', 'sp1'])
     assert.equal(log.code, 0, log.err)
-    assert.match(log.out, /sprint\.close state=open->closed,finished=\(unset\)->\(list:2\),carried=\(unset\)->\(list:2\),done=\(unset\)->1,done_points=\(unset\)->5,cancelled=\(unset\)->1,points=\(unset\)->11/)
+    // Both lists are under the cell bound, so they print themselves; over it they would print
+    // `(list:n)`. Either way the whole frozen tally is on the event, which is the claim here.
+    assert.match(log.out, /sprint\.close state=open->closed,finished=\(unset\)->alpha-task,gamma-task,carried=\(unset\)->beta-task,story-one,done=\(unset\)->1,done_points=\(unset\)->5,cancelled=\(unset\)->1,points=\(unset\)->11/)
   })
 })
 

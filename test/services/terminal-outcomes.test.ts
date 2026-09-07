@@ -153,9 +153,19 @@ describe('a generated id stops at a word, because a person reads it hundreds of 
       'Rewrite the first-run text',
     ]) {
       const slug = slugFor(title, 'task', taken)
+      assert.ok(slug !== undefined, `${title} produced no id`)
       assert.ok(slug.length >= 3 && slug.length <= 64, `${slug} is ${slug.length} characters`)
       assert.doesNotMatch(slug, /^-|-$/, slug)
     }
+  })
+
+  // The case that used to fall through to the type name: `file task "<Japanese title>"` filed
+  // as `task` and the next one as `task-2`, two ids naming their type rather than their item.
+  it('says it has no id for a title whose every character folds away', () => {
+    assert.equal(slugFor('\u65e5\u672c\u8a9e\u306e\u30bf\u30a4\u30c8\u30eb\u3060\u3051', 'task', taken), undefined)
+    assert.equal(slugFor('!!! ???', 'task', taken), undefined)
+    // Latin diacritics still fold, so only a script NFKD cannot reduce reaches the refusal.
+    assert.equal(slugFor('\u00dcn\u00efc\u00f6d\u00e9 only', 'task', taken), 'u-ni-co-de-only')
   })
 
   it('still dedupes against what the store already holds', () => {

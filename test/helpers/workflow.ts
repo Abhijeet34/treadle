@@ -124,5 +124,9 @@ export function parseWorkflow(text: string): Record<string, Job> {
 
 /** One workflow of this repository, parsed. */
 export function workflowOf(root: string, file: string): Record<string, Job> {
-  return parseWorkflow(readFileSync(path.join(root, '.github', 'workflows', file), 'utf8'))
+  // Read as LF whatever the checkout did. The parser above is indentation- and line-based, and
+  // on a CRLF clone - every Windows clone until the root `.gitattributes` landed - it found no
+  // job at all in any file, which four assertions reported as "workflow has no jobs: block".
+  const yaml = readFileSync(path.join(root, '.github', 'workflows', file), 'utf8')
+  return parseWorkflow(yaml.replaceAll('\r\n', '\n'))
 }

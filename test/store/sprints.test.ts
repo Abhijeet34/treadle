@@ -12,7 +12,7 @@ import { describe, it } from 'node:test'
 import type { Sprint } from '../../src/domain/index.ts'
 import { ShardedStore } from '../../src/adapters/store/index.ts'
 import { readWorkspace } from '../../src/application/services/context.ts'
-import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
+import { aWorkspace, anEvent, anItem, deleteIndex } from '../helpers/store-fixtures.ts'
 
 const SPRINT: Sprint = {
   id: 'sprint-31', title: 'Sprint 31', state: 'open', filed_at: '2026-09-06T09:00:00Z', version: 1,
@@ -118,7 +118,7 @@ describe('sprints are one record file beside the shards', () => {
       await workspace.store.apply({ txn: 't1', writes: [], sprints: [{ sprint: SPRINT }], events: [] })
       assert.equal((await workspace.store.sprints()).ok && ((await workspace.store.sprints()) as { value: readonly Sprint[] }).value.length, 1)
 
-      await rm(path.join(workspace.root, '.index'), { recursive: true, force: true })
+      await deleteIndex(workspace.root, workspace.store)
       const rebuilt = await workspace.store.sprints()
       assert.deepEqual(rebuilt.ok ? rebuilt.value : 'refused', [SPRINT])
 

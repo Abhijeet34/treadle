@@ -194,6 +194,11 @@ export async function openSprint(
   // different files, and a reader of `backlog --sprint s31` should not have to wonder which.
   const taken = new Set([...view.value.byId.keys(), ...view.value.sprintById.keys()])
   const id = request.id ?? slugFor(request.title, 'sprint', taken)
+  if (id === undefined) {
+    return refusal(workspace, 'C1', 'sprint',
+      'no character of this title becomes part of an id, so the id would name nothing; name one with --id',
+      ['treadle sprint open "<title>" --end <date> --id <slug>'])
+  }
   if (view.value.sprintById.has(id)) {
     return refusal(workspace, 'I5', id, `${id} is already a sprint here`, [`treadle sprints ${id}`, 'treadle sprint open "<title>" --end <date> --id <slug>'])
   }
@@ -215,6 +220,14 @@ export async function openSprint(
   const set = [`start - -> ${sprint.start}`, `end - -> ${sprint.end}`]
   if (sprint.goal !== undefined) set.push(`goal - -> ${echoed(sprint.goal)}`)
   const data: Record<string, Value> = { sprint: id, state: 'open', v: '1', set }
+  // A sprint whose whole window is behind the clock opens, because a team recording a sprint
+  // it has already run is a real thing to do and refusing it is a product call nobody has
+  // made. What it must not do is open silently: `status` then prints `day 250/14`, which
+  // reads as a defect in the tool rather than as a `--start` typed with the wrong year.
+  const where = dayOfSprint(sprint, now)
+  if (where.day > where.days) {
+    data['note'] = `this sprint's window closed on ${sprint.end}, so it opens at day ${where.day} of ${where.days}; check --start and --end if that is not what you meant`
+  }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: id, state: 'open' })
 
   const txn = ids.txn()
@@ -471,12 +484,19 @@ async function moveSprint(
   else if (sprint.closed_at !== undefined) set.push(`closed_at ${sprint.closed_at} -> -`)
   const carriedLine = (list: readonly string[] | undefined): string => (list === undefined || list.length === 0 ? '-' : list.join(','))
   const numberLine = (value: number | undefined): string => (value === undefined ? '-' : String(value))
-  if (to === 'closed' || wasFinished !== undefined) set.push(`finished ${carriedLine(wasFinished)} -> ${carriedLine(after.finished)}`)
-  if (to === 'closed' || wasCarried !== undefined) set.push(`carried ${carriedLine(wasCarried)} -> ${carriedLine(after.carried)}`)
-  if (to === 'closed' || wasDone !== undefined) set.push(`done ${numberLine(wasDone)} -> ${numberLine(after.done)}`)
-  if (to === 'closed' || wasDonePoints !== undefined) set.push(`done_points ${numberLine(wasDonePoints)} -> ${numberLine(after.done_points)}`)
-  if (to === 'closed' || wasCancelled !== undefined) set.push(`cancelled ${numberLine(wasCancelled)} -> ${numberLine(after.cancelled)}`)
-  if (to === 'closed' || wasPoints !== undefined) set.push(`points ${numberLine(wasPoints)} -> ${numberLine(after.points)}`)
+  // A `set` line is a move, so a field whose two sides are equal does not get one: a close of
+  // a sprint that finished nothing printed `set finished - -> -`, which reports a move from
+  // nothing to nothing on the surface a person reads first. The frozen tally still reaches the
+  // event whole, below, because a reading of the log alone has to recover it.
+  const moved = (field: string, before: string, next: string): void => {
+    if (before !== next) set.push(`${field} ${before} -> ${next}`)
+  }
+  moved('finished', carriedLine(wasFinished), carriedLine(after.finished))
+  moved('carried', carriedLine(wasCarried), carriedLine(after.carried))
+  moved('done', numberLine(wasDone), numberLine(after.done))
+  moved('done_points', numberLine(wasDonePoints), numberLine(after.done_points))
+  moved('cancelled', numberLine(wasCancelled), numberLine(after.cancelled))
+  moved('points', numberLine(wasPoints), numberLine(after.points))
 
   const data: Record<string, Value> = { sprint: sprint.id, state: `${sprint.state} -> ${to}`, v: `${sprint.version} -> ${sprint.version + 1}`, set }
   if (to === 'closed') data['carried'] = carriedLine(carried)

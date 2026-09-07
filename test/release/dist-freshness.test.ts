@@ -19,6 +19,7 @@ import { describe, it } from 'node:test'
 import { distProblems, staleAgainst } from '../../scripts/check-dist-fresh.ts'
 import { preflight } from '../../scripts/release-preflight.ts'
 import { workflowOf } from '../helpers/workflow.ts'
+import { POSIX_MODES } from '../helpers/platform.ts'
 
 const run = promisify(execFile)
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -57,7 +58,7 @@ describe('a bundle older than its source is not packed', () => {
 
   // Found by rebuilding and then running ./dist/treadle.js: esbuild writes 0644, so the
   // shebang that chooses the runtime's stack size was never read from a checkout.
-  it('refuses a bundle the kernel would not read the shebang of', async () => {
+  it('refuses a bundle the kernel would not read the shebang of', { skip: POSIX_MODES }, async () => {
     const root = await aTree(OLD, NEW)
     try {
       await chmod(path.join(root, 'dist', 'treadle.js'), 0o644)
@@ -128,7 +129,9 @@ describe('the release path runs that gate, and it is not prepack', () => {
     const root = await aTree(NEW, OLD)
     try {
       const stale = staleAgainst(root)
-      assert.equal(stale, path.join('src', 'cli', 'main.ts'), 'the checker did not find the newer source file')
+      // Repository-relative with `/` on every platform, so the sentence the preflight prints
+      // reads the same everywhere: it already names `dist/treadle.js` that way.
+      assert.equal(stale, 'src/cli/main.ts', 'the checker did not find the newer source file')
       const problems = preflight({
         tag: 'v0.1.0',
         facts: { objectType: 'tag', commit: 'abc', signed: true, onReleaseBranch: true },

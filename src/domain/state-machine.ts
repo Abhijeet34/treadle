@@ -339,25 +339,38 @@ export function evaluateTransition(
     }
   }
 
+  // Every value this edge records and did not get, or got wrong, in one refusal.
+  // `edgeRequirements` reads the `records` list off the same table and `explain` prints it
+  // whole - `cancelled G7 reason,resolution` - so a caller who read that column and then ran
+  // the move was told one name at a time: `transition x cancelled` refused resolution, and
+  // with `--resolution` set refused reason, for a fact one column already states. The rule id
+  // is the first failure's own, and the causes are joined, which is the shape the guard
+  // failures below already have.
+  const records: { readonly rule: 'T4' | 'T6'; readonly cause: string }[] = []
   for (const [name, rule] of Object.entries(CLOSED_VALUE)) {
     const given = request[name as 'resolution' | 'outcome']
     if (spec.name !== rule.on) {
-      if (given === undefined) continue
-      return refuse(fail('VALIDATION', 'T6', `only the ${rule.on} transition records ${name}, and this is ${spec.name}`, [item.id]).error)
+      if (given !== undefined) {
+        records.push({ rule: 'T6', cause: `only the ${rule.on} transition records ${name}, and this is ${spec.name}` })
+      }
+      continue
     }
     if (given === undefined) {
-      return refuse(fail('VALIDATION', 'T6', `the ${rule.on} transition records ${name}, ${rule.what}, and none was given; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
-    }
-    if (!rule.allowed.includes(given)) {
-      return refuse(fail('VALIDATION', 'T6', `${given} is not ${withArticle(name)}; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
+      records.push({ rule: 'T6', cause: `the ${rule.on} transition records ${name}, ${rule.what}, and none was given; the set is ${rule.allowed.join(', ')}` })
+    } else if (!rule.allowed.includes(given)) {
+      records.push({ rule: 'T6', cause: `${given} is not ${withArticle(name)}; the set is ${rule.allowed.join(', ')}` })
     }
   }
 
   const needsReason = spec.requiresReason || overrides.length > 0
   if (needsReason && (request.reason === undefined || request.reason.trim() === '')) {
-    return refuse(fail('VALIDATION', 'T4', spec.requiresReason
+    records.push({ rule: 'T4', cause: spec.requiresReason
       ? `the ${spec.name} transition records a reason, and none was given`
-      : `an override records a reason, and none was given`, [item.id]).error)
+      : 'an override records a reason, and none was given' })
+  }
+  const firstRecord = records[0]
+  if (firstRecord !== undefined) {
+    return refuse(fail('VALIDATION', firstRecord.rule, records.map((r) => r.cause).join('; '), [item.id]).error)
   }
   // T7. A reason lands whole in the event log, which was the second unbounded prose door:
   // 10,000 characters were accepted and written to a committed file. The bound is
