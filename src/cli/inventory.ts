@@ -99,8 +99,8 @@ export const COMMANDS: readonly Command[] = [
     ],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
-      ['treadle backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched, so every row shows why it matched'],
-      ['treadle backlog --label ux --fields +labels', 'one label an item carries, with the whole list as a column; every clause on the line has to hold, as with all filters'],
+      ['treadle backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched'],
+      ['treadle backlog --label ux --label ui --state ready --fields +labels', 'every clause has to hold, --label included, so this is ready work carrying both labels, with the whole list as a column'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
       ['treadle backlog --sprint sprint-30', 'the items whose sprint_id is that sprint now, which for a closed one is not the set its close recorded'],
@@ -193,9 +193,8 @@ export const COMMANDS: readonly Command[] = [
     columns: false,
     usage: ['treadle remove <id> --reason <text> --yes'],
     examples: [
-      ['treadle remove login-cta-2 --reason "filed twice by the same import" --yes', 'take a mis-filed record out of the shard; every event it earned stays in the log and treadle history login-cta-2 still reads them'],
       ['treadle remove login-cta-2 --reason "filed twice" --dry-run', 'what would go, with every guard evaluated and nothing written; --yes is what the real run needs'],
-      ['treadle transition login-cta-2 cancelled --resolution duplicate --reason "same as login-cta"', 'work that was really done or really stopped is a transition, not a removal: this keeps the record and says why it stopped'],
+      ['treadle remove login-cta-2 --reason "filed twice by the same import" --yes', 'take a mis-filed record out of the shard; every event it earned stays in the log and treadle history login-cta-2 still reads them, so work that really stopped is transition <id> cancelled instead, which keeps the record'],
     ],
   },
   {

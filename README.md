@@ -53,7 +53,7 @@ node bin/treadle.js status
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 1,750 tests in 162 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 3.45.
+The suite ran 1,819 tests in 117 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 6.93.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
@@ -92,6 +92,7 @@ See [Status](#status) for the line between implemented and specified-only.
 - **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest.
 - **A board that stores nothing.** `board` is the backlog grouped by state, scoped to the open sprint unless told otherwise, with a blocked row first in its column and its blocker named beside it; it takes every filter `backlog` takes and caps each column at `--limit` with the column's total beside the cap.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change.
+- **Finding work, and unfiling it.** `backlog --title <words>` searches titles by their words, `--label <slug>` filters on a label and `--fields +labels` prints the list, and `remove` takes a mis-filed record out of its shard while the append-only log keeps every event it earned, so `history <id>` still answers after it. A removal is refused wherever another record would be left naming it: [ADR-0024](docs/architecture/adr/0024-a-record-leaves-the-store-and-the-log-keeps-it.md).
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
 ## Status

@@ -13,7 +13,7 @@
 // would leave another record naming nothing - are asserted here rather than assumed.
 
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
@@ -98,6 +98,22 @@ describe('STR-4: a label that is written is a label that can be read back', () =
     const help = must(await cli(['help', 'backlog']), 'help backlog')
     assert.match(help.out, /--label <slug>/)
     assert.match(help.out, /--fields \+labels/)
+  })
+
+  it('repeats, and every label named has to hold, which is what file --label already does', async () => {
+    must(await cli(['set', 'login-cta', 'labels=frontend,ux,qa']), 'set labels')
+    const both = must(await cli(['backlog', '--label', 'frontend', '--label', 'qa']), 'two labels')
+    assert.match(both.out, /^filter label frontend label qa$/m)
+    assert.match(both.out, /^login-cta /m)
+    assert.match(both.out, /^~items 1 1$/m)
+    const neither = must(await cli(['backlog', '--label', 'frontend', '--label', 'backend']), 'no item carries both')
+    assert.match(neither.out, /^none searched 3 matched 0$/m)
+    must(await cli(['set', 'login-cta', 'labels=frontend,ux']), 'restore')
+  })
+
+  it('carries every clause into the page line that continues the list', async () => {
+    const paged = must(await cli(['backlog', '--label', 'frontend', '--label', 'ux', '--limit', '1']), 'paged')
+    assert.match(paged.out, /^filter label frontend label ux$/m)
   })
 
   it('answers an empty label with a list rather than a refusal, as every other filter does', async () => {
@@ -492,6 +508,28 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     assert.match(read.out, /^members finished-task$/m)
   })
 
+  it('refuses a member of a sprint an older build closed, which recorded no member list', async () => {
+    // A close before ADR-0023 wrote neither `finished` nor `points`, so `membersOf` reads
+    // nothing and `committedTo` recomputes that sprint's set from what still points at it.
+    // Reading the frozen list alone let such a member be removed and shrink a count a team
+    // had already read; the item's own `sprint_id` is the membership there.
+    must(await cli(['file', 'task', 'A legacy member', '--id', 'legacy-member']), 'file')
+    must(await cli(['sprint', 'open', 'Sprint 30', '--id', 'sprint-30', '--start', '2026-08-24', '--end', '2026-09-04']), 'sprint open')
+    must(await cli(['sprint', 'commit', 'sprint-30', 'legacy-member']), 'commit')
+    for (const target of ['ready', 'in_progress', 'done']) {
+      must(await cli(['transition', 'legacy-member', target]), `transition ${target}`)
+    }
+    must(await cli(['sprint', 'close', 'sprint-30']), 'close')
+    const record = path.join(root, '.work', 'sprints.md')
+    const text = await readFile(record, 'utf8')
+    await writeFile(record, text.split('\n').filter((line) => !/^(finished|points|done_points|cancelled|done):/.test(line)).join('\n'))
+
+    const refused = await cli(['remove', 'legacy-member', '--reason', 'mis-filed', '--yes'])
+    assert.equal(refused.code, 3)
+    assert.match(refused.err, /^rule R6$/m)
+    assert.match(refused.err, /^"cause legacy-member is a member of sprint-30, which is closed/m)
+  })
+
   it('removes a done item nothing depends on, because a state is not what a record names', async () => {
     must(await cli(['file', 'task', 'A done task nothing names', '--id', 'lone-done']), 'file')
     for (const target of ['ready', 'in_progress', 'done']) {
@@ -531,6 +569,13 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
   it('names the command, its flags and the transition it is not, in help', async () => {
     const help = must(await cli(['help', 'remove']), 'help remove')
     assert.match(help.out, /treadle remove <id> --reason <text> --yes/)
-    assert.match(help.out, /work that was really done or really stopped is a transition, not a removal/)
+    assert.match(help.out, /work that really stopped is transition <id> cancelled instead, which keeps the record/)
+  })
+
+  it('offers sprint set to a caller who reached for set on a sprint id', async () => {
+    const refused = await cli(['set', 'sprint-31', 'goal=x'])
+    assert.equal(refused.code, 5)
+    assert.match(refused.err, /^"cause sprint-31 is a sprint here, not an item, and set takes an item id$/m)
+    assert.match(refused.err, /^fix treadle sprint set sprint-31 --goal "<text>"$/m)
   })
 })

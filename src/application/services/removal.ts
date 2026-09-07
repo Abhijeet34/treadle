@@ -15,7 +15,7 @@
 // makes another record depend on it; what does is a closed sprint that counted it, an edge
 // pointing at it, or a child parented to it.
 
-import { fieldsOf, overLength, MAX_REASON, membersOf, type ItemId, type WorkItem } from '../../domain/index.ts'
+import { fieldsOf, overLength, MAX_REASON, type ItemId, type WorkItem } from '../../domain/index.ts'
 import { errorResult, okResult, type ResultObject, type ResultShape, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
@@ -64,17 +64,26 @@ type Reference = { readonly cause: string; readonly fix: readonly string[] }
 
 /**
  * The first record that would be left naming this item, or `undefined`. The three kinds are
- * the three ways one record can hold another's id: a closed sprint's frozen member list, a
- * stored relation edge, and a child's parent.
+ * the three ways one record can hold another's id: a closed sprint's committed set, a stored
+ * relation edge, and a child's parent.
+ *
+ * A closed sprint is read two ways because two eras of record exist. This build's close
+ * writes `carried` and `finished`, so a member is named by one of them; a sprint an older
+ * build closed wrote neither for its finished members, and `committedTo` recomputes that
+ * sprint's set from what still points at it, so `sprint_id` is the membership there. Reading
+ * only the frozen list let a member of a legacy closed sprint be removed, which shrinks a
+ * count a team already read; reading only `sprint_id` misses every carried member, which is
+ * `H28`. Both are read.
  *
  * An open sprint is deliberately not among them. Its committed set is what points at it,
- * recomputed on every read, so a member leaving takes nothing with it; a closed sprint's set
- * is the list its close wrote, which `sprints` counts its whole tally over, and dropping an
- * id out from under that list is `H28` by construction.
+ * recomputed on every read, so a member leaving takes nothing with it.
  */
-function namedBy(view: WorkspaceView, id: ItemId): Reference | undefined {
+function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
+  const { id } = item
   for (const sprint of view.sprints) {
-    if (!(membersOf(sprint) ?? []).includes(id)) continue
+    if (sprint.state !== 'closed') continue
+    const recorded = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
+    if (!recorded.includes(id) && item.sprint_id !== sprint.id) continue
     return {
       cause: `${id} is a member of ${sprint.id}, which is closed, and a closed sprint's committed set is a record that its tally was counted over`,
       fix: [`treadle sprints ${sprint.id}`],
@@ -139,7 +148,7 @@ export async function removeItem(
   if (request.reason.length > MAX_REASON) {
     return refusal(workspace, 'T7', item.id, overLength('a reason', MAX_REASON, request.reason.length), ['treadle help remove'])
   }
-  const named = namedBy(view.value, item.id)
+  const named = namedBy(view.value, item)
   if (named !== undefined) {
     return errorResult({
       code: 'GUARD_REFUSED', command: 'remove', workspace, effect: 'mutate', rule: 'R6', entity: item.id,
@@ -180,6 +189,14 @@ export async function removeItem(
   const now = clock.now()
   const txn = ids.txn()
   const eventId = ids.event()
+  // The transaction names no read set. `guardReads` exists for a decision made against a
+  // neighbour that then moves, and every guard above is about a neighbour that does not exist
+  // yet: an edge or a child written after this read and before this write would be left
+  // dangling, and no read set can name a record that is not there to be read. The window is
+  // the one every guard here already has, the store's own lock is what narrows it, and
+  // `doctor` reports the result as `H24` or the hierarchy's own finding. Closing it needs a
+  // write-time hook on "nothing may point at this id", which is a store-level rule rather
+  // than a bigger read set.
   const applied = await store.apply({
     txn,
     writes: [],

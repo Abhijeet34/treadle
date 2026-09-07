@@ -162,13 +162,24 @@ function flagValueRefusal(
   // exited 1 on the tree before this one. It is the same class the length bound above closes
   // and it is closed in the same place, for every filter at once rather than per line printed.
   for (const name of FILTER_FLAGS) {
-    const value = flag(flags, name)
-    if (value === undefined || isSafeText(value, 'line')) continue
-    return validation(
-      command,
-      `--${name} carries a character no record's field may hold, so nothing could match it: a filter is a single line with no control or bidi override characters`,
-      help,
-    )
+    for (const value of valuesOf(flags, name)) {
+      // The bound above reads a string flag, so a repeatable one is checked here instead of
+      // being widened there: widening it would preempt `file --label`'s own dictionary
+      // refusal, which names the slug rule rather than a line length.
+      if (value.length > MAX_LINE) {
+        return validation(
+          command,
+          `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
+          help,
+        )
+      }
+      if (isSafeText(value, 'line')) continue
+      return validation(
+        command,
+        `--${name} carries a character no record's field may hold, so nothing could match it: a filter is a single line with no control or bidi override characters`,
+        help,
+      )
+    }
   }
 
   // `--title` is the one filter that matches on words rather than on a whole value, so a
@@ -191,10 +202,17 @@ function filtersOf(
   flags: Readonly<Record<string, unknown>>, order: readonly FilterFlag[],
 ): readonly Filter[] {
   const written = order.length > 0 ? order : FILTER_FLAGS
-  return written.flatMap((name) => {
-    const value = flag(flags, name)
-    return value === undefined ? [] : [{ field: name, value } as Filter]
-  })
+  return written.flatMap((name) => valuesOf(flags, name).map((value) => ({ field: name, value } as Filter)))
+}
+
+/**
+ * Every value a filter flag was given, in the order written. All but `--label` take one, and
+ * `--label` repeats into one clause per label, so `matches` ands them like any other pair.
+ */
+function valuesOf(flags: Readonly<Record<string, unknown>>, name: string): readonly string[] {
+  const value = flags[name]
+  if (typeof value === 'string') return [value]
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 }
 
 function fieldsOf(flags: Readonly<Record<string, unknown>>, fallback: readonly string[]): readonly string[] {

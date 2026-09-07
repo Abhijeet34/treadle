@@ -940,10 +940,16 @@ export function notFound(
   command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
   if (view.sprintById.has(id)) {
+    // `set` is the one command whose caller was reaching for a sprint's own field editor, so
+    // it gets the line that does what they meant. The other callers of this refusal were
+    // reading, and the two reads below are what they wanted.
+    const instead = command === 'set'
+      ? [`treadle sprint set ${id} --goal "<text>"`, `treadle sprints ${id}`]
+      : [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`]
     return errorResult({
       code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
       cause: `${id} is a sprint here, not an item, and ${command} takes an item id`,
-      fix: [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`],
+      fix: instead,
     })
   }
   const held = view.items.length

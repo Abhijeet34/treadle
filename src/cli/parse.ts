@@ -76,7 +76,10 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     assignee: { type: 'string' },
     priority: { type: 'string' },
     resolution: { type: 'string' },
-    label: { type: 'string' },
+    // Repeatable, and every one has to hold. `file --label` already repeats, so a caller who
+    // learned it there would otherwise write `backlog --label a --label b` and silently get
+    // `b` alone; and an item carries a list, so "carrying both" is the question to ask of it.
+    label: { type: 'string', multiple: true },
     title: { type: 'string' },
   },
   board: {
@@ -86,7 +89,7 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     assignee: { type: 'string' },
     priority: { type: 'string' },
     resolution: { type: 'string' },
-    label: { type: 'string' },
+    label: { type: 'string', multiple: true },
     title: { type: 'string' },
     all: { type: 'boolean' },
   },
