@@ -359,6 +359,8 @@ An edge between two items is stored once, as a `## Relations` section on its sou
 Everything else is derived on read from that one direction: `show`'s inverse rows (`blocked_by`), `explain`'s `blocked` and `blocks` lines, the `dep` component of `next`, and guards `G2`, `G7` and `DOR3`.
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
 `addRelation` returns the ids whose edges its cycle check read, and the writer passes them as the transaction's `reads`, which the store refuses with `S10` if one moved: without that, two processes adding the two halves of a cycle at once both landed.
+`guardReads` in `src/application/services/context.ts` is the same read set for every guard and gate rule that reads a neighbour, and `transition` and `sprint commit` pass it: a start decided against a done blocker landed after the blocker was reopened, and an accept landed after a done child was, until they did.
+A new guard that reads another record's state adds that record there, or `test/services/guard-race.test.ts` is where its race shows.
 Both traversals walk an adjacency map; a traversal that filters the relation list per node visited is the shape that put `doctor` at 12.3 s over 3,600 edges.
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
 
@@ -445,10 +447,13 @@ whose `sprint_id` points at the sprint, plus what the close recorded as `carried
 `committedTo` in `src/application/services/sprints.ts` is the one place that union is made.
 A close leaves unfinished items pointing at the closed sprint; `next`'s `spr` component is
 1 only for a member of an open sprint, so leftover work is not boosted until it is
-committed onward. A close also freezes what it tallied, in `done` and `done_points` on the
-record, because `committedTo` restores what the carry-over took away and a live count over
-a closed sprint therefore rises as that work is finished elsewhere; a sprint closed before
-those fields carries neither and reads live. A sprint admits `draft` work and every surface
+committed onward. A close also freezes what it tallied, in `done`, `done_points` and
+`cancelled` on the record, because `committedTo` restores what the carry-over took away and
+a live count over a closed sprint therefore rises as that work is finished elsewhere; a
+sprint closed before those fields carries none of them and reads live. `I2` also refuses a
+reopen once a carried item has since been committed onward: a reopen clears `carried`, and
+dropping that item would shrink a record a team already read. A sprint admits `draft` work
+and every surface
 that commits or reads a committed set names it through `notGroomed` in `context.ts`, rather
 than refusing it, because `file --sprint` files in `draft` by construction. ADR-0022 argues
 both. `sprint_id` is owned by `sprint commit` in `writerOf`, and `file --sprint`

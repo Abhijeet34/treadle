@@ -359,6 +359,15 @@ function eventsFor(item: WorkItem, count: number, next: () => number): readonly 
   return out
 }
 
+/** Non-empty lines across every `.jsonl` file under `dir`: one event each, which is how the log is written. */
+async function eventLines(dir: string): Promise<number> {
+  let total = 0
+  for (const name of (await readdir(dir).catch(() => [] as string[])).filter((file) => file.endsWith('.jsonl'))) {
+    total += readFileSync(path.join(dir, name), 'utf8').split('\n').filter((line) => line.length > 0).length
+  }
+  return total
+}
+
 async function directoryBytes(dir: string): Promise<number> {
   let total = 0
   let names: string[]
@@ -487,6 +496,14 @@ async function readBack(
   if (all.value.length !== spec.items) {
     throw new Error(`corpus at ${root}: store holds ${all.value.length} items, spec says ${spec.items}`)
   }
+  // The events are counted off the log files for the same reason: `eventsWritten` was the
+  // spec's arithmetic, so a cache entry missing an events file was cloned, reported whole
+  // and measured, while a missing shard was refused by the count above.
+  const eventsWritten = await eventLines(path.join(root, 'events'))
+  const eventsWanted = spec.items * spec.eventsPerItem
+  if (eventsWritten !== eventsWanted) {
+    throw new Error(`corpus at ${root}: the log holds ${eventsWritten} events, spec says ${eventsWanted}`)
+  }
   const ready = await store.list({ state: 'ready' })
   if (!ready.ok) throw new Error(`corpus readback: ${ready.error.message}`)
   const sprints = await store.sprints()
@@ -510,7 +527,7 @@ async function readBack(
     spec,
     root,
     itemsInStore: all.value.length,
-    eventsWritten: all.value.length * spec.eventsPerItem,
+    eventsWritten,
     months,
     largestMonth,
     largestMonthItems: perMonth.get(largestMonth) ?? 0,

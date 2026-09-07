@@ -79,6 +79,23 @@ describe('the benchmark rig isolates each run from every other run', () => {
     )
   })
 
+  // `eventsWritten` was the spec's arithmetic rather than a readback, so an entry short of an
+  // events file was cloned, reported whole and measured, while a missing shard was refused.
+  it('a cache entry short of its events stops the run the way one short of its items does', async () => {
+    const base = await scratch()
+    const cache = path.join(base, 'cache')
+    const first = await acquireCorpus(cache, path.join(base, 'run-a'), SPEC, false)
+    assert.equal(first.eventsWritten, SPEC.items * SPEC.eventsPerItem)
+
+    const entry = path.join(cache, (await readdir(cache)).find((name) => !name.startsWith('.')) as string)
+    await rm(path.join(entry, 'events', `${first.largestMonth}.jsonl`))
+
+    await assert.rejects(
+      () => acquireCorpus(cache, path.join(base, 'run-b'), SPEC, false),
+      /the log holds \d+ events, spec says 40/,
+    )
+  })
+
   it('--rebuild-corpus generates privately and leaves the shared cache alone', async () => {
     const base = await scratch()
     const cache = path.join(base, 'cache')

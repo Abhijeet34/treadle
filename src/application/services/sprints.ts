@@ -23,9 +23,9 @@ import {
 import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
-import type { Store, StoreEvent } from '../ports/store.ts'
-import { notGroomed, notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
-import { echoed, nearIds, notFound, slugFor } from './items.ts'
+import type { ItemRead, Store, StoreEvent } from '../ports/store.ts'
+import { guardReads, notGroomed, notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
+import { echoed, noSprint, notFound, slugFor } from './items.ts'
 import { makeEvent, type Actor, type Target } from './mutation.ts'
 import { storeRefusal } from './refusal.ts'
 
@@ -92,17 +92,6 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
   return errorResult({ code: 'VALIDATION', command: 'sprint', workspace, effect: 'mutate', rule, entity, cause, fix })
 }
 
-/** The one refusal for a sprint id nothing here carries, with the nearest sprint ids beside it. */
-export function noSprint(command: string, effect: 'read' | 'mutate', workspace: string, view: WorkspaceView, id: string): ResultObject {
-  const held = view.sprints.length
-  return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-    cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
-    near: nearIds(view.sprintById.keys(), id),
-    fix: ['treadle sprints'],
-  })
-}
-
 /** The items committed to one sprint: what points at it, plus what its close carried away. */
 export function committedTo(view: WorkspaceView, sprint: Sprint): readonly WorkItemSummary[] {
   const pointing = view.items.filter((item) => item.sprint_id === sprint.id)
@@ -136,7 +125,9 @@ function tallyOf(sprint: Sprint, items: readonly WorkItemSummary[]): Tally {
   return {
     committed: items.length,
     done: frozen ? sprint.done as number : done.length,
-    cancelled: items.filter((item) => item.state === 'cancelled').length,
+    // A sprint closed before `cancelled` was recorded carries `done` alone and reads this
+    // one live, which is what it did.
+    cancelled: frozen && sprint.cancelled !== undefined ? sprint.cancelled : items.filter((item) => item.state === 'cancelled').length,
     points: items.reduce((sum, item) => sum + (item.points ?? 0), 0),
     donePoints: frozen ? sprint.done_points ?? 0 : done.reduce((sum, item) => sum + (item.points ?? 0), 0),
   }
@@ -237,7 +228,7 @@ async function itemsNamed(
 async function applyMoves(
   target: Target, clock: Clock, ids: IdGenerator, view: WorkspaceView, actor: Actor,
   moves: readonly ItemMove[], to: string | undefined, op: 'item.commit' | 'item.uncommit',
-  data: Record<string, Value>,
+  data: Record<string, Value>, reads: readonly ItemRead[] = [],
 ): Promise<ResultObject> {
   const workspace = view.identity.id
   const now = clock.now()
@@ -253,7 +244,7 @@ async function applyMoves(
     }))
     return { item: draft as unknown as WorkItem, ifVersion: move.item.version }
   })
-  const applied = await target.store.apply({ txn, writes, events })
+  const applied = await target.store.apply({ txn, writes, ...(reads.length === 0 ? {} : { reads }), events })
   if (!applied.ok) return storeRefusal('sprint', 'mutate', applied.error, workspace)
   const summary = { ...data, events: `${events.length} ${op}` }
   if (target.mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...summary, dry_run: 1, would_exit: 0 } })
@@ -305,7 +296,11 @@ export async function commitItems(
     data['note'] = notGroomedNote(ungroomed)
   }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: sprint.id, state: sprint.state })
-  return applyMoves(target, clock, ids, view.value, request.actor, moves, sprint.id, 'item.commit', data)
+  // The ready gate read each item's neighbours, so the write carries them: a commit decided
+  // against a blocker that was done landed after that blocker was reopened.
+  const moving = new Set(moves.map((move) => move.item.id))
+  const reads = moves.flatMap((move) => guardReads(view.value, move.item)).filter((read) => !moving.has(read.id))
+  return applyMoves(target, clock, ids, view.value, request.actor, moves, sprint.id, 'item.commit', data, reads)
 }
 
 export type UncommitRequest = {
@@ -370,17 +365,37 @@ async function moveSprint(
   if (sprint.state === to) {
     return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
   }
+  // A reopen clears `carried`, and an open sprint's set is what points at it, so a carried
+  // item that has since been committed onward would leave the record on the reopen and the
+  // re-close would count a smaller sprint. The close has been acted on by then, and I2's rule
+  // holds for it as it does for commit and uncommit: the committed set is a record.
+  const movedOn = (sprint.carried ?? []).filter((id) => {
+    const item = view.value.byId.get(id)
+    return item !== undefined && item.sprint_id !== sprint.id
+  })
+  const first = movedOn[0]
+  if (to === 'open' && first !== undefined) {
+    const where = view.value.byId.get(first)?.sprint_id
+    const moved = movedOn.length === 1
+      ? `${first}, which is now in ${where ?? 'no sprint'}`
+      : `${movedOn.join(', ')}, which have since moved on (${first} to ${where ?? 'no sprint'})`
+    return errorResult({
+      code: 'GUARD_REFUSED', command: 'sprint', workspace, effect: 'mutate', rule: 'I2', entity: sprint.id,
+      cause: `${sprint.id} carried ${moved}; a reopen would drop ${movedOn.length === 1 ? 'it' : 'them'} from the record, and a closed sprint's committed set is a record`,
+      fix: [`treadle sprints ${sprint.id}`, ...(where === undefined ? [] : [`treadle sprints ${where}`])],
+    })
+  }
   const now = clock.now()
   const committed = to === 'closed' ? committedTo(view.value, sprint) : []
   const carried = to === 'closed' ? carryOver(committed) : []
   // Read off the open sprint, so these are the live states at the instant of the close; a
   // carried item is not terminal by definition, so it is not among them.
   const frozen = tallyOf(sprint, committed)
-  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, ...rest } = sprint
+  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, cancelled: wasCancelled, ...rest } = sprint
   const after: Sprint = to === 'closed'
     ? {
       ...rest, state: 'closed', closed_at: now, ...(carried.length === 0 ? {} : { carried }),
-      done: frozen.done, done_points: frozen.donePoints,
+      done: frozen.done, done_points: frozen.donePoints, cancelled: frozen.cancelled,
     }
     : { ...rest, state: 'open' }
 
@@ -392,6 +407,7 @@ async function moveSprint(
   if (to === 'closed' || wasCarried !== undefined) set.push(`carried ${carriedLine(wasCarried)} -> ${carriedLine(after.carried)}`)
   if (to === 'closed' || wasDone !== undefined) set.push(`done ${numberLine(wasDone)} -> ${numberLine(after.done)}`)
   if (to === 'closed' || wasDonePoints !== undefined) set.push(`done_points ${numberLine(wasDonePoints)} -> ${numberLine(after.done_points)}`)
+  if (to === 'closed' || wasCancelled !== undefined) set.push(`cancelled ${numberLine(wasCancelled)} -> ${numberLine(after.cancelled)}`)
 
   const data: Record<string, Value> = { sprint: sprint.id, state: `${sprint.state} -> ${to}`, v: `${sprint.version} -> ${sprint.version + 1}`, set }
   if (to === 'closed') data['carried'] = carriedLine(carried)
@@ -399,8 +415,14 @@ async function moveSprint(
 
   const txn = ids.txn()
   const eventId = ids.event()
+  const reads = to === 'open'
+    ? (sprint.carried ?? []).flatMap((id) => {
+      const item = view.value.byId.get(id)
+      return item === undefined ? [] : [{ id, version: item.version }]
+    })
+    : []
   const applied = await store.apply({
-    txn, writes: [], sprints: [{ sprint: after, ifVersion: sprint.version }],
+    txn, writes: [], sprints: [{ sprint: after, ifVersion: sprint.version }], reads,
     events: [makeEvent({
       id: eventId, at: now, actor: request.actor, entity: sprint.id, entityKind: 'sprint',
       op: to === 'closed' ? 'sprint.close' : 'sprint.reopen',
@@ -459,7 +481,9 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   }
   data['committed'] = tally.committed
   data['done'] = tally.done
-  if (tally.cancelled > 0) data['cancelled'] = tally.cancelled
+  // Printed when there is one, or when the close recorded one: a stored `cancelled: 0` is a
+  // fact of the record, as `done 0` is, and a read surface has to carry every stored field.
+  if (tally.cancelled > 0 || sprint.cancelled !== undefined) data['cancelled'] = tally.cancelled
   // Named, not counted: "3 committed, 1 done" leaves a reader to work out for themselves
   // that one of the three is not workable, and which one.
   const ungroomed = notGroomed(committed)

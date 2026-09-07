@@ -26,7 +26,7 @@ import {
   type WorkItemSummary,
   type WorkItemType,
 } from '../../domain/index.ts'
-import { storeFail, storeOk, type Finding, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
+import { storeFail, storeOk, type Finding, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input. Workspace
@@ -253,6 +253,33 @@ export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = DE
 
 export function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
   return childrenGates(view, id).filter((child) => child.state !== 'done' && child.state !== 'cancelled')
+}
+
+/**
+ * Every record whose state a guard or a gate rule reads when it decides about `item`, at the
+ * version the view holds, for the transaction's read set. The guards read neighbours: G2, DOR3
+ * and DOD2 the blockers, DOD1, G8 and DOR8 the children, G7 the items this one blocks, DOR10
+ * the original it duplicates. A compare-and-set on the item alone left all of them open to
+ * the race `relation add` closed with the same read set: a start decided against a done
+ * blocker landed after that blocker was reopened, an accept landed after a done child was
+ * reopened, and a commit landed after the blocker it read as inactive came back. Every edge is
+ * read whatever the neighbour's state, because an inactive neighbour is the one whose move
+ * changes the verdict; the store refuses with `S10` if any of them moved.
+ */
+export function guardReads(view: WorkspaceView, item: WorkItem): readonly ItemRead[] {
+  const ids = new Set<ItemId>()
+  for (const relation of view.relations.relations) {
+    if (relation.kind !== 'blocks') continue
+    if (relation.source === item.id) ids.add(relation.target)
+    else if (relation.target === item.id) ids.add(relation.source)
+  }
+  for (const child of view.hierarchy.childrenOf.get(item.id) ?? []) ids.add(child)
+  for (const relation of item.relations ?? []) if (relation.kind === 'duplicates') ids.add(relation.target)
+  ids.delete(item.id)
+  return [...ids].flatMap((id) => {
+    const other = view.byId.get(id)
+    return other === undefined ? [] : [{ id, version: other.version }]
+  })
 }
 
 export function transitionContextFor(view: WorkspaceView, item: WorkItem): TransitionContext {

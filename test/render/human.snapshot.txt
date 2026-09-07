@@ -1743,6 +1743,7 @@ sprint  acme-platform  1 changed  txn t0910
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
+  set  cancelled - -> 0
   carried  avatar-crop
   event  e0911
 
@@ -1756,6 +1757,7 @@ sprint  acme-platform  1 changed  txn t0910
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
+  set  cancelled - -> 0
   carried  avatar-crop
   event  e0911
 
@@ -1769,6 +1771,7 @@ sprint  acme-platform  1 changed  txn t0910
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
+  set  cancelled - -> 0
   carried  avatar-crop
   event  e0911
 
@@ -1805,6 +1808,7 @@ sprints  acme-platform
   v  2
   committed  2
   done  1
+  cancelled  0
   pts  3/5
   carried  avatar-crop
   title
@@ -1823,6 +1827,7 @@ sprints  acme-platform
   v  2
   committed  2
   done  1
+  cancelled  0
   pts  3/5
   carried  avatar-crop
   title
@@ -1841,6 +1846,7 @@ sprints  acme-platform
   v  2
   committed  2
   done  1
+  cancelled  0
   pts  3/5
   carried  avatar-crop
   title

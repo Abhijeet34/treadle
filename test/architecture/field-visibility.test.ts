@@ -141,6 +141,7 @@ const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
   carried: readable('sprints:carried', 'the ids joined by commas, which is the form `explain` already gives a list of ids'),
   done: readable('sprints:done', 'the count the close froze, which is what a closed sprint reports instead of a live count over a set its carry-over has left'),
   done_points: readable('sprints:pts', 'the numerator of the points figure, printed done over committed as the live tally is'),
+  cancelled: readable('sprints:cancelled', 'the count the close froze beside `done`, so an item cancelled after the close is not counted under two outcomes'),
   goal: readable('sprints:goal'),
   extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
 }

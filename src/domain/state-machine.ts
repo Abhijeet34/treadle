@@ -328,7 +328,7 @@ export function evaluateTransition(
       return refuse(fail('VALIDATION', 'T6', `the ${rule.on} transition records ${name}, ${rule.what}, and none was given; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
     }
     if (!rule.allowed.includes(given)) {
-      return refuse(fail('VALIDATION', 'T6', `${given} is not a ${name}; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
+      return refuse(fail('VALIDATION', 'T6', `${given} is not ${withArticle(name)}; the set is ${rule.allowed.join(', ')}`, [item.id]).error)
     }
   }
 
