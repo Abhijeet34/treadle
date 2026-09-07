@@ -33,7 +33,7 @@ jobs:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     # A backstop the step timeout below should always reach first.
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       # One red platform should not hide the state of the others.
       fail-fast: false
@@ -58,8 +58,14 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Windows gets its own bound. The suite spawns a real child process for a large part of
+      # its CLI and durability coverage, and that is where Windows is slowest and least
+      # predictable: measured 2026-09-07 on the same tree within one hour, run 34123933241
+      # finished this step in 6.4 minutes and run 34125065085 was killed at 15 with the same
+      # suites reporting 16 to 22 seconds each rather than 2 to 5. A timeout is here to stop a
+      # hang, not to price a slow runner, so it is set where a hang is still obvious.
       - name: Test
-        timeout-minutes: 15
+        timeout-minutes: ${{ matrix.os == 'windows-2025' && 30 || 15 }}
         run: npm test 2>&1 | tee "$RUNNER_TEMP/test.log"
 
       - name: Build the bundle and weigh it against DR1
