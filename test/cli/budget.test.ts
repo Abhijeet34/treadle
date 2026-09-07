@@ -25,11 +25,14 @@ const BUDGET: Readonly<Record<string, number>> = {
   show: 310,
   next: 510,
   explain: 750,
-  // A.3 predates the command, so this figure is derived rather than quoted: the golden
-  // history is 280 B, and 380 gives it the same 75 percent fill that A.3 gave `backlog`
-  // (717 of 960) and `next` (380 of 510). The budget owner reconciles it with A.3 and with
-  // the copy of this table in bench/axes/a3-output.ts.
-  history: 380,
+  // A.3 predates the command, so this figure is derived rather than quoted: it gives the
+  // golden history the same 75 percent fill that A.3 gave `backlog` (717 of 960) and `next`
+  // (380 of 510). Raised from 380 when `history` began returning the reasons its own log
+  // records: the golden artefact went from 280 B to 468 B, 88 of which are the `reasons`
+  // block for two events that carry one, and a field the tool records and no reading returns
+  // is the defect this product has now shipped four times. The budget owner reconciles it
+  // with A.3 and with the copy of this table in bench/axes/a3-output.ts.
+  history: 630,
   // Derived the same way: the golden board over the whole 25-item workspace is 1,461 B and
   // the one scoped to the open sprint 357 B, each given the 75 percent fill. The unscoped
   // figure is five capped columns, so it is about 1.5 backlogs of the same rows.

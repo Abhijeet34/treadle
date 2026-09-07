@@ -432,6 +432,11 @@ events  3 of 3
     ority=1,points=8,assignee=kim
     dana
 
+reasons  2 of 2
+  AT                    OP               WHY
+  2026-08-21T09:00:00Z  item.transition  fixture
+  2026-08-21T09:00:00Z  item.transition  fixture
+
 ### history @ 80
 history  acme-platform
   item  sso-saml
@@ -448,6 +453,11 @@ events  3 of 3
     ignee=kim
     dana
 
+reasons  2 of 2
+  AT                    OP               WHY
+  2026-08-21T09:00:00Z  item.transition  fixture
+  2026-08-21T09:00:00Z  item.transition  fixture
+
 ### history @ 200
 history  acme-platform
   item  sso-saml
@@ -458,6 +468,11 @@ events  3 of 3
   2026-08-21T09:00:00Z  human  item.transition  state=ready->in_progress                                                               dana
   2026-08-21T09:00:00Z  human  item.transition  state=draft->ready                                                                     dana
   2026-08-21T09:00:00Z  human  item.file        type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,assignee=kim  dana
+
+reasons  2 of 2
+  AT                    OP               WHY
+  2026-08-21T09:00:00Z  item.transition  fixture
+  2026-08-21T09:00:00Z  item.transition  fixture
 
 ### help @ 60
 help  acme-platform
