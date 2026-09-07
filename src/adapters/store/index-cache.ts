@@ -99,6 +99,11 @@ create index if not exists items_file on items(file);
 drop index if exists items_state;
 create index if not exists items_state_filed on items(state, filed_at, id);
 create index if not exists items_filed on items(filed_at, id);
+-- \`where parent = ?\` is the referential check S17 runs inside the write lock on every
+-- removal, and the column was unindexed: 8.85 ms of full scan at 50,000 rows against
+-- 0.006 ms indexed. Partial, because four rows in five carry no parent and \`= ?\` never
+-- matches null; it serves \`parentEdges\` too, which reads exactly that subset.
+create index if not exists items_parent on items(parent) where parent is not null;
 -- Sprints are few and are read whole, so the table carries the source and the two columns
 -- the one read orders on, and nothing a scan would filter by.
 create table if not exists sprints (
@@ -118,6 +123,14 @@ create table if not exists findings (
 create index if not exists findings_file on findings(file);
 create index if not exists findings_against on findings(against);
 `
+
+/**
+ * One bound placeholder per value, so a list of ids reaches a query as parameters and never
+ * as text. An empty list still needs a term the parser accepts, and `null` matches no row.
+ */
+function placeholders(values: readonly string[]): string {
+  return values.length === 0 ? 'null' : values.map(() => '?').join(', ')
+}
 
 /** Created before the version check, because the version is read out of it. */
 const META_SCHEMA = 'create table if not exists meta (key text primary key, value text not null);'
@@ -655,6 +668,33 @@ export class IndexCache {
       .prepare('select parent from items where id = ?')
       .get(id) as unknown as { parent: string | null } | undefined
     return row?.parent ?? undefined
+  }
+
+  /**
+   * The first served record whose parent is this id, or undefined. `items_parent` is the
+   * index that makes it one lookup rather than a scan, and S17 runs it under the write lock
+   * on every removal.
+   */
+  childOf(parent: string, skip: readonly string[] = []): string | undefined {
+    const row = this.#open()
+      .prepare(`select id from items where parent = ? and id not in (${placeholders(skip)}) limit 1`)
+      .get(parent, ...skip) as unknown as { id: string } | undefined
+    return row?.id
+  }
+
+  /**
+   * The first served record storing an edge at this id, or undefined. `relations` holds a
+   * record's edges as the JSON array the record itself carries, so this is a scan of the
+   * rows that carry one: 12.2 ms at 50,000 items and the bench corpus's edge density,
+   * 26.5 ms at three times that density, both on a machine at a 1-minute load of 2.8. An
+   * `edges(source, kind, target)` table maintained where `relations` is written would make
+   * it indexed, and is the move to make when a measurement asks for it rather than now.
+   */
+  relationTo(target: string, skip: readonly string[] = []): { readonly id: string; readonly kind: string } | undefined {
+    const row = this.#open()
+      .prepare(`select items.id as id, json_extract(value, '$.kind') as kind from items, json_each(items.relations) where json_extract(value, '$.target') = ? and items.id not in (${placeholders(skip)}) limit 1`)
+      .get(target, ...skip) as unknown as { id: string; kind: string } | undefined
+    return row === undefined ? undefined : { id: row.id, kind: row.kind }
   }
 
   /**

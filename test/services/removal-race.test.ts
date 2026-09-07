@@ -76,7 +76,9 @@ describe('a removal and the neighbour written under it', () => {
     assert.equal(refused.ok, false, 'an edge was written at the record this removal decided against')
     assert.equal(refused.code, 'CONFLICT')
     assert.equal(refused.data['rule'], 'S17')
-    assert.deepEqual(refused.data['entity'], ['csv-export', 'webhook-retry'])
+    assert.equal(refused.data['entity'], 'csv-export')
+    assert.equal(refused.data['cause'],
+      'webhook-retry blocks csv-export, written after this removal was decided; retry so the decision reads what is there now')
 
     const view = await readWorkspace(second)
     assert.equal(view.ok, true)
@@ -103,7 +105,9 @@ describe('a removal and the neighbour written under it', () => {
     assert.equal(refused.ok, false, 'a child was parented at the record this removal decided against')
     assert.equal(refused.code, 'CONFLICT')
     assert.equal(refused.data['rule'], 'S17')
-    assert.deepEqual(refused.data['entity'], ['auth-refresh', 'onboard-copy'])
+    assert.equal(refused.data['entity'], 'auth-refresh')
+    assert.equal(refused.data['cause'],
+      'onboard-copy has auth-refresh as its parent, written after this removal was decided; retry so the decision reads what is there now')
 
     const view = await readWorkspace(second)
     assert.equal(view.ok, true)
@@ -128,7 +132,9 @@ describe('a removal and the neighbour written under it', () => {
     assert.equal(refused.ok, false, 'the parent left the store after this write was decided against it')
     assert.equal(refused.code, 'CONFLICT')
     assert.equal(refused.data['rule'], 'S10')
-    assert.deepEqual(refused.data['entity'], ['auth-refresh'])
+    assert.equal(refused.data['entity'], 'auth-refresh')
+    assert.equal(refused.data['cause'],
+      'auth-refresh is not in the store, so onboard-copy cannot name it as its parent; retry so the decision reads what is there now')
 
     const view = await readWorkspace(second)
     assert.equal(view.ok, true)

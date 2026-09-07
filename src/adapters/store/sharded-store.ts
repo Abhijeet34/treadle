@@ -702,6 +702,105 @@ export class ShardedStore implements Store {
 
   // -- writing ---------------------------------------------------------------------------
 
+  /**
+   * Every closed sprint this transaction leaves behind, for the referential check below. A
+   * sprint record that will not parse or decode is skipped rather than failing the write: it
+   * is already a finding the store reports on every read, and a damaged sprint elsewhere in
+   * that file is no reason to refuse a removal that has nothing to do with it. `sprints()`
+   * fails on one because a caller asking for the sprints has been handed a wrong answer
+   * otherwise; a caller removing an item has not.
+   */
+  #closedSprints(transaction: StoreTransaction): readonly Sprint[] {
+    const closed = new Map<string, Sprint>()
+    for (const row of this.#index.listSprints()) {
+      if (row.state !== 'closed') continue
+      const parsed = parseRecordSource(row.source, row.line)
+      if (!parsed.ok) continue
+      const sprint = decodeSprint(parsed.record)
+      if (sprint.ok) closed.set(sprint.value.id, sprint.value)
+    }
+    for (const write of transaction.sprints ?? []) {
+      if (write.sprint.state === 'closed') closed.set(write.sprint.id, write.sprint)
+      else closed.delete(write.sprint.id)
+    }
+    return [...closed.values()]
+  }
+
+  /**
+   * The referential rule: no transaction may leave a record naming an id the store does not
+   * hold. It runs inside the lock every write already holds, after the read set and before
+   * any shard is rewritten, so a refusal leaves nothing half-applied and there is no window
+   * between the check and the write.
+   *
+   * A read set cannot carry this. `remove`'s guards are all about a neighbour that does not
+   * exist yet - an edge, a child's parent, a closed sprint's member written after the guard
+   * read the store - and no `reads` entry can name a record that was not there to be read.
+   * `set parent_id=` and `file --parent` are the same defect in the other order: neither
+   * carries a read set at all, so the parent can leave between the decision and the write.
+   * `removeItem` keeps its own `R6` refusal, which fires first with the friendlier cause and
+   * the fix lines in the ordinary case where the neighbour was already there.
+   *
+   * The transaction's own effects are applied to the question first: a record it also removes
+   * leaves nothing behind, and one it rewrites answers as this transaction leaves it rather
+   * than as the index still holds it.
+   */
+  #referentialRefusal(transaction: StoreTransaction): StoreResult<never> | undefined {
+    const removed = new Set((transaction.removes ?? []).map((removal) => removal.id))
+    const written = new Map(transaction.writes.map((write) => [write.item.id, write.item]))
+
+    // The store-side form of what `reads` does for a relation's target, and the half that
+    // closes the order where the parent write lands after the removal. Relation targets are
+    // deliberately not checked on a write: an edge naming a record the store does not hold is
+    // `H24`, a state a hand edit may legitimately produce, and refusing it here would refuse
+    // to write back any file that already carries one.
+    for (const write of transaction.writes) {
+      const parent = write.item.parent_id
+      if (parent === undefined) continue
+      if (written.has(parent) || (!removed.has(parent) && this.#index.versionOf(parent) !== undefined)) continue
+      return storeFail(
+        'CONFLICT', 'S10',
+        `${parent} is not in the store, so ${write.item.id} cannot name it as its parent; retry so the decision reads what is there now`,
+        [parent, write.item.id],
+      )
+    }
+
+    if (removed.size === 0) return undefined
+    // Every id this transaction touches is answered from the transaction rather than from the
+    // index, so they are the rows the two lookups skip: a record being removed leaves nothing
+    // and a record being rewritten is judged above, and neither is what the index still says.
+    const touched = [...removed, ...written.keys()]
+    const sprints = this.#closedSprints(transaction)
+    for (const id of removed) {
+      const referrer = this.#referrerOf(id, touched, sprints)
+      if (referrer === undefined) continue
+      return storeFail('CONFLICT', 'S17', `${referrer.clause}, written after this removal was decided; retry so the decision reads what is there now`, [id, referrer.id])
+    }
+    return undefined
+  }
+
+  /**
+   * The first record this transaction would leave naming `id`, as the clause a refusal reads,
+   * or `undefined`. The three kinds are the three ways one record holds another's id: a
+   * child's parent, a stored relation edge, and a closed sprint's committed set - which is
+   * read both as the frozen `carried` and `finished` lists this build writes and as the
+   * `sprint_id` a sprint closed by an older build left its members pointing at.
+   */
+  #referrerOf(
+    id: string, skip: readonly string[], sprints: readonly Sprint[],
+  ): { readonly id: string; readonly clause: string } | undefined {
+    const child = this.#index.childOf(id, skip)
+    if (child !== undefined) return { id: child, clause: `${child} has ${id} as its parent` }
+    const edge = this.#index.relationTo(id, skip)
+    if (edge !== undefined) return { id: edge.id, clause: `${edge.id} ${edge.kind} ${id}` }
+    const row = this.#index.itemRow(id)
+    for (const sprint of sprints) {
+      const frozen = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
+      if (!frozen.includes(id) && row?.sprint !== sprint.id) continue
+      return { id: sprint.id, clause: `${sprint.id} is closed and counts ${id} in its committed set` }
+    }
+    return undefined
+  }
+
   async #applyUnderLock(transaction: StoreTransaction, lock: LockHandle): Promise<StoreResult<Applied>> {
     const shards = new Map<string, ParsedFile>()
     const applied: AppliedWrite[] = []
@@ -721,6 +820,9 @@ export class ShardedStore implements Store {
         [read.id], { expected: read.version, ...(actual === undefined ? {} : { actual }) },
       )
     }
+
+    const dangling = this.#referentialRefusal(transaction)
+    if (dangling !== undefined) return dangling
 
     for (const write of transaction.writes) {
       // The heartbeat is a timer on this event loop, so it fires only between records. A
