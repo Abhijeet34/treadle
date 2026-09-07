@@ -56,6 +56,10 @@ export const HISTORY_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'none', type: 'string' },
     { kind: 'scalar', key: 'more', type: 'integer' },
     { kind: 'scalar', key: 'page', type: 'string' },
+    // Last of the non-block properties, which is as late as the renderer's blocks-last rule
+    // allows and moves nothing already declared: the sentence that says the record this
+    // history belongs to is no longer in the store.
+    { kind: 'scalar', key: 'note', type: 'string' },
     {
       kind: 'block',
       key: 'events',
@@ -192,16 +196,21 @@ function side(value: unknown, field: string): string {
 }
 
 /**
- * One moved field as `field=from->to`, or as `field=to` where the event recorded no before at
- * all, which is what a creation is. Neither form is ever a bare name.
+ * One moved field as `field=from->to`, or as `field=value` where the event recorded one side
+ * only: no before at all is a creation, and no after at all is a removal, whose record left
+ * the store rather than taking a new value. Rendering the missing side as a marker said the
+ * log did not record what a removal became, when what it records is that it became nothing;
+ * the `op` column is what tells the two one-sided forms apart, exactly as it does for
+ * `item.relation.add` and `item.relation.remove`. Neither form is ever a bare name.
  */
 function move(
   field: string,
   before: Record<string, unknown> | undefined,
   after: Record<string, unknown> | undefined,
 ): string {
-  const to = side(after?.[field], field)
-  return before === undefined ? `${field}=${to}` : `${field}=${side(before[field], field)}->${to}`
+  if (before === undefined) return `${field}=${side(after?.[field], field)}`
+  if (after === undefined) return `${field}=${side(before[field], field)}`
+  return `${field}=${side(before[field], field)}->${side(after[field], field)}`
 }
 
 /** The item fields one event moved, in the order the event recorded them. */
@@ -289,12 +298,15 @@ export async function history(
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
   // An id names an item or a sprint; the log is keyed by entity and the rows read the same.
-  if (view.value.byId.get(id) === undefined && view.value.sprintById.get(id) === undefined) {
-    return notFound('history', 'read', workspace, view.value, id)
-  }
+  const held = view.value.byId.has(id) || view.value.sprintById.has(id)
 
   const events = await store.events({ entity: id })
   if (!events.ok) return storeRefusal('history', 'read', events.error, workspace)
+  // A record `remove` took out still has its whole history, because the log is keyed by
+  // entity id rather than by a record existing, and refusing here would make a removal erase
+  // the trail it is supposed to leave intact (ADR-0024). An id with neither a record nor an
+  // event is the absence `notFound` has always answered.
+  if (!held && events.value.length === 0) return notFound('history', 'read', workspace, view.value, id)
   // The store returns the log in the order it was written; the question this command answers
   // is almost always about the most recent change, so the newest is the first row.
   const ordered = [...events.value].reverse()
@@ -318,6 +330,10 @@ export async function history(
     })),
   }
 
+  const gone = !held
+    ? 'no record here carries this id now; these are the events it earned while it did'
+    : undefined
+
   const recorded = page
     .filter((event) => event.reason !== undefined)
     .map((event): Row => ({ at: cell(event.at), op: cell(event.op), why: why(event.reason) }))
@@ -331,6 +347,7 @@ export async function history(
     const following = ordered[from + page.length]
     if (following !== undefined) data['page'] = line(following.id)
   }
+  if (gone !== undefined) data['note'] = gone
   data['events'] = block
   // An empty block still renders its opener, which would put `reasons 0 of 0` under every
   // history of an item nothing was ever marked or moved with a reason for.

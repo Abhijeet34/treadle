@@ -63,6 +63,8 @@ export type IndexedItem = {
   readonly severity: string | null
   /** The stored edges as JSON, or null; a scan field like the rest, read on every command. */
   readonly relations: string | null
+  /** The stored labels as JSON, or null, which `backlog --label` filters and `--fields` prints. */
+  readonly labels: string | null
   readonly source: string
 }
 
@@ -87,7 +89,7 @@ create table if not exists items (
   id text primary key, file text not null, line integer not null, type text not null,
   state text not null, parent text, sprint text, points integer, priority integer, version integer not null,
   assignee text, filed_at text not null, title text not null,
-  resolution text, due text, severity text, relations text, source text not null);
+  resolution text, due text, severity text, relations text, labels text, source text not null);
 create index if not exists items_file on items(file);
 -- Both orders listItems can ask for. Every query it builds ends in an order by filed_at, id
 -- with an optional limit, so an index that leads on the filter and continues in that order
@@ -125,7 +127,7 @@ const META_SCHEMA = 'create table if not exists meta (key text primary key, valu
  * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
  * that cannot leave a half-migrated table behind.
  */
-const INDEX_FORMAT = '5'
+const INDEX_FORMAT = '6'
 const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
@@ -383,8 +385,8 @@ export class IndexCache {
 
       const insert = db.prepare(`insert into items
         (id, file, line, type, state, parent, sprint, points, priority, version, assignee, filed_at, title,
-         resolution, due, severity, relations, source)
-        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+         resolution, due, severity, relations, labels, source)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
       const holder = db.prepare('select file from items where id = ?')
       for (const item of items) {
         const was = previous.get(item.id)
@@ -395,7 +397,8 @@ export class IndexCache {
         try {
           insert.run(item.id, item.file, item.line, item.type, item.state, item.parent,
             item.sprint, item.points, item.priority, item.version, item.assignee,
-            item.filed_at, item.title, item.resolution, item.due, item.severity, item.relations, item.source)
+            item.filed_at, item.title, item.resolution, item.due, item.severity, item.relations,
+            item.labels, item.source)
         } catch {
           // The id is already in the store, and because the parser refuses a repeat inside
           // one file, "already" now means another shard. That is the half of D1 obligation 4
@@ -714,7 +717,7 @@ export class IndexCache {
   /** The same rows as `listItems`, as every column but the text: what a summary is built from. */
   listSummaries(query: ItemQuery): Iterable<SummaryRow> {
     return this.#items(
-      'id, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, resolution, due, severity, relations',
+      'id, type, state, parent, sprint, points, priority, version, assignee, filed_at, title, resolution, due, severity, relations, labels',
       query,
     ) as Iterable<SummaryRow>
   }

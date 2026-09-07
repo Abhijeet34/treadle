@@ -17,6 +17,7 @@ import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from '../application/services
 import { EVIDENCE_SHAPE, MARK_SHAPE } from '../application/services/marking.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
 import { RELATION_SHAPE } from '../application/services/relation.ts'
+import { REMOVE_SHAPE } from '../application/services/removal.ts'
 import { TRANSITION_SHAPE } from '../application/services/lifecycle.ts'
 import { SPRINT_SHAPE, SPRINTS_SHAPE } from '../application/services/sprints.ts'
 import { INIT_SHAPE } from '../application/services/workspace.ts'
@@ -93,10 +94,13 @@ export const COMMANDS: readonly Command[] = [
     columns: true,
     usage: [
       'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
-      'treadle backlog [--sprint <id>] [--priority <1-5>] [--fields <list>] [--limit <n>] [--cursor <id>]',
+      'treadle backlog [--sprint <id>] [--priority <1-5>] [--label <slug>] [--title <words>]',
+      'treadle backlog [--fields <list>] [--limit <n>] [--cursor <id>]',
     ],
     examples: [
       ['treadle backlog --state ready', 'what is ready to pick up'],
+      ['treadle backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched, so every row shows why it matched'],
+      ['treadle backlog --label ux --fields +labels', 'one label an item carries, with the whole list as a column; every clause on the line has to hold, as with all filters'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
       ['treadle backlog --sprint sprint-30', 'the items whose sprint_id is that sprint now, which for a closed one is not the set its close recorded'],
@@ -109,6 +113,7 @@ export const COMMANDS: readonly Command[] = [
     usage: [
       'treadle board [--sprint <id> | --all] [--limit <n>] [--fields <list>]',
       'treadle board [--state <s>] [--type <t>] [--assignee <a>] [--priority <1-5>] [--resolution <r>]',
+      'treadle board [--label <slug>] [--title <words>]',
     ],
     examples: [
       ['treadle board', 'the open sprint, one section per live state, blocked work first in each'],
@@ -183,11 +188,23 @@ export const COMMANDS: readonly Command[] = [
     ],
   },
   {
+    name: 'remove', shape: REMOVE_SHAPE, effect: 'mutate', record: 'record',
+    omits: false, pageable: false, confirm: 'severe', standalone: false,
+    columns: false,
+    usage: ['treadle remove <id> --reason <text> --yes'],
+    examples: [
+      ['treadle remove login-cta-2 --reason "filed twice by the same import" --yes', 'take a mis-filed record out of the shard; every event it earned stays in the log and treadle history login-cta-2 still reads them'],
+      ['treadle remove login-cta-2 --reason "filed twice" --dry-run', 'what would go, with every guard evaluated and nothing written; --yes is what the real run needs'],
+      ['treadle transition login-cta-2 cancelled --resolution duplicate --reason "same as login-cta"', 'work that was really done or really stopped is a transition, not a removal: this keeps the record and says why it stopped'],
+    ],
+  },
+  {
     name: 'sprint', shape: SPRINT_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
     usage: [
       'treadle sprint open <title> --end <date> [--start <date>] [--id <slug>] [--goal <text>]',
+      'treadle sprint set <sprint> [--title <text>] [--goal <text>] [--start <date>] [--end <date>]',
       'treadle sprint commit <sprint> <id> [<id> ...]',
       'treadle sprint uncommit <id> [<id> ...]',
       'treadle sprint close <sprint>',
@@ -196,6 +213,7 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle sprint open "Sprint 31" --start 2026-09-07 --end 2026-09-18 --goal "Ship the token refresh"', 'open a two-week sprint; dates are calendar days, read in UTC'],
       ['treadle sprint commit sprint-31 auth-refresh sso-saml', 'commit two items; refused if either sits in another open sprint or fails its ready gate'],
+      ['treadle sprint set sprint-31 --goal "Ship the token refresh"', 'change an open sprint\'s title, goal or dates; --goal= clears the goal, and a closed sprint is a record that reopen is the way back into'],
       ['treadle sprint close sprint-31', 'close it; the items still open are recorded on the sprint as carried'],
     ],
   },

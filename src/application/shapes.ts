@@ -13,6 +13,7 @@ import { SET_SHAPE } from './services/editing.ts'
 import { EVIDENCE_SHAPE, MARK_SHAPE } from './services/marking.ts'
 import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from './services/insight.ts'
 import { RELATION_SHAPE } from './services/relation.ts'
+import { REMOVE_SHAPE } from './services/removal.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from './services/meta.ts'
 import { SPRINT_SHAPE, SPRINTS_SHAPE } from './services/sprints.ts'
 import { INIT_SHAPE } from './services/workspace.ts'
@@ -31,6 +32,7 @@ export const SHAPES: readonly ResultShape[] = [
   MARK_SHAPE,
   NEXT_SHAPE,
   RELATION_SHAPE,
+  REMOVE_SHAPE,
   SET_SHAPE,
   SHOW_SHAPE,
   SPRINT_SHAPE,

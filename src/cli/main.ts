@@ -20,8 +20,9 @@ import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
 import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
+import { removeItem } from '../application/services/removal.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import { closeSprint, commitItems, openSprint, reopenSprint, sprints, uncommitItems } from '../application/services/sprints.ts'
+import { SPRINT_SET_FIELDS, closeSprint, commitItems, openSprint, reopenSprint, setSprint, sprints, uncommitItems, type SprintSetField } from '../application/services/sprints.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
@@ -147,6 +148,20 @@ function flagValueRefusal(
     return validation(
       command ?? 'treadle',
       `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
+      help,
+    )
+  }
+  // `--title` is the one filter that matches on words rather than on a whole value, so a
+  // value with no word in it is the one filter value that would select everything instead of
+  // nothing. Every other filter compares a value a record either carries or does not, and an
+  // empty one there matches nothing and says so through `narrowest`. Scoped to the two lists
+  // that filter, because `sprint set --title` writes a field and is held to that field's own
+  // check, as every other value-writing flag in BOUNDED_ELSEWHERE is.
+  const title = command === 'backlog' || command === 'board' ? flag(flags, 'title') : undefined
+  if (title !== undefined && title.trim().length === 0) {
+    return validation(
+      command ?? 'treadle',
+      '--title searches titles for the words it is given, and this value has none',
       help,
     )
   }
@@ -519,6 +534,14 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return relate(target, systemClock, randomIds, { verb: verb as RelationVerb, id: entity, kind, other, actor })
   }
 
+  if (command === 'remove') {
+    if (id === undefined) return validation('remove', 'remove needs the id of one item', ['treadle backlog'])
+    const reason = flag(flags, 'reason')
+    return removeItem(target, systemClock, randomIds, {
+      id, ...(reason === undefined ? {} : { reason }), confirmed: flags['yes'] === true, actor,
+    })
+  }
+
   if (command === 'sprints') return sprints(store, systemClock, operands[0])
 
   if (command === 'sprint') {
@@ -538,6 +561,15 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
         ...(goal === undefined ? {} : { goal }),
       })
     }
+    if (verb === 'set') {
+      if (first === undefined) return validation('sprint', 'sprint set needs the id of one sprint', ['treadle sprints'])
+      const fields: Partial<Record<SprintSetField, string>> = {}
+      for (const field of SPRINT_SET_FIELDS) {
+        const value = flag(flags, field)
+        if (value !== undefined) fields[field] = value
+      }
+      return setSprint(target, systemClock, randomIds, { sprint: first, fields, actor })
+    }
     if (verb === 'commit') {
       if (first === undefined) return validation('sprint', 'sprint commit needs a sprint id and then one or more item ids', ['treadle help sprint'])
       return commitItems(target, systemClock, randomIds, { sprint: first, items: rest, actor })
@@ -550,7 +582,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
         ? closeSprint(target, systemClock, randomIds, request)
         : reopenSprint(target, systemClock, randomIds, request)
     }
-    return validation('sprint', `sprint takes one of open, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
+    return validation('sprint', `sprint takes one of open, set, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
   }
 
   if (command === 'transition') {

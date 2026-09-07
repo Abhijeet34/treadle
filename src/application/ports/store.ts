@@ -110,6 +110,20 @@ export type ItemRead = {
   readonly version: number
 }
 
+/**
+ * One record taken out of the store, under the same compare-and-set rule a write is under:
+ * `ifVersion` asserts the exact stored version, so a removal decided against a record
+ * somebody has since moved is refused with `S10` rather than dropping the newer one.
+ *
+ * A removal is not a write of nothing. The record leaves its shard; the event log is
+ * untouched by it, keeps every event the record ever earned, and gains one more saying it
+ * went, by whom and why. ADR-0024 carries the argument.
+ */
+export type ItemRemoval = {
+  readonly id: ItemId
+  readonly ifVersion: number
+}
+
 /** One sprint write, under the same compare-and-set rule as an item's. */
 export type SprintWrite = {
   readonly sprint: Sprint
@@ -121,6 +135,8 @@ export type StoreTransaction = {
   readonly writes: readonly ItemWrite[]
   /** Sprint records, which live in one file beside the shards and land in the same journal. */
   readonly sprints?: readonly SprintWrite[]
+  /** Records that leave the store in this transaction; see `ItemRemoval`. */
+  readonly removes?: readonly ItemRemoval[]
   /** Records the decision depended on, refused as `S10` if one moved; see `ItemRead`. */
   readonly reads?: readonly ItemRead[]
   readonly events: readonly StoreEvent[]

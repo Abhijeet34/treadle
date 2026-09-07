@@ -478,6 +478,18 @@ export function withRecord(file: ParsedFile, record: ParsedRecord): ParsedFile {
 }
 
 /**
+ * One record taken out of a parsed file, which is what `remove` writes. An id the file does
+ * not carry leaves it unchanged: the write path has already resolved the record and refused
+ * every id it could not, so nothing here decides whether the removal was legal.
+ */
+export function withoutRecord(file: ParsedFile, id: string): ParsedFile {
+  const at = file.chunkById.get(id)
+  if (at === undefined) return file
+  const chunks = file.chunks.filter((_, index) => index !== at)
+  return { ...file, ...resolveIdentity(chunks) }
+}
+
+/**
  * A section body line beginning with `#` at column 0 would re-parse as a record heading or
  * a section heading, so DR3 rule 1 refuses to write one. Read stays permissive: such a line
  * in a hand-edited file is quarantined by the segment split, never silently re-homed.

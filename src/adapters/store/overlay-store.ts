@@ -41,10 +41,13 @@ function order(a: WorkItemSummary, b: WorkItemSummary): number {
   return a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at)
 }
 
-/** The base store's rows with this layer's writes over them, in `list`'s order. */
-function merged<T extends WorkItemSummary>(base: readonly T[], pending: Iterable<T>, query: ItemQuery): readonly T[] {
+/** The base store's rows with this layer's writes over them and its removals taken out, in `list`'s order. */
+function merged<T extends WorkItemSummary>(
+  base: readonly T[], pending: Iterable<T>, removed: ReadonlySet<string>, query: ItemQuery,
+): readonly T[] {
   const byId = new Map(base.map((item) => [item.id, item]))
   for (const item of pending) byId.set(item.id, item)
+  for (const id of removed) byId.delete(id)
   const items = [...byId.values()].filter((item) => matches(item, query)).sort(order)
   return query.limit === undefined ? items : items.slice(0, query.limit)
 }
@@ -53,6 +56,8 @@ export class OverlayStore implements Store {
   readonly #base: Store
   readonly #items = new Map<string, WorkItem>()
   readonly #sprints = new Map<string, Sprint>()
+  /** Ids this layer has removed, which the base store still holds; see `ItemRemoval`. */
+  readonly #removed = new Set<string>()
   readonly #events: StoreEvent[] = []
 
   constructor(base: Store) {
@@ -64,6 +69,7 @@ export class OverlayStore implements Store {
   }
 
   async get(id: string): Promise<StoreResult<WorkItem | undefined>> {
+    if (this.#removed.has(id)) return storeOk(undefined)
     const written = this.#items.get(id)
     if (written !== undefined) return storeOk(written)
     return this.#base.get(id)
@@ -72,7 +78,7 @@ export class OverlayStore implements Store {
   async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
     const base = await this.#base.list({})
     if (!base.ok) return base
-    return storeOk(merged(base.value, this.#items.values(), query))
+    return storeOk(merged(base.value, this.#items.values(), this.#removed, query))
   }
 
   // The overlay merges its pending writes over the whole base list on every read, which
@@ -88,7 +94,7 @@ export class OverlayStore implements Store {
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
     const base = await this.#base.summaries({})
     if (!base.ok) return base
-    return storeOk(merged(base.value, [...this.#items.values()].map(summaryOf), query))
+    return storeOk(merged(base.value, [...this.#items.values()].map(summaryOf), this.#removed, query))
   }
 
   async sprints(): Promise<StoreResult<readonly Sprint[]>> {
@@ -181,7 +187,16 @@ export class OverlayStore implements Store {
       applied.push({ id: write.sprint.id, version })
     }
 
+    const dropped: string[] = []
+    for (const removal of transaction.removes ?? []) {
+      const current = staged.get(removal.id) ?? await this.get(removal.id).then((r) => (r.ok ? r.value : undefined))
+      const conflict = compareAndSet(removal.id, current, removal.ifVersion)
+      if (conflict !== undefined) return conflict
+      dropped.push(removal.id)
+    }
+
     for (const [id, item] of staged) this.#items.set(id, item)
+    for (const id of dropped) { this.#items.delete(id); this.#removed.add(id) }
     for (const [id, sprint] of stagedSprints) this.#sprints.set(id, sprint)
     this.#events.push(...transaction.events)
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
@@ -190,6 +205,7 @@ export class OverlayStore implements Store {
   async close(): Promise<void> {
     this.#items.clear()
     this.#sprints.clear()
+    this.#removed.clear()
     this.#events.length = 0
   }
 }

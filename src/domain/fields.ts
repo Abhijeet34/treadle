@@ -225,6 +225,16 @@ export function shortField(name: string): string {
 // Both patterns are bounded and linear: one character class per position, no nested
 // quantifier, so neither can backtrack (threat model F8's ReDoS discipline).
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
+/**
+ * A label's own bound: two characters, not the id's three. `ux`, `ui`, `qa`, `ci` and `db`
+ * are the labels a team writes in its first week and every one of them was refused, which is
+ * a rule about ids applied to a field that is not one. Two rather than one is where the
+ * meaning stops: a one-character label is indistinguishable from a typed-past value, and it
+ * would make `backlog --label a` a filter nobody can read back. The ceiling stays 64, and
+ * `id`, `parent_id`, `sprint_id` and a relation target keep the three-character floor,
+ * because those name records and a two-character id collides far sooner than a label does.
+ */
+const LABEL = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
 
 // DR3 rule 7, widened to the whole class by finding F5. text.ts owns the class so the
@@ -380,8 +390,8 @@ const CHECKS: Readonly<Record<string, Check>> = {
     if (!Array.isArray(value)) return 'labels must be a list of slugs'
     const labels = value as readonly unknown[]
     for (const label of labels) {
-      if (typeof label !== 'string' || !SLUG.test(label)) {
-        return `labels must be slugs; ${String(label)} is not one`
+      if (typeof label !== 'string' || !LABEL.test(label)) {
+        return `labels must be slugs of 2 to 64 lowercase letters, digits and hyphens; ${String(label)} is not one`
       }
     }
     return new Set(labels).size === labels.length ? undefined : 'labels must be unique within one item'
