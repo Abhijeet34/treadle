@@ -116,8 +116,12 @@ describe('the defects found by using the tool', () => {
       const noteOf = (flag: string): string =>
         help.out.split('\n').find((line) => line.startsWith(`${flag} `)) ?? ''
 
-      assert.match(noteOf('--color'), /^--color A .*presentation/)
-      assert.match(noteOf('--width'), /^--width A .*presentation/)
+      // Both were `A ... it only changes presentation, and here there is nothing to present`,
+      // on a command that presents. `--width` is read by the human rendering, so it is `S`;
+      // `--color` is read by no rendering, which is the reason its note now gives.
+      assert.match(noteOf('--width'), /^--width S .*display cells/)
+      assert.match(noteOf('--color'), /^--color A .*no rendering emits colour/)
+      assert.doesNotMatch(noteOf('--color'), /nothing to present/)
       for (const flag of ['--yes', '--no-input']) {
         assert.match(noteOf(flag), new RegExp(`^${flag} A `), `${flag} is still accepted and ignored here`)
         assert.doesNotMatch(noteOf(flag), /presentation/, `${flag} has nothing to do with presentation`)
