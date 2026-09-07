@@ -30,13 +30,17 @@ import {
   relationGraphFrom,
   membersOf,
   summaryOf,
+  type Instant,
   type ItemId,
   type Sprint,
   type RelationGraph,
   type WorkItem,
+  type WorkItemState,
   type WorkItemSummary,
+  type WorkspaceConfig,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
+import type { Clock } from '../ports/clock.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { hasReviewStep, hidesContent } from './context.ts'
 import { storeRefusal } from './refusal.ts'
@@ -119,7 +123,27 @@ type Audited = {
   logged?: Map<string, string>
   /** H23 and H19, in log order. */
   fromLog?: DoctorFinding[]
+  /**
+   * The instant the item entered the state it is in now, folded forward over every event
+   * whose `after` names that state. It is `H03`'s input and the log is the only place it is:
+   * a record carries its state and never when it took it.
+   */
+  enteredAt?: Instant
 }
+
+/**
+ * What the audit needs beyond the records and the log: the workspace's own configuration,
+ * because two of its findings are thresholds a team set, and an instant to measure an age
+ * against. `status` already takes a clock for the overdue finding it raises; these are the
+ * same kind of fact, so they arrive the same way rather than through a second mechanism.
+ */
+export type AuditContext = {
+  readonly config: WorkspaceConfig
+  readonly now: Instant
+  readonly sprints: readonly Sprint[]
+}
+
+const DAY_MS = 86_400_000
 
 /**
  * The audit, fed one record at a time and then one event at a time, and read once both
@@ -127,6 +151,7 @@ type Audited = {
  * that need more of it than a summary carries are decided there.
  */
 export class WorkspaceAudit {
+  readonly #context: AuditContext
   readonly #sprintIds: ReadonlySet<string>
   readonly #heldItems: ReadonlySet<string>
   readonly #heldSprints: ReadonlySet<string>
@@ -143,11 +168,12 @@ export class WorkspaceAudit {
    * sets stay apart so a quarantined item never answers for a `sprint_id`.
    */
   constructor(
-    sprintIds: ReadonlySet<string>,
+    context: AuditContext,
     heldItems: ReadonlySet<string> = new Set(),
     heldSprints: ReadonlySet<string> = new Set(),
   ) {
-    this.#sprintIds = sprintIds
+    this.#context = context
+    this.#sprintIds = new Set(context.sprints.map((sprint) => sprint.id))
     this.#heldItems = heldItems
     this.#heldSprints = heldSprints
   }
@@ -173,7 +199,7 @@ export class WorkspaceAudit {
         detail: `the stored description is ${item.description.length} characters and the bound is ${MAX_DESCRIPTION}; the long form belongs in a file this record points at`,
       })
     }
-    const after = item.state === 'done' && hasReviewStep(item.type) && (item.evidence ?? []).length === 0
+    const after = item.state === 'done' && hasReviewStep(this.#context.config, item.type) && (item.evidence ?? []).length === 0
       ? [{
         rule: 'H21',
         id: item.id,
@@ -198,6 +224,12 @@ export class WorkspaceAudit {
         entry.logged ??= new Map()
         entry.logged.set(field, value)
       }
+    }
+    // The instant this item took the state it is in now, which is H03's whole input. A file
+    // event names `draft` and a transition names what it moved to, so one test over `after`
+    // covers both and the last one to name the current state is when it was entered.
+    if (typeof after === 'object' && after !== null && (after as Record<string, unknown>)['state'] === item.state) {
+      entry.enteredAt = event.at
     }
     if (Date.parse(event.at) < Date.parse(item.filed_at)) {
       (entry.fromLog ??= []).push({
@@ -234,8 +266,31 @@ export class WorkspaceAudit {
         detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
       })
     }
-    findings.push(...(entry.fromLog ?? NONE), ...entry.after)
+    findings.push(...this.#aging(entry), ...(entry.fromLog ?? NONE), ...entry.after)
     return findings
+  }
+
+  /**
+   * `H03`: an item in progress for longer than the workspace's `aging_days`. The threshold
+   * is configuration and zero disarms it, exactly as a zero column limit disarms `G3`, so a
+   * workspace that has set nothing raises nothing. Only `in_progress` is asked, which is the
+   * domain model's own wording: an item nobody has picked up is the backlog, and an item
+   * somebody picked up and left is the thing a standup is for.
+   */
+  #aging(entry: Audited): readonly DoctorFinding[] {
+    const days = this.#context.config.aging_days
+    if (days === 0 || entry.item.state !== 'in_progress' || entry.enteredAt === undefined) return NONE
+    const age = Math.floor((Date.parse(this.#context.now) - Date.parse(entry.enteredAt)) / DAY_MS)
+    if (!Number.isFinite(age) || age <= days) return NONE
+    return [{
+      rule: 'H03',
+      id: entry.item.id,
+      where: 'state',
+      // One command line, last, with nothing after it: `test/cli/runnable-lines.test.ts`
+      // reads a detail's trailing `; treadle ...` as a line to run, and a verb phrase after
+      // the command would be run as its arguments.
+      detail: `the item has been in_progress for ${age} days, over this workspace's aging_days of ${days}, and explain names what it is waiting on; treadle explain ${entry.item.id}`,
+    }]
   }
 
   /** The findings of the one item `record` was given, which is what `explain` reads. */
@@ -259,8 +314,39 @@ export class WorkspaceAudit {
         ...auditRelationsOf(known, entry.item),
         ...auditImpediment(entry.item),
       ]),
+      ...this.#columnsOverLimit(),
       ...storedBlockingCycle(relationGraphFrom(this.#entries.map((entry) => entry.item))),
     ]
+  }
+
+  /**
+   * `H04`: a column holding more than its configured limit. It is scoped exactly as `G3`
+   * scopes its count, to the one open sprint or to the workspace, so the finding and the
+   * guard cannot disagree about which items are in the column. `G3` refuses the move that
+   * would put a column over, and this reports the ones already there: a limit lowered under
+   * work in flight and an override are both routes no guard could have refused, which is the
+   * write-time-guard and load-time-finding pair the rest of this file already keeps.
+   */
+  #columnsOverLimit(): readonly DoctorFinding[] {
+    const limits = this.#context.config.wip_limits
+    if (limits.size === 0) return NONE
+    const open = this.#context.sprints.filter((sprint) => sprint.state === 'open')
+    const sprint = open.length === 1 ? open[0] : undefined
+    const findings: DoctorFinding[] = []
+    for (const [state, limit] of limits) {
+      if (limit === 0) continue
+      const used = this.#entries.filter((entry) =>
+        entry.item.state === state && (sprint === undefined || entry.item.sprint_id === sprint.id)).length
+      if (used <= limit) continue
+      const scope = sprint === undefined ? 'this workspace' : sprint.id
+      findings.push({
+        rule: 'H04',
+        id: '-',
+        where: state as WorkItemState,
+        detail: `the ${state} column of ${scope} holds ${used} items against a wip_limits of ${limit}, which G3 refuses to add to and an override or a lowered limit produces; treadle board --state ${state}`,
+      })
+    }
+    return findings
   }
 
   get checked(): number {
@@ -270,9 +356,9 @@ export class WorkspaceAudit {
 
 /** The findings of one item against its own slice of the log, in rule order. */
 export function auditItem(
-  item: WorkItem, events: readonly StoreEvent[], sprintIds: ReadonlySet<string>,
+  item: WorkItem, events: readonly StoreEvent[], context: AuditContext,
 ): readonly DoctorFinding[] {
-  const audit = new WorkspaceAudit(sprintIds)
+  const audit = new WorkspaceAudit(context)
   audit.record(item)
   for (const event of events) audit.event(event)
   return audit.ofOne()
@@ -404,7 +490,7 @@ function storedBlockingCycle(graph: RelationGraph): readonly DoctorFinding[] {
   }]
 }
 
-export async function doctor(store: Store): Promise<ResultObject> {
+export async function doctor(store: Store, clock: Clock): Promise<ResultObject> {
   const identity = await store.identity()
   if (!identity.ok) return storeRefusal('doctor', 'read', identity.error, undefined)
   const workspace = identity.value.id
@@ -419,7 +505,10 @@ export async function doctor(store: Store): Promise<ResultObject> {
   // true `H26` into silence.
   const held = (kind: 'item' | 'sprint'): ReadonlySet<string> =>
     new Set(stored.value.flatMap((finding) => (finding.id !== undefined && finding.kind === kind ? [finding.id] : [])))
-  const audit = new WorkspaceAudit(new Set(sprints.value.map((sprint) => sprint.id)), held('item'), held('sprint'))
+  const audit = new WorkspaceAudit(
+    { config: identity.value.config, now: clock.now(), sprints: sprints.value },
+    held('item'), held('sprint'),
+  )
   // The audit reads every field of every record against its events, so this is the one
   // command that decodes the whole store; it holds one record and one event at a time.
   const records = await store.eachItem({}, (item) => audit.record(item))
@@ -443,7 +532,11 @@ export async function doctor(store: Store): Promise<ResultObject> {
   // because both exited 7. The predicate is `readWorkspace`'s own, so the one status that says
   // "no answer over this store is whole" is decided in one place; an audit finding is always
   // over a served record and always counts.
-  const hiding = stored.value.filter(hidesContent).length + audited.length
+  // Every finding is asked the same question, whether the store raised it on load or the
+  // audit derived it: does it name content this store holds and does not serve. `H03` and
+  // `H04` report a threshold a team set over records that serve whole, so they print and
+  // this exits 0; ADR-0026 records the classification.
+  const hiding = [...stored.value, ...audited].filter(hidesContent).length
 
   const block: Block = {
     columns: columnsOf(DOCTOR_SHAPE, 'findings'),

@@ -92,6 +92,7 @@ function invocations(inside: string, elsewhere: string): ReadonlyMap<string, Inv
     ['remove', ['remove', 'docs-quickstart', '--reason', 'filed twice', '--yes']],
     ['sprint', ['sprint', 'open', 'Sprint one', '--start', '2026-09-07', '--end', '2026-09-18']],
     ['sprints', ['sprints']],
+    ['config', ['config', 'set', 'aging_days', '5']],
     ['doctor', ['doctor']],
     ['next', ['next', '--limit', '3']],
     ['explain', ['explain', 'auth-refresh']],

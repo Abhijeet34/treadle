@@ -18,6 +18,7 @@ import {
   type BugSeverity,
   type ItemId,
   type WorkItemSummary,
+  type Weights,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
@@ -41,25 +42,11 @@ import { invocation, notFound } from './items.ts'
 import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
-export type Weights = {
-  readonly pri: number
-  readonly age: number
-  readonly dep: number
-  readonly spr: number
-  readonly asg: number
-  readonly due: number
-  readonly sev: number
-}
-
-/**
- * Integer weights, so a score is an integer and two implementations cannot round apart.
- * `due` is four so a day past the date outranks four days of age and never a priority step:
- * a date the workspace agreed is evidence, and priority is still the thing a person set.
- * `sev` is six for the same reason read the other way: an S1 scores 4 and a priority level
- * is 10, so severity lifts a defect by at most 2.4 levels and priority stays the lever a
- * person sets. The two components answer different questions and both are printed.
- */
-export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4, sev: 6 }
+// The weights and their default are the workspace's own configuration and live in
+// `src/domain/config.ts`; they are re-exported here because `rank` and `scoreOf` are this
+// file's surface and a caller of either reads the type beside them.
+export { DEFAULT_WEIGHTS } from '../../domain/index.ts'
+export type { Weights } from '../../domain/index.ts'
 
 /** Three, because the question is what to pick up and the answer is meant to be read whole. */
 export const DEFAULT_NEXT_LIMIT = 3
@@ -253,7 +240,9 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('next', 'read', view.error, undefined)
   const workspace = view.value.identity.id
-  const weights = DEFAULT_WEIGHTS
+  // The workspace's own weights, which default to the table below. `next` prints them beside
+  // the score, so a team that reweighs the ranking reads its own numbers back.
+  const weights = view.value.config.next_weights
   const ranked = rank(view.value, clock.now(), weights, request.forActor)
   // `--for` shapes the score, so a page without it ranks the same item differently.
   const line = (cursor?: string): string => invocation('next', [], [
@@ -340,7 +329,7 @@ function enteredAt(events: readonly StoreEvent[], state: string): Entry | undefi
   return undefined
 }
 
-export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
+export async function explain(store: Store, clock: Clock, id: ItemId): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('explain', 'read', view.error, undefined)
   const workspace = view.value.identity.id
@@ -370,7 +359,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     })),
   }
 
-  const targets = legalTargetsFrom(item, hasReviewStep(item.type))
+  const targets = legalTargetsFrom(item, hasReviewStep(view.value.config, item.type))
   const moves: Block = {
     columns: columnsOf(EXPLAIN_SHAPE, 'moves'),
     shown: targets.length,
@@ -413,7 +402,7 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
   const audit = [
-    ...auditItem(item, log, new Set(view.value.sprintById.keys())),
+    ...auditItem(item, log, { config: view.value.config, now: clock.now(), sprints: view.value.sprints }),
     ...auditParentOf(new Set(view.value.byId.keys()), item),
     ...auditRelationsOf(new Set(view.value.byId.keys()), item),
     ...auditImpediment(item),
@@ -448,7 +437,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   const defects = census.length === 0 ? undefined : census.map(([s, n]) => `${s} ${n}`).join(' ')
 
   const now = clock.now()
-  const ranked = rank(view.value, now, DEFAULT_WEIGHTS, undefined).slice(0, 3)
+  const ranked = rank(view.value, now, view.value.config.next_weights, undefined).slice(0, 3)
   const overdue = view.value.items.filter((item) => isOverdue(item, now))
   const health = healthFindings(view.value.items, now)
   // `committedTo` is a scan of every item, so the open sprints' sets are taken once and both

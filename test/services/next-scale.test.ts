@@ -12,7 +12,7 @@ import { describe, it } from 'node:test'
 
 import { activeBlockers, type WorkspaceView } from '../../src/application/services/context.ts'
 import { DEFAULT_WEIGHTS, rank, scoreOf } from '../../src/application/services/insight.ts'
-import { hierarchyFrom, relationGraphFrom, type Relation, type WorkItemSummary } from '../../src/domain/index.ts'
+import { defaultConfig, hierarchyFrom, relationGraphFrom, type Relation, type WorkItemSummary } from '../../src/domain/index.ts'
 
 const READY = 60
 const NOW = '2026-09-15T12:00:00Z'
@@ -45,7 +45,8 @@ function viewOf(all: readonly WorkItemSummary[]): { view: WorkspaceView; passes:
     },
   })
   const view: WorkspaceView = {
-    identity: { id: 'test', name: 'test' },
+    identity: { id: 'test', name: 'test', version: 0, config: defaultConfig(), extra: 0 },
+    config: defaultConfig(),
     items: all,
     byId: new Map(all.map((item) => [item.id, item])),
     hierarchy: hierarchyFrom(all),

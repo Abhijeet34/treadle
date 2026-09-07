@@ -100,6 +100,25 @@ export {
 } from './fields.ts'
 
 export {
+  CHECK_NAMES,
+  CONFIG_KEYS,
+  DEFAULT_WEIGHTS,
+  GATE_SECTIONS,
+  WEIGHT_NAMES,
+  configLine,
+  defaultConfig,
+  isConfigKey,
+  isGateKey,
+  parseConfigValue,
+  renderGateRules,
+  withConfigKey,
+  type ConfigKey,
+  type WeightName,
+  type Weights,
+  type WorkspaceConfig,
+} from './config.ts'
+
+export {
   DEFAULT_DONE_GATE,
   DEFAULT_READY_GATE,
   evaluateGate,

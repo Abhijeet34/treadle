@@ -37,7 +37,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
 | Event sink (not built) | Receives the committed events of one transaction | The monthly event log | Unnamed: DR6's answer was hook dispatch, which [ADR-0012](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses |
-| Policy (evaluator built) | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, validated on load |
+| Policy (built) | Evaluates a guard or a gate rule and returns pass or fail with the reason and the remedy | The built-in gates in `src/domain/gates.ts` | A workspace-configured gate, read off `workspace.md`'s `## Ready gate` and `## Done gate` sections and validated on load by `validateGate` |
 
 The Store seam exists, with both implementations under one conformance suite; [architecture/adr/0006-the-store-seam.md](architecture/adr/0006-the-store-seam.md) is the record.
 
@@ -50,11 +50,11 @@ The Event sink is the one seam with no second implementation and no interface to
 DR6's second implementation for it was hook dispatch, and [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses that, so whoever builds this seam owes it a second implementation that exists for a product reason.
 Until one is named, the rule at the top of this section says what to do: an interface with one implementation is not a seam, and the store keeps writing the log itself.
 
-The Policy seam has its evaluator and not yet its second implementation.
-Its second implementation is meant to be data rather than a second code path: `evaluateGate` takes any `Gate`, so a workspace gate and a built-in gate run through the same evaluator, and the gates block `explain` prints is exactly what guards G1 and G6 decide.
-`validateGate` is what makes a configured gate safe to load, and nothing loads one today.
-`readyVerdict` and `doneVerdict` each take a gate and every caller passes the built-in default, so the shape is there and the second gate is not.
-The `gate` and `config` commands README lists as specified are where it arrives, and until then this seam sits with the Event sink rather than with the Store.
+The Policy seam has both implementations, and the second is data rather than a second code path.
+`evaluateGate` takes any `Gate`, so a workspace gate and a built-in gate run through the same evaluator, and the gates block `explain` prints is exactly what guards G1 and G6 decide.
+`readyVerdict` and `doneVerdict` each take a gate and default to the one the workspace's own record carries; a workspace that has configured none passes the built-in default, which is the same object either way.
+`validateGate` is what makes a configured gate safe to load, and it is raised on both sides of one decode: `config set` refuses the text with `V6` or `V7` before the write, and a hand edit of the same text is `H14` on `doctor`.
+[architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) is the record, and `test/cli/config.test.ts` is where a configured gate and the default are held to one evaluator at the command surface.
 
 ## Storage, in one paragraph, so the domain's shape makes sense
 

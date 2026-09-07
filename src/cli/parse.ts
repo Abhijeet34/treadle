@@ -101,6 +101,7 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     override: { type: 'string', multiple: true },
   },
   set: {},
+  config: {},
   mark: {
     severity: { type: 'string' },
     priority: { type: 'string' },

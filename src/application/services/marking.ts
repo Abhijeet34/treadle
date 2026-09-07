@@ -147,7 +147,7 @@ export async function markItem(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now })
+  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
   if (!valid.ok) {
     return refusal('mark', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
       [`treadle show ${item.id}`])
@@ -235,7 +235,7 @@ export async function addEvidence(
   const after = { ...item, evidence: [...existing, pointer] } as WorkItem
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now })
+  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
   if (!valid.ok) {
     return refusal('evidence', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
       ['treadle help evidence'])

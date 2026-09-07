@@ -7,8 +7,6 @@
 // gate rule that reads blockers is fed from the one stored direction of each edge.
 
 import {
-  DEFAULT_DONE_GATE,
-  DEFAULT_READY_GATE,
   blockersOf,
   evaluateGate,
   hierarchyFrom,
@@ -23,23 +21,31 @@ import {
   type Sprint,
   type TransitionContext,
   type WorkItem,
+  type WorkItemState,
   type WorkItemSummary,
   type WorkItemType,
+  type WorkspaceConfig,
 } from '../../domain/index.ts'
-import { storeFail, storeOk, type Finding, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
+import { storeFail, storeOk, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
- * Types whose work passes through review, which is guard G5's input. Workspace
- * configuration owns this once `config` lands; until then it is one stated default.
+ * Types whose work passes through review, which is guard G5's input, read from the
+ * workspace's `review_step` key. The compiled-in default is `story, bug, epic`, so a
+ * workspace that has never been configured answers exactly as it did before this was data.
  */
-const REVIEW_STEP: readonly WorkItemType[] = ['story', 'bug', 'epic']
-
-export function hasReviewStep(type: WorkItemType): boolean {
-  return REVIEW_STEP.includes(type)
+export function hasReviewStep(config: WorkspaceConfig, type: WorkItemType): boolean {
+  return config.review_step.includes(type)
 }
 
 export type WorkspaceView = {
   readonly identity: StoreIdentity
+  /**
+   * The workspace's own configuration, off the same record the identity came from: the
+   * review step, the point scale, the ranking weights, the column limits, `G4`'s boolean and
+   * the two gates. Every consumer reads it from here rather than from a constant of its own,
+   * which is what makes the Policy seam's second implementation data instead of a code path.
+   */
+  readonly config: WorkspaceConfig
   /**
    * Every item the store holds, because a view over fewer is refused before it exists, as
    * the fields a scan reads. The whole record of the one item a command acts on is read by
@@ -75,9 +81,18 @@ export type WorkspaceView = {
  * line the log could not read). A rule not listed here is treated as hiding content, which is
  * the loud direction to be wrong in.
  */
-const SERVED_ANYWAY: ReadonlySet<string> = new Set(['H16', 'S12'])
+const SERVED_ANYWAY: ReadonlySet<string> = new Set([
+  'H16', 'S12',
+  // The two configured-policy findings. Both are about work rather than about bytes: an
+  // item over the aging threshold and a column over its limit are records the store serves
+  // whole, and a limit lowered under work already in flight produces the second on a
+  // workspace nothing is wrong with. A `doctor` that exited 7 for either would tell a CI job
+  // that a slow story is the same event as a truncated shard.
+  'H03', 'H04',
+])
 
-export function hidesContent(finding: Finding): boolean {
+/** Takes a store `Finding` or a `doctor` one: both name a rule and the rule is the decision. */
+export function hidesContent(finding: { readonly rule: string }): boolean {
   return !SERVED_ANYWAY.has(finding.rule)
 }
 
@@ -117,6 +132,7 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
     ok: true,
     value: {
       identity: identity.value,
+      config: identity.value.config,
       items: items.value,
       byId: new Map(items.value.map((item) => [item.id, item])),
       hierarchy: hierarchyFrom(items.value),
@@ -217,7 +233,7 @@ export function blockedByThisIndex(view: WorkspaceView): ReadonlyMap<ItemId, rea
 function gateItems(view: WorkspaceView, ids: readonly ItemId[]): readonly GateItem[] {
   return ids.flatMap((id) => {
     const item = view.byId.get(id)
-    return item === undefined ? [] : [{ id: item.id, type: item.type, state: item.state, reviewStep: hasReviewStep(item.type) }]
+    return item === undefined ? [] : [{ id: item.id, type: item.type, state: item.state, reviewStep: hasReviewStep(view.config, item.type) }]
   })
 }
 
@@ -242,16 +258,21 @@ function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
     item,
     blockers: gateItems(view, activeBlockers(view, item.id)),
     children: childrenGates(view, item.id),
-    reviewStep: hasReviewStep(item.type),
+    reviewStep: hasReviewStep(view.config, item.type),
     ...(original === undefined ? {} : { duplicateOf: original }),
   }
 }
 
-export function readyVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = DEFAULT_READY_GATE): GateVerdict {
+/**
+ * The ready gate this workspace runs, which is the built-in one until its file names
+ * another. The gate is an argument to `evaluateGate` either way, so a configured gate and
+ * the default reach the one evaluator and `explain` prints exactly what `G1` decided.
+ */
+export function readyVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = view.config.ready_gate): GateVerdict {
   return evaluateGate(gate, gateContextFor(view, item))
 }
 
-export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = DEFAULT_DONE_GATE): GateVerdict {
+export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = view.config.done_gate): GateVerdict {
   return evaluateGate(gate, gateContextFor(view, item))
 }
 
@@ -286,18 +307,54 @@ export function guardReads(view: WorkspaceView, item: WorkItem): readonly ItemRe
   })
 }
 
-export function transitionContextFor(view: WorkspaceView, item: WorkItem): TransitionContext {
+/**
+ * The sprint a column count and G4's membership are scoped to: the one open sprint, or none.
+ * It is the board's own default scope (ADR-0018), which is what makes a limit a team reads
+ * off `board` the limit `G3` enforces. Two open sprints is a scope the board refuses to
+ * choose between and a guard may not refuse a move over, so it falls back to the workspace,
+ * which is the wider count and therefore the one that refuses sooner rather than later.
+ */
+function scopedSprint(view: WorkspaceView): Sprint | undefined {
+  const open = view.sprints.filter((sprint) => sprint.state === 'open')
+  return open.length === 1 ? open[0] : undefined
+}
+
+/**
+ * `G3`'s input for one target state: how many records already sit in that column, and the
+ * configured limit. A state the workspace limits nowhere yields no column at all, which is
+ * the shape `TransitionContext` documents as "no board" and which G3 passes on, so a
+ * workspace that configures nothing behaves exactly as ADR-0018 left it.
+ */
+function columnFor(view: WorkspaceView, to: WorkItemState | undefined): TransitionContext['column'] {
+  if (to === undefined) return undefined
+  const limit = view.config.wip_limits.get(to)
+  if (limit === undefined) return undefined
+  const sprint = scopedSprint(view)
+  const used = view.items.filter((other) =>
+    other.state === to && (sprint === undefined || other.sprint_id === sprint.id)).length
+  return { name: to, used, limit }
+}
+
+/**
+ * The facts one transition is decided against. `to` is the state the caller is asking for,
+ * which only `G3` reads: the column a move is INTO is the one whose limit binds, and a
+ * context built without a target carries none, which is what `preview` and every non-`start`
+ * edge want.
+ */
+export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState): TransitionContext {
+  const column = columnFor(view, to)
   return {
     item,
     readyGate: readyVerdict(view, item),
     doneGate: doneVerdict(view, item),
     blockers: gateItems(view, activeBlockers(view, item.id)),
-    // The board is a projection that stores nothing (ADR-0018): there is no column to be
-    // over, so `column` stays absent and G3 passes, and no membership to lack, so G4's "on
-    // the board" is true of every item and the guard stays disarmed. Arming either takes a
-    // stored limit or a stored membership, which is `config`, specified and not built.
-    iterationMember: true,
-    reviewStep: hasReviewStep(item.type),
+    ...(column === undefined ? {} : { column }),
+    // ADR-0018 left G4 disarmed because the board is a projection of every live item, so
+    // "on the board" was true of everything. `start_requires_sprint` is what a team that
+    // runs sprints turns on to mean the other half of the guard: work starts from a sprint.
+    iterationMember: !view.config.start_requires_sprint
+      || (item.sprint_id !== undefined && view.sprintById.get(item.sprint_id)?.state === 'open'),
+    reviewStep: hasReviewStep(view.config, item.type),
     blockedByThis: blockedByThis(view, item.id),
     openChildren: openChildrenOf(view, item.id),
   }

@@ -10,7 +10,7 @@
 // goes through encode, render, parse and decode exactly as the sharded store's does, so a
 // dry run can never approve a record the real store would refuse to write.
 
-import { summaryOf, type Sprint, type WorkItem, type WorkItemSummary } from '../../domain/index.ts'
+import { summaryOf, type Sprint, type WorkItem, type WorkItemSummary, type WorkspaceConfig } from '../../domain/index.ts'
 import {
   duplicateRefusal,
   storeFail,
@@ -60,13 +60,17 @@ export class OverlayStore implements Store {
   /** Ids this layer has removed, which the base store still holds; see `ItemRemoval`. */
   readonly #removed = new Set<string>()
   readonly #events: StoreEvent[] = []
+  /** The workspace record this layer has rewritten, which is what `config set --dry-run` reads back. */
+  #workspace: { readonly version: number; readonly config: WorkspaceConfig } | undefined
 
   constructor(base: Store) {
     this.#base = base
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
-    return this.#base.identity()
+    const base = await this.#base.identity()
+    if (!base.ok || this.#workspace === undefined) return base
+    return storeOk({ ...base.value, version: this.#workspace.version, config: this.#workspace.config })
   }
 
   async get(id: string): Promise<StoreResult<WorkItem | undefined>> {
@@ -192,6 +196,16 @@ export class OverlayStore implements Store {
       applied.push({ id: write.sprint.id, version })
     }
 
+    const workspace = transaction.workspace
+    let stagedWorkspace: { readonly version: number; readonly config: WorkspaceConfig } | undefined
+    if (workspace !== undefined) {
+      const identity = await this.identity()
+      if (!identity.ok) return identity
+      const conflict = compareAndSet(identity.value.id, identity.value, workspace.ifVersion)
+      if (conflict !== undefined) return conflict
+      stagedWorkspace = { version: workspace.ifVersion + 1, config: workspace.config }
+    }
+
     const dropped: string[] = []
     for (const removal of transaction.removes ?? []) {
       const current = staged.get(removal.id) ?? await this.get(removal.id).then((r) => (r.ok ? r.value : undefined))
@@ -209,6 +223,7 @@ export class OverlayStore implements Store {
     for (const [id, item] of staged) this.#items.set(id, item)
     for (const id of dropped) { this.#items.delete(id); this.#removed.add(id) }
     for (const [id, sprint] of stagedSprints) this.#sprints.set(id, sprint)
+    if (stagedWorkspace !== undefined) this.#workspace = stagedWorkspace
     this.#events.push(...transaction.events)
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
   }
@@ -257,6 +272,7 @@ export class OverlayStore implements Store {
     this.#items.clear()
     this.#sprints.clear()
     this.#removed.clear()
+    this.#workspace = undefined
     this.#events.length = 0
   }
 }

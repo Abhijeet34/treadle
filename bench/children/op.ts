@@ -13,6 +13,7 @@
 
 import { board } from '../../src/application/services/board.ts'
 import { readWorkspace } from '../../src/application/services/context.ts'
+import { systemClock } from '../../src/adapters/clock.ts'
 import { doctor } from '../../src/application/services/doctor.ts'
 import { next as nextUp } from '../../src/application/services/insight.ts'
 import { ShardedStore } from '../../src/adapters/store/index.ts'
@@ -160,7 +161,7 @@ switch (op) {
     break
   }
   case 'doctor': {
-    const result = await doctor(store)
+    const result = await doctor(store, systemClock)
     if (!result.ok) {
       process.stderr.write(`${result.code}: ${String(result.data['cause'])}\n`)
       process.exit(3)

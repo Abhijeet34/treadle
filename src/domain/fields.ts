@@ -295,6 +295,9 @@ export function asInstant(value: string): string {
 /** The clause the two day-taking fields add to their refusal, so a caller learns the form. */
 const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
 
+/** The load path's structural ceiling on an estimate; the workspace's scale is the write bound. */
+const MAX_POINTS = 100_000
+
 export type ValidateOptions = {
   readonly now: Instant
   /** The workspace's estimation scale; defaults to the model's 1,2,3,5,8,13. */
@@ -373,7 +376,15 @@ const CHECKS: Readonly<Record<string, Check>> = {
   description: (value, _item, options) =>
     text('description', options.storedProse === true ? Number.MAX_SAFE_INTEGER : MAX_DESCRIPTION)(value, _item, options),
   priority: int('priority', 1, 5),
+  // The scale is write-time only, the same `storedProse` distinction every narrowed bound
+  // here uses. A workspace that widens its scale writes an estimate an older compiled-in
+  // scale does not carry, and applying the write bound on load would quarantine the record
+  // the tool had just written; the load path holds the shape and the write path holds the
+  // scale, so `config set point_scale` can never make a served record unservable.
   points: (value, _item, options) => {
+    if (options.storedProse === true) {
+      return isBoundedInt(value, 0, MAX_POINTS) ? undefined : `points must be a whole number from 0 to ${MAX_POINTS}`
+    }
     const scale = options.pointScale ?? DEFAULT_POINT_SCALE
     return typeof value === 'number' && scale.includes(value)
       ? undefined

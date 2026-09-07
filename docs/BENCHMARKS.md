@@ -61,7 +61,7 @@ Five nested floors, each a strict superset of the one above, so a difference pri
 Subtract 2.2 ms of spawn from any wall figure to get the program's own cost.
 Type stripping costs 36.4 ms and loading the store costs 57.3 ms on top of it, so 94 ms of every cold invocation is module loading that a bundle would mostly remove.
 Both are above their own series: type stripping ran 32.6 to 33.3 ms in the runs either side of this one, which is the machine and not the code, and is why the fixed costs are taken from the best of fifty rather than the median.
-The tree now builds one, weighed in the package table of the appendix, and `npm run build` prints that count against DR8's 512,000 limit and fails rather than warns if it goes over.
+The tree now builds one, weighed in the package table of the appendix, and `npm run build` prints that count against DR8's limit, 768,000 bytes since [architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md](architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and fails rather than warns if it goes over.
 The timed children still launch from TypeScript source, so these figures and DR1's 45 ms budget on a 406 KB bundle are still not the same measurement.
 
 The floors are measured after the corpora are generated and immediately before the operations they are subtracted from, so both share their conditions.

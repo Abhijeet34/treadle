@@ -44,7 +44,7 @@
 // because a row carries exactly one space-bearing field and that is the actor, so it is a
 // block of its own keyed on `at` and `op`, which the table above prints.
 
-import { MAX_REASON, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
+import { MAX_REASON, isConfigKey, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
@@ -197,6 +197,15 @@ const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
 const LISTED = new Set<string>(['carried', 'finished', 'labels'])
 
 /**
+ * The two configuration keys whose value is a list of gate rules, each ending in a sentence.
+ * A rule's sentence carries spaces, so the general side rule reports the whole value unknown
+ * and says nothing a reader can act on; the count of rules is what a gate change is. It is
+ * `(list:n)`'s argument over the separator a gate uses, and it is a separate marker because
+ * `rules` is what the refusal, `explain`'s `rules n/m pass` line and the gate itself call them.
+ */
+const RULED = new Set<string>(['ready_gate', 'done_gate'])
+
+/**
  * One side of a move as it prints. `-` is the snapshot's own marker for a field that was not
  * set, and it printed as an empty string: `reviewer=->dev` reads as a typo rather than as a
  * field that had no previous value. Every marker is parenthesised, and a stored value that
@@ -205,6 +214,7 @@ const LISTED = new Set<string>(['carried', 'finished', 'labels'])
 function side(value: unknown, field: string): string {
   if (value === '-') return UNSET
   if (typeof value !== 'string' || value.length === 0) return UNKNOWN
+  if (RULED.has(field)) return `(rules:${value.split('|').length})`
   if (value.length > MAX_VALUE) {
     return LISTED.has(field) && value.includes(',') && !/\s/.test(value)
       ? `(list:${value.split(',').length})`
@@ -245,8 +255,9 @@ function movedBy(event: StoreEvent): readonly string[] {
   const source = after ?? before
   if (source === undefined) return []
   const keys = Object.keys(source)
-  // A sprint event names sprint fields; an item event never does, so one filter serves both.
-  const known = keys.filter((key) => isKnownField(key) || isSprintField(key))
+  // A sprint event names sprint fields and a workspace event names configuration keys; an
+  // item event names neither, so one filter serves all three.
+  const known = keys.filter((key) => isKnownField(key) || isSprintField(key) || isConfigKey(key))
   // A pair that was not set before and is not set after moved nothing, and a log of moves is
   // what this cell is: a sprint close over a sprint that finished nothing carried
   // `finished=(unset)->(unset)` beside the six pairs that did move. A creation has no before at

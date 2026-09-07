@@ -157,7 +157,7 @@ export async function relate(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(written, { now })
+  const valid = validateWorkItem(written, { now, pointScale: view.value.config.point_scale })
   if (!valid.ok) {
     return errorResult({
       code: 'VALIDATION', command: 'relation', workspace, effect: 'mutate',

@@ -38,6 +38,9 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
   one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
   eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15, sixteen: 16,
   seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+  // The compounds a document reaches once a set passes twenty. They are hyphenated words to
+  // a reader and one token to `spelled`, whose pattern carries the hyphen for that reason.
+  'twenty-one': 21, 'twenty-two': 22, 'twenty-three': 23, 'twenty-four': 24, 'twenty-five': 25,
 }
 
 /**
@@ -48,7 +51,7 @@ const NUMBER_WORDS: Readonly<Record<string, number>> = {
  * document spelled and not one this file guessed.
  */
 function spelled(text: string, noun: string): number {
-  const found = [...text.matchAll(new RegExp(`([A-Za-z]+) ${noun}`, 'gi'))]
+  const found = [...text.matchAll(new RegExp(`([A-Za-z-]+) ${noun}`, 'gi'))]
     .map((match) => (match[1] ?? '').toLowerCase())
     .filter((word) => word in NUMBER_WORDS)
     .map((word) => NUMBER_WORDS[word] as number)
@@ -252,7 +255,7 @@ function lineWith(file: string, text: string, marker: string): string {
 
 /** Every number word in one sentence, in the order it spells them. */
 function spelledWords(text: string): readonly number[] {
-  return [...text.matchAll(/\b([a-z]+)\b/gi)]
+  return [...text.matchAll(/\b([a-z]+(?:-[a-z]+)?)\b/gi)]
     .map((match) => (match[1] ?? '').toLowerCase())
     .filter((word) => word in NUMBER_WORDS)
     .map((word) => NUMBER_WORDS[word] as number)

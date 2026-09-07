@@ -9,7 +9,7 @@ treadle takes the first horn: the human-readable files are the source of truth a
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
 The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs twenty commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
+`bin/treadle.js` runs twenty-one commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `sprint`, `sprints`, `config`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -40,7 +40,7 @@ npm ci
 
 What a published install would carry is one file of executable code.
 `npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
-The budget is 512,000 bytes, recorded in `bench/budgets.json` as DR8's, and the build fails rather than warns if the bundle goes over.
+The budget is 768,000 bytes, recorded in `bench/budgets.json` as DR8's 768,000 bytes raised by [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and the build fails rather than warns if the bundle goes over.
 The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
 ## Quick start
@@ -109,17 +109,18 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: sprint records in `sprints.md` | Implemented |
 | Store: ceremony records; `migrate` | Specified, not implemented; an impediment is a work-item type in the month shards rather than a record of its own, [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
+| Workspace configuration: a closed key set and two gate sections on `workspace.md`, read by the review step, the point scale, the `next` weights, `G3`, `G4` and both gates | Implemented: [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
 | Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `sprint`, `sprints`, `config`, `config set`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
-| Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
+| Commands: `estimate`, `assign`, `split`, `undo`, `gate` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Implemented; the two scopes are one question each and a line naming both is refused |
-| `doctor`: twelve findings over records, the event log, the relation graph, the parent hierarchy, the sprint records and impediments; the rest wait on entities that do not exist yet | Partly implemented |
+| `doctor`: fourteen findings over records, the event log, the relation graph, the parent hierarchy, the sprint records, impediments and the workspace's configured thresholds; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
-| Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
+| Boards, as a projection: `board` groups by state and scopes to the open sprint; guards `G3` and `G4` read the limits and the membership rule the workspace record carries, and are disarmed until it does | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md), [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
 | Ceremonies, metrics, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
-| Build: one esbuild bundle, weighed against DR8's 512,000 bytes | Implemented; inside budget, enforced by the build in CI |
+| Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
@@ -144,7 +145,7 @@ treadle backlog --state ready --explain-absence history
 
 Fifteen items, of which five are `done`, three are `ready`, six are `draft` and one is `cancelled`.
 The six in `draft` are stories with no acceptance criteria, which is `DOR4` refusing them rather than a gap in the list, and `treadle explain <id>` names that rule on each.
-The five that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped: `set` writes the fields the design gave `estimate` and `assign`, and the board stores nothing, so the work-in-progress limit and the board membership guards `G3` and `G4` want moved to `workspace-config`.
+The five that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped: `set` writes the fields the design gave `estimate` and `assign`, and the board stores nothing, so the work-in-progress limit and the board membership guards `G3` and `G4` moved to `workspace-config`, which is where they are now read from.
 
 ## Documentation
 

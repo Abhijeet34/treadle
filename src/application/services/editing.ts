@@ -157,7 +157,7 @@ export async function setFields(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now })
+  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
   if (!valid.ok) {
     return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadle show ${item.id}`])
   }

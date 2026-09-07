@@ -18,9 +18,10 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { WorkspaceAudit, auditItem, doctor } from '../../src/application/services/doctor.ts'
+import { WorkspaceAudit, auditItem, doctor, type AuditContext } from '../../src/application/services/doctor.ts'
 import type { Store, StoreEvent } from '../../src/application/ports/store.ts'
-import type { WorkItem } from '../../src/domain/index.ts'
+import { defaultConfig, type WorkItem } from '../../src/domain/index.ts'
+import { fixedClock } from '../../src/adapters/clock.ts'
 import { aWorkspace } from '../helpers/store-fixtures.ts'
 
 const ITEMS = 50
@@ -76,10 +77,11 @@ function countingLog(events: readonly StoreEvent[]): { log: readonly StoreEvent[
   return { log, passes: () => passes }
 }
 
-const NO_SPRINTS: ReadonlySet<string> = new Set()
+/** No sprints, no configured threshold: the scale fixture measures the passes, not the policy. */
+const NO_POLICY: AuditContext = { config: defaultConfig(), now: '2026-09-08T09:00:00Z', sprints: [] }
 
 function auditWorkspace(items: readonly WorkItem[], events: readonly StoreEvent[]): readonly string[] {
-  const audit = new WorkspaceAudit(NO_SPRINTS)
+  const audit = new WorkspaceAudit(NO_POLICY)
   for (const item of items) audit.record(item)
   for (const event of events) audit.event(event)
   return audit.findings().map((finding) => JSON.stringify(finding))
@@ -100,7 +102,7 @@ describe('doctor audits a workspace in one pass over the log', () => {
 
   it('returns exactly what auditing each item against the whole log returns', () => {
     const streamed = auditWorkspace(items, events)
-    const whole = items.flatMap((item) => auditItem(item, events, NO_SPRINTS)).map((finding) => JSON.stringify(finding))
+    const whole = items.flatMap((item) => auditItem(item, events, NO_POLICY)).map((finding) => JSON.stringify(finding))
     assert.deepEqual(streamed, whole)
     assert.ok(streamed.length > 0, 'the fixture produced no findings, so the comparison proved nothing')
   })
@@ -126,7 +128,7 @@ describe('doctor audits a workspace in one pass over the log', () => {
         eachItem: (query, visit) => { calls.eachItem += 1; return base.eachItem(query, visit) },
         eachEvent: (query, visit) => { calls.eachEvent += 1; return base.eachEvent(query, visit) },
       }
-      const result = await doctor(counting)
+      const result = await doctor(counting, fixedClock('2026-09-08T09:00:00Z'))
       assert.equal(result.data['checked'], ITEMS)
       assert.equal((result.data['findings'] as { total: number }).total, ITEMS * 2, 'H20 and H19 once per item')
       assert.deepEqual(calls, { list: 0, events: 0, eachItem: 1, eachEvent: 1 })

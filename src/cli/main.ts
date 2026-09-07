@@ -12,6 +12,7 @@ import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '..
 import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, findUnsafeCharacter, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
+import { readConfig, setConfig } from '../application/services/config.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { setFields } from '../application/services/editing.ts'
 import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, invocation, showItem, type Filter } from '../application/services/items.ts'
@@ -439,7 +440,13 @@ async function execute(env: Environment): Promise<number> {
     // not read is not: `init` answers `already` there, so the line offered is the one that
     // dates the tool against the file. The other refusals carry their own instruction in the
     // cause, and no command line stands in for it.
-    const fix = opened.error.rule === 'S1' ? ['treadle init'] : opened.error.rule === 'S8' ? ['treadle version'] : []
+    //
+    // The code and not the rule decides the first of those, because a `workspace.md` the
+    // grammar quarantined also refuses under `S1` and `init` answers `already` over it: that
+    // refusal names the line to edit and there is no command that stands in for the edit,
+    // so it is one of the ones that offers nothing.
+    const missing = opened.error.code === 'STORE_UNAVAILABLE' && opened.error.rule === 'S1'
+    const fix = missing ? ['treadle init'] : opened.error.rule === 'S8' ? ['treadle version'] : []
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read',
       rule: opened.error.rule, cause: opened.error.message, ...(fix.length === 0 ? {} : { fix }),
@@ -498,7 +505,23 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     })
   }
 
-  if (command === 'doctor') return doctor(store)
+  if (command === 'doctor') return doctor(store, systemClock)
+
+  if (command === 'config') {
+    const verb = operands[0]
+    if (verb === undefined) return readConfig(store)
+    if (verb !== 'set') {
+      return validation('config', `config takes no verb to read and set to write, and ${shellWord(verb)} is neither`, ['treadle config', 'treadle help config'])
+    }
+    const key = operands[1]
+    const value = operands[2]
+    if (key === undefined) return validation('config', 'config set needs the key to write', ['treadle config'])
+    // An empty value is a real value for no key here: every key's grammar needs at least one
+    // character, so the clearing syntax `set <field>=` has nothing to mean and a key is put
+    // back to its default by writing the default, which the `source` column then reports.
+    if (value === undefined) return validation('config', `config set needs the value to write to ${key}`, ['treadle config', `treadle help config`])
+    return setConfig(target, systemClock, randomIds, { key, value, actor })
+  }
 
   if (command === 'next') {
     const forActor = flag(flags, 'for')
@@ -519,7 +542,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   }
   if (command === 'explain') {
     if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadle backlog'])
-    return explain(store, id)
+    return explain(store, systemClock, id)
   }
   if (command === 'history') {
     const txn = flag(flags, 'txn')

@@ -5,7 +5,7 @@
 // what lets a later implementation coordinate differently without a contract change.
 
 import type { DomainErrorCode } from '../../domain/index.ts'
-import type { Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType } from '../../domain/index.ts'
+import type { Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType, WorkspaceConfig } from '../../domain/index.ts'
 
 /**
  * The domain's three codes plus the five a store can produce on its own. Widening a
@@ -145,6 +145,8 @@ export type StoreTransaction = {
   readonly removes?: readonly ItemRemoval[]
   /** Records the decision depended on, refused as `S10` if one moved; see `ItemRead`. */
   readonly reads?: readonly ItemRead[]
+  /** The workspace record, which `config set` writes; see `WorkspaceWrite`. */
+  readonly workspace?: WorkspaceWrite
   readonly events: readonly StoreEvent[]
 }
 
@@ -191,11 +193,42 @@ export function duplicateRefusal(
   )
 }
 
+/**
+ * The workspace record, whole. It carries the printed identity and the configuration
+ * together because they are one record in one file: splitting them across two port methods
+ * would stat and parse `workspace.md` twice on every command, and the read every command
+ * already performs is the freshness pass that names it once.
+ *
+ * `config` is always a value. A configuration this build cannot read is a finding the store
+ * reports rather than a refusal here, so `doctor` can still be run over the file that says
+ * it; `readWorkspace` is what turns that finding into the refusal every other command gives.
+ */
 export type StoreIdentity = {
   readonly id: string
   readonly name: string
   /** Absent for a store that has no path, which the overlay is. */
   readonly path?: string
+  /** The record's compare-and-set token. Zero on a workspace written before `config set`. */
+  readonly version: number
+  readonly config: WorkspaceConfig
+  /**
+   * How many field keys the workspace record carries that this build has no meaning for. A
+   * newer writer's key is kept verbatim (DR3) and counted rather than printed, which is the
+   * decision the item and sprint dictionaries already made for `extra`: printing one invites
+   * a caller to act on a value nothing here can validate, and printing nothing at all made a
+   * mistyped configuration key indistinguishable from one nobody wrote.
+   */
+  readonly extra: number
+}
+
+/**
+ * The workspace record this transaction writes, under the same compare-and-set rule an item
+ * and a sprint are under. There is one such record per store, so this is a single value
+ * rather than a list, and `ifVersion` is the version the decision was made against.
+ */
+export type WorkspaceWrite = {
+  readonly config: WorkspaceConfig
+  readonly ifVersion: number
 }
 
 export interface Store {
