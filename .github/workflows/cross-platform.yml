@@ -92,8 +92,11 @@ jobs:
           mkdir -p pack
           npm pack --ignore-scripts --pack-destination pack
           tgz=$(ls pack/treadle-*.tgz)
-          npm install --global --ignore-scripts "$tgz"
-          echo "installed from $tgz"
+          # `./` is load-bearing: npm read `pack/treadle-0.1.0.tgz` as the `owner/repo`
+          # GitHub shorthand and tried `git ls-remote ssh://git@github.com/pack/...`,
+          # exit 128, measured in run 34151979303 on this runner.
+          npm install --global --ignore-scripts "./$tgz"
+          echo "installed from ./$tgz"
 
       - name: Quote the bytes npm generated
         shell: bash
@@ -111,20 +114,22 @@ jobs:
       - name: cmd.exe - treadle version
         shell: cmd
         run: |
-          treadle version
+          call treadle version
           echo VERSION_EXIT=%ERRORLEVEL%
+          exit /b 0
 
       - name: cmd.exe - treadle init then treadle file
         shell: cmd
         run: |
           mkdir "%RUNNER_TEMP%\cmdws"
           cd /d "%RUNNER_TEMP%\cmdws"
-          treadle init --name cmd-smoke
+          call treadle init --name cmd-smoke
           echo INIT_EXIT=%ERRORLEVEL%
-          treadle file task "The installed binary filed this from cmd"
+          call treadle file task "The installed binary filed this from cmd"
           echo FILE_EXIT=%ERRORLEVEL%
-          treadle status
+          call treadle status
           echo STATUS_EXIT=%ERRORLEVEL%
+          exit /b 0
 
       - name: PowerShell 7 (pwsh) - treadle version
         shell: pwsh
