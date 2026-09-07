@@ -171,12 +171,30 @@ export type ErrorInput = {
   readonly fix?: readonly string[]
 }
 
+/**
+ * The longest a cause may print. It is the field dictionary's own longest single-line bound,
+ * so every sentence this product writes fits inside it whole.
+ */
+export const MAX_CAUSE = 500
+
+/**
+ * A cause is one sentence, and `cause` is the one refusal field a caller's own text reaches:
+ * every splice site names an id, a title, a flag value or a field the caller wrote, and none
+ * of them is bounded at the point it is spliced. `treadle help <1,000,000 characters>` printed
+ * a one megabyte refusal for that reason. The `fix` list already carries this rule (A.6) and
+ * carries it per site; one bound here is the same rule with no site left to forget it.
+ */
+function bounded(cause: string): string {
+  if (cause.length <= MAX_CAUSE) return cause
+  return `${cause.slice(0, MAX_CAUSE)} (+${cause.length - MAX_CAUSE} characters elided)`
+}
+
 export function errorResult(input: ErrorInput): ResultObject {
   const data: Record<string, Value> = {}
   if (input.rule !== undefined) data['rule'] = input.rule
   if (input.guard !== undefined) data['guard'] = input.guard
   if (input.entity !== undefined) data['entity'] = input.entity
-  data['cause'] = input.cause
+  data['cause'] = bounded(input.cause)
   if (input.near !== undefined && input.near.length > 0) data['near'] = input.near
   if (input.fix !== undefined && input.fix.length > 0) data['fix'] = input.fix
   return {
