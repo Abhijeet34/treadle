@@ -42,6 +42,13 @@ It refuses a tag that is lightweight, that carries no signature `git verify-tag`
 `.github/rulesets/tags.json` requires the signature at the forge as well, and refuses to let a `v*` tag be updated or deleted once it exists.
 It does not check the tag's name; the next section says why.
 
+It also refuses a `dist/` older than any file under `src/`.
+`package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory has nineteen.
+The obvious remedy is a `prepack`, and this repository cannot have one.
+`.npmrc` sets `ignore-scripts=true` for the whole lifecycle as a supply-chain control, the workflow's own pack step passes `--ignore-scripts` on top of that, and `test/architecture/supply-chain.test.ts` refuses a manifest that declares `prepack` by name, because a declared script the lifecycle never executes is a gate that looks green and is not.
+So the clause sits in `scripts/release-preflight.ts`, which the workflow runs one step after `npm run build` and one step before it packs.
+`node scripts/check-dist-fresh.ts` is the same check, runnable on its own against a checkout.
+
 A signed tag is the authorisation, not a label on one.
 
 ## Why the tag ruleset does not check the tag name
