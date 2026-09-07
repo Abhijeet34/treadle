@@ -152,3 +152,83 @@ jobs:
             treadle status | head -1 | grep -q "^ok "
             echo "the packed tarball installs and answers on this userland"
           '
+
+  # The same question as `installed` above, for the two shells npm shims rather than links.
+  # Nothing else anywhere starts the shipped binary from `cmd.exe` or PowerShell: npm's
+  # `cmd-shim` reads the bundle's first line and writes the program it names into
+  # `treadle.cmd` and `treadle.ps1`, so a launcher edit that is invisible on POSIX can stop
+  # the tool starting here and no POSIX job can see it. Measured 2026-09-08 in run
+  # 34152092418 on windows-2025: the shipped `#!/usr/bin/env node` answers `ok version -` at
+  # exit 0 from cmd, PowerShell 7 and Windows PowerShell 5.1, and a `#!/bin/sh` first line
+  # makes the same install answer `The system cannot find the path specified.` at exit 1.
+  installed-windows:
+    name: installed on windows-2025
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+        shell: bash
+
+      - name: Build, pack and install the tarball a user would install
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/check-dist-fresh.ts
+          mkdir -p pack
+          npm pack --ignore-scripts --pack-destination pack
+          # `./` is load-bearing: npm reads `pack/treadle-0.1.0.tgz` as the `owner/repo`
+          # GitHub shorthand and tries `git ls-remote ssh://git@github.com/pack/...`, which
+          # failed this job at exit 128 in run 34151979303.
+          npm install --global --ignore-scripts "./$(ls pack/treadle-*.tgz)"
+          prefix=$(npm prefix -g)
+          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadle/dist/treadle.js")"
+          echo "the program npm's shim will run:"
+          grep -E '^\s+SET "_prog=' "$prefix/treadle.cmd"
+
+      - name: cmd.exe starts the installed binary
+        shell: cmd
+        run: |
+          rem `call` is load-bearing. A .cmd invoked from a batch script without it transfers
+          rem control and never returns, so every later line here would be dead.
+          call treadle version > "%RUNNER_TEMP%\version.txt" 2>&1 || (type "%RUNNER_TEMP%\version.txt" & echo ::error::treadle version did not start from cmd.exe & exit /b 1)
+          type "%RUNNER_TEMP%\version.txt"
+          findstr /C:"ok version" "%RUNNER_TEMP%\version.txt" >NUL || (echo ::error::treadle version started from cmd.exe but answered no ok line & exit /b 1)
+          mkdir "%RUNNER_TEMP%\cmd-ws"
+          cd /d "%RUNNER_TEMP%\cmd-ws"
+          call treadle init --name cmd-smoke > "%RUNNER_TEMP%\init.txt" 2>&1 || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init failed from cmd.exe & exit /b 1)
+          findstr /C:"ok init" "%RUNNER_TEMP%\init.txt" >NUL || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init answered no ok line from cmd.exe & exit /b 1)
+          call treadle file task "The installed binary filed this from cmd.exe" > "%RUNNER_TEMP%\file.txt" 2>&1 || (type "%RUNNER_TEMP%\file.txt" & echo ::error::treadle file failed from cmd.exe & exit /b 1)
+          type "%RUNNER_TEMP%\file.txt"
+          findstr /C:"ok file" "%RUNNER_TEMP%\file.txt" >NUL || (echo ::error::treadle file answered no ok line from cmd.exe & exit /b 1)
+
+      - name: PowerShell starts the installed binary
+        shell: pwsh
+        run: |
+          # The exit code alone is not evidence here. Measured 2026-09-08 in run 34152092418:
+          # with a `#!/bin/sh` first line the `.ps1` shim named `/bin/sh.exe`, PowerShell
+          # raised CommandNotFoundException, nothing ran, and `$LASTEXITCODE` stayed 0. What
+          # fails this step on that launcher is the runner's own `$ErrorActionPreference` of
+          # `stop`, measured red in run 34152591740 - but a user's PowerShell defaults to
+          # `continue`, and a shim that runs something harmless raises nothing at all. So each
+          # command is also checked for the ok line it should have printed.
+          $version = (treadle version 2>&1 | Out-String)
+          Write-Host $version
+          if ($LASTEXITCODE -ne 0) { throw "treadle version exited $LASTEXITCODE from PowerShell" }
+          if ($version -notmatch 'ok version') { throw "treadle version answered no ok line from PowerShell" }
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwsh-ws" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\pwsh-ws"
+          $init = (treadle init --name pwsh-smoke 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadle init exited $LASTEXITCODE from PowerShell" }
+          if ($init -notmatch 'ok init') { Write-Host $init; throw "treadle init answered no ok line from PowerShell" }
+          $filed = (treadle file task "The installed binary filed this from PowerShell" 2>&1 | Out-String)
+          Write-Host $filed
+          if ($LASTEXITCODE -ne 0) { throw "treadle file exited $LASTEXITCODE from PowerShell" }
+          if ($filed -notmatch 'ok file') { throw "treadle file answered no ok line from PowerShell" }
