@@ -28,8 +28,11 @@ export function isOverdue(item: WorkItemSummary, now: Instant): boolean {
 /** Whole days past `due`, clamped, and zero when the item is not overdue. */
 export function daysOverdue(item: WorkItemSummary, now: Instant): number {
   if (!isOverdue(item, now)) return 0
+  // isOverdue has already proved both fields parse finite, so the `as string` cast
+  // below is the only thing standing in for that proof; keeping the two parses on
+  // one line keeps them next to the guard that justifies them.
   const days = Math.floor((Date.parse(now) - Date.parse(item.due as string)) / DAY_MS)
-  return Math.max(0, Math.min(MAX_OVERDUE_DAYS, days))
+  return Math.min(MAX_OVERDUE_DAYS, days)
 }
 
 /**
