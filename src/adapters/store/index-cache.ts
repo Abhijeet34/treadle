@@ -124,14 +124,6 @@ create index if not exists findings_file on findings(file);
 create index if not exists findings_against on findings(against);
 `
 
-/**
- * One bound placeholder per value, so a list of ids reaches a query as parameters and never
- * as text. An empty list still needs a term the parser accepts, and `null` matches no row.
- */
-function placeholders(values: readonly string[]): string {
-  return values.length === 0 ? 'null' : values.map(() => '?').join(', ')
-}
-
 /** Created before the version check, because the version is read out of it. */
 const META_SCHEMA = 'create table if not exists meta (key text primary key, value text not null);'
 
@@ -671,15 +663,20 @@ export class IndexCache {
   }
 
   /**
-   * The first served record whose parent is this id, or undefined. `items_parent` is the
-   * index that makes it one lookup rather than a scan, and S17 runs it under the write lock
-   * on every removal.
+   * The first served record whose parent is this id and that `skip` does not name, or
+   * undefined. `items_parent` is the index that makes it one lookup rather than a scan, and
+   * S17 runs it under the write lock on every removal.
+   *
+   * `skip` bounds the row count rather than becoming an `id not in (...)` clause: the caller
+   * passes every id its transaction touches, and a bulk transaction would otherwise build a
+   * parameter list against SQLite's own variable ceiling. One more row than `skip` names is
+   * always enough to find a referrer outside it, or to prove there is none.
    */
   childOf(parent: string, skip: readonly string[] = []): string | undefined {
-    const row = this.#open()
-      .prepare(`select id from items where parent = ? and id not in (${placeholders(skip)}) limit 1`)
-      .get(parent, ...skip) as unknown as { id: string } | undefined
-    return row?.id
+    const rows = this.#open()
+      .prepare('select id from items where parent = ? limit ?')
+      .all(parent, skip.length + 1) as unknown as readonly { id: string }[]
+    return rows.find((row) => !skip.includes(row.id))?.id
   }
 
   /**
@@ -689,11 +686,14 @@ export class IndexCache {
    * 26.5 ms at three times that density, both on a machine at a 1-minute load of 2.8. An
    * `edges(source, kind, target)` table maintained where `relations` is written would make
    * it indexed, and is the move to make when a measurement asks for it rather than now.
+   *
+   * `skip` bounds the rows returned, for the reason `childOf`'s does.
    */
   relationTo(target: string, skip: readonly string[] = []): { readonly id: string; readonly kind: string } | undefined {
-    const row = this.#open()
-      .prepare(`select items.id as id, json_extract(value, '$.kind') as kind from items, json_each(items.relations) where json_extract(value, '$.target') = ? and items.id not in (${placeholders(skip)}) limit 1`)
-      .get(target, ...skip) as unknown as { id: string; kind: string } | undefined
+    const rows = this.#open()
+      .prepare("select items.id as id, json_extract(value, '$.kind') as kind from items, json_each(items.relations) where json_extract(value, '$.target') = ? limit ?")
+      .all(target, skip.length + 1) as unknown as readonly { id: string; kind: string }[]
+    const row = rows.find((entry) => !skip.includes(entry.id))
     return row === undefined ? undefined : { id: row.id, kind: row.kind }
   }
 
