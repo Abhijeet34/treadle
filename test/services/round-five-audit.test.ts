@@ -178,6 +178,14 @@ describe('a sprint refuses a repeated id instead of blaming a writer that does n
     assert.match(twice.err, /^fix treadle sprint commit overlap task-three$/m)
   })
 
+  it('names every id in the fix, deduplicated in order, even ones trailing the repeat', async () => {
+    const twice = await cli(['sprint', 'commit', 'overlap', 'a', 'b', 'a', 'c'])
+    assert.equal(twice.code, 2, twice.out)
+    assert.match(twice.err, /^rule C1$/m)
+    assert.match(twice.err, /^"cause sprint commit names a twice, and an item enters or leaves a sprint once$/m)
+    assert.match(twice.err, /^fix treadle sprint commit overlap a b c$/m)
+  })
+
   it('refuses uncommit the same way, instead of answering already with the id printed twice', async () => {
     const twice = await cli(['sprint', 'uncommit', 'task-three', 'task-three'])
     assert.equal(twice.code, 2, twice.out)

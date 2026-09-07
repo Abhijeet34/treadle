@@ -250,10 +250,16 @@ function repeatedId(
   command: 'commit' | 'uncommit', workspace: string, prefix: readonly string[], ids: readonly ItemId[],
 ): ResultObject | undefined {
   const seen = new Set<ItemId>()
-  const repeat = ids.find((id) => (seen.has(id) ? true : (seen.add(id), false)))
+  const deduped: ItemId[] = []
+  let repeat: ItemId | undefined
+  for (const id of ids) {
+    if (seen.has(id)) { if (repeat === undefined) repeat = id; continue }
+    seen.add(id)
+    deduped.push(id)
+  }
   if (repeat === undefined) return undefined
   return refusal(workspace, 'C1', repeat, `sprint ${command} names ${repeat} twice, and an item enters or leaves a sprint once`,
-    [['treadle', 'sprint', command, ...prefix, ...seen].join(' ')])
+    [['treadle', 'sprint', command, ...prefix, ...deduped].join(' ')])
 }
 
 async function itemsNamed(
