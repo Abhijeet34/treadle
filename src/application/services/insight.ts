@@ -8,17 +8,15 @@
 
 import {
   BUG_SEVERITIES,
-  TRANSITION_TABLE,
   dayOfSprint,
+  edgeRequirements,
   daysOverdue,
   healthFindings,
   isOverdue,
   isTerminal,
   legalTargetsFrom,
   type BugSeverity,
-  type GuardId,
   type ItemId,
-  type WorkItem,
   type WorkItemSummary,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
@@ -114,6 +112,9 @@ export const EXPLAIN_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'blocks', type: 'string' },
     { kind: 'scalar', key: 'sev', type: 'string' },
     { kind: 'text', key: 'by' },
+    // Last of the non-block properties, which is as late as the renderer's blocks-last rule
+    // allows and moves nothing already declared: how many of the evaluated rules pass.
+    { kind: 'scalar', key: 'rules', type: 'string' },
     {
       kind: 'block',
       key: 'gates',
@@ -122,7 +123,11 @@ export const EXPLAIN_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'moves',
-      columns: [{ name: 'to' }, { name: 'guards' }],
+      // `records` is the values the edge writes and refuses to be taken without, spelled as
+      // the flag that carries each: `explain` used to print guards alone, so `transition`
+      // refused eight of the thirteen names for a value this row never mentioned. Appended
+      // after `guards`, which STABILITY's output-schema rule makes a non-breaking addition.
+      columns: [{ name: 'to' }, { name: 'guards' }, { name: 'records' }],
     },
     {
       kind: 'block',
@@ -153,6 +158,8 @@ export const STATUS_SHAPE: ResultShape = {
     // Last of the non-block properties, which is as late as the renderer's blocks-last rule
     // allows and moves nothing already declared.
     { kind: 'scalar', key: 'not_ready', type: 'string' },
+    // Which set `findings` counts, and which command counts the other one.
+    { kind: 'scalar', key: 'audit', type: 'string' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
     {
@@ -349,10 +356,11 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     ...done.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'done', rule })),
   ]
 
+  const evaluated = ready.rules.length + done.rules.length
   const gates: Block = {
     columns: columnsOf(EXPLAIN_SHAPE, 'gates'),
     shown: failing.length,
-    total: ready.rules.length + done.rules.length,
+    total: evaluated,
     rows: failing.map((entry): Row => ({
       gate: entry.gate,
       rule: entry.rule.rule,
@@ -366,7 +374,10 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     columns: columnsOf(EXPLAIN_SHAPE, 'moves'),
     shown: targets.length,
     total: targets.length,
-    rows: targets.map((to): Row => ({ to, guards: guardsOnEdge(item, to).join(',') || '-' })),
+    rows: targets.map((to): Row => {
+      const edge = edgeRequirements(item, to)
+      return { to, guards: edge.guards.join(',') || '-', records: edge.records.join(',') || '-' }
+    }),
   }
 
   // One read of this item's log serves both the entry below and the audit further down; it
@@ -391,6 +402,11 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
   data['blocks'] = blocking.length === 0 ? '-' : blocking.join(',')
   if (item.severity !== undefined) data['sev'] = item.severity
   if (at !== undefined) data['by'] = at.by
+  // `~gates 0 8` reads as eight rows withheld, and this is the one block in the tool whose
+  // unshown rows no page or flag can fetch, so the header alone cannot tell "all eight pass"
+  // from "eight are not printed". The rows are the failing set by design; this line is the
+  // set they were drawn from, so both numbers are readable without one.
+  data['rules'] = `${evaluated - failing.length}/${evaluated} pass`
   data['gates'] = gates
   data['moves'] = moves
 
@@ -409,13 +425,6 @@ export async function explain(store: Store, id: ItemId): Promise<ResultObject> {
     }
   }
   return okResult(EXPLAIN_SHAPE, { workspace, data })
-}
-
-/** Guards the transition table names on an edge, without evaluating any of them. */
-function guardsOnEdge(item: WorkItem, to: string): readonly GuardId[] {
-  const spec = TRANSITION_TABLE.find((edge) => edge.from === item.state && edge.to === to)
-  if (spec === undefined) return []
-  return item.type === 'epic' && to === 'done' ? [...spec.guards, 'G8'] : spec.guards
 }
 
 export async function status(store: Store, clock: Clock): Promise<ResultObject> {
@@ -472,6 +481,15 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
       ...(defects === undefined ? {} : { defects }),
       ...(ungroomed.length === 0 ? {} : { not_ready: ungroomed.join(',') }),
+      // What `findings` above counts, said where it is read. That number is the structural
+      // set the store computes on the read this call already performs: a record it holds and
+      // cannot serve. `doctor` reads every record against the event log and its gates
+      // besides, so a store with an `H26` or an `H20` reads `findings 0` here and exits 7
+      // there, and a caller that treated the orientation call as the whole check never ran
+      // the other one. Running the audit here instead would put this call at doctor's cost,
+      // 3,523 ms against 479 at 50,000 items (bench/budgets.json), so the orientation call
+      // stays the cheap one and says what it did not do.
+      audit: 'not run here; treadle doctor reads every record against the event log',
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
         shown: states.length,

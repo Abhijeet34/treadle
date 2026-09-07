@@ -3,11 +3,12 @@
 //
 // A sprint is not a work item. It has no gates, no severity and no review, so it is not put
 // through the item state machine: it is `open` or `closed`, and nothing else about it moves.
-// The committed set is not stored here either. An item carries `sprint_id`, so the set of
-// items committed to an open sprint is the set of items that point at it, and storing the
-// same list on the sprint would be one fact in two places. What the sprint record does keep
-// is what cannot be derived after the fact: the carry-over its close recorded, and the tally
-// at that instant, because both drift once the carry-over is worked on somewhere else.
+// An OPEN sprint's committed set is not stored here. An item carries `sprint_id`, so the set
+// committed to an open sprint is the set of items that point at it, and storing the same list
+// on the sprint would be one fact in two places. A CLOSED sprint's set is stored, because it
+// is no longer derivable: `members`, `carried` and the four tally numbers are written at the
+// close and never move again, since every one of them drifts the moment a member is revived,
+// reopened or committed onward.
 // docs/architecture/adr/0016-sprints.md carries the argument for each of these, and
 // docs/architecture/adr/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md the
 // argument for the tally.
@@ -53,6 +54,24 @@ export type Sprint = {
   readonly done?: number
   readonly done_points?: number
   /**
+   * The members that were finished at the close, done or cancelled, in id order. With
+   * `carried`, which is every member that was not, this is the whole committed set: the two
+   * are disjoint by construction and `membersOf` unions them. The set used to be recomputed
+   * as "items pointing at the sprint, plus the carried list", so reviving or reopening a
+   * member that was terminal at close and committing it onward shrank the record underneath
+   * a frozen count, and a closed sprint read `committed 4` over `done 1 cancelled 1` and
+   * `pts 5/3`.
+   *
+   * Stored as its own list rather than as the whole set, for two reasons. A whole set repeats
+   * every carried id, which is the "one fact in two places" this file's header refuses; and a
+   * field value is bounded at 8 KiB, so one combined list halved the number of members a
+   * sprint could close with, and a 300-item sprint finished to the last item could not close
+   * at all.
+   */
+  readonly finished?: readonly ItemId[]
+  /** The total points over the committed set, frozen with the rest of the tally. */
+  readonly points?: number
+  /**
    * Frozen with `done` and for the same reason: a committed item cancelled after the close
    * read as `done 1 cancelled 1` over `committed 1`, one item under two outcomes, because
    * this count was still live beside a frozen one.
@@ -70,7 +89,7 @@ export type Sprint = {
  */
 export const SPRINT_FIELDS = [
   'id', 'title', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried',
-  'done', 'done_points', 'cancelled', 'goal', 'extra',
+  'finished', 'done', 'done_points', 'cancelled', 'points', 'goal', 'extra',
 ] as const
 
 const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
@@ -127,6 +146,19 @@ export function carryOver(committed: readonly WorkItemSummary[]): readonly ItemI
     .sort()
 }
 
+/**
+ * The committed set a close recorded, in id order, or `undefined` where no close recorded
+ * one. `points` is the marker rather than either list: an empty list cannot be written to a
+ * record, because the grammar refuses an empty field value, so a sprint closed over no work
+ * carries neither line. Reading that absence as "an older build closed this, count live" let
+ * a hand edit point an item at such a sprint and read `committed 1` under a frozen `done 0`.
+ * Every close this build performs writes `points` and no earlier one did.
+ */
+export function membersOf(sprint: Sprint): readonly ItemId[] | undefined {
+  if (sprint.state !== 'closed' || sprint.points === undefined) return undefined
+  return [...(sprint.carried ?? []), ...(sprint.finished ?? [])].sort()
+}
+
 function invalid(rule: string, message: string, id: string | undefined): Failure {
   return fail('VALIDATION', rule, message, id === undefined ? [] : [id])
 }
@@ -158,14 +190,25 @@ export function validateSprint(sprint: Sprint): Result<Sprint> {
     if (!isInstant(sprint.closed_at)) return invalid('V4', 'closed_at must be an RFC 3339 instant in UTC', id)
     if (sprint.state !== 'closed') return invalid('V4', `closed_at is set on a sprint whose state is ${sprint.state}, not closed`, id)
   }
-  if (sprint.carried !== undefined) {
-    if (sprint.state !== 'closed') return invalid('V4', `carried is set on a sprint whose state is ${sprint.state}, not closed`, id)
-    for (const item of sprint.carried) {
-      if (typeof item !== 'string' || !SLUG.test(item)) return invalid('V4', `carried must be a list of item ids; ${String(item)} is not one`, id)
+  for (const field of ['carried', 'finished'] as const) {
+    const list = sprint[field]
+    if (list === undefined) continue
+    if (sprint.state !== 'closed') return invalid('V4', `${field} is set on a sprint whose state is ${sprint.state}, not closed`, id)
+    for (const item of list) {
+      if (typeof item !== 'string' || !SLUG.test(item)) return invalid('V4', `${field} must be a list of item ids; ${String(item)} is not one`, id)
     }
-    if (new Set(sprint.carried).size !== sprint.carried.length) return invalid('V4', 'carried names an item twice', id)
+    if (new Set(list).size !== list.length) return invalid('V4', `${field} names an item twice`, id)
   }
-  for (const field of ['done', 'done_points', 'cancelled'] as const) {
+  // The two lists partition the committed set: a member was finished at the close or it was
+  // carried, never both. An id in both would be counted twice by every number below it.
+  if (sprint.carried !== undefined && sprint.finished !== undefined) {
+    const carried = new Set(sprint.carried)
+    const both = sprint.finished.find((item) => carried.has(item))
+    if (both !== undefined) {
+      return invalid('V4', `${both} is in carried and in finished, and a member of a closed sprint is one or the other`, id)
+    }
+  }
+  for (const field of ['done', 'done_points', 'cancelled', 'points'] as const) {
     const value = sprint[field]
     if (value === undefined) continue
     if (sprint.state !== 'closed') return invalid('V4', `${field} is set on a sprint whose state is ${sprint.state}, not closed`, id)

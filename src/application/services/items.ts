@@ -104,7 +104,9 @@ export const FILE_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'type', type: 'string' },
     { kind: 'scalar', key: 'state', type: 'string' },
     { kind: 'text', key: 'title', whole: true },
-    { kind: 'list', key: 'set' },
+    // F12: every `set` entry ends in a value the caller wrote, so the line carries the
+    // untrusted-content marker rather than reading as the tool's own speech.
+    { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'event', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
     { kind: 'scalar', key: 'preview', type: 'integer' },
@@ -169,7 +171,9 @@ export const SHOW_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'evidence',
-      columns: [{ name: 'kind' }, { name: 'ref' }, { name: 'label', text: true }],
+      // `kind` is a closed set and the tool's own word; `ref` is the pointer the caller
+      // wrote, bounded to one token by the field dictionary, so it is marked in place.
+      columns: [{ name: 'kind' }, { name: 'ref', data: true }, { name: 'label', text: true }],
     },
     // Appended after `evidence`, which STABILITY's output-schema rule makes a non-breaking
     // addition. `ac` above stays the tick count; this is the text the count is over, which
@@ -209,6 +213,9 @@ export const BACKLOG_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'more', type: 'integer' },
     { kind: 'scalar', key: 'page', type: 'string' },
+    // Appended after the scalars already declared, which STABILITY's output-schema rule makes
+    // a non-breaking addition: which set a closed `--sprint` scope reads.
+    { kind: 'scalar', key: 'note', type: 'string' },
     { kind: 'block', key: 'items', columns: ITEM_COLUMNS },
   ],
 }
@@ -325,7 +332,22 @@ export async function fileItem(
   const workspace = view.value.identity.id
 
   const now = clock.now()
-  const id = request.id ?? slugFor(request.title, request.type, new Set([...view.value.byId.keys(), ...view.value.sprintById.keys()]))
+  const spoken = namedByRecord(view.value)
+  const id = request.id ?? slugFor(request.title, request.type, new Set([...view.value.byId.keys(), ...view.value.sprintById.keys(), ...spoken.keys()]))
+  // An id another record still names is not free, whatever the store no longer holds under
+  // it. A record deleted by hand leaves its `blocks` edges and its sprint's `members` and
+  // `carried` lists pointing at the id, and refiling the title reissued it: the new draft
+  // read `blocked yes item-aa` on an edge it never had, and a closed sprint counted it as a
+  // member it never committed. `doctor` names each of those as `H24` or `H28`, and this is
+  // the same fact refused at the one point that would otherwise resolve it silently.
+  const holder = spoken.get(id)
+  if (holder !== undefined) {
+    return errorResult({
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      cause: `${holder} still names ${id} and no record here carries it, so filing under that id would attach a stored reference to an item that never had it`,
+      fix: ['treadle doctor', `treadle file ${request.type} "<title>" --id <slug>`],
+    })
+  }
   // The same rule `sprint open` holds from its side: an id names one thing, and the log
   // that `history` reads is keyed by id alone.
   if (view.value.sprintById.has(id)) {
@@ -686,6 +708,8 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 
   const refused = columnRefusal('backlog', workspace, request.columns, ITEM_COLUMNS)
   if (refused !== undefined) return refused
+  const scoped = sprintScope(view.value, request.filters)
+  if (scoped !== undefined && 'refusal' in scoped) return scoped.refusal
 
   const line = (cursor?: string): string =>
     invocation('backlog', [], [...listFlags(request.filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
@@ -725,6 +749,7 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   if (request.explainAbsence !== undefined) {
     Object.assign(data, absence(view.value, request.filters, request.explainAbsence))
   }
+  if (scoped !== undefined && 'note' in scoped) data['note'] = scoped.note
 
   const remaining = matched.length - (from + page.length)
   if (remaining > 0) {
@@ -734,6 +759,58 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   }
   data['items'] = block
   return okResult(BACKLOG_SHAPE, { workspace, data })
+}
+
+/**
+ * Every id some record still names that no record here carries, to the record that names it.
+ * A stored `blocks` edge and a closed sprint's `carried` or `finished` list both survive a
+ * hand-deleted record, and both would silently re-attach to whatever takes the slug next.
+ * The value is the sentence fragment a refusal reads, so it names which record to look at.
+ */
+export function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
+  const dangling = new Map<ItemId, string>()
+  const claim = (id: ItemId, by: string): void => {
+    if (!view.byId.has(id) && !dangling.has(id)) dangling.set(id, by)
+  }
+  // Only the target can dangle: the graph is read off the records themselves, so every
+  // source is a record this view holds.
+  for (const relation of view.relations.relations) claim(relation.target, `${relation.source}'s ${relation.kind} edge`)
+  for (const sprint of view.sprints) {
+    for (const field of ['carried', 'finished'] as const) {
+      for (const member of sprint[field] ?? []) claim(member, `sprint ${sprint.id}'s ${field} list`)
+    }
+  }
+  return dangling
+}
+
+/**
+ * What `--sprint <id>` names, for the two commands that take it as a filter rather than as a
+ * scope. Three answers about one closed sprint used to be readable at once: `sprints` counts
+ * the set the close recorded, this filter counts what points at the sprint now, and `board`
+ * counts the live states of those. The sets agree while a sprint is open and diverge the
+ * moment a member is committed onward, so a closed scope says here which of them it reads;
+ * `help board` already said it for the board and nothing said it for the backlog.
+ *
+ * An id that names no sprint and that no item points at is a typo, and it gets the refusal
+ * `board --sprint` already gives rather than an empty list under `ok`.
+ */
+export function sprintScope(
+  view: WorkspaceView, filters: readonly Filter[],
+): { readonly refusal: ResultObject } | { readonly note: string } | undefined {
+  const named = filters.find((filter) => filter.field === 'sprint')
+  if (named === undefined) return undefined
+  const sprint = view.sprintById.get(named.value)
+  if (sprint === undefined) {
+    // A closed sprint's leftovers and an `H26` value some record still carries are both
+    // scopes with something to show, so an id an item points at is not a typo.
+    return view.items.some((item) => item.sprint_id === named.value)
+      ? undefined
+      : { refusal: noSprint('backlog', 'read', view.identity.id, view, named.value) }
+  }
+  if (sprint.state !== 'closed') return undefined
+  return {
+    note: `${sprint.id} is closed; this reads the items whose sprint_id is ${sprint.id} now, not the set its close recorded; treadle sprints ${sprint.id}`,
+  }
 }
 
 /** The clause whose own selectivity was lowest, so a caller learns which term to relax. */

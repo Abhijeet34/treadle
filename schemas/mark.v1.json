@@ -76,7 +76,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-trust": "data"
         },
         "already": {
           "type": [

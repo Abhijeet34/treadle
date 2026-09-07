@@ -141,6 +141,14 @@ export type Finding = {
   readonly rule: string
   readonly reason: string
   readonly id?: string
+  /**
+   * Which record kind the finding's `id` names, when it names one. A quarantined record still
+   * exists, so a neighbour pointing at its id is not dangling; the kind is what keeps that
+   * from being read too broadly, since an item and a sprint may not share an id but a reader
+   * of one flat set cannot tell which of the two a quarantined id was. The store derives it
+   * from the file it was reading, and a finding about a file rather than a record has none.
+   */
+  readonly kind?: 'item' | 'sprint'
 }
 
 /**

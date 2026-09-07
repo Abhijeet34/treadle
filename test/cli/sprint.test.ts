@@ -53,8 +53,8 @@ describe('a sprint from open to close, at the command surface', () => {
     assert.match(opened.out, /^ok sprint acme-platform \S+ 1$/m)
     assert.match(opened.out, /^sprint sprint-31$/m)
     assert.match(opened.out, /^state open$/m)
-    assert.match(opened.out, /^set start - -> 2026-09-07$/m)
-    assert.match(opened.out, /^set end - -> 2026-09-18$/m)
+    assert.match(opened.out, /^"set start - -> 2026-09-07$/m)
+    assert.match(opened.out, /^"set end - -> 2026-09-18$/m)
     const file = await readFile(path.join(demo.root, 'sprints.md'), 'utf8')
     assert.match(file, /^# sprint-31: Sprint 31$/m)
     assert.match(file, /^type: sprint\nstate: open\nfiled_at: \S+\nversion: 1\nstart: 2026-09-07\nend: 2026-09-18\n\n## Goal\n\nShip the token refresh$/m)
@@ -142,7 +142,7 @@ describe('a sprint from open to close, at the command surface', () => {
 
     const filed = await cli(['file', 'task', 'Rotate the deploy key', '--id', 'deploy-key', '--points', '1', '--sprint', 'sprint-32'])
     assert.equal(filed.code, 0, filed.err)
-    assert.match(filed.out, /^set sprint_id - -> sprint-32$/m)
+    assert.match(filed.out, /^"set sprint_id - -> sprint-32$/m)
   })
 
   it('closes the sprint, records the items still open as carried, and leaves them pointing at it', async () => {
@@ -154,7 +154,7 @@ describe('a sprint from open to close, at the command surface', () => {
     assert.equal(closed.code, 0, closed.err)
     assert.match(closed.out, /^state open -> closed$/m)
     assert.match(closed.out, /^v 1 -> 2$/m)
-    assert.match(closed.out, /^set carried - -> avatar-crop,csv-export$/m)
+    assert.match(closed.out, /^"set carried - -> avatar-crop,csv-export$/m)
     assert.match(closed.out, /^carried avatar-crop,csv-export$/m)
 
     const record = await cli(['sprints', 'sprint-31'])
@@ -236,15 +236,18 @@ describe('a sprint from open to close, at the command surface', () => {
     const reopened = await cli(['sprint', 'reopen', 'sprint-32'])
     assert.equal(reopened.code, 0, reopened.err)
     assert.match(reopened.out, /^state closed -> open$/m)
-    assert.match(reopened.out, /^set carried csv-export -> -$/m)
+    assert.match(reopened.out, /^"set carried csv-export -> -$/m)
     const record = await cli(['sprints', 'sprint-32'])
     assert.match(record.out, /^state open$/m)
     assert.doesNotMatch(record.out, /^carried /m)
 
     const log = await cli(['history', 'sprint-32'])
     assert.equal(log.code, 0, log.err)
-    assert.match(log.out, /^\S+ human sprint.reopen state=closed->open,carried=csv-export->\(unset\) dana$/m)
-    assert.match(log.out, /^\S+ human sprint.close state=open->closed,carried=\(unset\)->csv-export dana$/m)
+    // The whole frozen record is on both sides of the close and the reopen, so a reading of
+    // the log alone recovers the tally. A list of more than one id prints its count, because
+    // this cell joins its own pairs with commas.
+    assert.match(log.out, /^\S+ human sprint.reopen state=closed->open,finished=avatar-crop->\(unset\),carried=csv-export->\(unset\),done=0->\(unset\),done_points=0->\(unset\),cancelled=1->\(unset\),points=7->\(unset\) dana$/m)
+    assert.match(log.out, /^\S+ human sprint.close state=open->closed,finished=\(unset\)->avatar-crop,carried=\(unset\)->csv-export,done=\(unset\)->0,done_points=\(unset\)->0,cancelled=\(unset\)->1,points=\(unset\)->7 dana$/m)
     assert.match(log.out, /^\S+ human sprint.open state=open,start=2026-09-21,end=2026-10-02 dana$/m)
     await insideEveryWidth(['history', 'sprint-32'])
   })
@@ -315,8 +318,8 @@ describe('a carried item counts as done in the sprint that finished it, and in n
     assert.equal(committed.code, 0, committed.err)
     const closed = await cli(['sprint', 'close', 'sprint-a'])
     assert.equal(closed.code, 0, closed.err)
-    assert.match(closed.out, /^set done - -> 0$/m)
-    assert.match(closed.out, /^set done_points - -> 0$/m)
+    assert.match(closed.out, /^"set done - -> 0$/m)
+    assert.match(closed.out, /^"set done_points - -> 0$/m)
     assert.match(closed.out, /^carried avatar-crop$/m)
 
     assert.equal((await cli(['sprint', 'open', 'Sprint B', '--id', 'sprint-b', '--start', '2026-09-21', '--end', '2026-10-02'])).code, 0)
@@ -340,7 +343,7 @@ describe('a carried item counts as done in the sprint that finished it, and in n
 
     // The two numbers are on the record, so a reader of sprints.md sees the same velocity.
     const file = await readFile(path.join(demo.root, 'sprints.md'), 'utf8')
-    assert.match(file, /^carried: avatar-crop\ndone: 0\ndone_points: 0$/m)
+    assert.match(file, /^carried: avatar-crop\ndone: 0\ndone_points: 0\ncancelled: 0\npoints: 2$/m)
   })
 
   it('reads live again once the sprint is reopened, because the freeze is what the close recorded', async () => {
@@ -356,7 +359,7 @@ describe('a carried item counts as done in the sprint that finished it, and in n
     assert.equal((await cli(['sprint', 'commit', 'sprint-c', 'dep-bump'])).code, 0)
     const closed = await cli(['sprint', 'close', 'sprint-c'])
     assert.equal(closed.code, 0, closed.err)
-    assert.match(closed.out, /^set done - -> 0$/m)
+    assert.match(closed.out, /^"set done - -> 0$/m)
     for (const target of ['in_progress', 'done']) {
       const finished = await cli(['transition', 'dep-bump', target])
       assert.equal(finished.code, 0, finished.err)
@@ -367,8 +370,8 @@ describe('a carried item counts as done in the sprint that finished it, and in n
 
     const reopened = await cli(['sprint', 'reopen', 'sprint-c'])
     assert.equal(reopened.code, 0, reopened.err)
-    assert.match(reopened.out, /^set done 0 -> -$/m)
-    assert.match(reopened.out, /^set done_points 0 -> -$/m)
+    assert.match(reopened.out, /^"set done 0 -> -$/m)
+    assert.match(reopened.out, /^"set done_points 0 -> -$/m)
     const record = await cli(['sprints', 'sprint-c'])
     assert.match(record.out, /^committed 1$/m, 'the item still points at the sprint, so the set is whole')
     assert.match(record.out, /^done 1$/m, 'and the count is live again')
@@ -384,8 +387,8 @@ describe('a carried item counts as done in the sprint that finished it, and in n
     for (const target of ['in_progress', 'done']) assert.equal((await cli(['transition', 'webhook-retry', target])).code, 0)
     const closed = await cli(['sprint', 'close', 'sprint-d'])
     assert.equal(closed.code, 0, closed.err)
-    assert.match(closed.out, /^set done - -> 1$/m)
-    assert.match(closed.out, /^set cancelled - -> 0$/m)
+    assert.match(closed.out, /^"set done - -> 1$/m)
+    assert.match(closed.out, /^"set cancelled - -> 0$/m)
 
     assert.equal((await cli(['transition', 'webhook-retry', 'in_progress', '--reason', 'it regressed'])).code, 0)
     const stopped = await cli(['transition', 'webhook-retry', 'cancelled', '--resolution', 'superseded', '--reason', 'replaced by a queue'])
@@ -399,7 +402,7 @@ describe('a carried item counts as done in the sprint that finished it, and in n
 
     const reopened = await cli(['sprint', 'reopen', 'sprint-d'])
     assert.equal(reopened.code, 0, reopened.err)
-    assert.match(reopened.out, /^set cancelled 0 -> -$/m)
+    assert.match(reopened.out, /^"set cancelled 0 -> -$/m)
     const live = await cli(['sprints', 'sprint-d'])
     assert.match(live.out, /^cancelled 1$/m, 'open again, the count is live')
   })
@@ -480,7 +483,7 @@ describe('a sprint says which of its committed work is not groomed yet', () => {
   it('says it on file --sprint, which files in draft and so always has something to say', async () => {
     const filed = await cli(['file', 'task', 'Rotate the deploy key', '--id', 'deploy-key', '--points', '1', '--sprint', 'sprint-31'])
     assert.equal(filed.code, 0, filed.err)
-    assert.match(filed.out, /^set sprint_id - -> sprint-31$/m)
+    assert.match(filed.out, /^"set sprint_id - -> sprint-31$/m)
     assert.match(filed.out, /^not_ready deploy-key$/m)
     assert.match(filed.out, /^note deploy-key is draft, and next ranks ready work; treadle transition deploy-key ready$/m)
   })

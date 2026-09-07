@@ -140,7 +140,11 @@ export async function relate(
     if (holder === undefined) {
       return okResult(RELATION_SHAPE, {
         workspace, txn: null, changed: 0,
-        data: { already: source.id, v: String(source.version), note: `${source.id} does not ${kind} ${request.other}` },
+        // The kind is a stored token, not an English verb: "does not blocks" and "does not
+        // caused_by" both came out of splicing one into a sentence that wanted one. Naming
+        // the edge instead reads correctly for all six kinds and for both directions, since
+        // a symmetric edge is stored on the lower id and may be held by neither end.
+        data: { already: source.id, v: String(source.version), note: `no ${kind} edge between ${source.id} and ${request.other} is stored here` },
       })
     }
     edge = { kind, source: holder.item.id, target: holder.entry.target }

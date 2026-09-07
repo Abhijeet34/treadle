@@ -12,6 +12,7 @@ import {
   RESOLUTIONS,
   TRANSITIONS,
   WORK_ITEM_STATES,
+  edgeRequirements,
   evaluateTransition,
   legalTargetsFrom,
 } from '../../src/domain/index.ts'
@@ -113,6 +114,51 @@ describe('every state-by-target pair, legal and illegal', () => {
       })
     }
   }
+})
+
+// `explain` printed guard ids alone, so eight of the thirteen transition names read as
+// "this move needs nothing" on a move `transition` then refused as T4 or T6. The row and the
+// refusal now come off one table, and the oracle above is what holds both to the model.
+describe('edgeRequirements names what each edge records, and the evaluator refuses exactly that', () => {
+  for (const from of WORK_ITEM_STATES) {
+    for (const [to, name] of Object.entries(LEGAL[from]) as readonly [WorkItemState, TransitionName][]) {
+      const closed = Object.keys(CLOSED_VALUE[name] ?? {})
+      const expected = [...(REASON_REQUIRED.has(name) ? ['reason'] : []), ...closed]
+
+      it(`${from} -> ${to} (${name}) records ${expected.join(',') || 'nothing'}`, () => {
+        assert.deepEqual([...edgeRequirements(subject(from), to).records], expected)
+      })
+
+      it(`${from} -> ${to} (${name}) is refused with nothing recorded, and taken with all of it`, () => {
+        // G5 decides which of the two `in_progress` exits this item has, and it is a guard
+        // rather than something the edge records, so the context is set for the edge tried.
+        const setting = context(subject(from), { reviewStep: to === 'in_review' })
+        const bare = evaluateTransition(setting, { target: to })
+        if (expected.length === 0) {
+          assert.equal(bare.outcome, 'allowed', `${name} needs nothing and was ${JSON.stringify(bare)}`)
+          return
+        }
+        // T4 is the missing reason and T6 the missing closed value; which of the two fires
+        // first is the evaluator's order, and either proves the row was not empty.
+        assert.ok(['T4', 'T6'].includes(refusal(bare).error.rule ?? ''), `${name}: rule was ${refusal(bare).error.rule}`)
+        const whole = evaluateTransition(setting, {
+          target: to, reason: 'because', ...(CLOSED_VALUE[name] ?? {}),
+        })
+        assert.equal(whole.outcome, 'allowed', `${name} was refused with everything the row names: ${JSON.stringify(whole)}`)
+      })
+    }
+  }
+
+  // The one guard no spec's own list carries; `explain` used to add it in a second copy of
+  // this rule, in the service layer, where nothing held the two together.
+  it('adds G8 to an epic closing, and to nothing else', () => {
+    assert.deepEqual([...edgeRequirements(item('epic', { state: 'in_progress' }), 'done').guards], ['G5', 'G6', 'G8'])
+    assert.deepEqual([...edgeRequirements(item('task', { state: 'in_progress' }), 'done').guards], ['G5', 'G6'])
+  })
+
+  it('names nothing at all for an edge the table does not carry', () => {
+    assert.deepEqual(edgeRequirements(subject('done'), 'draft'), { guards: [], records: [] })
+  })
 })
 
 describe('legalTargetsFrom agrees with the oracle', () => {

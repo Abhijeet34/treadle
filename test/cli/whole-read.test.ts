@@ -83,8 +83,8 @@ describe('a store holding a record it cannot serve refuses every answer over it'
 
   it('names both exit statuses in its help', async () => {
     const help = await cli(['help', 'doctor'])
-    assert.match(help.out, /^exit 0 clean: /m)
-    assert.match(help.out, /^exit 7 the findings table is not empty; /m)
+    assert.match(help.out, /^exit 0 every stored record is served; /m)
+    assert.match(help.out, /^exit 7 a record is held and not served, or the audit flagged a served one$/m)
   })
 
   it('serves everything again once the markers are resolved, and doctor exits 0 saying so', async () => {

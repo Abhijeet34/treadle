@@ -150,6 +150,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }

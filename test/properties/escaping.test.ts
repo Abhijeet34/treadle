@@ -77,13 +77,14 @@ class Reader {
    * An empty scalar is an absent line, not a `<key> ` with nothing after the space: A2 rule 1
    * forbids the trailing whitespace and the renderer drops the line, so the reader does too.
    */
-  scalar(key: string, expected: string): void {
+  scalar(key: string, expected: string, data: boolean): void {
     if (expected.length === 0) return
-    assert.equal(this.take(`scalar ${key}`), `${key} ${expected}`)
+    assert.equal(this.take(`scalar ${key}`), `${data ? '"' : ''}${key} ${expected}`)
   }
 
-  list(key: string, entries: readonly string[]): void {
-    for (const entry of entries) assert.equal(this.take(`list ${key}`), `${key} ${entry}`)
+  list(key: string, entries: readonly string[], data: boolean): void {
+    const mark = data ? '"' : ''
+    for (const entry of entries) assert.equal(this.take(`list ${key}`), `${mark}${key} ${entry}`)
   }
 
   /** A text field arrives whole as a marked scalar or as a counted block, never as loose lines. */
@@ -116,7 +117,7 @@ class Reader {
     const header = this.take(`the header of ${key}`)
     assert.equal(
       header,
-      `#${columns.map((c) => (c.text === true ? `"${c.name}` : c.name)).join(' ')}`,
+      `#${columns.map((c) => (c.text === true || c.data === true ? `"${c.name}` : c.name)).join(' ')}`,
       `the header of ${key} does not declare the columns it rendered`,
     )
     for (const row of block.rows) {
@@ -176,9 +177,9 @@ function verify(shape: ResultShape, result: ResultObject, reader: Reader): void 
     const value = result.data[property.key]
     if (value === undefined) continue
     if (property.kind === 'block') reader.block(property.key, value as Block)
-    else if (property.kind === 'list') reader.list(property.key, value as readonly string[])
+    else if (property.kind === 'list') reader.list(property.key, value as readonly string[], property.data === true)
     else if (property.kind === 'text') reader.text(property.key, String(value))
-    else reader.scalar(property.key, String(value))
+    else reader.scalar(property.key, String(value), property.kind === 'scalar' && property.data === true)
   }
   assert.deepEqual(reader.remaining, [], 'the stream carried lines the shape never declared')
 }

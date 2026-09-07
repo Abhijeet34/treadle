@@ -42,7 +42,9 @@ export const MARK_SHAPE: ResultShape = {
   properties: [
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'string' },
-    { kind: 'list', key: 'set' },
+    // F12: every `set` entry ends in a value the caller wrote, so the line carries the
+    // untrusted-content marker rather than reading as the tool's own speech.
+    { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
     { kind: 'scalar', key: 'preview', type: 'integer' },
@@ -62,7 +64,9 @@ export const EVIDENCE_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'string' },
     { kind: 'scalar', key: 'kind', type: 'string' },
-    { kind: 'scalar', key: 'ref', type: 'string' },
+    // The pointer as it was stored, which `show` prints back as a `data` column: one field
+    // reads as third-party content on both surfaces or on neither.
+    { kind: 'scalar', key: 'ref', type: 'string', data: true },
     { kind: 'text', key: 'label' },
     { kind: 'scalar', key: 'entries', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },

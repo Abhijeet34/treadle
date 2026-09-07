@@ -335,6 +335,17 @@ describe('the derived blocked flag', () => {
     assert.equal(isBlocked(graph, stateOf, 'sso-saml'), false)
   })
 
+  // The rule read from the other end. "Blocked" means the work cannot proceed, and finished
+  // work is not proceeding; a blocker revived after the item it held was done put that done
+  // item at `blocked yes` with two gate remedies naming an impediment that holds nothing up.
+  it('names no blocker at all for an item that is itself done or cancelled', () => {
+    for (const own of ['done', 'cancelled'] as const) {
+      const stateOf = states({ 'auth-refresh': 'in_progress', 'legacy-oauth': 'ready', 'sso-saml': own })
+      assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), [], `a ${own} item has no active blockers`)
+      assert.equal(isBlocked(graph, stateOf, 'sso-saml'), false)
+    }
+  })
+
   it('is computed, never stored: the same graph gives a different answer as states move', () => {
     const before = states({ 'auth-refresh': 'ready', 'legacy-oauth': 'ready', 'sso-saml': 'ready' })
     const after = states({ 'auth-refresh': 'done', 'legacy-oauth': 'done', 'sso-saml': 'ready' })

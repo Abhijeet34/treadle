@@ -172,6 +172,10 @@ export function activeBlockerIndex(view: WorkspaceView): ReadonlyMap<ItemId, rea
     if (relation.kind !== 'blocks') continue
     const state = view.byId.get(relation.source)?.state
     if (state === undefined || state === 'done' || state === 'cancelled') continue
+    // The same clause `blockersOf` carries: finished work is not held up by anything, so a
+    // revived blocker never puts a done or cancelled item back on a blocked list.
+    const blocked = view.byId.get(relation.target)?.state
+    if (blocked === 'done' || blocked === 'cancelled') continue
     const blockers = index.get(relation.target)
     if (blockers === undefined) index.set(relation.target, [relation.source])
     else blockers.push(relation.source)

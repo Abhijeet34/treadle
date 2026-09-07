@@ -225,7 +225,9 @@ describe('a stored field is cleared by an empty value', () => {
     assert.equal(dataOf(again)['already'], 'draft-task', 'clearing a field that is not set is a no-op, not a write')
     const log = dataOf(await must(['history', 'draft-task']))
     const rows = (log['events'] as { rows: { what: string }[] }).rows
-    assert.equal(rows[0]?.what, 'description=(text:14)->(unset),parent_id=epic-one->(unset),assignee=kim->(unset),labels=a-1,b-2->(unset),due=2030-01-01T00:00:00Z->(unset)')
+    // `labels` is a comma-joined list inside a cell that joins its own pairs with commas, so
+    // `labels=a-1,b-2->(unset)` read as two pairs; a list of more than one prints its count.
+    assert.equal(rows[0]?.what, 'description=(text:14)->(unset),parent_id=epic-one->(unset),assignee=kim->(unset),labels=(list:2)->(unset),due=2030-01-01T00:00:00Z->(unset)')
     const doctor = await cli(['doctor'])
     assert.equal(doctor.code, 0, doctor.err)
   })

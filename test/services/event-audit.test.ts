@@ -34,7 +34,7 @@ describe('what each read says about a hand-written event line', () => {
     assert.equal(init.code, 0, init.err)
     const filed = await runCli(['file', 'story', 'First story', '--id', 'first-story'], { cwd: root, env: { TREADLE_ACTOR: 'alice' } })
     assert.equal(filed.code, 0, filed.err)
-    filedAt = /^set filed_at - -> (\S+)$/m.exec(filed.out)?.[1] as string
+    filedAt = /^"set filed_at - -> (\S+)$/m.exec(filed.out)?.[1] as string
     assert.ok(filedAt !== undefined)
   })
   after(async () => { await rm(root, { recursive: true, force: true }) })

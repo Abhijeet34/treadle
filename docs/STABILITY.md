@@ -48,7 +48,8 @@ Not breaking:
 
 The mapping is: `0` success including an idempotent no-op, `2` invalid input, `3` a guard refused, `4` a stale-version conflict, `5` not found, `6` the store is unavailable, `7` the stored files carry something no write path would have accepted, `1` anything else, `130` interrupted.
 
-`7` is the one status a command can exit while still printing its answer on stdout: `doctor` answers with the findings table and exits `7` when the table is not empty.
+`7` is the one status a command can exit while still printing its answer on stdout: `doctor` answers with the findings table and exits `7` when a row on it hides a record or names a served record the audit flagged.
+A table whose every row reports content the store still serves and the next write normalises, `H16`'s CRLF checkout being the one that happens by accident, prints the rows and exits `0` under a `serving` line, because a CI job could not otherwise tell that checkout from a truncated shard.
 Every other command exits `7` as a refusal, because a store that holds a record it cannot serve cannot give a whole answer; the refusal names the file, the line and the reason of the first such record.
 
 ### The output schema

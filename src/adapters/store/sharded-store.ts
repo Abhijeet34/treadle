@@ -304,7 +304,12 @@ export class ShardedStore implements Store {
   async findings(): Promise<StoreResult<readonly Finding[]>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
-    return storeOk([...this.#index.findings(), ...this.#cycleFindings])
+    // The kind is derived here rather than stored, because the file a finding names already
+    // decides it and the index is a cache a schema change would have to rebuild.
+    return storeOk([...this.#index.findings(), ...this.#cycleFindings].map((finding) => (
+      finding.id === undefined || finding.file === WORKSPACE_FILE
+        ? finding
+        : { ...finding, kind: finding.file === SPRINTS_FILE ? 'sprint' as const : 'item' as const })))
   }
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {

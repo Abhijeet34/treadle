@@ -99,6 +99,7 @@ export const COMMANDS: readonly Command[] = [
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
+      ['treadle backlog --sprint sprint-30', 'the items whose sprint_id is that sprint now, which for a closed one is not the set its close recorded'],
     ],
   },
   {
@@ -215,8 +216,8 @@ export const COMMANDS: readonly Command[] = [
     usage: ['treadle doctor'],
     examples: [['treadle doctor', 'what the files say that no write path would have accepted']],
     exits: [
-      [0, 'clean: every stored record is served and the audit flagged nothing'],
-      [7, 'the findings table is not empty; a record is held and not served, or the audit flagged one'],
+      [0, 'every stored record is served; the table is empty, or its rows only report content the next write normalises'],
+      [7, 'a record is held and not served, or the audit flagged a served one'],
     ],
   },
   {

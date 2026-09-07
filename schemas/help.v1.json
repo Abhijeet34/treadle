@@ -118,6 +118,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }
@@ -181,6 +184,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

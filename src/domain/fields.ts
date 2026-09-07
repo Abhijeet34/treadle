@@ -277,6 +277,10 @@ const oneOf = (name: string, allowed: readonly string[]): Check => (value) =>
  * characters or by nine times, and the write it refuses is the one place that number is
  * known.
  */
+// Every length in this file is JavaScript string length, which is UTF-16 code units, so a
+// character outside the Basic Multilingual Plane counts as two. One unit is used on every surface that
+// prints a count, so a refusal's number is the number the bound compared; docs/DOMAIN.md,
+// "The bounded fields", states it for a reader.
 export function overLength(name: string, max: number, observed: number): string {
   return `${name} is ${observed} characters and the limit is ${max}, which is ${observed - max} over`
 }

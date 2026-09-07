@@ -44,7 +44,9 @@ export const SET_SHAPE: ResultShape = {
   properties: [
     { kind: 'scalar', key: 'item', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'string' },
-    { kind: 'list', key: 'set' },
+    // F12: every `set` entry ends in a value the caller wrote, so the line carries the
+    // untrusted-content marker rather than reading as the tool's own speech.
+    { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
     { kind: 'scalar', key: 'preview', type: 'integer' },

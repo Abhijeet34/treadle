@@ -37,6 +37,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0020](0020-a-finding-is-decided-by-a-whole-read.md) | A finding is a verdict on the files cached like any row, only the pass that read a file whole may decide a duplicate, an append that meets one hands the file back, and `doctor` re-derives the index so the fix line every refusal prints is the recovery |
 | [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md) | `doctor` is fed one record and one event at a time through two streaming reads on the store seam, `next` ranks off one index over the graph, and both are gated as a ratio to the read every command performs |
 | [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) | A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time |
+| [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) | A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -100,6 +101,8 @@ between the two commands the tool prescribes.
 | `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
 | `H26` | `doctor`, `explain` | An item's `sprint_id` names no sprint record, which no write path produces since ADR-0016 |
 | `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
+| `H28` | `doctor` | A closed sprint's `members` or `carried` list names an id no record here carries, so the sprint counts a member nothing can show |
+| `H29` | `doctor` | A closed sprint's frozen tally is larger than the set it was counted over, which no close writes |
 
 ## The CLI's rule ids
 

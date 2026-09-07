@@ -272,6 +272,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }
@@ -301,7 +304,8 @@
               "name": "kind"
             },
             {
-              "name": "ref"
+              "name": "ref",
+              "trust": "data"
             },
             {
               "name": "label",
@@ -332,6 +336,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -393,6 +400,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

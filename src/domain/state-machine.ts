@@ -150,6 +150,27 @@ export function legalTargetsFrom(item: WorkItem, reviewStep: boolean): readonly 
 }
 
 /**
+ * What one edge of the table demands of the caller, without evaluating anything: the guards
+ * it runs and the values it records. `explain` prints both and `transition` enforces both,
+ * and they are read here so the two cannot drift: `explain` printed guards alone, so eight
+ * of the thirteen transition names read as "needs nothing" on a move `transition` then
+ * refused as `T4` or `T6`. The `records` list is spelled as the flag a caller passes.
+ */
+export function edgeRequirements(
+  item: WorkItem, to: string,
+): { readonly guards: readonly GuardId[]; readonly records: readonly string[] } {
+  const spec = TRANSITION_TABLE.find((edge) => edge.from === item.state && edge.to === to)
+  if (spec === undefined) return { guards: [], records: [] }
+  const closed = Object.entries(CLOSED_VALUE)
+    .filter(([, value]) => value.on === spec.name)
+    .map(([field]) => field)
+  return {
+    guards: guardsFor(spec, item, spec.to),
+    records: [...(spec.requiresReason ? ['reason'] : []), ...closed],
+  }
+}
+
+/**
  * The next move toward `done` from a state, read off the table along the edges that need no
  * reason: groom, start, submit or finish as the review step decides, accept, and resume off a
  * hold. `done` itself is reachable from two states only, and a remedy is run from wherever the

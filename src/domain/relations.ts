@@ -297,12 +297,20 @@ export function relationsOf(graph: RelationGraph, id: ItemId): readonly Relation
  * A blocker the caller cannot find is not active: it cannot be finished or cancelled, so
  * counting it would hold the item forever on a record a hand edit removed. `doctor` names
  * the dangling edge instead.
+ *
+ * Finished work has no active blockers either, and that is the same rule read from the
+ * other end: "blocked" means the work cannot proceed, and work that is done or cancelled is
+ * not proceeding. A blocker revived after the item it held finished used to put a `done`
+ * item at `blocked yes` with two gate remedies telling a reader to advance an impediment
+ * that holds nothing up.
  */
 export function blockersOf(
   graph: RelationGraph,
   stateOf: (id: ItemId) => WorkItemState | undefined,
   id: ItemId,
 ): readonly ItemId[] {
+  const own = stateOf(id)
+  if (own !== undefined && isTerminal(own)) return []
   return graph.relations
     .filter((r) => {
       if (r.kind !== 'blocks' || r.target !== id) return false

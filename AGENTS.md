@@ -202,13 +202,19 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. `doctor` raises nine of them and
+same audit for one item off the events it already reads. `doctor` raises eleven of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
-event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016 and
-`H27` with ADR-0017. `test/architecture/documented-numbers.test.ts` holds that table to what
-`doctor` actually raises. `status`'s `findings` count stays what it always was, the store's
-own load-time findings.
+event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016,
+`H27` with ADR-0017, and `H28` and `H29` with ADR-0023.
+`test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
+raises. A membership test here asks whether the store HOLDS an id, served or quarantined,
+and per record kind: a quarantined record still exists, so a neighbour pointing at it is
+not dangling, and a quarantined item must not answer for a `sprint_id`. `Finding.kind` is
+what carries that, derived by the store from the file it read. `doctor`'s exit reads
+`hidesContent`, the predicate `readWorkspace` already uses, so a table whose every row is
+`SERVED_ANYWAY` prints under a `serving` line and exits 0. `status`'s `findings` count stays
+what it always was, the store's own load-time findings, and its `audit` line says so.
 
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
 table because two readers need it: `set` refuses a field another command owns, and a gate
@@ -462,20 +468,23 @@ answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path 
 month past 8 MiB is written happily and then refused by every command with `S4` and no way
 back. "Where it stops scaling" in `docs/BENCHMARKS.md` carries the measurements.
 
-## A sprint is a record in one file, and its committed set is derived
+## An open sprint's committed set is derived and a closed one's is a record
 
 `sprints.md` holds every sprint in the record grammar the shards use, indexed in its own
 table and quarantined the same way; `src/domain/sprint.ts` is the dictionary and the three
 commit refusals (`I2` closed, `I3` in another open sprint, `I4` cannot be worked), and
-ADR-0016 argues every judgement call. The committed set is never stored: it is the items
-whose `sprint_id` points at the sprint, plus what the close recorded as `carried`, and
-`committedTo` in `src/application/services/sprints.ts` is the one place that union is made.
+ADR-0016 argues every judgement call. An OPEN sprint's committed set is the items whose
+`sprint_id` points at it. A CLOSED sprint's is `carried` plus the `## Finished` section,
+the two disjoint halves the close wrote, unioned by `membersOf` and read by `committedTo` in
+`src/application/services/sprints.ts`, which is the one place either answer is produced.
 A close leaves unfinished items pointing at the closed sprint; `next`'s `spr` component is
 1 only for a member of an open sprint, so leftover work is not boosted until it is
-committed onward. A close also freezes what it tallied, in `done`, `done_points` and
-`cancelled` on the record, because `committedTo` restores what the carry-over took away and
-a live count over a closed sprint therefore rises as that work is finished elsewhere; a
-sprint closed before those fields carries none of them and reads live. `I2` also refuses a
+committed onward. A close freezes `done`, `done_points`, `cancelled` and `points` beside
+those two lists, and every number is counted over them, because a set recomputed after the
+close shrank the moment a terminal member was revived and committed onward; `points` is the
+field that says a close froze a complete record, since an empty list is written to no
+record at all, and a sprint without it reads live. ADR-0023 carries the argument, and
+`finished` is a section rather than a field because a field value is bounded at 8 KiB. `I2` also refuses a
 reopen once a carried item has since been committed onward: a reopen clears `carried`, and
 dropping that item would shrink a record a team already read. A sprint admits `draft` work
 and every surface

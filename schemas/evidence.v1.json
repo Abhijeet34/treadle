@@ -82,7 +82,8 @@
           "type": [
             "string",
             "null"
-          ]
+          ],
+          "x-trust": "data"
         },
         "label": {
           "type": "string",
