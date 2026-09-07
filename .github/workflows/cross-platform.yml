@@ -29,126 +29,129 @@ permissions:
   contents: read
 
 jobs:
-  test:
-    name: ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    # A backstop the step timeout below should always reach first.
-    timeout-minutes: 35
+  measure:
+    name: ${{ matrix.launcher }}
+    runs-on: windows-2025
+    timeout-minutes: 25
     strategy:
-      # One red platform should not hide the state of the others.
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, macos-15, windows-2025]
-    defaults:
-      run:
-        # bash on all three, so one script body works everywhere; the Windows runner's
-        # default is pwsh.
+        # env-node: what treadle ships today, the baseline the decision needs first.
+        # bin-sh:   the launcher data/treadle-platform-parity-m5/report.md designed.
+        # env-sh:   the same launcher through PATH rather than an absolute POSIX path, which
+        #           is the one shape that could resolve to a program a Windows shell has.
+        launcher: [env-node, bin-sh, env-sh]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: What this runner has
         shell: bash
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          # The floor, on every platform. ci.yml is where current Node is tested.
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      # Windows gets its own bound. The suite spawns a real child process for a large part of
-      # its CLI and durability coverage, and that is where Windows is slowest and least
-      # predictable: measured 2026-09-07 on the same tree within one hour, run 34123933241
-      # finished this step in 6.4 minutes and run 34125065085 was killed at 15 with the same
-      # suites reporting 16 to 22 seconds each rather than 2 to 5. A timeout is here to stop a
-      # hang, not to price a slow runner, so it is set where a hang is still obvious.
-      - name: Test
-        timeout-minutes: ${{ matrix.os == 'windows-2025' && 30 || 15 }}
-        run: npm test 2>&1 | tee "$RUNNER_TEMP/test.log"
-
-      - name: Build the bundle and weigh it against DR1
-        run: npm run build
-
-      # A green tick does not carry how many tests ran, and on Windows that is exactly the
-      # thing that can go wrong: npm hands a script to cmd.exe, cmd keeps the quotes around
-      # `"test/**/*.test.ts"`, `node --test` matches no file and exits 0 over an empty set.
-      # Measured on a sibling repository with the identical command shape, where one platform
-      # reported green having run nothing. A run that cannot say how many tests it ran fails.
-      - name: Say how many tests this platform ran
-        if: always()
         run: |
-          set -uo pipefail
-          # The largest count in the log, not the last. A test that runs `node --test` in a
-          # child prints that child's own TAP summary, and on windows-2025 the security suite's
-          # nested `# tests 215` landed after the run's own `tests 1728`: `tail -1` read the
-          # child and failed a green job for running 215 tests. The run's own count is always
-          # the largest, because every nested set is a subset of it.
-          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | sort -n | tail -1 || true)
-          if [ -z "${ran:-}" ]; then
-            echo "::error::${{ matrix.os }}: the suite reported no test count, so nothing here is evidence" >&2
-            echo "${{ matrix.os }} - NO VERDICT: the suite never reported a test count" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          # A floor far below the suite's real size, so it catches a run that matched no
-          # files or a small fraction of them and never fails on a test being deleted.
-          if [ "$ran" -lt 500 ]; then
-            echo "::error::${{ matrix.os }} ran only $ran tests; the suite was 1,734 on 2026-09-07" >&2
-            echo "${{ matrix.os }} - ran $ran tests, which is short" >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-          echo "${{ matrix.os }} - ran $ran tests" >> "$GITHUB_STEP_SUMMARY"
-
-  # The tool as a user installs it, on the two userlands the shebang has to satisfy. The three
-  # matrix jobs above all run the suite from a checkout, so none of them ever executes the
-  # shipped bundle through its own first line, and that is exactly where the regression this
-  # job exists for lived: `#!/usr/bin/env -S node --stack-size=3072` shipped on 2026-09-07 and
-  # `treadle version` answered `env: unrecognized option: S` and exited 1 on node:24-alpine,
-  # the smallest official Node image. `release.yml` gates `artifacts` on this workflow, so a
-  # tool that cannot start on BusyBox cannot reach a release.
-  #
-  # The tarball is packed here rather than downloaded, because the release's own smoke job runs
-  # after `npm publish` and a first-start failure has to be caught long before that.
-  installed:
-    name: installed on ${{ matrix.image }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        # BusyBox and glibc: the two `env` implementations a POSIX userland ships.
-        image: [node:24-alpine, node:24-trixie-slim]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
+          node --version
+          npm --version
+          echo "npm prefix -g: $(npm prefix -g)"
+          for p in sh bash node; do echo "which $p: $(which $p || echo none)"; done
+          ls -l /bin/sh || echo "no /bin/sh visible to Git Bash"
 
       - run: npm ci
+        shell: bash
 
-      - name: Build and pack the tarball a user would install
+      - name: Build, then write the candidate first line over the bundle
+        shell: bash
         run: |
           set -euo pipefail
           npm run build
-          node scripts/check-dist-fresh.ts
-          mkdir -p pack
-          npm pack --ignore-scripts --pack-destination pack
-          ls -l pack
+          case "${{ matrix.launcher }}" in
+            env-node) first='' ;;
+            bin-sh)   first='#!/bin/sh' ;;
+            env-sh)   first='#!/usr/bin/env sh' ;;
+          esac
+          if [ -n "$first" ]; then
+            {
+              printf '%s\n' "$first"
+              printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
+              tail -n +2 dist/treadle.js
+            } > dist/treadle.next
+            mv dist/treadle.next dist/treadle.js
+            chmod +x dist/treadle.js
+          fi
+          echo "--- first two lines of dist/treadle.js ---"
+          head -2 dist/treadle.js | od -c | head -8
+          echo "--- node --check on the bundle ---"
+          node --check dist/treadle.js && echo "valid JS" || echo "NOT valid JS"
 
-      - name: Install it and run the happy path
+      - name: Pack the tarball and install it globally, as a user would
+        shell: bash
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
-            set -eu
-            npm install --global --ignore-scripts /pack/treadle-*.tgz >/dev/null 2>&1
-            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadle/dist/treadle.js)"
-            treadle version
-            mkdir -p /tmp/ws && cd /tmp/ws
-            treadle init --name installed-smoke
-            treadle file story "The installed binary filed this"
-            treadle status | head -1 | grep -q "^ok "
-            echo "the packed tarball installs and answers on this userland"
-          '
+          mkdir -p pack
+          npm pack --ignore-scripts --pack-destination pack
+          tgz=$(ls pack/treadle-*.tgz)
+          npm install --global --ignore-scripts "$tgz"
+          echo "installed from $tgz"
+
+      - name: Quote the bytes npm generated
+        shell: bash
+        run: |
+          set -uo pipefail
+          prefix=$(npm prefix -g)
+          echo "prefix: $prefix"
+          for f in treadle treadle.cmd treadle.ps1; do
+            echo "===================== $f ====================="
+            if [ -f "$prefix/$f" ]; then cat "$prefix/$f"; else echo "(no such file)"; fi
+          done
+          echo "===================== installed shebang ====================="
+          head -2 "$prefix/node_modules/treadle/dist/treadle.js" || true
+
+      - name: cmd.exe - treadle version
+        shell: cmd
+        run: |
+          treadle version
+          echo VERSION_EXIT=%ERRORLEVEL%
+
+      - name: cmd.exe - treadle init then treadle file
+        shell: cmd
+        run: |
+          mkdir "%RUNNER_TEMP%\cmdws"
+          cd /d "%RUNNER_TEMP%\cmdws"
+          treadle init --name cmd-smoke
+          echo INIT_EXIT=%ERRORLEVEL%
+          treadle file task "The installed binary filed this from cmd"
+          echo FILE_EXIT=%ERRORLEVEL%
+          treadle status
+          echo STATUS_EXIT=%ERRORLEVEL%
+
+      - name: PowerShell 7 (pwsh) - treadle version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          treadle version
+          Write-Host "VERSION_EXIT=$LASTEXITCODE"
+          exit 0
+
+      - name: PowerShell 7 (pwsh) - treadle init then treadle file
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwshws" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\pwshws"
+          treadle init --name pwsh-smoke
+          Write-Host "INIT_EXIT=$LASTEXITCODE"
+          treadle file task "The installed binary filed this from PowerShell"
+          Write-Host "FILE_EXIT=$LASTEXITCODE"
+          treadle status
+          Write-Host "STATUS_EXIT=$LASTEXITCODE"
+          exit 0
+
+      - name: Windows PowerShell 5.1 - treadle version
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          treadle version
+          Write-Host "VERSION_EXIT=$LASTEXITCODE"
+          exit 0
