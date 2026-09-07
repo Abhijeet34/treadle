@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// An oversized input, at every entry point that takes free text, on every platform.
+// An oversized input, at every entry point that takes free text, on the platforms that can
+// deliver one.
 //
 // Measured on 2026-09-07: `treadle set <id> desc=<1,000,000 y>` printed a raw `RangeError:
 // Maximum call stack size exceeded` on stderr and exited 7, which tells a caller its store is
@@ -15,27 +16,22 @@
 // failed CI four times with `spawn E2BIG` before reaching treadle. It was measuring this
 // machine's per-entry limit rather than the tool's behaviour. Eleven arguments of 90,000
 // characters, every one of them far under Linux's per-entry cap, make a 990,547 byte block
-// that is a RangeError and exit 7 at the 984 KiB default and a clean run at 3072; the same
-// block delivered as eleven environment variables, behind an ordinary short command line, does
-// the same. Both shapes are exercised below, and both are sized from this platform's own
-// ARG_MAX, so neither skips itself anywhere.
+// that is a RangeError at the 984 KiB default stack and a clean run at 3072.
 //
-// AND ARG_MAX IS NOT THE BOUND THE SHEBANG HAS TO CLEAR, which cost a CI round to learn.
-// A second version of this file asserted that the requested stack exceeds ARG_MAX, which is
-// true on macOS and false on Linux: run 34106349134 measured ARG_MAX at 4,194,304 there and
-// refused the assertion against a 3 MiB stack, while in the same run the two block tests below
-// passed with 4,140,820 bytes of argv and 4,142,278 bytes of environment. A block larger than
-// the whole V8 stack ran clean, so Linux does not charge that block against the stack the way
-// macOS does, and no relation between `--stack-size` and ARG_MAX is a property of both.
-// Raising the request to clear a 4 MiB ceiling would also have put it at half the main
-// thread's own 8 MiB stack, trading a typed refusal for a segfault.
+// WHICH IS WHY THE CEILING RUN IS LINUX'S ALONE. The shebang asked for that 3 MiB stack for
+// one day and stopped the tool starting under BusyBox `env`, so `bin/treadle.js` is back to
+// `#!/usr/bin/env node` and macOS keeps the platform limit rather than the flag
+// (`docs/STABILITY.md`, "The macOS argument-block limit"). Linux does not charge the block
+// against the stack - run 34106349134 answered, typed, behind 4,140,820 bytes of argv under
+// the default - so Linux is where a block at the ceiling is a statement about this tool and
+// not about a kernel. On macOS a block at the ceiling is the documented platform limit, and
+// Windows caps a command line at 32,767 characters and ships no `getconf`.
 //
-// So the structural tests state the two relations that are true everywhere and are what the
-// shebang is for: a floor, because a request at the runtime's default is what crashed macOS,
-// and a ceiling, because a request near the thread's own stack faults instead of throwing.
-// The load-bearing claim is behavioural and the six tests under them make it directly: for the
-// largest block this platform can put in front of the process, on the argv axis and on the
-// environment axis, the tool answers and never returns a trace.
+// What every POSIX platform still holds, below that limit, is the load-bearing half: the
+// largest single entry the field dictionary will ever meet is a typed refusal with no trace,
+// which is what `MAX_CAUSE`, `MAX_LINE` and the field bounds are for and what no shebang
+// affects. And every platform holds the shebang's own portability, because losing it is the
+// regression that shipped.
 
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
@@ -47,11 +43,14 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, before, after } from 'node:test'
 
 import { EXIT_OF } from '../../src/cli/exit.ts'
-import { V8_DEFAULT_STACK_KIB, flagsOf, shebangOf, stackKibOf } from '../../scripts/shebang.ts'
+import { flagsOf, portabilityProblem, shebangOf } from '../../scripts/shebang.ts'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const ENTRY = path.join(ROOT, 'bin', 'treadle.js')
 const FLAGS = flagsOf(shebangOf(ROOT))
+
+/** Windows has no `getconf`, no ARG_MAX and no fork of this shape; the block tests are POSIX's. */
+const POSIX = process.platform !== 'win32'
 
 /** Argv and the environment share one ceiling; this is what the platform says it is. */
 function argMax(): number {
@@ -59,7 +58,19 @@ function argMax(): number {
   assert.ok(Number.isInteger(said) && said > 0, `getconf ARG_MAX said ${said}`)
   return said
 }
-const ARG_MAX = argMax()
+const ARG_MAX = POSIX ? argMax() : 0
+
+/**
+ * Why a describe below does not run here, or false when it does. A block filled to ARG_MAX is
+ * a statement about this tool on Linux and a statement about the kernel anywhere else, so it
+ * runs on Linux; a single 90,000 character entry is under every POSIX ceiling and over every
+ * bound the field dictionary states, so it runs wherever a POSIX exec does.
+ */
+const LINUX_ONLY = process.platform === 'linux'
+  ? false
+  : `a block at ARG_MAX is ${process.platform}'s own limit, not this tool's; docs/STABILITY.md carries it`
+const POSIX_ONLY = POSIX ? false : 'a Windows command line is capped at 32,767 characters'
+
 
 /**
  * The largest single entry this file will build. Linux caps one argv or environment string at
@@ -129,35 +140,23 @@ function assertTypedRefusal(ran: Ran, what: string): void {
   assert.equal(ran.code, EXIT_OF.VALIDATION, `${what}: exited ${ran.code} rather than ${EXIT_OF.VALIDATION}`)
 }
 
-/** KiB of stack the main thread actually has, or undefined where the shell reports no limit. */
-function stackRlimitKib(): number | undefined {
-  const said = execFileSync('sh', ['-c', 'ulimit -s'], { encoding: 'utf8' }).trim()
-  const kib = Number(said)
-  return Number.isInteger(kib) && kib > 0 ? kib : undefined
-}
-
-describe('the shipped executable asks for a stack between the two bounds that are real', () => {
-  it('asks for more than the runtime\'s own default, which is what the default crashed under', (t) => {
-    const kib = stackKibOf(FLAGS)
-    assert.ok(
-      kib > V8_DEFAULT_STACK_KIB,
-      `the shebang asks for ${kib} KiB, and ${V8_DEFAULT_STACK_KIB} KiB is the default a 990,547 byte block exhausted`,
+describe('the shipped executable starts on every userland this package says it runs on', () => {
+  it('names no env option and no node flag, because BusyBox env has neither', () => {
+    const shebang = shebangOf(ROOT)
+    assert.equal(
+      portabilityProblem(shebang), undefined,
+      `bin/treadle.js opens with ${shebang}, and the tool has to start under BusyBox env too`,
     )
-    t.diagnostic(`${kib} KiB requested, ${V8_DEFAULT_STACK_KIB} KiB default, ARG_MAX ${ARG_MAX} bytes here`)
   })
 
-  // The cost of asking for too much, which is why this bound exists as well: a V8 stack near
-  // the thread's own means a deep call faults rather than throwing, and a segfault is worse
-  // than the RangeError this shebang exists to prevent.
-  it('stays under half the main thread\'s own stack, so a deep call still throws', (t) => {
-    const rlimit = stackRlimitKib()
-    if (rlimit === undefined) return t.skip('this shell reports no stack limit to compare against')
-    const kib = stackKibOf(FLAGS)
-    assert.ok(
-      kib * 2 <= rlimit,
-      `the shebang asks for ${kib} KiB of V8 stack and the main thread has ${rlimit} KiB`,
+  // The regression itself, spelled as its own case so the sentence in the failure names it.
+  it('is not the -S line that stopped treadle starting on node:24-alpine', () => {
+    const shebang = shebangOf(ROOT)
+    assert.equal(
+      shebang.includes('-S'), false,
+      `${shebang} needs env -S, which BusyBox 1.37.0 does not have: measured 2026-09-07, `
+        + '`treadle version` printed "env: unrecognized option: S" and exited 1 on node:24-alpine',
     )
-    t.diagnostic(`${kib} KiB requested against a ${rlimit} KiB thread stack`)
   })
 
   it('gives the bundle the entry point\'s own line, through the function the build calls', () => {
@@ -170,7 +169,7 @@ describe('the shipped executable asks for a stack between the two bounds that ar
   })
 })
 
-describe('a block at this platform\'s ceiling is an answer, not a crash', () => {
+describe('a block at this platform\'s ceiling is an answer, not a crash', { skip: LINUX_ONLY }, () => {
   let work: string
 
   before(async () => {
@@ -204,7 +203,7 @@ describe('a block at this platform\'s ceiling is an answer, not a crash', () => 
   })
 })
 
-describe('the largest single entry this platform carries is a typed refusal', () => {
+describe('the largest single entry this platform carries is a typed refusal', { skip: POSIX_ONLY }, () => {
   let work: string
   // On macOS this is a megabyte; on Linux it is one entry under MAX_ARG_STRLEN. Both are far
   // past every bound the field dictionary states, which is what the refusal has to say.
