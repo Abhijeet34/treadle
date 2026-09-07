@@ -11,7 +11,7 @@ import { isTerminal, type Instant, type ItemId, type WorkItemSummary } from './t
 const DAY_MS = 86_400_000
 
 /** The ceiling `next` scores against, so one forgotten item cannot own the ranking. */
-export const MAX_OVERDUE_DAYS = 30
+export const MAX_OVERDUE_DAYS = 60
 
 /**
  * True when the item is wanted by an instant that has passed and the work is still open.
