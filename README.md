@@ -19,8 +19,8 @@ The floor is the oldest Node.js release line still inside its official support w
 A release never ships with a floor on a line that reaches end of life within six months of that release date.
 
 Linux, macOS and Windows, and any POSIX userland including BusyBox: the executable opens with `#!/usr/bin/env node` and asks for nothing a userland may not have.
-One platform limit is worth knowing before you meet it. On macOS an argument block over roughly 984 KiB kills the process inside Node's own startup, before treadle runs at all, because the kernel puts argv and the environment on the stack V8 measures its limit against.
-No workflow produces one by accident and no code here can catch it; [docs/STABILITY.md](docs/STABILITY.md) carries the measurement and the two ways round it.
+One platform limit is worth knowing before you meet it. On macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all, because the kernel puts argv and the environment on the stack V8 measures its limit against.
+No workflow produces one by accident and no code here can catch it; [docs/STABILITY.md](docs/STABILITY.md) carries the measurement and the decision to keep it rather than trade it for a launcher that fails on Windows.
 
 The published package has zero runtime dependencies, and that is a budget rather than a coincidence: the index is `node:sqlite`, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
 

@@ -41,10 +41,13 @@ reads that line rather than spelling a second copy, and `scripts/shebang.ts`'s
 BusyBox does not have, and the day the line carried `-S node --stack-size=3072` the installed
 tool answered `env: unrecognized option: S` and exited 1 on `node:24-alpine`. The cost is one
 platform limit rather than a crash protection: on macOS an argv-plus-environment block over
-about 984 KiB kills the process inside Node's own bootstrap, which no code here can catch.
+about 955 KB kills the process inside Node's own bootstrap, which no code here can catch. That
+limit is removable by a `#!/bin/sh` launcher, and that trade was measured and declined on
+2026-09-08: on `windows-2025` the sh launcher stops the tool starting in every native Windows
+shell, and both PowerShells report exit 0 while doing so.
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
-measurements; `docs/architecture/adr/0009-release-and-supply-chain.md` carries the release
-design, and `docs/RELEASING.md` how a release happens and how to roll one back.
+measurements and the trade; `docs/architecture/adr/0009-release-and-supply-chain.md` carries
+the release design, and `docs/RELEASING.md` how a release happens and how to roll one back.
 
 Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
 the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release
@@ -567,8 +570,10 @@ Put macOS and Windows coverage on a weekly `schedule:` plus `workflow_dispatch`,
 Do not add a `macos-*` or `windows-*` runner to a job that runs on `pull_request`.
 Never add `cancel-in-progress` to a release, publish, or scheduled workflow: cancelling a publish mid-flight causes real damage, and a superseded scheduled run is the only record of its own result.
 
-`cross-platform.yml` is that weekly matrix, `release.yml` gates `artifacts` on it, and its `installed` job is the only thing anywhere that runs the packed tarball's own binary rather than the suite from a checkout.
-Dispatch it by hand (`gh-axi workflow run cross-platform.yml --ref <branch>`) whenever a branch touches the store, a path, the shebang, or the human rendering: `ci.yml` is Linux and cannot see any of them, and the first run this workflow ever had was red on two platforms.
+`cross-platform.yml` is that weekly matrix, `release.yml` gates `artifacts` on it, and its `installed` and `installed-windows` jobs are the only things anywhere that run the packed tarball's own binary rather than the suite from a checkout.
+`installed` covers the two POSIX `env` implementations; `installed-windows` covers `cmd.exe` and PowerShell, which npm shims rather than links, so the bundle's first line decides what program those shims run.
+Dispatch the workflow by hand (`gh-axi workflow run cross-platform.yml --ref <branch>`) whenever a branch touches the store, a path, the shebang, or the human rendering: `ci.yml` is Linux and cannot see any of them, and the first run this workflow ever had was red on two platforms.
+A `workflow_dispatch` only fires for a workflow that already exists on the default branch, so a new workflow file cannot be dispatched from a branch at all; measure inside an existing one.
 
 ## Writing a test that will run on Windows
 
@@ -578,6 +583,11 @@ Compare paths through `node:path` and never against a literal `/`, and never bui
 Where the invariant can be expressed in what Windows does have, express it: `deleteIndex` in `test/helpers/store-fixtures.ts` removes the index between two opens rather than under a live handle, because Windows will not unlink a file another handle holds.
 That last rule is a production rule too: close a `DatabaseSync` on every path out of the function that opened it, including the throwing ones, or the store cannot rebuild its own cache on Windows.
 The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md`, the shipped schemas and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
+
+Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:
+`npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
+a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;
+and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows does not have, because `CommandNotFoundException` is not a process exit, so a check there asserts the ok line the command should have printed and not the exit code alone.
 
 ## Maintaining this file
 

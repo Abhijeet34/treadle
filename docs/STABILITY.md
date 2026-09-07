@@ -102,39 +102,125 @@ userland runs, BusyBox included.
 That is a support statement: `node:24-alpine` is the smallest official Node image and the one a
 container-based agent reaches for first, and a tool whose first command prints
 `env: unrecognized option: S` has failed before it started.
-`scripts/shebang.ts`'s `portabilityProblem` holds the line and
-`test/cli/oversized-argument.test.ts` asserts it on every platform.
+It is also a Windows statement, because npm does not link on Windows: `cmd-shim` reads that
+first line and writes the program it names into the generated `treadle.cmd` and `treadle.ps1`.
+`scripts/shebang.ts`'s `portabilityProblem` holds the line, `test/cli/oversized-argument.test.ts`
+asserts it on every platform, and the `installed` and `installed-windows` jobs of
+`.github/workflows/cross-platform.yml` start the packed tarball from BusyBox, glibc, `cmd.exe`
+and PowerShell so a first line that stops the tool starting cannot reach a release.
 
-The cost of that line is one platform limit, stated here rather than defended by a flag.
+The cost of that line is one platform limit on macOS, and this section states it as the trade it
+is rather than as something unavoidable.
+
+### The limit, measured
 
 On macOS the kernel places argv and the environment at the top of the main thread's stack and
-V8 sets its own limit `--stack-size` KiB below that top, so a block larger than the default
-984 KiB leaves the isolate with no stack and the process dies inside Node's bootstrap:
+V8 sets its own limit `--stack-size` KiB below that top, so a large enough block leaves the
+isolate with no stack and the process dies inside Node's bootstrap:
 `RangeError: Maximum call stack size exceeded` at `<anonymous_script>:0`, exit 7, before the
 first line of this tool runs.
-Measured 2026-09-07 on Node 24.11.1: eleven arguments of 90,000 characters, a 990,547 byte
-block, crash; the same block delivered as eleven environment variables behind a short command
-line crashes identically; and `node /dev/null "$(cat 1mb)"` crashes with an empty script, which
-is what places the fault in the runtime's startup rather than in any code here.
+That exit 7 is worth naming, because it is the one place a caller sees this tool's
+`INTERNAL` code without the store being in the state that code otherwise reports.
 
-Three consequences follow, and none of them is fixable in this package:
+Measured 2026-09-07 on Node 24.11.1, with a 59-byte environment:
 
-- No check at an entry point can fire, because on the crashing platform the entry point is
-  never evaluated.
-- A wrapper that re-executes node with a larger stack receives the same block and dies before
-  it can exec.
-- `NODE_OPTIONS=--stack-size=3072` is refused by Node itself, so the environment cannot carry
-  the flag either.
+| Case | Result |
+|---|---|
+| Single argument of 955,173 bytes, a block of about 955,270 | survives |
+| Single argument of 955,182 bytes | `RangeError`, exit 7 |
+| Single argument of 1,048,000 bytes, over the 1,048,576 `ARG_MAX` | exit 126, `argument list too long`, from the shell; treadle never runs |
+| The same block delivered as environment variables behind a short command line | dies identically |
+| `node /dev/null "$(cat 1mb)"`, an empty script | dies identically |
 
-Linux does not charge the block against the stack: CI run 34106349134 answered, typed, behind
-4,140,820 bytes of argv and 4,142,278 bytes of environment under the default stack.
-Windows caps a whole command line at 32,767 characters, far below the limit.
+So the ceiling is a block of about 955 KB rather than the nominal 984 KiB, 52 KiB lower,
+because Node's own bootstrap has already spent that much stack before the first JS frame.
+The crash band runs from there to `ARG_MAX`, and it is about 93 KB wide.
+The empty-script case is what places the fault in the runtime's startup rather than in any code
+here, and `ulimit -s` does not move it: the geometry is measured from the top of the stack, not
+from its size.
+
+### Why no valid call reaches it
+
+The field dictionary is checked before anything is written, so the largest command line a legal
+call can produce is bounded well below the band: `MAX_DESCRIPTION` is 10,000 characters,
+`MAX_LINE` is 200, `MAX_REASON` and `MAX_CAUSE` are 500, and a `set` naming every settable field
+at its bound is under 25 KB.
+The band starts 38x above that.
+Every block inside it is a call this tool refuses on every platform; what macOS changes is the
+refusal's shape, from `err VALIDATION` at exit 2 to a `RangeError` at exit 7.
+
+Linux is not uniformly better, which is the part the earlier version of this section left out.
+Debian 12 and Alpine both refuse any single argument over 131,072 bytes with `E2BIG` at exec,
+exit 126, before treadle runs, so the 1,000,000-byte single argument that macOS answers with a
+typed refusal below 955 KB is a kernel refusal on Linux at every size over 128 KiB.
+What Linux does carry better is the total: 23 arguments of 90,000 characters, 2,070,023 bytes,
+answered typed on both images, and a 24th was `E2BIG`.
+CI run 34106349134 answered behind 4,140,820 bytes of argv and 4,142,278 bytes of environment
+on a runner with a raised stack rlimit; under the default 8 MiB stack the Linux total is 2 MiB.
+Windows caps a whole command line at 32,767 characters, far below the band.
+
+### The two launchers that would remove it, and what each costs
+
+A block this size only reaches V8 because V8 is what the kernel execs.
+Put a program that is not V8 on the first line and it can survive the block and hand node a
+larger stack, so the limit is removable.
+Both ways of doing that were built and run, and each costs a platform the package supports.
+
+`#!/usr/bin/env -S node --stack-size=3072` was shipped for one day and reverted.
+BusyBox `env` takes `-i`, `-0` and `-u` and has no `-S`, so on `node:24-alpine`, measured
+2026-09-07, `treadle version` printed `env: unrecognized option: S` and exited 1.
+The first command a stranger runs on the most common small CI image failed.
+
+`#!/bin/sh` with `':' //; exec node --stack-size=2048 "$0" "$@"` on the second line removes the
+band on macOS, glibc and BusyBox alike, and stops the tool starting in every native Windows
+shell.
+Measured 2026-09-08 on `windows-2025` with Node 24.15.0 and npm 11.12.1, from a genuine
+`npm pack` and global install:
+
+| Launcher | `cmd.exe` | PowerShell 7 and Windows PowerShell 5.1 |
+|---|---|---|
+| `#!/usr/bin/env node` | `ok version -`, exit 0 | `ok version -`, exit 0 |
+| `#!/bin/sh` | `The system cannot find the path specified.`, exit 1 | `The term '/bin/sh.exe' is not recognized as a name of a cmdlet, function, script file, or executable program.`, exit **0** |
+| `#!/usr/bin/env sh` | `ok version -`, exit 0 | `ok version -`, exit 0 |
+| `#!/usr/bin/env sh`, no POSIX `sh` on `PATH` | `'"sh"' is not recognized as an internal or external command`, exit 1 | `The term 'sh.exe' is not recognized`, exit **0** |
+
+`treadle init` and `treadle file task` behave as their `version` row does, in both shells.
+The exit 0 is the reason this trade is worse than it reads: npm's `treadle.ps1` assigns
+`$ret=$LASTEXITCODE` after a call that never happened, so a `CommandNotFoundException` leaves
+the exit code at 0 and a Windows user's script sees success over a launcher that never ran.
+
+`#!/usr/bin/env sh` is the near miss.
+It starts in all three native Windows shells and on `node:24-alpine` and `node:24-trixie-slim`,
+but only because npm's shim resolves a bare `sh` through `PATH` and the machine happened to
+carry Git for Windows.
+Take that off `PATH` and it fails exactly like `#!/bin/sh`, invisibly in PowerShell.
+It does not make treadle run on Windows; it makes treadle run on a Windows machine that already
+has something else installed.
+
+### The decision, and what it gives up
+
+Keep `#!/usr/bin/env node`.
+Decided 2026-09-08 after the Windows measurement, recorded as `macos-argv-band-vs-windows-shims`.
+
+What that gives up is one refusal shape, on one platform, for a block between about 955 KB and
+1 MiB that the field dictionary refuses everywhere anyway.
+What the alternatives would have given up is a platform that works today, in exchange for a
+failure mode that reports success.
+A limit a valid call cannot reach costs less than a silent failure a stranger can reach on their
+first run.
+
+Two consequences of keeping the line, so nobody re-derives them:
+
+- No check at an entry point can fire, because on the crashing platform the entry point is never
+  evaluated.
+- `NODE_OPTIONS=--stack-size=3072` is refused by Node itself, so the environment cannot carry the
+  flag either.
 
 What holds everywhere is the bound on the value rather than on the block: `MAX_CAUSE` and
 `MAX_LINE` bound what a refusal prints and the field dictionary bounds what a value may be, so
 any argument this tool actually reads is a typed refusal with no stack trace.
-If a workflow genuinely needs to pass a megabyte on macOS, pass it through a file and a field
-the dictionary sizes, or run node with `--stack-size=3072` yourself.
+If a workflow genuinely needs to pass a megabyte on macOS, pass it through a file and a field the
+dictionary sizes, or run node with `--stack-size=3072` yourself.
 
 ## Deprecation
 
