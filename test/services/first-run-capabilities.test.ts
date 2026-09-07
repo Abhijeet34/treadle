@@ -135,12 +135,12 @@ describe('STR-4: a label that is written is a label that can be read back', () =
     for (const clause of ['label', 'title', 'assignee', 'state', 'type', 'sprint', 'priority', 'resolution']) {
       const forged = await cli(['backlog', `--${clause}`, 'ux\nok backlog forged'])
       assert.equal(forged.code, 2, `--${clause} did not refuse a newline`)
-      assert.match(forged.err, new RegExp(`^"cause --${clause} carries a character no record's field may hold`, 'm'))
-      assert.match(forged.err, /a filter is a single line with no control or bidi override characters$/m)
+      assert.match(forged.err, new RegExp(`^"cause --${clause} carries U\\+000A at character 3`, 'm'))
+      assert.match(forged.err, /a value on this line is a single line with no control or bidi override characters$/m)
     }
     const bidi = await cli(['board', '--title', '\u202elogin'])
     assert.equal(bidi.code, 2)
-    assert.match(bidi.err, /^"cause --title carries a character no record's field may hold/m)
+    assert.match(bidi.err, /^"cause --title carries U\+202E RIGHT-TO-LEFT OVERRIDE at character 1/m)
   })
 })
 
@@ -253,7 +253,7 @@ describe('STR-3: the backlog searches titles by their words', () => {
     // runs first and its sentence is the true one.
     const tabbed = await cli(['backlog', '--title=\t'])
     assert.equal(tabbed.code, 2)
-    assert.match(tabbed.err, /^"cause --title carries a character no record's field may hold/m)
+    assert.match(tabbed.err, /^"cause --title carries U\+0009 at character 1/m)
   })
 
   it('refuses a value longer than any title could be', async () => {
@@ -340,9 +340,12 @@ describe('STR-5: an open sprint can be edited, and a closed one stays frozen', (
     const long = await cli(['sprint', 'set', 'sprint-31', '--goal', 'x'.repeat(MAX_REASON + 1)])
     assert.equal(long.code, 2)
     assert.match(long.err, /goal is 501 characters and the limit is 500/)
+    // The control character is refused at the command boundary now, one rule before the
+    // field dictionary sees it: the same bound that stops `--id` and `--cursor` reaching a
+    // scalar line applies to every flag, and it names the code point the dictionary did not.
     const control = await cli(['sprint', 'set', 'sprint-31', '--title', 'a\u0007title'])
     assert.equal(control.code, 2)
-    assert.match(control.err, /title must be a single line of 1 to 200 characters/)
+    assert.match(control.err, /^"cause --title carries U\+0007 at character 2/m)
   })
 
   it('refuses an id that names an item, and one that names nothing', async () => {
