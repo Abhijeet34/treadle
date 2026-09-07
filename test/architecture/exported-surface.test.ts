@@ -23,12 +23,20 @@
 // consumer keeps one alive. Eleven values sat in that position when this rule was widened,
 // so the re-export clauses are stripped out of the reference text before the match.
 //
-// A document IS a reader. `MAX_GOAL`, `MAX_EVIDENCE_REF` and `nextTowardDone` are named in
-// docs/DOMAIN.md as the domain core's published surface, which is a deliberate claim about
-// the symbol and not an accident, so the tracked Markdown counts alongside the code.
+// docs/DOMAIN.md IS a reader, and it is the only document that is. It publishes the domain
+// core's surface, so naming a symbol there is a deliberate claim about it; `MAX_GOAL`,
+// `MAX_EVIDENCE_REF` and `nextTowardDone` are exported for that and nothing else. No other
+// document counts, and a decision record least of all: an ADR names the symbols it argued
+// about at the time it was written and goes on naming them after they are gone, so counting
+// one would have let `auditSprint`, `gateContextFor` and `BOARD_COLUMNS` through on the
+// strength of ADR-0023, ADR-0022 and ADR-0018 respectively.
 //
-// The reference scan is a word match over every `.ts` in the tree, `bin/`, and the tracked
-// Markdown. That is deliberately lenient in one direction only: an unrelated local or a
+// Only `src/` is held. Nine values under `test/`, `bench/` and `scripts/` are in the same
+// position and are left alone deliberately: a helper exported for symmetry inside a suite
+// costs nothing that ships, and only `src` reaches `dist/treadle.js`.
+//
+// The reference scan is a word match over every `.ts` in the tree, `bin/`, and that one
+// document. That is deliberately lenient in one direction only: an unrelated local or a
 // prose word of the same name reads as a reference and lets an export through, which
 // under-reports. It cannot invent a reference for a name that appears nowhere else, which is
 // the direction that matters.
@@ -55,8 +63,12 @@ const SOURCES = filesUnder(path.join(ROOT, 'src'), ['.ts'])
 const EVERYWHERE = ['src', 'test', 'bench', 'scripts'].flatMap(
   (dir) => filesUnder(path.join(ROOT, dir), ['.ts']),
   ).concat(filesUnder(path.join(ROOT, 'bin'), ['.js']))
-  .concat(filesUnder(path.join(ROOT, 'docs'), ['.md']))
-  .concat(['README.md', 'AGENTS.md', 'CONTRIBUTING.md'].map((name) => path.join(ROOT, name)))
+  .concat([path.join(ROOT, 'docs', 'DOMAIN.md')])
+  // This file names the symbols it was written against, and a word match cannot tell a
+  // comment from a call: leaving it in the reference set would exempt every example above
+  // from the rule the examples exist to explain. Measured: with it in, re-exporting
+  // `auditSprint` passed.
+  .filter((file) => file !== fileURLToPath(import.meta.url))
 
 /** `export const X`, `export function X`, `export async function X`, `export class X`. */
 const VALUE_EXPORT = /^export (?:async )?(?:function|const|let|class) ([A-Za-z_$][\w$]*)/gm

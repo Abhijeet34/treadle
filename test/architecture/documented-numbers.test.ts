@@ -391,17 +391,22 @@ describe('every document that counts the renderings counts the renderer seam', (
 })
 
 describe('every document that counts the seams counts the seam table', () => {
-  // The table in docs/ARCHITECTURE.md is the register; three documents quote its length.
+  // The table in docs/ARCHITECTURE.md is the register, and three documents quote its length.
+  // docs/architecture/adr/README.md's "DR6 names six seams" is deliberately not held to it:
+  // that sentence counts the design record rather than this tree, so a seam added here would
+  // leave it right and this assertion wrong.
+  const heading = /^## The ([a-z]+) seams$/m.exec(ARCHITECTURE)
   const section = ARCHITECTURE.slice(ARCHITECTURE.indexOf('\n## The '), ARCHITECTURE.indexOf('\n## Storage'))
   const seams = [...section.matchAll(/^\| [^|]+ \((?:built|not built|evaluator built)\) \|/gm)].length
 
   it('the table has as many rows as its own heading spells', () => {
     assert.ok(seams > 0, 'docs/ARCHITECTURE.md has no seam table')
-    assert.equal(spelled(lineWith('docs/ARCHITECTURE.md', ARCHITECTURE, '## The '), 'seams'), seams,
+    assert.ok(heading !== null, 'docs/ARCHITECTURE.md has no "## The <number> seams" heading')
+    assert.equal(NUMBER_WORDS[(heading[1] as string).toLowerCase()], seams,
       `docs/ARCHITECTURE.md's seam heading spells a number its own table does not carry; the table has ${seams} rows`)
   })
 
-  for (const file of ['README.md', 'AGENTS.md', 'docs/ARCHITECTURE.md', 'docs/architecture/adr/README.md']) {
+  for (const file of ['README.md', 'AGENTS.md', 'docs/ARCHITECTURE.md']) {
     it(`${file} spells the number of seams the table carries`, () => {
       assert.equal(spelled(read(file), 'seams'), seams,
         `${file} names a seam count docs/ARCHITECTURE.md's table does not carry; it has ${seams} rows`)
