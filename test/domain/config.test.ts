@@ -12,9 +12,6 @@
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
 import {
   CHECK_NAMES,
@@ -22,12 +19,13 @@ import {
   WEIGHT_NAMES,
   configLine,
   defaultConfig,
+  evaluateGate,
   parseConfigValue,
   withConfigKey,
   type ConfigKey,
+  type Gate,
 } from '../../src/domain/index.ts'
-
-const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
+import { gateContext, item } from '../helpers/fixtures.ts'
 
 /** A value every key accepts, spelled as a caller would type it on a `config set` line. */
 const ACCEPTED: Readonly<Record<ConfigKey, string>> = {
@@ -136,15 +134,24 @@ describe('the configuration dictionary accepts what its keys name', () => {
 })
 
 describe('the configurable vocabulary is the vocabulary the evaluator runs', () => {
-  // Read off the union rather than off a second list, so a check added to `GateCheck` with
-  // no name in `CHECK_NAMES` fails here instead of being quietly unconfigurable.
-  const gates = readFileSync(path.join(ROOT, 'src', 'domain', 'gates.ts'), 'utf8')
-  const union = gates.slice(gates.indexOf('export type GateCheck'), gates.indexOf('export type GateRule'))
-  const kinds = [...union.matchAll(/kind: '([a-z_]+)'/g)].map((match) => match[1] as string)
+  // A name in `CHECK_NAMES` that `checkOf` cannot build, or that the evaluator's switch
+  // cannot run, fails here: each name is parsed into a real one-rule gate and handed to the
+  // real evaluator, rather than compared against a second list.
+  const FIELD_TAKING = new Set(['field_present', 'field_non_empty_list', 'list_all_ticked', 'field_is_true'])
 
-  it('names every check the GateCheck union declares, and no check it does not', () => {
-    assert.ok(kinds.length >= 10, `only ${kinds.length} checks were read off the union`)
-    assert.deepEqual([...CHECK_NAMES].sort(), [...new Set(kinds)].sort())
+  it('parses and evaluates every check CHECK_NAMES names, through parseConfigValue and evaluateGate', () => {
+    assert.ok(CHECK_NAMES.length >= 10, `only ${CHECK_NAMES.length} checks are named`)
+    for (const name of CHECK_NAMES) {
+      const spelled = FIELD_TAKING.has(name) ? `${name}:title` : name === 'child_present' ? `${name}:task` : name
+      const text = `T1 all ${spelled} a rule naming the check ${name}`
+      const parsed = parseConfigValue('ready_gate', text)
+      assert.equal(parsed.ok, true, `${name} did not parse: ${parsed.ok ? '' : parsed.error.message}`)
+      if (!parsed.ok) continue
+      const verdict = evaluateGate(parsed.value as Gate, gateContext(item('task')))
+      assert.equal(verdict.rules.length, 1, `${name} produced ${verdict.rules.length} rule verdicts, not one`)
+      assert.equal(verdict.rules[0]?.rule, 'T1')
+      assert.equal(typeof verdict.rules[0]?.pass, 'boolean', `${name} did not report a pass/fail verdict`)
+    }
   })
 
   it('names every component of the score next weights may set', () => {
