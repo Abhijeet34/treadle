@@ -29,7 +29,7 @@ import { randomBytes } from 'node:crypto'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
 import { openExclusive } from './atomic.ts'
 
-export const HEARTBEAT_MS = 200
+const HEARTBEAT_MS = 200
 export const STALE_MS = 5_000
 const RETRY_MIN_MS = 5
 const RETRY_MAX_MS = 25

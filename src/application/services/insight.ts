@@ -67,7 +67,7 @@ export const DEFAULT_NEXT_LIMIT = 3
 const SEVERITY_RANK: Readonly<Record<BugSeverity, number>> = { S1: 4, S2: 3, S3: 2, S4: 1 }
 
 /** 4 for an S1 down to 1 for an S4, and 0 for anything with no severity. */
-export function severityRank(item: WorkItemSummary): number {
+function severityRank(item: WorkItemSummary): number {
   return item.severity === undefined ? 0 : SEVERITY_RANK[item.severity]
 }
 
@@ -184,7 +184,7 @@ export type Score = {
   readonly parts: string
 }
 
-export function ageDays(filed: string, now: string): number {
+function ageDays(filed: string, now: string): number {
   const days = Math.floor((Date.parse(now) - Date.parse(filed)) / DAY_MS)
   return Math.max(0, Math.min(MAX_AGE_DAYS, Number.isFinite(days) ? days : 0))
 }

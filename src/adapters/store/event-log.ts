@@ -123,7 +123,7 @@ export function parseEventLine(line: string, file: string, at: number): StoreRes
 }
 
 /** The event keys the index carries as columns; the rest of the line is stored beside them. */
-export const EVENT_COLUMN_KEYS = ['id', 'at', 'entity', 'op', 'actor', 'txn'] as const
+const EVENT_COLUMN_KEYS = ['id', 'at', 'entity', 'op', 'actor', 'txn'] as const
 
 /**
  * The half of an event the index does not hold in a column, as JSON.

@@ -31,7 +31,7 @@ export type Actor = {
 }
 
 /** The bound the three identity fields of the dictionary already carry. */
-export const MAX_ACTOR = 200
+const MAX_ACTOR = 200
 
 /**
  * Why an actor cannot be recorded, or `undefined`. The value comes from a flag or from the

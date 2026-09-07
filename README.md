@@ -7,7 +7,7 @@ A backlog that lives in a hand-written markdown list is one the tool cannot enfo
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
-The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
+The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
 `bin/treadle.js` runs twenty commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
@@ -57,7 +57,7 @@ Neither is required and nothing prompts for one, so a workspace run without eith
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 2,041 tests in 121 seconds on Node 24.11.1 on 2026-09-07, on a shared machine under a load average of 6.93.
+The suite ran 2,097 tests in 128 seconds on Node 24.11.1 on 2026-09-08, on a shared machine whose 1-minute load average was 2.65 when the run started and 8.21 when it ended, most of that rise being the run's own children.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
@@ -114,8 +114,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
-| Hierarchy roll-up: points, done points, progress and descendant counts over a subtree | Implemented in the domain core; `rollUp` has no caller, so no command surfaces it |
-| `doctor`: twelve findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
+| `doctor`: twelve findings over records, the event log, the relation graph, the parent hierarchy, the sprint records and impediments; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
 | Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
 | Ceremonies, metrics, export, completions | Specified, not implemented |
@@ -159,9 +158,9 @@ The five that are `done` carry the commit that shipped them as evidence, and eac
 - [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
 
-Every figure in this file that can be derived from the tree is held to it by `test/architecture/documented-numbers.test.ts`: the command list against the inventory, the type count against `WORK_ITEM_TYPES`, the backlog figures against `.work`, the doctor's finding ids against what `doctor` raises, the Node floor against `engines.node`, and the bundle budget against `bench/budgets.json`.
+Every figure in this file that can be derived from the tree is held to it by `test/architecture/documented-numbers.test.ts`: the command list against the inventory, the type count against `WORK_ITEM_TYPES`, the backlog figures against `.work`, the doctor's finding ids and their count against what `doctor` raises, the threat model's totals against the register in `test/security/findings.test.ts`, the axis counts against what the rig emits, the rendering count against `RENDERINGS`, the seam count against the table in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the Node floor against `engines.node`, and the bundle budget against `bench/budgets.json`.
 Every number that test now checks was correct on the day it was written and went stale in silence, which is the case a habit does not catch and a test does.
-What it deliberately does not check is a measurement: a wall time, a byte count of the tree or a coverage decimal moves on a commit that changed nothing about the claim, and [docs/VERIFICATION.md](docs/VERIFICATION.md) carries those with the run they came from.
+What it deliberately does not check is a measurement: a wall time, a test count, a byte count of the tree or a coverage decimal is a figure of a run rather than of a tree, and moves on a commit that changed nothing about the claim. [docs/VERIFICATION.md](docs/VERIFICATION.md) carries those with the run they came from, and what the test holds about the two in the paragraph above is that neither is ever printed here without the runtime and the date it was measured on.
 
 ## Licence
 

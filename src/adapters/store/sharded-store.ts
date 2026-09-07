@@ -70,7 +70,7 @@ export const WORKSPACE_FILE = 'workspace.md'
  * Every sprint, in one file beside the shards. A sprint spans months, so a month key would
  * be a lie about it, and there are few enough that one file is read whole (ADR-0016).
  */
-export const SPRINTS_FILE = 'sprints.md'
+const SPRINTS_FILE = 'sprints.md'
 /** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
 const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'
@@ -645,7 +645,7 @@ export class ShardedStore implements Store {
 
   /**
    * Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an edge
-   * a hand edit or a git merge put in a file, and the roll-up runs over exactly that data.
+   * a hand edit or a git merge put in a file, and every parent walk reads exactly that data.
    * The walk needs the parent edges and nothing else, so it reads two index columns rather
    * than decoding every record.
    *
@@ -1138,7 +1138,7 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
   }
 }
 
-export function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
+function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
   return { id: sprint.id, file, line, state: sprint.state, filed_at: sprint.filed_at, source }
 }
 

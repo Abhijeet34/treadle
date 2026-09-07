@@ -5,7 +5,6 @@
 // this file, and test/architecture/layering.test.ts is the enforcement.
 
 export {
-  DOMAIN_ERROR_CODES,
   fail,
   ok,
   type DomainError,
@@ -64,7 +63,6 @@ export {
   FIELD_KEY_PATTERN,
   FORBIDDEN_FIELD_KEYS,
   buildRecord,
-  isForbiddenFieldKey,
   validateFieldKeys,
 } from './record.ts'
 
@@ -78,8 +76,6 @@ export {
 } from './text.ts'
 
 export {
-  COMMON_FIELDS,
-  FIELD_ALIASES,
   MAX_DESCRIPTION,
   MAX_EVIDENCE_ENTRIES,
   MAX_EVIDENCE_LABEL,
@@ -136,16 +132,13 @@ export {
   cycleAbove,
   findParentCycle,
   hierarchyFrom,
-  rollUp,
   setParent,
   type HierarchyGraph,
-  type RollUp,
 } from './hierarchy.ts'
 
 export {
   MAX_GOAL,
   SPRINT_FIELDS,
-  SPRINT_STATES,
   carryOver,
   membersOf,
   dateOf,

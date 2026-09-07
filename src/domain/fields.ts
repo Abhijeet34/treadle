@@ -47,7 +47,7 @@ export const MAX_EVIDENCE_LABEL = 120
  */
 export const MAX_RELATION_ENTRIES = 50
 
-export const COMMON_FIELDS = [
+const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'description', 'priority', 'points', 'hours_estimate', 'parent_id',
   'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due', 'evidence',
@@ -112,7 +112,7 @@ export function isKnownField(name: string): boolean {
  * was told it was not a field. Every path resolves a caller's spelling through
  * `canonicalField` before it decides anything, so neither name can be the unknown one.
  */
-export const FIELD_ALIASES: Readonly<Record<string, string>> = {
+const FIELD_ALIASES: Readonly<Record<string, string>> = {
   item: 'id',
   filed: 'filed_at',
   v: 'version',
@@ -293,7 +293,7 @@ export function asInstant(value: string): string {
 }
 
 /** The clause the two day-taking fields add to their refusal, so a caller learns the form. */
-export const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
+const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
 
 export type ValidateOptions = {
   readonly now: Instant

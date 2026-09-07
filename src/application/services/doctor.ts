@@ -354,7 +354,7 @@ export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | '
  * four members printed `99/4`, and a close writes each of these numbers off the set it froze,
  * so no write path produces one over it.
  */
-export function auditSprint(sprint: Sprint, known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
+function auditSprint(sprint: Sprint, known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
   const findings: DoctorFinding[] = []
   for (const field of ['carried', 'finished'] as const) {
     for (const id of sprint[field] ?? []) {

@@ -25,7 +25,7 @@ import { noSprint } from './items.ts'
 export const BOARD_STATES: readonly WorkItemState[] = ['draft', 'ready', 'in_progress', 'in_review', 'on_hold']
 
 /** Every column `backlog` has, and `blocked`: the active blockers of the row, which needs the graph. */
-export const BOARD_COLUMNS: readonly ColumnSpec[] = [...ITEM_COLUMNS, { name: 'blocked' }]
+const BOARD_COLUMNS: readonly ColumnSpec[] = [...ITEM_COLUMNS, { name: 'blocked' }]
 
 /** State is the grouping key, so it is not a default column; `blocked` is the board's reason to exist. */
 export const DEFAULT_BOARD_COLUMNS = ['id', 'type', 'pts', 'sev', 'blocked', 'title'] as const

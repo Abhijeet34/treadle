@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-// Parent/child hierarchy, allowed pairs, cycle detection and roll-up (domain model 2.3).
+// Parent/child hierarchy, allowed pairs and cycle detection (domain model 2.3).
 // The depth and cycle tests are the regression for threat-model finding F8: write-time
-// cycle detection is bypassed by a hand edit and by a git merge, so the roll-up has to
-// refuse a cycle it is handed rather than recurse into it.
+// cycle detection is bypassed by a hand edit and by a git merge, so the parent walk has to
+// refuse a chain it is handed rather than recurse into it.
 
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
@@ -13,7 +13,6 @@ import {
   WORK_ITEM_TYPES,
   findParentCycle,
   hierarchyFrom,
-  rollUp,
   setParent,
 } from '../../src/domain/index.ts'
 import type { WorkItem } from '../../src/domain/index.ts'
@@ -93,103 +92,51 @@ describe('cycle detection on write', () => {
   })
 })
 
-describe('F8 the roll-up is bounded', () => {
-  it('refuses a hand-edited hierarchy cycle instead of recursing into it', () => {
-    const cycle = hierarchyFrom([
-      item('epic', { id: 'epic-a', parent_id: 'epic-b' }),
-      item('epic', { id: 'epic-b', parent_id: 'epic-a' }),
-    ])
-    const error = errorOf(rollUp(cycle, 'epic-a'))
-    assert.equal(error.code, 'INTEGRITY')
-    assert.equal(error.rule, 'P2')
-    assert.ok(error.message.includes('epic-a'), error.message)
-  })
-
-  it('refuses a self-parent cycle the same way', () => {
-    const cycle = hierarchyFrom([item('task', { id: 'task-a', parent_id: 'task-a' })])
-    assert.equal(errorOf(rollUp(cycle, 'task-a')).rule, 'P2')
-  })
-
-  it('refuses a chain deeper than the stated ceiling rather than overflowing the stack', () => {
-    const depth = MAX_HIERARCHY_DEPTH + 5
-    const chain = Array.from({ length: depth }, (_, i) =>
-      item('task', {
-        id: `task-${String(i).padStart(4, '0')}`,
-        ...(i + 1 < depth ? { parent_id: `task-${String(i + 1).padStart(4, '0')}` } : {}),
-      }))
-    // Deepest first: the root is the last element, so a roll-up from it walks the whole chain.
-    const error = errorOf(rollUp(hierarchyFrom(chain), `task-${String(depth - 1).padStart(4, '0')}`))
-    assert.equal(error.code, 'INTEGRITY')
-    assert.equal(error.rule, 'P3')
-    assert.ok(error.message.includes(String(MAX_HIERARCHY_DEPTH)), error.message)
-  })
+describe('F8 the parent walk is bounded', () => {
+  /** A chain a hand edit could leave: story parented to story is not an allowed pair, so
+   *  no write makes this and only the load path can hand it to the walk. */
+  const storyChain = (depth: number) => hierarchyFrom(Array.from({ length: depth }, (_, i) =>
+    item('story', {
+      id: `story-${String(i).padStart(4, '0')}`,
+      ...(i + 1 < depth ? { parent_id: `story-${String(i + 1).padStart(4, '0')}` } : {}),
+    })))
 
   it('states a ceiling that is a real number, not Infinity', () => {
     assert.ok(Number.isInteger(MAX_HIERARCHY_DEPTH) && MAX_HIERARCHY_DEPTH > 0)
   })
 
-  it('walks a chain exactly at the ceiling without refusing', () => {
-    const depth = MAX_HIERARCHY_DEPTH
-    const chain = Array.from({ length: depth }, (_, i) =>
-      item('task', {
-        id: `task-${String(i).padStart(4, '0')}`,
-        ...(i + 1 < depth ? { parent_id: `task-${String(i + 1).padStart(4, '0')}` } : {}),
-      }))
-    unwrap(rollUp(hierarchyFrom(chain), `task-${String(depth - 1).padStart(4, '0')}`))
-  })
-})
-
-describe('roll-up', () => {
-  const epic = item('epic', { id: 'sso', state: 'in_progress' })
-  const stories = [
-    item('story', { id: 'sso-saml', parent_id: 'sso', points: 8, state: 'done' }),
-    item('story', { id: 'sso-oidc', parent_id: 'sso', points: 5, state: 'in_progress' }),
-    item('story', { id: 'sso-scim', parent_id: 'sso', points: 3, state: 'cancelled' }),
-  ]
-
-  it('sums the points of non-cancelled descendants and excludes cancelled ones from both sides', () => {
-    const summary = unwrap(rollUp(hierarchyFrom([epic, ...stories]), 'sso'))
-    assert.equal(summary.points, 13)
-    assert.equal(summary.donePoints, 8)
-    assert.equal(summary.progress, 8 / 13)
-  })
-
-  it('counts direct children and done children', () => {
-    const summary = unwrap(rollUp(hierarchyFrom([epic, ...stories]), 'sso'))
-    assert.equal(summary.children, 2)
-    assert.equal(summary.doneChildren, 1)
-  })
-
-  it('reports progress as null rather than a division by zero when nothing is estimated', () => {
-    const bare = hierarchyFrom([item('epic', { id: 'e' }), item('task', { id: 't', parent_id: 'e' })])
-    assert.equal(unwrap(rollUp(bare, 'e')).progress, null)
-  })
-
-  it('rolls up through a grandchild', () => {
+  it('refuses a parent chain a hand edit already closed into a cycle', () => {
     const graph = hierarchyFrom([
-      epic,
-      item('story', { id: 'sso-saml', parent_id: 'sso', points: 8, state: 'in_progress' }),
-      item('task', { id: 'saml-meta', parent_id: 'sso-saml', points: 2, state: 'done' }),
+      item('story', { id: 'story-1', parent_id: 'story-2' }),
+      item('story', { id: 'story-2', parent_id: 'story-1' }),
+      item('task', { id: 'loose-task' }),
     ])
-    const summary = unwrap(rollUp(graph, 'sso'))
-    assert.equal(summary.points, 10)
-    assert.equal(summary.donePoints, 2)
-    assert.equal(summary.descendants, 2)
-    assert.equal(summary.children, 1)
+    const error = errorOf(setParent(graph, 'loose-task', 'story-1'))
+    assert.equal(error.code, 'INTEGRITY')
+    assert.equal(error.rule, 'P2')
+    assert.ok(error.message.includes('story-1'), error.message)
   })
 
-  it('excludes a cancelled parent subtree entirely, not just the cancelled item', () => {
+  it('refuses a parent chain deeper than the stated ceiling rather than overflowing the stack', () => {
     const graph = hierarchyFrom([
-      epic,
-      item('story', { id: 'sso-saml', parent_id: 'sso', points: 8, state: 'cancelled' }),
-      item('task', { id: 'saml-meta', parent_id: 'sso-saml', points: 2, state: 'done' }),
+      ...[...storyChain(MAX_HIERARCHY_DEPTH + 5).parentOf].map(([id, parent_id]) =>
+        item('story', { id, parent_id })),
+      item('story', { id: `story-${String(MAX_HIERARCHY_DEPTH + 4).padStart(4, '0')}` }),
+      item('task', { id: 'loose-task' }),
     ])
-    const summary = unwrap(rollUp(graph, 'sso'))
-    assert.equal(summary.points, 0)
-    assert.equal(summary.descendants, 0)
+    const error = errorOf(setParent(graph, 'loose-task', 'story-0000'))
+    assert.equal(error.code, 'INTEGRITY')
+    assert.equal(error.rule, 'P3')
+    assert.ok(error.message.includes(String(MAX_HIERARCHY_DEPTH)), error.message)
   })
 
-  it('refuses to roll up an id the graph does not hold', () => {
-    assert.equal(errorOf(rollUp(hierarchyFrom([epic]), 'nowhere')).rule, 'P4')
+  it('walks a parent chain exactly at the ceiling without refusing', () => {
+    const graph = hierarchyFrom([
+      ...[...storyChain(MAX_HIERARCHY_DEPTH).parentOf].map(([id, parent_id]) =>
+        item('story', { id, parent_id })),
+      item('story', { id: `story-${String(MAX_HIERARCHY_DEPTH - 1).padStart(4, '0')}` }),
+      item('task', { id: 'loose-task' }),
+    ])
+    unwrap(setParent(graph, 'loose-task', 'story-0000'))
   })
 })

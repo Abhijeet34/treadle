@@ -236,7 +236,7 @@ function duplicateOf(view: WorkspaceView, item: WorkItem): GateItem | undefined 
   return edge === undefined ? undefined : gateItems(view, [edge.target])[0]
 }
 
-export function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
+function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
   const original = duplicateOf(view, item)
   return {
     item,
@@ -255,7 +255,7 @@ export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = DE
   return evaluateGate(gate, gateContextFor(view, item))
 }
 
-export function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
+function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
   return childrenGates(view, id).filter((child) => child.state !== 'done' && child.state !== 'cancelled')
 }
 
