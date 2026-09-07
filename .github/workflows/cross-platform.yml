@@ -50,15 +50,6 @@ jobs:
           set -euo pipefail
           npm run build
           node scripts/check-dist-fresh.ts
-          # TEMPORARY, for the demonstration only: the sh launcher written over the built
-          # bundle, so this job faces the launcher the decision is about.
-          {
-            printf '%s\n' '#!/bin/sh'
-            printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
-            tail -n +2 dist/treadle.js
-          } > dist/treadle.next
-          mv dist/treadle.next dist/treadle.js
-          chmod +x dist/treadle.js
           mkdir -p pack
           npm pack --ignore-scripts --pack-destination pack
           # `./` is load-bearing: npm reads `pack/treadle-0.1.0.tgz` as the `owner/repo`
@@ -107,80 +98,33 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "treadle file exited $LASTEXITCODE from PowerShell" }
           if ($filed -notmatch 'ok file') { throw "treadle file answered no ok line from PowerShell" }
 
-  # TEMPORARY. `#!/usr/bin/env sh` answered from cmd and PowerShell in run 34152092418, but
-  # only because the shim resolves a bare `sh` on PATH and this runner has Git for Windows.
-  # This job takes Git off PATH and asks the same question.
-  pathless:
-    name: env-sh without Git on PATH
+  # TEMPORARY. The same job with the `#!/bin/sh` launcher written over the bundle and the
+  # cmd step dropped, so the PowerShell guard alone has to catch it. It exists because that
+  # guard cannot rest on the exit code: PowerShell left `$LASTEXITCODE` at 0 on this exact
+  # launcher in run 34152092418. This job must be RED; it comes out before the branch ships.
+  installed-windows-broken-ps:
+    name: broken launcher, PowerShell guard only
     runs-on: windows-2025
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-        shell: bash
-      - name: Build the env-sh launcher, pack it and install it
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run build
-          {
-            printf '%s\n' '#!/usr/bin/env sh'
-            printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
-            tail -n +2 dist/treadle.js
-          } > dist/treadle.next
-          mv dist/treadle.next dist/treadle.js
-          mkdir -p pack
-          npm pack --ignore-scripts --pack-destination pack
-          npm install --global --ignore-scripts "./$(ls pack/treadle-*.tgz)"
-          echo "NODE_DIR=$(cygpath -w "$(dirname "$(which node)")")" >> "$GITHUB_ENV"
-          echo "NPM_PREFIX=$(npm prefix -g)" >> "$GITHUB_ENV"
-      - name: cmd.exe with no sh on PATH
-        shell: cmd
-        run: |
-          set "PATH=%NODE_DIR%;%NPM_PREFIX%;C:\Windows\system32;C:\Windows"
-          where sh
-          echo WHERE_SH_EXIT=%ERRORLEVEL%
-          call treadle version
-          echo VERSION_EXIT=%ERRORLEVEL%
-          exit /b 0
-      - name: PowerShell with no sh on PATH
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Continue'
-          $env:PATH = "$env:NODE_DIR;$env:NPM_PREFIX;C:\Windows\system32;C:\Windows;C:\Windows\System32\WindowsPowerShell\v1.0"
-          Write-Host "sh on PATH: $((Get-Command sh -ErrorAction SilentlyContinue) | Out-String)"
-          treadle version
-          Write-Host "VERSION_EXIT=$LASTEXITCODE"
-          exit 0
 
-  # TEMPORARY. A Windows answer is worth nothing if the same first line stops the tool
-  # starting on the two POSIX userlands `installed` already covers, so env-sh is measured
-  # there too before it can be offered as a shape that keeps both sides.
-  posix-env-sh:
-    name: env-sh on ${{ matrix.image }}
-    runs-on: ubuntu-24.04
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        image: [node:24-alpine, node:24-trixie-slim]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .nvmrc
           cache: npm
+
       - run: npm ci
-      - name: Build the env-sh launcher and pack it
+        shell: bash
+
+      - name: Build, pack and install the tarball a user would install
+        shell: bash
         run: |
           set -euo pipefail
           npm run build
+          node scripts/check-dist-fresh.ts
           {
-            printf '%s\n' '#!/usr/bin/env sh'
+            printf '%s\n' '#!/bin/sh'
             printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
             tail -n +2 dist/treadle.js
           } > dist/treadle.next
@@ -188,17 +132,32 @@ jobs:
           chmod +x dist/treadle.js
           mkdir -p pack
           npm pack --ignore-scripts --pack-destination pack
-      - name: Install it and run the happy path
+          # `./` is load-bearing: npm reads `pack/treadle-0.1.0.tgz` as the `owner/repo`
+          # GitHub shorthand and tries `git ls-remote ssh://git@github.com/pack/...`, which
+          # failed this job at exit 128 in run 34151979303.
+          npm install --global --ignore-scripts "./$(ls pack/treadle-*.tgz)"
+          prefix=$(npm prefix -g)
+          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadle/dist/treadle.js")"
+          echo "the program npm's shim will run:"
+          grep -E '^\s+SET "_prog=' "$prefix/treadle.cmd"
+
+      - name: PowerShell starts the installed binary
+        shell: pwsh
         run: |
-          set -euo pipefail
-          docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
-            set -eu
-            npm install --global --ignore-scripts /pack/treadle-*.tgz >/dev/null 2>&1
-            head -2 /usr/local/lib/node_modules/treadle/dist/treadle.js
-            treadle version
-            echo "VERSION_EXIT=$?"
-            mkdir -p /tmp/ws && cd /tmp/ws
-            treadle init --name installed-smoke
-            treadle file story "The installed binary filed this"
-            treadle status | head -1
-          '
+          # The exit code alone is not evidence here. Measured 2026-09-08 in run 34152092418:
+          # with a `#!/bin/sh` first line the `.ps1` shim named `/bin/sh.exe`, PowerShell
+          # raised CommandNotFoundException, nothing ran, and `$LASTEXITCODE` stayed 0. So
+          # each command is checked for the ok line it should have printed as well.
+          $version = (treadle version 2>&1 | Out-String)
+          Write-Host $version
+          if ($LASTEXITCODE -ne 0) { throw "treadle version exited $LASTEXITCODE from PowerShell" }
+          if ($version -notmatch 'ok version') { throw "treadle version answered no ok line from PowerShell" }
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwsh-ws" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\pwsh-ws"
+          $init = (treadle init --name pwsh-smoke 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadle init exited $LASTEXITCODE from PowerShell" }
+          if ($init -notmatch 'ok init') { Write-Host $init; throw "treadle init answered no ok line from PowerShell" }
+          $filed = (treadle file task "The installed binary filed this from PowerShell" 2>&1 | Out-String)
+          Write-Host $filed
+          if ($LASTEXITCODE -ne 0) { throw "treadle file exited $LASTEXITCODE from PowerShell" }
+          if ($filed -notmatch 'ok file') { throw "treadle file answered no ok line from PowerShell" }
