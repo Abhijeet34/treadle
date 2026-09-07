@@ -114,7 +114,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
-| `doctor`: twelve findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
+| `doctor`: twelve findings over records, the event log, the relation graph, the parent hierarchy, the sprint records and impediments; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
 | Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
 | Ceremonies, metrics, export, completions | Specified, not implemented |
@@ -158,9 +158,9 @@ The five that are `done` carry the commit that shipped them as evidence, and eac
 - [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).
 
-Every figure in this file that can be derived from the tree is held to it by `test/architecture/documented-numbers.test.ts`: the command list against the inventory, the type count against `WORK_ITEM_TYPES`, the backlog figures against `.work`, the doctor's finding ids against what `doctor` raises, the Node floor against `engines.node`, and the bundle budget against `bench/budgets.json`.
+Every figure in this file that can be derived from the tree is held to it by `test/architecture/documented-numbers.test.ts`: the command list against the inventory, the type count against `WORK_ITEM_TYPES`, the backlog figures against `.work`, the doctor's finding ids and their count against what `doctor` raises, the threat model's totals against the register in `test/security/findings.test.ts`, the axis counts against what the rig emits, the rendering count against `RENDERINGS`, the seam count against the table in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), the Node floor against `engines.node`, and the bundle budget against `bench/budgets.json`.
 Every number that test now checks was correct on the day it was written and went stale in silence, which is the case a habit does not catch and a test does.
-What it deliberately does not check is a measurement: a wall time, a byte count of the tree or a coverage decimal moves on a commit that changed nothing about the claim, and [docs/VERIFICATION.md](docs/VERIFICATION.md) carries those with the run they came from.
+What it deliberately does not check is a measurement: a wall time, a test count, a byte count of the tree or a coverage decimal is a figure of a run rather than of a tree, and moves on a commit that changed nothing about the claim. [docs/VERIFICATION.md](docs/VERIFICATION.md) carries those with the run they came from, and what the test holds about the two in the paragraph above is that neither is ever printed here without the runtime and the date it was measured on.
 
 ## Licence
 

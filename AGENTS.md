@@ -212,7 +212,7 @@ same audit for one item off the events it already reads. `doctor` raises twelve 
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016,
-`H27` with ADR-0017, and `H28` and `H29` with ADR-0023.
+`H27` with ADR-0017, `H28` and `H29` with ADR-0023, and `H30` with ADR-0025.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
 raises. A membership test here asks whether the store HOLDS an id, served or quarantined,
 and per record kind: a quarantined record still exists, so a neighbour pointing at it is
@@ -242,9 +242,12 @@ Before hand-checking any of these, run the suite: it already checks them.
   clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
 - `tsconfig.json` sets `noUnusedLocals` and `noUnusedParameters`, so an unused local, import
   or parameter fails `npm run typecheck` and cannot land. What tsc cannot see is an export
-  nothing imports, which is therefore the only shape dead code takes here: look for a symbol
-  whose every occurrence tree-wide is its own declaration plus a barrel line in
-  `src/domain/index.ts` or `src/adapters/store/index.ts`. Nothing is published
+  nothing imports, which is therefore the only shape dead code takes here:
+  `test/architecture/exported-surface.test.ts` refuses a value under `src/` that no other
+  file in the tree names, which is what two hand sweeps each missed part of. It holds values
+  and not types, so a type export still needs the reading below, as does a symbol whose only
+  reader outside its file is a barrel line in `src/domain/index.ts` or
+  `src/adapters/store/index.ts`. Nothing is published
   (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
   alive; a test-only caller does not either, with one exception that has already cost a
   sweep. A test that uses a symbol as an independent oracle for the production path is a
@@ -362,10 +365,16 @@ Before hand-checking any of these, run the suite: it already checks them.
 - A number a document states about this tree is held to the tree by
   `test/architecture/documented-numbers.test.ts`: the README's command list against the
   inventory, its type count against `WORK_ITEM_TYPES`, its backlog figures against `.work`,
-  the `H` table in `docs/architecture/adr/README.md` against what `doctor` raises, the Node
+  the `H` table in `docs/architecture/adr/README.md` and the finding count README.md and this
+  file spell against what `doctor` raises, the threat model's total and closed counts against
+  the register in `test/security/findings.test.ts`, the axis total and the measured split
+  against what `bench/` emits, the rendering count against `RENDERINGS`, the seam count
+  against the table in `docs/ARCHITECTURE.md`, the decision-record index against the files in
+  its own directory, `docs/DOMAIN.md`'s state, parent-pair, relation and gate tables against
+  the closed sets `src/domain` declares, the Node
   floor against `engines.node`, and the bundle budget against `bench/budgets.json`. When one
   of those moves, the fix is the sentence, not the assertion. A measurement does not go in
-  that file: a wall time, a byte count of the tree or a coverage decimal moves on a commit
+  that file: a wall time, a test count, a byte count of the tree or a coverage decimal moves on a commit
   that changed nothing about the claim, and those live in `docs/VERIFICATION.md` with the
   date and the load they were taken at. A record a later record overtakes is marked with an
   `**Overtaken in part by:**` line in its own header rather than rewritten.

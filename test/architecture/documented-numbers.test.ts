@@ -364,6 +364,17 @@ describe('every document that counts the benchmark axes counts the rig', () => {
       `the README's Benchmarks row counts axes the rig does not emit; bench/ emits ${axes.size}, of which ${unmeasured} report NOT MEASURED`)
   })
 
+  it('AGENTS.md counts the axes and the two that stay NOT MEASURED', () => {
+    const total = /of the ([a-z]+) comparison axes/.exec(AGENTS)
+    assert.ok(total !== null, 'AGENTS.md has no "<n> of the <n> comparison axes" sentence')
+    assert.equal(NUMBER_WORDS[(total[1] as string).toLowerCase()], axes.size,
+      `AGENTS.md names an axis count the rig does not emit; bench/ emits ${axes.size}`)
+    const stays = /([A-Za-z]+) axes stay `NOT MEASURED`/.exec(AGENTS)
+    assert.ok(stays !== null, 'AGENTS.md has no "<n> axes stay `NOT MEASURED`" sentence')
+    assert.equal(NUMBER_WORDS[(stays[1] as string).toLowerCase()], unmeasured,
+      `AGENTS.md names a NOT MEASURED count bench/axes/remaining.ts does not report; it reports ${unmeasured}`)
+  })
+
   it('the README Documentation list names the same axis count', () => {
     assert.equal(spelled(lineWith('README.md', README, 'docs/BENCHMARKS.md](docs/BENCHMARKS.md)'), 'axes'),
       axes.size, `the README's Documentation entry for docs/BENCHMARKS.md names an axis count the rig does not emit; bench/ emits ${axes.size}`)
