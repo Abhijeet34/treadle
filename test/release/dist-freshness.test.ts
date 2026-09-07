@@ -16,7 +16,9 @@ import { promisify } from 'node:util'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 
-import { distProblems } from '../../scripts/check-dist-fresh.ts'
+import { distProblems, staleAgainst } from '../../scripts/check-dist-fresh.ts'
+import { preflight } from '../../scripts/release-preflight.ts'
+import { workflowOf } from '../helpers/workflow.ts'
 
 const run = promisify(execFile)
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
@@ -102,21 +104,43 @@ describe('a bundle older than its source is not packed', () => {
 describe('the release path runs that gate, and it is not prepack', () => {
   // A `prepack` is the obvious remedy and would never execute: .npmrc turns the lifecycle off
   // as a supply-chain control and supply-chain.test.ts refuses one in the manifest by name.
-  // The clause has to sit in the step the workflow actually runs.
-  it('runs the preflight after the build and before the pack', async () => {
-    const workflow = await (await import('node:fs/promises'))
-      .readFile(path.join(ROOT, '.github', 'workflows', 'release.yml'), 'utf8')
-    const built = workflow.indexOf('npm run build')
-    const preflight = workflow.indexOf('scripts/release-preflight.ts')
-    const packed = workflow.indexOf('npm pack')
-    assert.ok(built >= 0 && preflight >= 0 && packed >= 0, 'the release workflow no longer builds, checks or packs')
-    assert.ok(built < preflight, 'the preflight runs before the build, so it would judge the previous bundle')
-    assert.ok(preflight < packed, 'the tarball is built before anything checks the bundle going into it')
+  // The clause has to sit in the step the workflow actually runs, so this asserts about the
+  // job's own ordered steps rather than about where three substrings fall in the file.
+  it('runs the preflight after the build and before the pack', () => {
+    const job = workflowOf(ROOT, 'release.yml')['artifacts']
+    assert.ok(job !== undefined, 'release.yml no longer has an artifacts job')
+    const at = (want: string): number =>
+      job.steps.findIndex((step) => (step.run ?? '').includes(want))
+    const built = at('npm run build')
+    const preflight = at('scripts/release-preflight.ts')
+    const packed = at('npm pack')
+    assert.ok(built >= 0, 'the artifacts job no longer builds the bundle')
+    assert.ok(preflight >= 0, 'the artifacts job no longer runs the release preflight')
+    assert.ok(packed >= 0, 'the artifacts job no longer packs a tarball')
+    assert.ok(built < preflight, `build is step ${built} and the preflight step ${preflight}, so it judges the previous bundle`)
+    assert.ok(preflight < packed, `the preflight is step ${preflight} and the pack step ${packed}, so the tarball is built before anything checks it`)
   })
 
-  it('reads the freshness clause from the same module this file tests', async () => {
-    const source = await (await import('node:fs/promises'))
-      .readFile(path.join(ROOT, 'scripts', 'release-preflight.ts'), 'utf8')
-    assert.match(source, /staleAgainst/, 'the preflight no longer carries the stale-bundle clause')
+  // The preflight and the freshness check are two modules, and what matters is that the one
+  // the workflow runs actually asks the other. This runs both: a real stale tree through
+  // `staleAgainst`, and its answer through the real `preflight`.
+  it('carries a stale bundle from the checker into a preflight problem', async () => {
+    const root = await aTree(NEW, OLD)
+    try {
+      const stale = staleAgainst(root)
+      assert.equal(stale, path.join('src', 'cli', 'main.ts'), 'the checker did not find the newer source file')
+      const problems = preflight({
+        tag: 'v0.1.0',
+        facts: { objectType: 'tag', commit: 'abc', signed: true, onReleaseBranch: true },
+        manifest: { version: '0.1.0', license: 'Apache-2.0', files: ['dist/'], bin: { treadle: 'dist/treadle.js' }, repository: 'https://github.com/Abhijeet34/treadle' },
+        bundleBytes: 362429,
+        bundleLimit: 512000,
+        staleAgainst: stale,
+        publishing: false,
+      })
+      assert.equal(problems.length, 1, `the preflight did not refuse a stale bundle: ${problems.join('; ')}`)
+      assert.match(problems[0] as string, /src\/cli\/main\.ts/)
+      assert.match(problems[0] as string, /npm run build/)
+    } finally { await rm(root, { recursive: true, force: true }) }
   })
 })

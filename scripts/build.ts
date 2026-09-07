@@ -9,11 +9,13 @@ import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
+import { shebangOf } from './shebang.ts'
+
 const root = fileURLToPath(new URL('..', import.meta.url))
 const outfile = path.join(root, 'dist', 'treadle.js')
 // One source for how the runtime is started. The development entry point already carries the
 // line, and a second copy here is a line that can drift while both files still look right.
-const shebang = readFileSync(path.join(root, 'bin', 'treadle.js'), 'utf8').split('\n')[0] as string
+const shebang = shebangOf(root)
 
 const budgets = JSON.parse(readFileSync(path.join(root, 'bench', 'budgets.json'), 'utf8')) as {
   absolute: Record<string, { limit: number; source: string }>
