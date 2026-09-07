@@ -19,6 +19,7 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
+import { checkRuntime } from '../../src/cli/runtime.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BUNDLE = 'dist/treadle.js'
@@ -209,6 +210,19 @@ describe('the published package is the bundle and nothing else', () => {
     const declared = manifest.devDependencies?.['@types/node'] ?? ''
     assert.equal(declared.replace(/^[\^~]/, '').split('.')[0], floorMajor,
       `@types/node is ${declared} while engines.node floors at ${floorMajor}.x`)
+  })
+
+  it('the floor the CLI names in a refusal is the floor package.json declares', () => {
+    // The one copy a user reads. checkRuntime prints DECLARED_FLOOR to anyone below the hard
+    // floor, so a raise that moved engines.node and left this literal behind would have the
+    // tool naming a version it no longer supports, and the three-places assertion above does
+    // not look here. Derived from the manifest rather than restated, so there is no sixth
+    // literal to keep in step.
+    const declared = (manifest.engines?.node ?? '').replace(/^>=/, '')
+    const result = checkRuntime('23.0.0')
+    assert.equal(result.ok, false)
+    assert.match((result as { cause: string }).cause, new RegExp(declared.replaceAll('.', '\\.')),
+      `checkRuntime's refusal must name ${declared}, the floor package.json declares`)
   })
 })
 

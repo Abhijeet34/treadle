@@ -226,7 +226,14 @@ Before hand-checking any of these, run the suite: it already checks them.
   whose every occurrence tree-wide is its own declaration plus a barrel line in
   `src/domain/index.ts` or `src/adapters/store/index.ts`. Nothing is published
   (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
-  alive; a test-only caller does not either.
+  alive; a test-only caller does not either, with one exception that has already cost a
+  sweep. A test that uses a symbol as an independent oracle for the production path is a
+  consumer, not a caller to be discounted: `scoreOf` in
+  `src/application/services/insight.ts` is reachable from no `src` file, and
+  `test/services/next-scale.test.ts` scores every ready item with it to prove that `rank`'s
+  indexed scores are the same list. Delete it and the property that ADR-0021's index is
+  correct has nothing left holding it. Read what the test does with the symbol before
+  deciding, because a missing wire and dead code look identical to a grep.
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
   filesystem. `test/security/f1-f7-no-execution.test.ts` and
@@ -254,6 +261,11 @@ Before hand-checking any of these, run the suite: it already checks them.
   an API that is absent there and only a test that happens to run the line would catch it.
   Raise `engines.node` first and the bump follows; `.github/dependabot.yml` ignores the major
   until then.
+- `DECLARED_FLOOR` in `src/cli/runtime.ts` is the floor a user reads, because `checkRuntime`
+  prints it to anyone below the hard floor, and the same file asserts it against
+  `engines.node`. The floor is named in five places now: `package.json`, `.nvmrc`,
+  `ci.yml`, `@types/node`'s major and that constant. Raising it means editing all five, and
+  the suite names whichever one is left behind.
 - A pull request may not remove a test the merge base has. `scripts/check-tests-kept.ts`
   compares test titles at `merge-base(origin/main, HEAD)` against the branch head, counts a
   rename and a `.skip` as removals, and takes one `Removes-test: <exact title>` commit trailer

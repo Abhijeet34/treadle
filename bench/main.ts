@@ -43,10 +43,33 @@ type Flags = {
   readonly samples?: number
 }
 
+/** Takes a value; everything else is a switch. Both lists are read by `parseFlags` to decide
+ *  what an argument it does not know is, so a flag added to one of them is refused correctly
+ *  without a third place to edit. */
+const VALUE_FLAGS = ['--out', '--scales', '--samples'] as const
+const SWITCH_FLAGS = ['--rebuild-corpus', '--write-budgets', '--gate'] as const
+
+/** A fault in the invocation rather than in the rig, so it prints its message and no stack. */
+class UsageError extends Error {}
+
 function parseFlags(argv: readonly string[]): Flags {
   const value = (name: string): string | undefined => {
     const at = argv.indexOf(name)
     return at < 0 ? undefined : argv[at + 1]
+  }
+  // An unknown argument used to be ignored, so `--help` generated four corpora and started
+  // measuring, and a mistyped `--gate` ran the whole rig and computed no verdict. Neither
+  // says anything, and both cost the minutes the rig exists to spend carefully.
+  for (let i = 0; i < argv.length; i += 1) {
+    const arg = argv[i] as string
+    if (VALUE_FLAGS.includes(arg as (typeof VALUE_FLAGS)[number])) { i += 1; continue }
+    if (SWITCH_FLAGS.includes(arg as (typeof SWITCH_FLAGS)[number])) continue
+    throw new UsageError(
+      `bench: ${arg} is not an argument of this rig.\n` +
+      `  switches: ${SWITCH_FLAGS.join(' ')}\n` +
+      `  each of these takes a value: ${VALUE_FLAGS.join(' ')}\n` +
+      '  npm run bench runs every scale in bench/bench.config.json; npm run bench:gate adds --gate',
+    )
   }
   const scales = value('--scales')
   const samples = value('--samples')
@@ -263,4 +286,8 @@ async function main(): Promise<void> {
   if (flags.gate && g.failed > 0) process.exitCode = 1
 }
 
-await main()
+await main().catch((error: unknown) => {
+  if (!(error instanceof UsageError)) throw error
+  process.stderr.write(`${error.message}\n`)
+  process.exitCode = 2
+})

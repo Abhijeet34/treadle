@@ -191,6 +191,9 @@ export function toMarkdown(report: RunReport): string {
   push(`Tolerance ${report.gate.tolerancePercent}% over the committed limit, because ${report.gate.toleranceWhy}`)
   push(`Limits derived from run ${report.gate.derivedFrom.runId} on ${report.gate.derivedFrom.date} (${report.gate.derivedFrom.machine}, Node ${report.gate.derivedFrom.node}).`)
   push(`${report.gate.rows.length} budgets: ${report.gate.passed} pass, ${report.gate.failed} fail, ${report.gate.openMisses} open miss, ${report.gate.pending} pending.`)
+  if (!report.gate.timingEnforced) {
+    push(`Every timing row below reads "not build-blocking, for the reason above the table", and this is that reason: ${report.gate.timingWhy}`)
+  }
   push('An open miss is a budget the product has never met. It is reported with its number and does not fail a build for standing still; a regression against a budget that was met does.')
   push('')
   push('| Budget | Observed | Limit | Unit | Status | Note |', '|---|---|---|---|---|---|')

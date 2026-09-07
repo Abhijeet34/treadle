@@ -89,7 +89,8 @@ Refused, for ADR-0014's reason: a budget written before the operation it names e
 ## Consequences
 
 Every figure below is a cold process per sample, seven samples, both trees interleaved on every sample over copies of the same corpora, at 1-minute loads of 4.34 at the start and 4.54 at the end, with `process.resourceUsage().maxRSS` and `performance.now()` read by the child around the operation.
-The transcripts are under `.fm-evidence/` on the branch that landed this.
+Those transcripts were the working record of the branch that landed this and are not committed, because `.gitignore` excludes `.fm-evidence/`.
+The figures below are what they printed, and `bench/budgets.json` carries both as ratio rows, `doctorRssOverWorkspace` and `nextCostOverWorkspace`, so a return of either shape fails the gate rather than resting on a transcript.
 
 **Positive**
 

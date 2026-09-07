@@ -13,6 +13,9 @@ npm run bench -- --write-budgets    # re-derive bench/budgets.json from this run
 npm run bench:gate                  # exit 1 on a regression past the stated tolerance
 ```
 
+An argument that is none of these exits 2 and names the two lists it checked against,
+rather than running the whole rig on a typo.
+
 Parameters that decide what a figure means live in `bench.config.json`, not in a flag list:
 the seed, the scales, the sample count per scale, the parallel-writer counts and the size of
 the malformed-input corpus. `TREADLE_BENCH_DIR` overrides the base the rig works under.
