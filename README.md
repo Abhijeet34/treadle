@@ -115,7 +115,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
 | Hierarchy roll-up: points, done points, progress and descendant counts over a subtree | Implemented in the domain core; `rollUp` has no caller, so no command surfaces it |
-| `doctor`: eleven findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
+| `doctor`: twelve findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
 | Boards, as a projection: `board` groups by state and scopes to the open sprint; work-in-progress limits and board membership are not stored, so guards `G3` and `G4` stay disarmed | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md) |
 | Ceremonies, metrics, export, completions | Specified, not implemented |

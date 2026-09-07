@@ -255,6 +255,7 @@ export class WorkspaceAudit {
     return [
       ...this.#entries.flatMap((entry) => [
         ...this.#ofItem(entry),
+        ...auditParentOf(known, entry.item),
         ...auditRelationsOf(known, entry.item),
         ...auditImpediment(entry.item),
       ]),
@@ -275,6 +276,27 @@ export function auditItem(
   audit.record(item)
   for (const event of events) audit.event(event)
   return audit.ofOne()
+}
+
+/**
+ * A `parent_id` naming a record the store does not hold (H30). The store refuses to write
+ * one, so this reports what reached the files by the routes D1 permits: a hand edit, a git
+ * merge, a build older than that rule. It is the same test `H24` runs for a relation's
+ * target and `H26` for a `sprint_id`, against the same held-or-served set, and it was the
+ * one neighbour of the three with no finding at all - `doctor` exited 0 over a record whose
+ * parent had gone, while `show` went on printing the parent as though it were there.
+ */
+export function auditParentOf(
+  known: ReadonlySet<ItemId>, item: Pick<WorkItemSummary, 'id' | 'parent_id'>,
+): readonly DoctorFinding[] {
+  const parent = item.parent_id
+  if (parent === undefined || known.has(parent)) return NONE
+  return [{
+    rule: 'H30',
+    id: item.id,
+    where: 'parent_id',
+    detail: `parent_id names ${parent} and no record here carries that id; treadle set ${item.id} parent_id= drops it`,
+  }]
 }
 
 /**

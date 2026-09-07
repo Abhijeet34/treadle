@@ -10,10 +10,14 @@
 //
 // The guards below are all one rule read two ways: a removal is refused exactly where it
 // would leave another record naming something the store no longer holds, because that is the
-// shape `doctor` raises as `H24`, `H26` and `H28`, and a write that manufactures a finding is
-// a write the tool should not perform. An item's own state gates nothing, because no state
-// makes another record depend on it; what does is a closed sprint that counted it, an edge
-// pointing at it, or a child parented to it.
+// shape `doctor` raises as `H24`, `H26`, `H28` and `H30`, and a write that manufactures a
+// finding is a write the tool should not perform. An item's own state gates nothing, because
+// no state makes another record depend on it; what does is a closed sprint that counted it,
+// an edge pointing at it, or a child parented to it.
+//
+// These guards decide against a read taken before the store's lock, so they cannot see a
+// neighbour written after it. That half of the rule is the store's, as `S17` inside the lock
+// (ADR-0025); this half is what gives a caller the cause and the line that clears it.
 
 import { fieldsOf, overLength, MAX_REASON, type ItemId, type WorkItem } from '../../domain/index.ts'
 import { errorResult, okResult, type ResultObject, type ResultShape, type Value } from '../result.ts'
@@ -192,14 +196,13 @@ export async function removeItem(
   const now = clock.now()
   const txn = ids.txn()
   const eventId = ids.event()
-  // The transaction names no read set. `guardReads` exists for a decision made against a
-  // neighbour that then moves, and every guard above is about a neighbour that does not exist
-  // yet: an edge or a child written after this read and before this write would be left
-  // dangling, and no read set can name a record that is not there to be read. The window is
-  // the one every guard here already has, the store's own lock is what narrows it, and
-  // `doctor` reports the result as `H24` or the hierarchy's own finding. Closing it needs a
-  // write-time hook on "nothing may point at this id", which is a store-level rule rather
-  // than a bigger read set.
+  // The transaction names no read set, and that is not the gap it used to be. `guardReads`
+  // exists for a decision made against a neighbour that then moves, and every guard above is
+  // about a neighbour that does not exist yet, which no `reads` entry can name. The store
+  // closes that window under the lock it already takes: `S17` refuses this removal if any
+  // record still names the id when the write is about to land (ADR-0025). `R6` above stays
+  // because it fires first, with the friendlier cause and the fix lines, in the ordinary
+  // case where the neighbour was already there.
   const applied = await store.apply({
     txn,
     writes: [],

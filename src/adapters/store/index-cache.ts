@@ -99,6 +99,11 @@ create index if not exists items_file on items(file);
 drop index if exists items_state;
 create index if not exists items_state_filed on items(state, filed_at, id);
 create index if not exists items_filed on items(filed_at, id);
+-- \`where parent = ?\` is the referential check S17 runs inside the write lock on every
+-- removal, and the column was unindexed: 8.85 ms of full scan at 50,000 rows against
+-- 0.006 ms indexed. Partial, because four rows in five carry no parent and \`= ?\` never
+-- matches null; it serves \`parentEdges\` too, which reads exactly that subset.
+create index if not exists items_parent on items(parent) where parent is not null;
 -- Sprints are few and are read whole, so the table carries the source and the two columns
 -- the one read orders on, and nothing a scan would filter by.
 create table if not exists sprints (
@@ -655,6 +660,41 @@ export class IndexCache {
       .prepare('select parent from items where id = ?')
       .get(id) as unknown as { parent: string | null } | undefined
     return row?.parent ?? undefined
+  }
+
+  /**
+   * The first served record whose parent is this id and that `skip` does not name, or
+   * undefined. `items_parent` is the index that makes it one lookup rather than a scan, and
+   * S17 runs it under the write lock on every removal.
+   *
+   * `skip` bounds the row count rather than becoming an `id not in (...)` clause: the caller
+   * passes every id its transaction touches, and a bulk transaction would otherwise build a
+   * parameter list against SQLite's own variable ceiling. One more row than `skip` names is
+   * always enough to find a referrer outside it, or to prove there is none.
+   */
+  childOf(parent: string, skip: readonly string[] = []): string | undefined {
+    const rows = this.#open()
+      .prepare('select id from items where parent = ? limit ?')
+      .all(parent, skip.length + 1) as unknown as readonly { id: string }[]
+    return rows.find((row) => !skip.includes(row.id))?.id
+  }
+
+  /**
+   * The first served record storing an edge at this id, or undefined. `relations` holds a
+   * record's edges as the JSON array the record itself carries, so this is a scan of the
+   * rows that carry one: 12.2 ms at 50,000 items and the bench corpus's edge density,
+   * 26.5 ms at three times that density, both on a machine at a 1-minute load of 2.8. An
+   * `edges(source, kind, target)` table maintained where `relations` is written would make
+   * it indexed, and is the move to make when a measurement asks for it rather than now.
+   *
+   * `skip` bounds the rows returned, for the reason `childOf`'s does.
+   */
+  relationTo(target: string, skip: readonly string[] = []): { readonly id: string; readonly kind: string } | undefined {
+    const rows = this.#open()
+      .prepare("select items.id as id, json_extract(value, '$.kind') as kind from items, json_each(items.relations) where json_extract(value, '$.target') = ? limit ?")
+      .all(target, skip.length + 1) as unknown as readonly { id: string; kind: string }[]
+    const row = rows.find((entry) => !skip.includes(entry.id))
+    return row === undefined ? undefined : { id: row.id, kind: row.kind }
   }
 
   /**

@@ -208,7 +208,7 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. `doctor` raises eleven of them and
+same audit for one item off the events it already reads. `doctor` raises twelve of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016,
@@ -414,6 +414,9 @@ Everything else is derived on read from that one direction: `show`'s inverse row
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
 `addRelation` returns the ids whose edges its cycle check read, and the writer passes them as the transaction's `reads`, which the store refuses with `S10` if one moved: without that, two processes adding the two halves of a cycle at once both landed.
 `guardReads` in `src/application/services/context.ts` is the same read set for every guard and gate rule that reads a neighbour, and `transition` and `sprint commit` pass it: a start decided against a done blocker landed after the blocker was reopened, and an accept landed after a done child was, until they did.
+A read set closes a decision made against a neighbour that then MOVES, and closes nothing about a neighbour that did not exist when the decision was made: an edge, a child's parent or a closed sprint's member written between `readWorkspace` and the write is nameable by no `reads` entry, and `remove`'s `R6` guards are all of that shape.
+That half is the store's, as `S17` inside the lock `apply` already holds (ADR-0025), so a guard about a neighbour that does not exist yet belongs there and not in a bigger read set.
+Two rules of it are load-bearing and neither is obvious: it checks the write that INTRODUCES a reference rather than the reference, or a record whose parent has already gone is refused every write including the remedy `H30` prints; and it does not check a relation target on a write at all, because an edge naming a record the store does not hold is `H24`, a state a hand edit may leave and a file that carries one must still be writable.
 A new guard that reads another record's state adds that record there, or `test/services/guard-race.test.ts` is where its race shows.
 Both traversals walk an adjacency map; a traversal that filters the relation list per node visited is the shape that put `doctor` at 12.3 s over 3,600 edges.
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.

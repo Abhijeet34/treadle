@@ -13,6 +13,7 @@ ADR-0019 belongs to no design record either: like ADR-0013 it answers an inciden
 ADR-0021 carries the next free number for ADR-0014's reason: it reshapes two commands the design never priced, found the first time the corpus carried a relation graph.
 ADR-0022 carries the next free number because it answers one audit's findings across four of the records above rather than belonging to any one of them.
 ADR-0024 carries the next free number for the same reason, over a second audit's findings and one captain decision about which of them to build.
+ADR-0025 carries the next free number because it answers a scout report's measurement of ADR-0024's own rule at the wrong layer.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -40,6 +41,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) | A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time |
 | [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) | A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked |
 | [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and the label, title-word and open-sprint readers that were missing |
+| [ADR-0025](0025-the-referential-rule-lives-under-the-write-lock.md) | No transaction may leave a record naming an id the store does not hold, checked inside the lock the write already takes rather than against a read taken before it, with `H30` reporting the ones the files already carry |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -73,6 +75,7 @@ The set is closed.
 | `S14` | Two events in the store share an id |
 | `S15` | A path inside the store is a symbolic link, which the store never follows |
 | `S16` | The lock was lost while held: the holder stalled past the heartbeat window and another writer reclaimed it |
+| `S17` | A removal would leave a record naming the removed id: a child's parent, a stored relation edge, or a closed sprint's committed set |
 
 ## The doctor's finding ids
 
@@ -89,6 +92,9 @@ came with ADR-0016, for a `sprint_id` written before sprints were records. ADR-0
 `H27`, which needs only the impediment's own record, and ADR-0022 narrows it to an
 impediment past `draft`, because `file` lands one in `draft` and the finding used to fire
 between the two commands the tool prescribes.
+ADR-0025 argues `H30`, the parent's half of `H24`: the store refuses to write a `parent_id`
+naming a record it does not hold, and this reports the ones a hand edit, a git merge or an
+older build left behind, which nothing reported at all.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -105,6 +111,7 @@ between the two commands the tool prescribes.
 | `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
 | `H28` | `doctor` | A closed sprint's `members` or `carried` list names an id no record here carries, so the sprint counts a member nothing can show |
 | `H29` | `doctor` | A closed sprint's frozen tally is larger than the set it was counted over, which no close writes |
+| `H30` | `doctor`, `explain` | A record's `parent_id` names an item the store does not hold, so the record reads as a child of nothing |
 
 ## The CLI's rule ids
 
