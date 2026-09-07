@@ -35,13 +35,16 @@ tests use. `npm run build` bundles that same entry file to `dist/treadle.js` wit
 that bundle is what `bin` points at and `files` ships: no source reaches the tarball. Change
 the entry file, not one of the two.
 
-`bin/treadle.js`'s shebang is load-bearing and carries the reason in its own header: it starts
-node with `--stack-size`, because the default V8 stack is smaller than an argv block execve
-will carry and the process dies before any line of this tool runs. `scripts/build.ts` reads
-that line rather than spelling a second copy. The consequence to know: `node dist/treadle.js`
-bypasses the shebang and is not the shipped interface, so reproduce an argument-size question
-against the executable itself. `docs/architecture/adr/0009-release-and-supply-chain.md`
-carries why, and `docs/RELEASING.md` carries how a release happens and how to roll one back.
+`bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way. `scripts/build.ts`
+reads that line rather than spelling a second copy, and `scripts/shebang.ts`'s
+`portabilityProblem` refuses an `env` option or a node flag on it: both need `env -S`, which
+BusyBox does not have, and the day the line carried `-S node --stack-size=3072` the installed
+tool answered `env: unrecognized option: S` and exited 1 on `node:24-alpine`. The cost is one
+platform limit rather than a crash protection: on macOS an argv-plus-environment block over
+about 984 KiB kills the process inside Node's own bootstrap, which no code here can catch.
+`docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
+measurements; `docs/architecture/adr/0009-release-and-supply-chain.md` carries the release
+design, and `docs/RELEASING.md` how a release happens and how to roll one back.
 
 Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
 the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release
