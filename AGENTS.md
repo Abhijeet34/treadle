@@ -447,10 +447,13 @@ whose `sprint_id` points at the sprint, plus what the close recorded as `carried
 `committedTo` in `src/application/services/sprints.ts` is the one place that union is made.
 A close leaves unfinished items pointing at the closed sprint; `next`'s `spr` component is
 1 only for a member of an open sprint, so leftover work is not boosted until it is
-committed onward. A close also freezes what it tallied, in `done` and `done_points` on the
-record, because `committedTo` restores what the carry-over took away and a live count over
-a closed sprint therefore rises as that work is finished elsewhere; a sprint closed before
-those fields carries neither and reads live. A sprint admits `draft` work and every surface
+committed onward. A close also freezes what it tallied, in `done`, `done_points` and
+`cancelled` on the record, because `committedTo` restores what the carry-over took away and
+a live count over a closed sprint therefore rises as that work is finished elsewhere; a
+sprint closed before those fields carries none of them and reads live. `I2` also refuses a
+reopen once a carried item has since been committed onward: a reopen clears `carried`, and
+dropping that item would shrink a record a team already read. A sprint admits `draft` work
+and every surface
 that commits or reads a committed set names it through `notGroomed` in `context.ts`, rather
 than refusing it, because `file --sprint` files in `draft` by construction. ADR-0022 argues
 both. `sprint_id` is owned by `sprint commit` in `writerOf`, and `file --sprint`
