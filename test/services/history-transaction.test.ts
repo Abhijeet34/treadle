@@ -1,0 +1,208 @@
+// SPDX-License-Identifier: Apache-2.0
+// `history --txn <id>`: the transaction-scoped half of the reader `history <id>` opened.
+//
+// Every event the log holds carries the `txn` of the write that made it, and a mutation's
+// own result hands that id back on its envelope. Until this flag there was no way to spend
+// it: an agent that had just run `sprint commit sprint-31 a b c` and been told `ok sprint
+// probe tj0vksb 3` could ask what changed about one item at a time, or open the JSONL.
+//
+// The case that makes it worth a flag is the one where a command writes several events. The
+// three `item.commit` rows of that transaction render an identical `what` cell,
+// `sprint_id=(unset)->sprint-31`, so the record each one moved is the only thing telling them
+// apart and it is not on the row. That is why the transaction-scoped read leads the `what`
+// cell with `entity=<id>` and the entity-scoped read does not: there it is the `item` scalar
+// and constant on every row.
+
+import assert from 'node:assert/strict'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { describe, it, before, after } from 'node:test'
+
+import { history } from '../../src/application/services/history.ts'
+import { makeEvent } from '../../src/application/services/mutation.ts'
+import { agentRenderer } from '../../src/adapters/render/agent.ts'
+import { humanRenderer } from '../../src/adapters/render/human.ts'
+import { jsonRenderer } from '../../src/adapters/render/json.ts'
+import { EXIT_OF } from '../../src/application/result.ts'
+import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
+import { runCli, type Run } from '../helpers/cli-run.ts'
+
+const ENV = { TREADLE_ACTOR: 'dana' }
+
+type Rows = { readonly shown: number; readonly total: number; readonly rows: readonly Record<string, unknown>[] }
+
+/** The transaction id off a mutation's envelope, which is where a caller gets one. */
+function txnOf(run: Run): string {
+  const first = run.out.split('\n')[0] ?? ''
+  const txn = first.split(' ')[3]
+  assert.ok(txn !== undefined && txn !== '-', `no transaction id on ${first}`)
+  return txn
+}
+
+describe('history --txn lists every event one command wrote', () => {
+  let root: string
+  let commit: string
+  let removal: string
+  const cli = (argv: readonly string[]): Promise<Run> => runCli(argv, { cwd: root, env: ENV })
+
+  before(async () => {
+    root = await mkdtemp(path.join(tmpdir(), 'treadle-txn-'))
+    const must = async (argv: readonly string[]): Promise<Run> => {
+      const run = await cli(argv)
+      assert.equal(run.code, 0, `${argv.join(' ')}: ${run.err}`)
+      return run
+    }
+    await must(['init', '--name', 'txn'])
+    for (const id of ['auth-refresh', 'sso-saml', 'rate-limit']) {
+      await must(['file', 'story', `Story ${id}`, '--id', id, '--points', '3', '--set', 'acceptance_criteria=one|two'])
+      await must(['transition', id, 'ready'])
+    }
+    await must(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2030-01-31'])
+    commit = txnOf(await must(['sprint', 'commit', 'sprint-31', 'auth-refresh', 'sso-saml', 'rate-limit']))
+    await must(['file', 'task', 'Filed twice', '--id', 'login-cta-2'])
+    removal = txnOf(await must(['remove', 'login-cta-2', '--reason', 'filed twice by the same import', '--yes']))
+  })
+
+  after(async () => { await rm(root, { recursive: true, force: true }) })
+
+  it('names the record each event moved, which the entity-scoped read leaves to its scalar', async () => {
+    const run = await cli(['history', '--txn', commit])
+    assert.equal(run.code, 0, run.err)
+    assert.match(run.out, new RegExp(`^transaction ${commit}$`, 'm'), run.out)
+    assert.match(run.out, /^~events 3 3$/m, run.out)
+    for (const id of ['auth-refresh', 'sso-saml', 'rate-limit']) {
+      assert.match(run.out, new RegExp(`item\\.commit entity=${id},sprint_id=\\(unset\\)->sprint-31 dana$`, 'm'), run.out)
+    }
+    // The entity-scoped read is unchanged: one record, so the entity is the scalar.
+    const one = await cli(['history', 'auth-refresh'])
+    assert.equal(one.code, 0, one.err)
+    assert.match(one.out, /^item auth-refresh$/m, one.out)
+    assert.doesNotMatch(one.out, /entity=/, one.out)
+  })
+
+  it('says the record is gone, exactly as the entity-scoped read does', async () => {
+    const run = await cli(['history', '--txn', removal])
+    assert.equal(run.code, 0, run.err)
+    assert.match(run.out, /item\.remove entity=login-cta-2/, run.out)
+    assert.match(run.out, /^"note .*no record here carries/m, run.out)
+  })
+
+  it('refuses an id and --txn together, and names both readings', async () => {
+    const run = await cli(['history', 'auth-refresh', '--txn', commit])
+    assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
+    assert.match(run.err, /ask different questions/, run.err)
+    assert.match(run.err, /^fix treadle history auth-refresh$/m, run.err)
+    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+  })
+
+  it('names both readings when the line names neither', async () => {
+    const run = await cli(['history'])
+    assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
+    assert.match(run.err, /--txn/, run.err)
+  })
+
+  it('refuses an unknown transaction by name, rather than answering with an empty list', async () => {
+    const run = await cli(['history', '--txn', 'tzzzzzz'])
+    assert.equal(run.code, EXIT_OF.NOT_FOUND, run.out + run.err)
+    assert.match(run.err, /^entity tzzzzzz$/m, run.err)
+    assert.match(run.err, /names no transaction here/, run.err)
+    // An empty answer and a wrong id must not read the same.
+    assert.doesNotMatch(run.out, /~events 0 0/, run.out)
+  })
+
+  it('answers an event id with the transaction that wrote it', async () => {
+    const listed = await cli(['history', '--txn', commit, '--out', 'json'])
+    assert.equal(listed.code, 0, listed.err)
+    const rows = (JSON.parse(listed.out) as { data: { events: Rows } }).data.events.rows
+    const eventId = await (async (): Promise<string> => {
+      // The event ids are not on the row, so they come off the cursor the page line carries.
+      const paged = await cli(['history', '--txn', commit, '--limit', '1', '--out', 'json'])
+      const page = (JSON.parse(paged.out) as { data: { page?: string } }).data.page
+      assert.ok(page !== undefined, 'a three-event transaction paged at one prints no page line')
+      return page.split(' ').at(-1) as string
+    })()
+    assert.equal(rows.length, 3)
+    const run = await cli(['history', '--txn', eventId])
+    assert.equal(run.code, EXIT_OF.NOT_FOUND, run.out + run.err)
+    assert.match(run.err, /is an event here, not a transaction/, run.err)
+    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+  })
+
+  it('refuses an unknown cursor with a first page that keeps the transaction', async () => {
+    const run = await cli(['history', '--txn', commit, '--cursor', 'nope'])
+    assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
+    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+  })
+
+  it('carries the transaction through all three renderings', async () => {
+    for (const rendering of ['agent', 'json', 'human']) {
+      const run = await cli(['history', '--txn', commit, '--out', rendering])
+      assert.equal(run.code, 0, run.err)
+      assert.ok(run.out.includes(commit), `${rendering} does not name the transaction`)
+      assert.ok(run.out.includes('auth-refresh'), `${rendering} does not name the record`)
+    }
+  })
+
+  it('is named by help, so a caller finds it by asking', async () => {
+    const run = await cli(['help', 'history'])
+    assert.equal(run.code, 0, run.err)
+    assert.match(run.out, /--txn <txn>/, run.out)
+  })
+})
+
+describe('a transaction larger than one page', () => {
+  let demo: Demo
+  const TXN = 't0050'
+  const SIZE = 50
+
+  before(async () => {
+    demo = await aDemoWorkspace()
+    const applied = await demo.store.apply({
+      txn: TXN,
+      writes: [],
+      events: Array.from({ length: SIZE }, (_, at) => makeEvent({
+        id: `e5${String(at).padStart(3, '0')}`,
+        at: '2026-09-05T09:00:00Z',
+        actor: { id: 'dana', kind: 'human' },
+        entity: 'auth-refresh',
+        op: 'item.set',
+        txn: TXN,
+        command: 'set',
+        before: { assignee: '-' },
+        after: { assignee: `dev${at}` },
+      })),
+    })
+    assert.equal(applied.ok, true, 'the fifty-event transaction was refused')
+  })
+
+  after(async () => { await demo.dispose() })
+
+  it('pages at the limit and continues under the same transaction', async () => {
+    const first = await history(demo.store, { scope: { kind: 'txn', txn: TXN }, limit: 9 })
+    assert.equal(first.ok, true)
+    const events = first.data['events'] as Rows
+    assert.equal(events.shown, 9)
+    assert.equal(events.total, SIZE)
+    assert.equal(first.data['more'], SIZE - 9)
+    const page = first.data['page'] as string
+    assert.match(page, new RegExp(`^treadle history --txn ${TXN} --limit 9 --cursor e\\S+$`), page)
+
+    // Walk it to the end by its own cursor lines: every row of the transaction, once.
+    const seen: string[] = []
+    let cursor: string | undefined
+    for (let pages = 0; pages < 20; pages += 1) {
+      const result = await history(demo.store, {
+        scope: { kind: 'txn', txn: TXN }, limit: 9, ...(cursor === undefined ? {} : { cursor }),
+      })
+      assert.equal(result.ok, true)
+      const block = result.data['events'] as Rows
+      for (const row of block.rows) seen.push(String(row['what']))
+      const next = result.data['page'] as string | undefined
+      if (next === undefined) break
+      cursor = next.split(' ').at(-1) as string
+    }
+    assert.equal(seen.length, SIZE, 'walking the page lines did not read the transaction once through')
+    assert.equal(new Set(seen).size, SIZE, 'a row was read twice')
+  })
+})
