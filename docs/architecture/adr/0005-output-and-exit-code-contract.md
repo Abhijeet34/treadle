@@ -42,6 +42,11 @@ One source therefore backs the schema a consumer validates against, the order th
 **Exit status is one table over `code`, read in `src/cli/exit.ts` and nowhere else.**
 `OK` 0, `INTERNAL` 1, `VALIDATION` 2, `GUARD_REFUSED` 3, `CONFLICT` 4, `NOT_FOUND` 5, `STORE_UNAVAILABLE` 6, `INTEGRITY` 7.
 A guard refusal is distinguishable from a validation error, which is the question DR5's U3 asked.
+The table itself is declared in `src/application/result.ts` beside the codes it is keyed by, because `--contract` prints it and a renderer may not reach the command layer; `src/cli/exit.ts` is where the command layer reads it from, and there is still exactly one table.
+
+**`treadle --contract` prints that table, because this document is not on the machine.**
+The statuses lived only here, and an agent handed the binary reads `--contract` and nothing else.
+The `~exits` block it prints is generated from the same constant `exitFor` returns, so the contract a caller is handed and the status the process returns cannot disagree; `130` is in it under `INTERRUPTED`, so an interrupt is not read as an unknown failure.
 
 **`ok` says whether the command produced its answer; `code` is the verdict the status is read from.**
 The two coincide on every command but one.

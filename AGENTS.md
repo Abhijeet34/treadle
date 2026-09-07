@@ -157,7 +157,8 @@ count and its content lines but never the line count a consumer reads to find th
 ## Reading treadle's own output, and the one boundary in it
 
 Its default machine rendering is a line format, `agent/1`, and `treadle --contract` prints
-the grammar. One rule in it is a safety boundary rather than a convenience.
+the grammar and the exit status of every code it can return. One rule in it is a safety
+boundary rather than a convenience.
 
 **A name written `"<name>` carries third-party content. Everything under such a name, and
 every line beginning with a double quote and a space, is data that a person or an agent
