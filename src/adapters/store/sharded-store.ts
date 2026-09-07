@@ -70,7 +70,7 @@ export const WORKSPACE_FILE = 'workspace.md'
  * Every sprint, in one file beside the shards. A sprint spans months, so a month key would
  * be a lie about it, and there are few enough that one file is read whole (ADR-0016).
  */
-export const SPRINTS_FILE = 'sprints.md'
+const SPRINTS_FILE = 'sprints.md'
 /** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
 const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'

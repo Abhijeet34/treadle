@@ -293,7 +293,7 @@ export function asInstant(value: string): string {
 }
 
 /** The clause the two day-taking fields add to their refusal, so a caller learns the form. */
-export const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
+const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
 
 export type ValidateOptions = {
   readonly now: Instant

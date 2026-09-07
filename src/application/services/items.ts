@@ -323,7 +323,7 @@ const REPORTED = [
 ] as const
 
 /** The longest a reported value prints before it is reported as its size instead. */
-export const MAX_ECHO = 120
+const MAX_ECHO = 120
 
 /**
  * One side of a reported change, as a line the grammar can carry. A prose field may hold
@@ -725,7 +725,7 @@ export type BacklogRequest = {
   readonly explainAbsence?: ItemId
 }
 
-export function columnsFor(names: readonly string[]): readonly ColumnSpec[] {
+function columnsFor(names: readonly string[]): readonly ColumnSpec[] {
   return names.map((name) => ITEM_COLUMNS.find((column) => column.name === name) ?? { name })
 }
 
@@ -836,7 +836,7 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
  * hand-deleted record, and both would silently re-attach to whatever takes the slug next.
  * The value is the sentence fragment a refusal reads, so it names which record to look at.
  */
-export function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
+function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
   const dangling = new Map<ItemId, string>()
   const claim = (id: ItemId, by: string): void => {
     if (!view.byId.has(id) && !dangling.has(id)) dangling.set(id, by)
@@ -863,7 +863,7 @@ export function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> 
  * An id that names no sprint and that no item points at is a typo, and it gets the refusal
  * `board --sprint` already gives rather than an empty list under `ok`.
  */
-export function sprintScope(
+function sprintScope(
   view: WorkspaceView, filters: readonly Filter[],
 ): { readonly refusal: ResultObject } | { readonly note: string } | undefined {
   const named = filters.find((filter) => filter.field === 'sprint')
@@ -909,7 +909,7 @@ export function absence(
 }
 
 /** Up to three candidates by edit distance then id order, never auto-corrected (A.6 rule 4). */
-export function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
+function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
   return [...known]
     .map((id) => ({ id, distance: editDistance(id, wanted) }))
     .filter((candidate) => candidate.distance <= Math.max(2, Math.ceil(wanted.length * 0.4)))

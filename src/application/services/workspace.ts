@@ -30,7 +30,7 @@ export const INIT_SHAPE: ResultShape = {
   ],
 }
 
-export const CREATED_FILES: readonly (readonly [string, string])[] = [
+const CREATED_FILES: readonly (readonly [string, string])[] = [
   ['workspace.md', 'the workspace record: its id, its name and the instant it was created'],
   ['items/', 'one record file per month; this is what you commit and review'],
   ['events/', 'the append-only event log, one file per month'],
@@ -38,7 +38,7 @@ export const CREATED_FILES: readonly (readonly [string, string])[] = [
   ['.gitattributes', 'merges the event log by union, and marks it generated so a review reads the records'],
 ]
 
-export const NEXT_STEPS: readonly string[] = [
+const NEXT_STEPS: readonly string[] = [
   // First, because the line above it says `actor unknown` and nothing else in the tool said
   // how to change that: every event this workspace records carries `by unknown` until it is
   // set, and a workspace whose pitch is "with who made it" has to say how the who is set.
