@@ -18,8 +18,16 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 
+import { RENDERINGS } from '../../src/adapters/render/index.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
-import { WORK_ITEM_TYPES } from '../../src/domain/index.ts'
+import {
+  ALLOWED_PARENT_PAIRS,
+  DEFAULT_DONE_GATE,
+  DEFAULT_READY_GATE,
+  RELATION_KINDS,
+  WORK_ITEM_STATES,
+  WORK_ITEM_TYPES,
+} from '../../src/domain/index.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
@@ -220,5 +228,235 @@ describe('every document states one runtime floor and one bundle budget', () => 
       README.includes(`as ${record}'s`) || README.includes(`${record}'s ${limit} bytes`),
       `the README credits the bundle budget to a record other than ${record}`,
     )
+  })
+})
+
+// ---------------------------------------------------------------------------------------
+// The sections above were written for the numbers that had already gone stale once. They
+// left the rest of the surface unheld, which is how the `doctor` finding count and the
+// axis count went on being edited by hand in four files apiece. What follows widens the
+// same rule to every count in these documents that something in the tree decides.
+//
+// A count this file cannot reach is named in the report that added it rather than left
+// looking checked: the suite's own test count and wall time are the two, because both are
+// figures of a run rather than of a tree, and the last test below holds what can be held
+// about them, which is that the README never prints one without the run it came from.
+// ---------------------------------------------------------------------------------------
+
+/** The line of `text` carrying `marker`, refused rather than skipped when there is none. */
+function lineWith(file: string, text: string, marker: string): string {
+  const line = text.split('\n').find((candidate) => candidate.includes(marker))
+  assert.ok(line !== undefined, `${file} has no line containing ${JSON.stringify(marker)}`)
+  return line
+}
+
+/** Every number word in one sentence, in the order it spells them. */
+function spelledWords(text: string): readonly number[] {
+  return [...text.matchAll(/\b([a-z]+)\b/gi)]
+    .map((match) => (match[1] ?? '').toLowerCase())
+    .filter((word) => word in NUMBER_WORDS)
+    .map((word) => NUMBER_WORDS[word] as number)
+}
+
+/** Every `.ts` under `bench/` as one string, so an axis id is found wherever it is declared. */
+function filesUnderBench(): string {
+  const parts: string[] = []
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name)
+      if (entry.isDirectory()) walk(full)
+      else if (entry.name.endsWith('.ts')) parts.push(readFileSync(full, 'utf8'))
+    }
+  }
+  walk(path.join(ROOT, 'bench'))
+  return parts.join('\n')
+}
+
+const AGENTS = read('AGENTS.md')
+const ARCHITECTURE = read('docs/ARCHITECTURE.md')
+const BENCHMARKS = read('docs/BENCHMARKS.md')
+const DOMAIN = read('docs/DOMAIN.md')
+
+describe("every document that counts doctor's findings counts what doctor raises", () => {
+  // The ADR table is already held to the same ids above. What was unheld is the number the
+  // prose spells, which is why README and AGENTS.md both had to be edited by hand when H30
+  // landed and why both said eleven for as long as nobody read them together.
+  const raised = new Set([...read('src/application/services/doctor.ts')
+    .matchAll(/rule: '(H\d+)'/g)].map((match) => match[1] as string))
+
+  it('the README Status row spells the number of findings doctor.ts raises', () => {
+    assert.equal(spelled(lineWith('README.md', README, '| `doctor`:'), 'findings'), raised.size,
+      `the README's \`doctor\` Status row spells a finding count src/application/services/doctor.ts does not raise; it raises ${raised.size}: ${[...raised].join(', ')}`)
+  })
+
+  it('AGENTS.md spells the same number', () => {
+    const said = /`doctor` raises ([a-z]+) of them/.exec(AGENTS)?.[1]
+    assert.ok(said !== undefined && said in NUMBER_WORDS,
+      'AGENTS.md has no sentence reading "`doctor` raises <number> of them"')
+    assert.equal(NUMBER_WORDS[said], raised.size,
+      `AGENTS.md spells a doctor finding count src/application/services/doctor.ts does not raise; it raises ${raised.size}`)
+  })
+})
+
+describe('every document that counts the threat model counts the register', () => {
+  // test/security/findings.test.ts is the register: a finding with a `test` is closed, one
+  // with only a `waitingOn` is open. Four documents quote both numbers and none was held.
+  const register = read('test/security/findings.test.ts')
+  const findings = [...register.matchAll(/^ {2}\{ id: 'F\d+',(.*)$/gm)].map((match) => match[1] as string)
+  const closed = findings.filter((entry) => entry.includes(" test: '"))
+
+  for (const file of ['README.md', 'SECURITY.md', 'docs/PROVENANCE.md', 'AGENTS.md']) {
+    it(`${file} spells the number of findings the register holds`, () => {
+      const text = read(file)
+      const line = text.split('\n').find((candidate) =>
+        candidate.includes('threat model') && candidate.includes('findings'))
+      assert.ok(line !== undefined, `${file} has no sentence about the threat model's findings`)
+      assert.ok(spelledWords(line).includes(findings.length),
+        `${file} counts the threat model's findings as ${spelledWords(line).join(' and ')}; test/security/findings.test.ts registers ${findings.length}`)
+    })
+  }
+
+  it('the README says how many of them are closed', () => {
+    const said = /([a-z]+) of the ([a-z]+) findings in the project's threat model are closed/i.exec(README)
+    assert.ok(said !== null, "the README has no \"<n> of the <n> findings in the project's threat model are closed\" sentence")
+    assert.deepEqual(
+      [NUMBER_WORDS[(said[1] as string).toLowerCase()], NUMBER_WORDS[(said[2] as string).toLowerCase()]],
+      [closed.length, findings.length],
+      `the README says ${said[1]} of ${said[2]} threat-model findings are closed; the register has ${closed.length} of ${findings.length} naming a regression test`)
+  })
+})
+
+describe('every document that counts the benchmark axes counts the rig', () => {
+  // The axis set is whatever the rig emits an `axis:` for, measured or not; `remaining.ts`
+  // is the not-measured half and reports through `notMeasured`, so the two numbers the
+  // documents quote, the total and how many are measured, both come off the source.
+  const axes = new Set([...filesUnderBench().matchAll(/axis: '(A\d+)'/g)].map((match) => match[1] as string))
+  const unmeasured = [...read('bench/axes/remaining.ts').matchAll(/notMeasured\(\{/g)].length
+
+  it('the acceptance bar in docs/BENCHMARKS.md is stated over every axis', () => {
+    assert.equal(spelled(lineWith('docs/BENCHMARKS.md', BENCHMARKS, 'The acceptance bar for treadle'), 'axes'),
+      axes.size, `docs/BENCHMARKS.md states the bar over an axis count the rig does not emit; bench/ emits ${axes.size}: ${[...axes].join(', ')}`)
+  })
+
+  it('every axis-table heading in docs/BENCHMARKS.md names the same total', () => {
+    const headings = [...BENCHMARKS.matchAll(/^#{2,4} The ([a-z]+) (?:comparison )?axes$/gm)]
+      .map((match) => (match[1] as string))
+    assert.ok(headings.length > 0, 'docs/BENCHMARKS.md has no "The <number> axes" heading')
+    assert.deepEqual([...new Set(headings.map((word) => NUMBER_WORDS[word]))], [axes.size],
+      `an axis-table heading in docs/BENCHMARKS.md names a count the rig does not emit; bench/ emits ${axes.size}`)
+  })
+
+  it('docs/BENCHMARKS.md says how many of them were measured', () => {
+    const said = /([a-z]+) of the ([a-z]+) are measured here/i.exec(BENCHMARKS)
+    assert.ok(said !== null, 'docs/BENCHMARKS.md has no "<n> of the <n> are measured here" sentence')
+    assert.deepEqual(
+      [NUMBER_WORDS[(said[1] as string).toLowerCase()], NUMBER_WORDS[(said[2] as string).toLowerCase()]],
+      [axes.size - unmeasured, axes.size],
+      `docs/BENCHMARKS.md says ${said[1]} of ${said[2]} axes are measured; bench/axes/remaining.ts leaves ${unmeasured} of ${axes.size} unmeasured`)
+  })
+
+  it("the README's Status row counts the measured axes and the ones that are not", () => {
+    const said = /([a-z]+) of the ([a-z]+) comparison axes measured, ([a-z]+) not/.exec(README)
+    assert.ok(said !== null, 'the README has no "<n> of the <n> comparison axes measured, <n> not" row')
+    assert.deepEqual(
+      [1, 2, 3].map((group) => NUMBER_WORDS[(said[group] as string).toLowerCase()]),
+      [axes.size - unmeasured, axes.size, unmeasured],
+      `the README's Benchmarks row counts axes the rig does not emit; bench/ emits ${axes.size}, of which ${unmeasured} report NOT MEASURED`)
+  })
+
+  it('the README Documentation list names the same axis count', () => {
+    assert.equal(spelled(lineWith('README.md', README, 'docs/BENCHMARKS.md](docs/BENCHMARKS.md)'), 'axes'),
+      axes.size, `the README's Documentation entry for docs/BENCHMARKS.md names an axis count the rig does not emit; bench/ emits ${axes.size}`)
+  })
+})
+
+describe('every document that counts the renderings counts the renderer seam', () => {
+  it('the README and docs/ARCHITECTURE.md spell what RENDERINGS declares', () => {
+    assert.equal(spelled(lineWith('README.md', README, '`bin/treadle.js` runs'), 'forms'), RENDERINGS.length,
+      `the README's \`bin/treadle.js\` runs sentence names a rendering count src/adapters/render does not ship; RENDERINGS declares ${RENDERINGS.length}`)
+    assert.equal(spelled(ARCHITECTURE, 'renderers'), RENDERINGS.length,
+      `docs/ARCHITECTURE.md names a renderer count src/adapters/render does not ship; RENDERINGS declares ${RENDERINGS.length}`)
+  })
+})
+
+describe('every document that counts the seams counts the seam table', () => {
+  // The table in docs/ARCHITECTURE.md is the register; three documents quote its length.
+  const section = ARCHITECTURE.slice(ARCHITECTURE.indexOf('\n## The '), ARCHITECTURE.indexOf('\n## Storage'))
+  const seams = [...section.matchAll(/^\| [^|]+ \((?:built|not built|evaluator built)\) \|/gm)].length
+
+  it('the table has as many rows as its own heading spells', () => {
+    assert.ok(seams > 0, 'docs/ARCHITECTURE.md has no seam table')
+    assert.equal(spelled(lineWith('docs/ARCHITECTURE.md', ARCHITECTURE, '## The '), 'seams'), seams,
+      `docs/ARCHITECTURE.md's seam heading spells a number its own table does not carry; the table has ${seams} rows`)
+  })
+
+  for (const file of ['README.md', 'AGENTS.md', 'docs/ARCHITECTURE.md', 'docs/architecture/adr/README.md']) {
+    it(`${file} spells the number of seams the table carries`, () => {
+      assert.equal(spelled(read(file), 'seams'), seams,
+        `${file} names a seam count docs/ARCHITECTURE.md's table does not carry; it has ${seams} rows`)
+    })
+  }
+})
+
+describe('the decision-record index names every record in the directory', () => {
+  // A record added without a row reads as undecided, and a row left behind after a rename
+  // is a dead link. Neither is visible in a diff of the other file.
+  const dir = path.join(ROOT, 'docs', 'architecture', 'adr')
+  const files = readdirSync(dir).filter((name) => /^\d{4}-.*\.md$/.test(name)).sort()
+  const index = read('docs/architecture/adr/README.md')
+  const linked = [...index.matchAll(/^\| \[ADR-\d{4}\]\(([^)]+)\)/gm)].map((match) => match[1] as string).sort()
+
+  it('links every record file, and no file it does not hold', () => {
+    assert.deepEqual(linked, files,
+      'docs/architecture/adr/README.md links a different set of records than the directory holds; add the row or drop it')
+  })
+})
+
+describe('docs/DOMAIN.md counts the closed sets the domain declares', () => {
+  it('spells the number of states WORK_ITEM_STATES declares', () => {
+    assert.equal(spelled(lineWith('docs/DOMAIN.md', DOMAIN, 'it flows through the same'), 'states'),
+      WORK_ITEM_STATES.length,
+      `docs/DOMAIN.md spells a state count src/domain does not declare; WORK_ITEM_STATES declares ${WORK_ITEM_STATES.length}`)
+  })
+
+  it('spells the number of parent pairs ALLOWED_PARENT_PAIRS declares', () => {
+    assert.equal(spelled(DOMAIN, 'allowed type pairs'), ALLOWED_PARENT_PAIRS.length,
+      `docs/DOMAIN.md spells a parent-pair count src/domain does not declare; ALLOWED_PARENT_PAIRS declares ${ALLOWED_PARENT_PAIRS.length}`)
+  })
+
+  it('spells the number of relation kinds RELATION_KINDS declares, and lists each with its inverse', () => {
+    assert.equal(spelled(lineWith('docs/DOMAIN.md', DOMAIN, 'each with a defined inverse'), 'kinds'),
+      RELATION_KINDS.length,
+      `docs/DOMAIN.md spells a relation-kind count src/domain does not declare; RELATION_KINDS declares ${RELATION_KINDS.length}`)
+    const section = DOMAIN.slice(DOMAIN.indexOf('| Kind | Inverse | Directional |'))
+    const rows = [...section.slice(0, section.indexOf('\n\n')).matchAll(/^\| `([a-z_]+)` \| `[a-z_]+` \|/gm)]
+      .map((match) => match[1] as string)
+    assert.deepEqual(rows.sort(), [...RELATION_KINDS].sort(),
+      "docs/DOMAIN.md's relation table names a different set of kinds than RELATION_KINDS declares")
+  })
+
+  for (const [gate, name] of [[DEFAULT_READY_GATE, 'ready'], [DEFAULT_DONE_GATE, 'done']] as const) {
+    it(`lists every rule id the default ${name} gate carries, and no other`, () => {
+      const heading = `Default ${name} gate:`
+      const start = DOMAIN.indexOf(heading)
+      assert.ok(start !== -1, `docs/DOMAIN.md has no "${heading}" table`)
+      const end = DOMAIN.indexOf('\n\n', DOMAIN.indexOf('|---|', start))
+      const documented = [...DOMAIN.slice(start, end).matchAll(/^\| `(DO[RD]\d+)` \| ([a-z]+) \|/gm)]
+        .map((match) => [match[1] as string, match[2] as string] as const)
+      assert.deepEqual(documented, gate.rules.map((rule) => [rule.id, rule.scope] as const),
+        `docs/DOMAIN.md's default ${name} gate table names different rules or scopes than src/domain/gates.ts evaluates`)
+    })
+  }
+})
+
+describe('the README never prints a suite figure without the run it came from', () => {
+  // The test count and the wall time are figures of a run, not of the tree: a count moves
+  // with a parameterised loop and the seconds move with the machine, so no assertion here
+  // can hold either against this checkout. What can be held is that they stay attributable,
+  // which is the property that makes a stale one detectable by a reader instead of by luck.
+  it('names the runtime and the date beside the count', () => {
+    const line = lineWith('README.md', README, 'The suite ran ')
+    assert.match(line, /The suite ran [\d,]+ tests in \d+ seconds on Node \d+\.\d+\.\d+ on \d{4}-\d{2}-\d{2}\b/,
+      'the README states a suite figure without the runtime and the date it was measured on; a measurement this file cannot check has to carry its own conditions')
   })
 })
