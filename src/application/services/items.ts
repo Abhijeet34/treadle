@@ -277,7 +277,6 @@ export type FileRequest = {
 }
 
 const INT_FIELDS = new Set(['priority', 'points', 'hours_estimate', 'timebox_hours'])
-
 const LIST_FIELDS = new Set(['labels'])
 const CRITERIA_FIELDS = new Set(['acceptance_criteria'])
 
@@ -349,7 +348,7 @@ export async function fileItem(
   if (id === undefined) {
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'C1', entity: request.type,
-      cause: `no character of this title becomes part of an id, so the id would name the type and nothing else; name one with --id`,
+      cause: 'no character of this title becomes part of an id, so the id would name the type and nothing else; name one with --id',
       fix: [`treadle file ${request.type} "<title>" --id <slug>`],
     })
   }

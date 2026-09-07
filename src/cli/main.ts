@@ -562,7 +562,6 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       return validation('transition', `${targetState} is not a state; the targets are ${WORK_ITEM_STATES.join(', ')} and resume`, ['treadle help transition'])
     }
     const reason = flag(flags, 'reason')
-    // A hold's end is a day like a due date, and `asInstant` is where that rule lives.
     const until = flag(flags, 'until')
     const overrides = flags['override']
     // Both are closed sets the domain owns (`T6`), so they are carried through unchecked
@@ -573,6 +572,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
       id,
       target: targetState as WorkItemState | 'resume',
       ...(reason === undefined ? {} : { reason }),
+      // A hold's end is a day like a due date, and `asInstant` is where that rule lives.
       ...(until === undefined ? {} : { until: asInstant(until) }),
       ...(resolution === undefined ? {} : { resolution }),
       ...(outcome === undefined ? {} : { outcome }),
