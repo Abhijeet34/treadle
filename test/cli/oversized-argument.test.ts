@@ -18,7 +18,24 @@
 // that is a RangeError and exit 7 at the 984 KiB default and a clean run at 3072; the same
 // block delivered as eleven environment variables, behind an ordinary short command line, does
 // the same. Both shapes are exercised below, and both are sized from this platform's own
-// ARG_MAX rather than from a constant, so neither skips itself anywhere.
+// ARG_MAX, so neither skips itself anywhere.
+//
+// AND ARG_MAX IS NOT THE BOUND THE SHEBANG HAS TO CLEAR, which cost a CI round to learn.
+// A second version of this file asserted that the requested stack exceeds ARG_MAX, which is
+// true on macOS and false on Linux: run 34106349134 measured ARG_MAX at 4,194,304 there and
+// refused the assertion against a 3 MiB stack, while in the same run the two block tests below
+// passed with 4,140,820 bytes of argv and 4,142,278 bytes of environment. A block larger than
+// the whole V8 stack ran clean, so Linux does not charge that block against the stack the way
+// macOS does, and no relation between `--stack-size` and ARG_MAX is a property of both.
+// Raising the request to clear a 4 MiB ceiling would also have put it at half the main
+// thread's own 8 MiB stack, trading a typed refusal for a segfault.
+//
+// So the structural tests state the two relations that are true everywhere and are what the
+// shebang is for: a floor, because a request at the runtime's default is what crashed macOS,
+// and a ceiling, because a request near the thread's own stack faults instead of throwing.
+// The load-bearing claim is behavioural and the six tests under them make it directly: for the
+// largest block this platform can put in front of the process, on the argv axis and on the
+// environment axis, the tool answers and never returns a trace.
 
 import assert from 'node:assert/strict'
 import { execFileSync, spawn } from 'node:child_process'
@@ -30,7 +47,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, it, before, after } from 'node:test'
 
 import { EXIT_OF } from '../../src/cli/exit.ts'
-import { flagsOf, shebangOf, stackKibOf } from '../../scripts/shebang.ts'
+import { V8_DEFAULT_STACK_KIB, flagsOf, shebangOf, stackKibOf } from '../../scripts/shebang.ts'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 const ENTRY = path.join(ROOT, 'bin', 'treadle.js')
@@ -112,14 +129,35 @@ function assertTypedRefusal(ran: Ran, what: string): void {
   assert.equal(ran.code, EXIT_OF.VALIDATION, `${what}: exited ${ran.code} rather than ${EXIT_OF.VALIDATION}`)
 }
 
-describe('the shipped executable asks for a stack this platform cannot put a block in front of', () => {
-  it(`asks for more V8 stack than ARG_MAX, which is ${ARG_MAX} bytes here`, (t) => {
+/** KiB of stack the main thread actually has, or undefined where the shell reports no limit. */
+function stackRlimitKib(): number | undefined {
+  const said = execFileSync('sh', ['-c', 'ulimit -s'], { encoding: 'utf8' }).trim()
+  const kib = Number(said)
+  return Number.isInteger(kib) && kib > 0 ? kib : undefined
+}
+
+describe('the shipped executable asks for a stack between the two bounds that are real', () => {
+  it('asks for more than the runtime\'s own default, which is what the default crashed under', (t) => {
     const kib = stackKibOf(FLAGS)
     assert.ok(
-      kib * 1024 > ARG_MAX,
-      `the shebang asks for ${kib} KiB of V8 stack and execve can put ${ARG_MAX} bytes above it`,
+      kib > V8_DEFAULT_STACK_KIB,
+      `the shebang asks for ${kib} KiB, and ${V8_DEFAULT_STACK_KIB} KiB is the default a 990,547 byte block exhausted`,
     )
-    t.diagnostic(`${kib} KiB of stack, ${ARG_MAX} bytes of ceiling, ${kib * 1024 - ARG_MAX} bytes left over`)
+    t.diagnostic(`${kib} KiB requested, ${V8_DEFAULT_STACK_KIB} KiB default, ARG_MAX ${ARG_MAX} bytes here`)
+  })
+
+  // The cost of asking for too much, which is why this bound exists as well: a V8 stack near
+  // the thread's own means a deep call faults rather than throwing, and a segfault is worse
+  // than the RangeError this shebang exists to prevent.
+  it('stays under half the main thread\'s own stack, so a deep call still throws', (t) => {
+    const rlimit = stackRlimitKib()
+    if (rlimit === undefined) return t.skip('this shell reports no stack limit to compare against')
+    const kib = stackKibOf(FLAGS)
+    assert.ok(
+      kib * 2 <= rlimit,
+      `the shebang asks for ${kib} KiB of V8 stack and the main thread has ${rlimit} KiB`,
+    )
+    t.diagnostic(`${kib} KiB requested against a ${rlimit} KiB thread stack`)
   })
 
   it('gives the bundle the entry point\'s own line, through the function the build calls', () => {
