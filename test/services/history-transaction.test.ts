@@ -21,9 +21,6 @@ import { describe, it, before, after } from 'node:test'
 
 import { history } from '../../src/application/services/history.ts'
 import { makeEvent } from '../../src/application/services/mutation.ts'
-import { agentRenderer } from '../../src/adapters/render/agent.ts'
-import { humanRenderer } from '../../src/adapters/render/human.ts'
-import { jsonRenderer } from '../../src/adapters/render/json.ts'
 import { EXIT_OF } from '../../src/application/result.ts'
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli, type Run } from '../helpers/cli-run.ts'
@@ -85,7 +82,7 @@ describe('history --txn lists every event one command wrote', () => {
     const run = await cli(['history', '--txn', removal])
     assert.equal(run.code, 0, run.err)
     assert.match(run.out, /item\.remove entity=login-cta-2/, run.out)
-    assert.match(run.out, /^"note .*no record here carries/m, run.out)
+    assert.match(run.out, /^note 1 of the records these rows name is no longer here/m, run.out)
   })
 
   it('refuses an id and --txn together, and names both readings', async () => {
@@ -179,21 +176,22 @@ describe('a transaction larger than one page', () => {
   after(async () => { await demo.dispose() })
 
   it('pages at the limit and continues under the same transaction', async () => {
-    const first = await history(demo.store, { scope: { kind: 'txn', txn: TXN }, limit: 9 })
+    const PAGE = 5
+    const first = await history(demo.store, { scope: { kind: 'txn', txn: TXN }, limit: PAGE })
     assert.equal(first.ok, true)
     const events = first.data['events'] as Rows
-    assert.equal(events.shown, 9)
+    assert.equal(events.shown, PAGE)
     assert.equal(events.total, SIZE)
-    assert.equal(first.data['more'], SIZE - 9)
+    assert.equal(first.data['more'], SIZE - PAGE)
     const page = first.data['page'] as string
-    assert.match(page, new RegExp(`^treadle history --txn ${TXN} --limit 9 --cursor e\\S+$`), page)
+    assert.match(page, new RegExp(`^treadle history --txn ${TXN} --limit ${PAGE} --cursor e\\S+$`), page)
 
     // Walk it to the end by its own cursor lines: every row of the transaction, once.
     const seen: string[] = []
     let cursor: string | undefined
-    for (let pages = 0; pages < 20; pages += 1) {
+    for (let pages = 0; pages < SIZE; pages += 1) {
       const result = await history(demo.store, {
-        scope: { kind: 'txn', txn: TXN }, limit: 9, ...(cursor === undefined ? {} : { cursor }),
+        scope: { kind: 'txn', txn: TXN }, limit: PAGE, ...(cursor === undefined ? {} : { cursor }),
       })
       assert.equal(result.ok, true)
       const block = result.data['events'] as Rows

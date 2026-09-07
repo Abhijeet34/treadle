@@ -439,7 +439,7 @@ describe('a real record and a real log print what the decisions claim', () => {
     itemKeys = shown
 
     const printed = new Set<string>()
-    const log = await history(rig.store, 'every-bug', { limit: 20 })
+    const log = await history(rig.store, { scope: { kind: 'item', id: 'every-bug' }, limit: 20 })
     assert.equal(log.ok, true)
     const why = await explain(rig.store, 'every-bug')
     assert.equal(why.ok, true)
@@ -533,7 +533,7 @@ describe('a real record and a real log print what the decisions claim', () => {
       assert.ok(log.ok, `the log for ${entity} is unreadable`)
       assert.ok(log.value.length > 0, `${entity} has no recorded event, so this sweep is vacuous`)
       const printed = [
-        agentRenderer.render(await history(rig.store, entity, { limit: 200 })),
+        agentRenderer.render(await history(rig.store, { scope: { kind: 'item', id: entity }, limit: 200 })),
         agentRenderer.render(await explain(rig.store, entity)),
       ].join('\n')
       for (const event of log.value) {

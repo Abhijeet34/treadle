@@ -81,6 +81,12 @@ export type ItemQuery = {
 
 export type EventQuery = {
   readonly entity?: string
+  /**
+   * The transaction whose events are wanted, which is the id `apply` returns and every
+   * mutation's result carries. It selects across entities where `entity` selects across
+   * transactions, so the two compose and `history` uses one or the other.
+   */
+  readonly txn?: string
   /** Inclusive lower bound on `at`. */
   readonly from?: Instant
   /** Exclusive upper bound on `at`. */

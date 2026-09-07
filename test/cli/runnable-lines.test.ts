@@ -226,6 +226,19 @@ async function rewriteSchema(dir: string, files: readonly string[], schema: numb
   }
 }
 
+/**
+ * Event lines appended to the log as the store would have written them, so a provocation can
+ * name a transaction and an event by id. Ids minted at runtime are random, and a static
+ * provocation cannot carry one: `history --txn` and its refusals emit lines built from a real
+ * transaction, and without a known id the sweep would run over none of them.
+ */
+async function appendEvents(dir: string, events: readonly Readonly<Record<string, unknown>>[]): Promise<void> {
+  const month = (String(events[0]?.['at'] ?? '')).slice(0, 7)
+  const file = path.join(dir, '.work', 'events', `${month}.jsonl`)
+  const existing = await readFile(file, 'utf8').catch(() => '')
+  await writeFile(file, `${existing}${events.map((event) => JSON.stringify(event)).join('\n')}\n`)
+}
+
 async function shards(dir: string): Promise<readonly string[]> {
   return (await readdir(path.join(dir, '.work', 'items'))).filter((name) => name.endsWith('.md')).map((name) => `items/${name}`)
 }
@@ -381,6 +394,28 @@ const SCENARIOS: readonly Scenario[] = [
     ],
   },
   {
+    // `--txn` is the one reader whose every emitted line is built from an id the tool minted
+    // at random, so the log is given one the provocations below can name.
+    name: 'a log carrying one transaction across two records',
+    build: async (dir) => {
+      await baseWorkspace(dir)
+      await appendEvents(dir, ['ready-task', 'spare-task'].map((entity, at) => ({
+        id: `eknown${at + 1}`, at: '2026-02-03T09:00:00Z', actor: 'dana', actor_kind: 'human',
+        entity_kind: 'item', entity, op: 'item.set',
+        before: { assignee: '-' }, after: { assignee: 'kim' }, cmd: 'set', txn: 'tknown1',
+      })))
+    },
+    provocations: [
+      ['history', '--txn', 'tknown1', '--limit', '1'],
+      ['history', '--txn', 'tknown1', '--cursor', 'nope'],
+      ['history', 'ready-task', '--txn', 'tknown1'],
+      // An event id where a transaction id belongs, which is answered with the transaction
+      // that wrote it, and an id that is neither.
+      ['history', '--txn', 'eknown1'],
+      ['history', '--txn', 'tzzzzzz'],
+    ],
+  },
+  {
     name: 'a shard at an older schema, which a write refuses',
     build: async (dir) => {
       await baseWorkspace(dir)
@@ -437,6 +472,9 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a page line carrying the columns', /^treadle backlog --type task --fields id,state --limit 1 --cursor \S+$/],
   ['a page line carrying --for', /^treadle next --for kim --limit 1 --cursor \S+$/],
   ['a history page carrying the limit', /^treadle history blocked-held --limit 1 --cursor \S+$/],
+  ['a transaction-scoped history page keeping its transaction', /^treadle history --txn tknown1 --limit 1 --cursor \S+$/],
+  ['an event id answered with the transaction that wrote it', /^treadle history --txn tknown1$/],
+  ['two scopes on one line answered with each of them alone', /^treadle history ready-task$/],
   ['a whole line carrying the filter', /^treadle board --type task --all$/],
   ['a dry-run fix keeping its operands', /^treadle transition task-plain ready --dry-run( --out json)?$/],
   ['a sprint open line carrying --end', /^treadle sprint open "<title>" --end <date> --id <slug>$/],

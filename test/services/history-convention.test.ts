@@ -111,7 +111,7 @@ describe('the what column of history has one convention', () => {
 
   before(async () => {
     rig = await aLogCarryingEveryOp()
-    const log = await history(rig.store, ID, { limit: 50 })
+    const log = await history(rig.store, { scope: { kind: 'item', id: ID }, limit: 50 })
     assert.equal(log.ok, true)
     const block = log.data['events'] as { rows: readonly Record<string, string>[] }
     cells = block.rows.map((row) => row['what'] as string)
@@ -209,7 +209,7 @@ describe('a stored value shaped like the length marker does not become one', () 
       id: MARKER_ID, assignments: ['assignee=3 chars'], actor: ACTOR,
     }), 'set')
 
-    const log = await history(store, MARKER_ID, { limit: 50 })
+    const log = await history(store, { scope: { kind: 'item', id: MARKER_ID }, limit: 50 })
     assert.equal(log.ok, true)
     const block = log.data['events'] as { rows: readonly Record<string, string>[] }
     const row = block.rows.find((entry) => entry['op'] === 'item.set')

@@ -114,6 +114,10 @@ create table if not exists events (
   actor text not null, txn text not null, file text not null, rest text not null);
 create index if not exists events_file on events(file);
 create index if not exists events_entity on events(entity, at);
+-- \`history --txn\` selects across entities where \`events_entity\` selects across
+-- transactions, and that read is a scan of the whole table without this: the entity-scoped
+-- read of one item costs 1.2 s over the 1.1 million-event corpus with its own index.
+create index if not exists events_txn on events(txn);
 -- \`against\` names the file whose copy won when this finding is a duplicate-id clash. A
 -- clash is the one finding whose truth depends on another file, so when that file changes
 -- or goes, the fingerprint of the file carrying the clash is dropped and it is re-read.
@@ -785,6 +789,7 @@ export class IndexCache {
     const where: string[] = []
     const values: (string | number)[] = []
     if (query.entity !== undefined) { where.push('entity = ?'); values.push(query.entity) }
+    if (query.txn !== undefined) { where.push('txn = ?'); values.push(query.txn) }
     if (query.from !== undefined) { where.push('at >= ?'); values.push(query.from) }
     if (query.to !== undefined) { where.push('at < ?'); values.push(query.to) }
     const clause = where.length === 0 ? '' : ` where ${where.join(' and ')}`

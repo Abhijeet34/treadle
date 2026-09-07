@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "history.v1.json",
   "title": "history/1",
-  "description": "List every recorded change to one item, newest first, with who made it.",
+  "description": "List every recorded change to one record, or every event one transaction wrote, newest first.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -91,6 +91,12 @@
           ]
         },
         "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "transaction": {
           "type": [
             "string",
             "null"

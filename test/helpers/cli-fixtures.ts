@@ -162,7 +162,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('show-criteria', await showItem(demo.store, clock, 'auth-refresh', 'ac'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
     golden.set('explain', await explain(demo.store, 'sso-saml'))
-    golden.set('history', await history(demo.store, 'sso-saml', { limit: 9 }))
+    golden.set('history', await history(demo.store, { scope: { kind: 'item', id: 'sso-saml' }, limit: 9 }))
     golden.set('help', topLevelHelp('acme-platform'))
     golden.set('help-command', commandHelp('transition', 'acme-platform') as ResultObject)
     golden.set('not-found', await showItem(demo.store, clock, 'sso-saml-typo'))
@@ -220,6 +220,12 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     }))
     golden.set('sprint-commit', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
       sprint: 'sprint-31', items: ['webhook-retry', 'avatar-crop'], actor: ACTOR,
+    }))
+    // The transaction-scoped read, over the one transaction here that wrote more than one
+    // event: the commit above put two items in the sprint under a single id, which is the
+    // case the flag exists for. A read moves no figure below it.
+    golden.set('history-txn', await history(demo.store, {
+      scope: { kind: 'txn', txn: (golden.get('sprint-commit') as ResultObject).txn as string }, limit: 9,
     }))
     golden.set('sprint-refused', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
       sprint: 'sprint-31', items: ['theme-dark'], actor: ACTOR,
