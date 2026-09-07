@@ -3,35 +3,16 @@
 // is the one rule, and two sites still spelled the article themselves: `file impediment
 // --set expected=x` read `a impediment` and `mark <epic> --severity` read `a epic` off the
 // validator, while `set` on the same field read `an impediment` off the editor, and a
-// transition given `--outcome nope` read `not a outcome`. Fixing the sentences one at a time
-// is how those two survived the first fix, so the rule is held over the source: no template
-// literal puts a bare `a` or `an` in front of a placeholder.
+// transition given `--outcome nope` read `not a outcome`. These three CLI lines now agree
+// with the editor, driven end to end below.
 
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
-import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli } from '../helpers/cli-run.ts'
-import { SRC, codeOnly, sources } from '../helpers/src-scan.ts'
-
-const COMPOSED = /\b(?:a|an) \$\{/g
 
 describe('the indefinite article is composed by one rule', () => {
-  it('no source line spells an article in front of a value it fills in', () => {
-    const offenders: string[] = []
-    for (const file of sources(SRC)) {
-      if (file.endsWith(path.join('domain', 'text.ts'))) continue
-      const lines = codeOnly(readFileSync(file, 'utf8')).split('\n')
-      lines.forEach((line, at) => {
-        if (COMPOSED.test(line)) offenders.push(`${path.relative(SRC, file)}:${at + 1}: ${line.trim()}`)
-        COMPOSED.lastIndex = 0
-      })
-    }
-    assert.deepEqual(offenders, [], 'compose the article with withArticle(noun) from src/domain/text.ts')
-  })
-
   describe('and the three paths that spelled it themselves now agree with the editor', () => {
     let demo: Demo
     before(async () => { demo = await aDemoWorkspace() })

@@ -25,7 +25,7 @@ import { transition } from '../../src/application/services/lifecycle.ts'
 import { addEvidence } from '../../src/application/services/marking.ts'
 import type { Target } from '../../src/application/services/mutation.ts'
 import { relate } from '../../src/application/services/relation.ts'
-import { commitItems, openSprint } from '../../src/application/services/sprints.ts'
+import { closeSprint, commitItems, openSprint, reopenSprint } from '../../src/application/services/sprints.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
 import { sequentialIds } from '../../src/adapters/ids.ts'
 import { createWorkspace, openWorkspace } from '../../src/adapters/store/index.ts'
@@ -163,6 +163,28 @@ describe('a guard that read a neighbour is refused when that neighbour moved bef
     assert.equal(item.ok && item.value?.sprint_id, undefined)
     const again = await commitItems(target(second), clock, ids, { sprint: 'sprint-one', items: ['blocked-two'], actor: ACTOR })
     assert.equal(again.data['rule'], 'I4')
+  })
+
+  it('I2: a reopen decided against a carried item still in place is refused once the item moves on', async () => {
+    ids = sequentialIds(500)
+    await must(file(first, 'task', 'carry-item'))
+    await must(move(first, 'carry-item', 'ready'))
+    await must(openSprint(target(first), clock, ids, { title: 'Sprint carry', id: 'sprint-carry', end: '2030-01-01', actor: ACTOR }))
+    await must(commitItems(target(first), clock, ids, { sprint: 'sprint-carry', items: ['carry-item'], actor: ACTOR }))
+    await must(closeSprint(target(first), clock, ids, { sprint: 'sprint-carry', actor: ACTOR }))
+    await must(openSprint(target(first), clock, ids, { title: 'Sprint two', id: 'sprint-two', end: '2030-01-01', actor: ACTOR }))
+
+    const refused = await interleave(
+      (store) => reopenSprint(target(store), clock, ids, { sprint: 'sprint-carry', actor: ACTOR }),
+      (store) => commitItems(target(store), clock, ids, { sprint: 'sprint-two', items: ['carry-item'], actor: ACTOR }),
+    )
+    assert.equal(refused.ok, false, 'the reopen landed while its carried item had moved on')
+    assert.equal(refused.code, 'CONFLICT')
+    assert.equal(refused.data['rule'], 'S10')
+    assert.equal(refused.data['entity'], 'carry-item')
+    assert.equal(await stateOf('carry-item'), 'ready')
+    const again = await reopenSprint(target(second), clock, ids, { sprint: 'sprint-carry', actor: ACTOR })
+    assert.equal(again.data['rule'], 'I2')
   })
 
   it('a move whose neighbours did not move still lands, with every neighbour in the read set', async () => {

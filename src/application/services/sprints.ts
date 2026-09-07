@@ -415,8 +415,14 @@ async function moveSprint(
 
   const txn = ids.txn()
   const eventId = ids.event()
+  const reads = to === 'open'
+    ? (sprint.carried ?? []).flatMap((id) => {
+      const item = view.value.byId.get(id)
+      return item === undefined ? [] : [{ id, version: item.version }]
+    })
+    : []
   const applied = await store.apply({
-    txn, writes: [], sprints: [{ sprint: after, ifVersion: sprint.version }],
+    txn, writes: [], sprints: [{ sprint: after, ifVersion: sprint.version }], reads,
     events: [makeEvent({
       id: eventId, at: now, actor: request.actor, entity: sprint.id, entityKind: 'sprint',
       op: to === 'closed' ? 'sprint.close' : 'sprint.reopen',
