@@ -358,10 +358,17 @@ export async function fileItem(
   const item = draft as unknown as WorkItem
   const valid = validateWorkItem(item, { now })
   if (!valid.ok) {
+    // The line that files it with every field the type requires, so a refusal for a missing
+    // field is answered once. Built from the type's own list and the dictionary's
+    // placeholders, which is what keeps it inside A.6's rule for a `fix`.
+    const required = requiredAtCreation(request.type)
+      .map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate',
       rule: valid.error.rule ?? 'V4', entity: id, cause: valid.error.message,
-      fix: [`treadle help file`],
+      fix: required.length === 0
+        ? ['treadle help file']
+        : [`treadle file ${request.type} "<title>"${required}`, 'treadle help file'],
     })
   }
 

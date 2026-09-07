@@ -20,6 +20,8 @@ import process from 'node:process'
 import { parseArgs } from 'node:util'
 import { fileURLToPath } from 'node:url'
 
+import { staleAgainst } from './check-dist-fresh.ts'
+
 const SEMVER = /^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/
 
 export type Manifest = {
@@ -53,9 +55,11 @@ export function preflight(input: {
   readonly manifest: Manifest
   readonly bundleBytes: number | undefined
   readonly bundleLimit: number
+  /** The source file newer than the bundle, when there is one; see `check-dist-fresh.ts`. */
+  readonly staleAgainst: string | undefined
   readonly publishing: boolean
 }): readonly string[] {
-  const { tag, facts, manifest, bundleBytes, bundleLimit, publishing } = input
+  const { tag, facts, manifest, bundleBytes, bundleLimit, staleAgainst, publishing } = input
   const problems: string[] = []
 
   if (!SEMVER.test(tag)) {
@@ -89,6 +93,25 @@ export function preflight(input: {
     problems.push('dist/treadle.js does not exist; run npm run build before packing')
   } else if (bundleBytes > bundleLimit) {
     problems.push(`dist/treadle.js is ${bundleBytes} bytes, over DR1's ${bundleLimit}`)
+  } else if (bundleBytes < bundleLimit / 10) {
+    // A floor as well as a ceiling, found by truncating a bundle and watching the freshness
+    // clause pass it: an mtime says when a file was written and not that a build wrote it. The
+    // measured bundle is 362,429 bytes against a 512,000 limit, so a tenth of the limit is far
+    // below any plausible build of this tool and far above a partial write.
+    problems.push(
+      `dist/treadle.js is ${bundleBytes} bytes, under a tenth of DR1's ${bundleLimit}; `
+        + 'that is a partial write rather than a build, so run npm run build again',
+    )
+  } else if (staleAgainst !== undefined) {
+    // The workflow builds one step above this one, so a bundle older than the source here
+    // means the build did not land. `prepack` cannot be relied on to catch it: this
+    // repository's .npmrc sets ignore-scripts=true as a supply-chain control and the release
+    // workflow's own pack step passes --ignore-scripts as well, so the packing lifecycle is
+    // off by design and this is the gate that actually runs before the tarball is built.
+    problems.push(
+      `dist/treadle.js was written before ${staleAgainst} was last changed, so the tarball `
+        + 'would carry a bundle that is not this source; run npm run build',
+    )
   }
 
   if (publishing) {
@@ -213,6 +236,7 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
     manifest,
     bundleBytes,
     bundleLimit: budgets.absolute['bundleBytes']?.limit ?? 512000,
+    staleAgainst: staleAgainst(root),
     publishing: values.publishing,
   })
 

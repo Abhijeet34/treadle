@@ -30,6 +30,12 @@ import {
  * is unchanged, so a record written before these bounds still reads.
  */
 export const MAX_DESCRIPTION = 10_000
+/**
+ * The dictionary's single-line bound: a title, a name, an evidence ref. Nothing a caller
+ * writes on one line of a record is longer, which is what makes it the bound a flag that
+ * names an entity or filters on a field is held to before any of it can be printed back.
+ */
+export const MAX_LINE = 200
 /** The same bound `hold_reason` already carries, which is the dictionary's one reason field. */
 export const MAX_REASON = 500
 export const MAX_EVIDENCE_ENTRIES = 20
@@ -309,7 +315,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
   id: slug('id'),
   type: oneOf('type', WORK_ITEM_TYPES),
   state: oneOf('state', WORK_ITEM_STATES),
-  title: line('title', 200),
+  title: line('title', MAX_LINE),
   filed_at: instant('filed_at'),
   version: (value) => (isBoundedInt(value, 1, Number.MAX_SAFE_INTEGER) ? undefined : 'version must be a whole number of 1 or more'),
 
@@ -324,10 +330,10 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
   hours_estimate: int('hours_estimate', 1, 400),
   parent_id: slug('parent_id'),
-  assignee: line('assignee', 200),
-  reporter: line('reporter', 200),
-  reviewer: line('reviewer', 200),
-  component: line('component', 200),
+  assignee: line('assignee', MAX_LINE),
+  reporter: line('reporter', MAX_LINE),
+  reviewer: line('reviewer', MAX_LINE),
+  component: line('component', MAX_LINE),
   sprint_id: slug('sprint_id'),
   labels: (value) => {
     if (!Array.isArray(value)) return 'labels must be a list of slugs'
@@ -480,10 +486,16 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
     }
   }
 
-  for (const name of requiredAtCreation(item.type)) {
-    if (item[name as keyof WorkItem] === undefined) {
-      return invalid('V4', `${withArticle(item.type)} needs ${name} at creation`, item)
-    }
+  // Every missing one, in one sentence. Naming the first alone cost a caller filing a bug
+  // three refusals and three round trips for a fact the type already declares whole, which is
+  // ADR-0020's rule read the other way: a verdict is decided by a whole read of the record,
+  // not by the first thing in it that fails.
+  const missing = requiredAtCreation(item.type).filter((name) => item[name as keyof WorkItem] === undefined)
+  if (missing.length > 0) {
+    const named = missing.length === 1
+      ? missing[0] as string
+      : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1) as string}`
+    return invalid('V4', `${withArticle(item.type)} needs ${named} at creation`, item)
   }
 
   for (const name of present) {

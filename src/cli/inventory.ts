@@ -301,11 +301,19 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     // this is the opt-in that puts the values themselves on stderr, where a CI job and an
     // agent transcript keep them; a caller cannot weigh that disclosure against an unnamed flag.
     case '--log-values': return 'S'
+    // No rendering emits colour at all, by decision rather than by omission (the human
+    // renderer's own header says why), so this is ignored everywhere. It stays `A` and not
+    // `X` under the rule above: it only changes presentation, and its absence changes no
+    // answer. What was wrong was the reason help gave, not the letter.
     case '--color': return 'A'
     // `--ascii` reaches the human rendering's truncation mark and nothing else, so it is
     // supported rather than ignored: the answer is the same, the bytes are not.
     case '--ascii': return 'S'
-    case '--width': return 'A'
+    // The human rendering lays every line of every command out at this width and refuses to
+    // exceed it (interface B.4), so it is supported wherever a command answers at all. It was
+    // `A` here while `emit` passed it to the renderer on every call, which told a caller the
+    // one knob the rendering has does nothing.
+    case '--width': return 'S'
     // Only a command that can prompt has anything to suppress. `init` is the one with a
     // confirmation class today; interface B.5's severe class lands with `undo`.
     case '--no-input': return command.confirm === 'none' ? 'A' : 'S'

@@ -122,7 +122,7 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   before: hidden('the values a change moved away from. `history` names the fields a change moved and `show` prints what they are now, so a `before` column would put a per-row copy of the old record inside a list whose budget is per row. The one question the old value answers alone is whether the record still agrees with the log, and `doctor` H20 asks it against the record rather than printing it.'),
   after: readable('history:what', 'the field names, not the values: a value may carry a space and the row grammar allows one space-bearing column, which the actor is'),
   guards: readable('history:what', 'as `override=<guard>`. A guard that fails refuses the write, so every guard in a stored event passed and a column of `pass` would be noise; an overridden guard is the one that is not'),
-  reason: readable('explain:reason', 'for the write that put the item in its current state. It is bounded at 500 characters, so it is printed for the one event a reader asked about rather than on every row of a list'),
+  reason: readable('history:why', 'every recorded reason on the page, in a block of its own: a row carries one space-bearing field and that is the actor. `explain` prints the same field for the one event that put the item in the state it is in'),
   outcome: readable('history:what', 'as `outcome=<v>`'),
   cmd: hidden('`op` is the same fact in the vocabulary the store owns: `item.mark` for `mark`. `cmd` is kept in the log so a later rename of a command stays traceable against old events, and printing both prints one fact twice.'),
   txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
@@ -144,6 +144,23 @@ const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
   cancelled: readable('sprints:cancelled', 'the count the close froze beside `done`, so an item cancelled after the close is not counted under two outcomes'),
   goal: readable('sprints:goal'),
   extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
+}
+
+/**
+ * The event keys whose stored content a read surface projects rather than prints verbatim,
+ * each with the reason. Everything else has to come back out of a reading whole.
+ *
+ * The key sweep above asked only whether a key's NAME reaches a surface, and `reason` passed
+ * it on `explain`, which prints the reason of the event that put the item in the state it is
+ * in. A mark moves no state, so `mark --reason "revenue path"` was recorded and readable
+ * through no command at all. That is `acceptance_criteria`'s defect in the log rather than in
+ * the record, and this table plus the sweep under it is the same gate for events.
+ */
+const EVENT_CONTENT_HELD_BACK: Readonly<Record<string, string>> = {
+  before: 'the values a change moved away from; `history` prints them inside `field=from->to` under the marker convention, which is a projection and not the stored object',
+  after: 'the same, from the other side: prose is stored as its length and a value over 40 characters falls back to its field name, so the stored object is not what prints',
+  guards: 'a guard verdict is an object; `history` prints the overridden ones as `override=<guard>` and a passing guard is every row\'s answer',
+  id: 'the event id names one event, and `explain` prints the one it was asked about. Every event\'s id in a column is what `history --txn` is filed to answer; as a sweep it would demand a key no list prints',
 }
 
 /**
@@ -503,5 +520,35 @@ describe('a real record and a real log print what the decisions claim', () => {
       }
     }
     t.diagnostic(`${checked} stored values checked for content, over ${ITEMS.length} records`)
+  })
+
+  // The same assertion for the log. `reason` satisfied every key test in this file while no
+  // command would print a mark's reason, which is the defect the tests above cannot see.
+  it('prints the stored content of every readable event field, and not merely its name', async (t) => {
+    let checked = 0
+    for (const entity of ['every-bug', 'every-story', 'every-held', 'sprint-31'] as const) {
+      const log = await rig.store.events({ entity })
+      assert.ok(log.ok, `the log for ${entity} is unreadable`)
+      assert.ok(log.value.length > 0, `${entity} has no recorded event, so this sweep is vacuous`)
+      const printed = [
+        agentRenderer.render(await history(rig.store, entity, { limit: 200 })),
+        agentRenderer.render(await explain(rig.store, entity)),
+      ].join('\n')
+      for (const event of log.value) {
+        for (const [key, decision] of Object.entries(EVENT_FIELDS)) {
+          if (decision.kind !== 'readable' || key in EVENT_CONTENT_HELD_BACK) continue
+          const value = (event as unknown as Record<string, unknown>)[key]
+          if (value === undefined) continue
+          for (const atom of contentOf(value)) {
+            assert.ok(
+              printed.includes(atom),
+              `${entity}: an event carries ${key} ${JSON.stringify(atom)} and no reading printed it; see the header of this file`,
+            )
+            checked += 1
+          }
+        }
+      }
+    }
+    t.diagnostic(`${checked} stored event values checked for content`)
   })
 })

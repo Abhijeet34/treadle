@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { WORK_ITEM_STATES, WORK_ITEM_TYPES, canonicalField, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, canonicalField, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { doctor } from '../application/services/doctor.ts'
@@ -96,10 +96,61 @@ function renderingOf(flags: Readonly<Record<string, unknown>>, isTTY: boolean): 
   return isRendering(asked) ? asked : undefined
 }
 
+/** The plain positive integers, and nothing `Number.parseInt` would salvage a prefix from. */
+const COUNT = /^[0-9]+$/
+
 function positiveInt(value: string | undefined, fallback: number): number {
   if (value === undefined) return fallback
   const parsed = Number.parseInt(value, 10)
   return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback
+}
+
+/**
+ * The flags the line bound below does not apply to, each because something else already bounds
+ * it and says so better: `--desc`, `--goal`, `--reason` and every `--set <field>=` carry a
+ * field's prose and are held to that field's own check, `--actor` to `actorRefusal`, and
+ * `--workspace` is a filesystem path rather than a value of any record.
+ */
+const BOUNDED_ELSEWHERE = new Set(['desc', 'goal', 'reason', 'set', 'actor', 'workspace'])
+
+/**
+ * The first flag whose value this line cannot mean, as a refusal. Two rules, both about a
+ * value the tool would otherwise read past and then print back.
+ *
+ * A count flag is supported and read through a parser that salvages a prefix: `--width 1_0`
+ * and `--width 1e9` both laid the page out at 40 cells, and `--width NaN` and `--limit abc`
+ * used the default, each without a word. A supported flag that silently ignores what the
+ * caller wrote is `--width`'s own help note one layer down.
+ *
+ * Every other flag names an entity or filters on a field, and no field of a record holds more
+ * than one line. `treadle backlog --assignee <100,000 characters>` exited 0 with 200 KB of
+ * stdout, because the value no record could carry came back in the `filter` and `narrowest`
+ * lines and in the `page` line built from them. Refusing it here bounds all four and every
+ * later reader of a filter, rather than one guard per line that prints one.
+ */
+function flagValueRefusal(
+  flags: Readonly<Record<string, unknown>>, command: string | undefined,
+): ResultObject | undefined {
+  const help = [command === undefined ? 'treadle help' : `treadle help ${command}`]
+  for (const name of ['width', 'limit'] as const) {
+    const value = flag(flags, name)
+    if (value === undefined) continue
+    if (COUNT.test(value) && Number.parseInt(value, 10) > 0) continue
+    return validation(
+      command ?? 'treadle',
+      `--${name} takes a whole number of at least 1, and ${shellWord(value)} is not one`,
+      help,
+    )
+  }
+  for (const [name, value] of Object.entries(flags)) {
+    if (typeof value !== 'string' || BOUNDED_ELSEWHERE.has(name) || value.length <= MAX_LINE) continue
+    return validation(
+      command ?? 'treadle',
+      `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
+      help,
+    )
+  }
+  return undefined
 }
 
 /** Every filter clause, in the order it was written on the command line. */
@@ -243,6 +294,9 @@ async function execute(env: Environment): Promise<number> {
   if (rendering === undefined) {
     return emit(env, validation('treadle', `--out takes one of ${RENDERINGS.join(', ')}`, ['treadle help']), flags)
   }
+
+  const badFlag = flagValueRefusal(flags, command)
+  if (badFlag !== undefined) return emit(env, badFlag, flags)
 
   if (command === 'help' || flags['help'] === true) {
     const topic = command === 'help' ? operands[0] : command

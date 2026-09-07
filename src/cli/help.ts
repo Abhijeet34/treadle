@@ -4,6 +4,7 @@
 // so a command whose contract changes cannot keep a help page that describes the old one.
 
 import { RENDERINGS } from '../adapters/render/index.ts'
+import { MAX_WIDTH, MIN_WIDTH } from '../adapters/render/human.ts'
 import { CONTRACT } from '../adapters/render/grammar.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type Row } from '../application/result.ts'
 import { HELP_SHAPE } from '../application/services/meta.ts'
@@ -11,7 +12,7 @@ import { COMMANDS, GLOBAL_FLAGS, commandNamed, verdictFor, type Command } from '
 
 const VERDICT_NOTE: Readonly<Record<string, string>> = {
   S: 'supported: it changes what this command does or shows',
-  A: 'accepted and ignored: it only changes presentation, and here there is nothing to present',
+  A: 'accepted and ignored: it has nothing to act on here',
   N: 'another scope: passing it here is a validation error naming the correct form',
   X: 'refused: ignoring it would answer a question the caller did not ask',
 }
@@ -34,6 +35,8 @@ const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
   '--dry-run A': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
   '--preview A': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
   '--actor A': 'accepted and ignored: this command records no event, so no actor is attributed',
+  '--color A': 'accepted and ignored: no rendering emits colour at all, so there is no colour to switch',
+  '--width S': `supported: it lays the human rendering out at that many display cells, clamped to ${MIN_WIDTH} to ${MAX_WIDTH}`,
   '--contract S': `supported: it prints the ${CONTRACT} line grammar and runs no command`,
   '--out S': `supported: it selects the rendering, one of ${RENDERINGS.join(', ')}`,
   '--ascii S': 'supported: it writes the human rendering truncation mark as three dots, not an ellipsis',

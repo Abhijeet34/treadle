@@ -21,6 +21,43 @@ export const RESULT_CODES = [
 ] as const
 export type ResultCode = (typeof RESULT_CODES)[number]
 
+/**
+ * The exit status each code carries, and the sentence a caller branches on. It lives beside
+ * the codes rather than in `src/cli/exit.ts` because two layers read it and adapters may not
+ * reach the command layer: `exitFor` returns the status and `--contract` prints the table, so
+ * the machine interface a stranger is handed cannot say one thing while the process does
+ * another. `src/cli/exit.ts` is still where a caller in that layer reads it from.
+ */
+export const EXIT_OF: Readonly<Record<ResultCode, number>> = {
+  OK: 0,
+  INTERNAL: 1,
+  VALIDATION: 2,
+  GUARD_REFUSED: 3,
+  CONFLICT: 4,
+  NOT_FOUND: 5,
+  STORE_UNAVAILABLE: 6,
+  INTEGRITY: 7,
+}
+
+/** Interrupted by SIGINT, after the lock is released. The one status no result object carries. */
+export const EXIT_INTERRUPTED = 130
+
+/**
+ * What each status means to a caller that reads nothing else. One sentence each, because the
+ * whole point of printing them is that the reader has not got the ADR open.
+ */
+export const EXIT_MEANING: Readonly<Record<ResultCode | 'INTERRUPTED', string>> = {
+  OK: 'the command produced its answer',
+  INTERNAL: 'the tool failed in a way it does not have a refusal for; the store was not changed',
+  VALIDATION: 'the line or a value on it is not one this tool accepts; nothing was read or written',
+  GUARD_REFUSED: 'the rules of the workflow refused the move; the cause names the guard',
+  CONFLICT: 'the record moved under you; read it again and retry',
+  NOT_FOUND: 'the entity named does not exist in this workspace',
+  STORE_UNAVAILABLE: 'the store could not be opened, locked or written',
+  INTEGRITY: 'the stored files carry something no write path would have accepted; run treadle doctor',
+  INTERRUPTED: 'SIGINT arrived while a call was in flight; the transaction committed whole or not at all',
+}
+
 export type Effect = 'read' | 'mutate'
 
 /**
@@ -171,12 +208,32 @@ export type ErrorInput = {
   readonly fix?: readonly string[]
 }
 
+/**
+ * The longest a cause may print. It is the field dictionary's own longest single-line bound,
+ * so every sentence this product writes fits inside it whole.
+ */
+export const MAX_CAUSE = 500
+
+/**
+ * A cause is one sentence, and `cause` and `entity` are the refusal fields a caller's own text
+ * reaches:
+ * every splice site names an id, a title, a flag value or a field the caller wrote,
+ * and none of them is bounded at the point it is spliced. `treadle help <1,000,000
+ * characters>` printed a one megabyte cause and `treadle show <the same>` a one megabyte
+ * entity, each on a refusal whose whole job is to be read. The `fix` list already carries this rule (A.6) and
+ * carries it per site; one bound here is the same rule with no site left to forget it.
+ */
+function bounded(cause: string): string {
+  if (cause.length <= MAX_CAUSE) return cause
+  return `${cause.slice(0, MAX_CAUSE)} (+${cause.length - MAX_CAUSE} characters elided)`
+}
+
 export function errorResult(input: ErrorInput): ResultObject {
   const data: Record<string, Value> = {}
   if (input.rule !== undefined) data['rule'] = input.rule
   if (input.guard !== undefined) data['guard'] = input.guard
-  if (input.entity !== undefined) data['entity'] = input.entity
-  data['cause'] = input.cause
+  if (input.entity !== undefined) data['entity'] = bounded(input.entity)
+  data['cause'] = bounded(input.cause)
   if (input.near !== undefined && input.near.length > 0) data['near'] = input.near
   if (input.fix !== undefined && input.fix.length > 0) data['fix'] = input.fix
   return {

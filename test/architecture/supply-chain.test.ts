@@ -7,11 +7,9 @@
 // The shipping shape is here for the same reason: `files`, `bin` and the path the benchmark
 // rig weighs all have to name the same bundle, and three places that agree by hand drift.
 //
-// parseWorkflow below turns a workflow's YAML into `{jobName: {ifExpr, permissions, uses,
-// runsOn, environment, text}}` by indentation alone, so an assertion can name the job it is
-// actually about (the `publish` job's permissions, not the word "write" anywhere in the file)
-// without pulling in a YAML dependency: DR7 already refused one at 686 KB for the record
-// format, and this file's workflows only ever nest two levels deep.
+// The workflow model an assertion names a job of lives in test/helpers/workflow.ts, so this
+// file and the release gate read one parser rather than two: an assertion is about the
+// `publish` job's permissions, not about the word "write" anywhere in the file.
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
@@ -20,6 +18,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 import { checkRuntime } from '../../src/cli/runtime.ts'
+import { workflowOf, type Job } from '../helpers/workflow.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BUNDLE = 'dist/treadle.js'
@@ -37,64 +36,8 @@ function tracked(file: string): boolean {
   return listed.trim().length > 0
 }
 
-type Job = {
-  ifExpr?: string
-  runsOn?: string
-  environment?: string
-  permissions: Record<string, string>
-  uses: string[]
-  text: string
-}
-
-function field(block: string, key: string): string | undefined {
-  return new RegExp(`^ {4}${key}:\\s*(.+)$`, 'm').exec(block)?.[1]?.trim()
-}
-
-function permissionsOf(block: string): Record<string, string> {
-  const section = /^ {4}permissions:\n((?: {6}.+\n?)+)/m.exec(`${block}\n`)?.[1] ?? ''
-  const out: Record<string, string> = {}
-  for (const line of section.split('\n')) {
-    const kv = /^ {6}([a-zA-Z0-9_-]+):\s*(.+)$/.exec(line)
-    if (kv) out[kv[1]!] = kv[2]!.trim()
-  }
-  return out
-}
-
-/** A workflow's jobs, keyed by name, from its own YAML rather than a line found anywhere. */
-function parseWorkflow(text: string): Record<string, Job> {
-  const jobsAt = text.split('\n').findIndex((line) => line === 'jobs:')
-  assert.ok(jobsAt >= 0, 'workflow has no jobs: block')
-  const jobs: Record<string, Job> = {}
-  let name: string | undefined
-  let buf: string[] = []
-  const flush = (): void => {
-    if (name === undefined) return
-    const block = buf.join('\n')
-    jobs[name] = {
-      ifExpr: field(block, 'if'),
-      runsOn: field(block, 'runs-on'),
-      environment: field(block, 'environment'),
-      permissions: permissionsOf(block),
-      uses: [...block.matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)].map((m) => m[1]!),
-      text: block,
-    }
-  }
-  for (const line of text.split('\n').slice(jobsAt + 1)) {
-    const header = /^ {2}([a-zA-Z0-9_-]+):\s*$/.exec(line)
-    if (header) {
-      flush()
-      name = header[1]
-      buf = []
-    } else if (name !== undefined) {
-      buf.push(line)
-    }
-  }
-  flush()
-  return jobs
-}
-
 function workflow(name: string): Record<string, Job> {
-  return parseWorkflow(readFileSync(path.join(ROOT, '.github', 'workflows', name), 'utf8'))
+  return workflowOf(ROOT, name)
 }
 
 describe('F13 control one: install-time scripts are off', () => {

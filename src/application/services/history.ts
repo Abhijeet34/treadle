@@ -30,8 +30,14 @@
 // alone left "when did this reach in_review, and who moved it there" unanswerable from any
 // read surface: `show` has the current state, `explain` has `since` and `from_event`, and
 // this column had the word `state`.
+//
+// WHY IS A SECOND BLOCK. `mark --reason "revenue path"` wrote the reason into the log and no
+// rendering returned it: `explain` prints the reason of the event that put the item in its
+// current state, and a mark moves no state. A reason cannot be a column of the table above,
+// because a row carries exactly one space-bearing field and that is the actor, so it is a
+// block of its own keyed on `at` and `op`, which the table above prints.
 
-import { isKnownField, isSprintField, type ItemId } from '../../domain/index.ts'
+import { MAX_REASON, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
@@ -54,6 +60,17 @@ export const HISTORY_SHAPE: ResultShape = {
       kind: 'block',
       key: 'events',
       columns: [{ name: 'at' }, { name: 'kind' }, { name: 'op' }, { name: 'what' }, { name: 'by', text: true }],
+    },
+    /**
+     * Why, for the events on this page that recorded one. It is a block of its own and not a
+     * column of the one above because a row carries exactly one space-bearing field, which is
+     * the actor, and a reason is prose. Its rows key on `at` and `op`, which the events table
+     * prints, so a reader joins the two without a column either table does not already have.
+     */
+    {
+      kind: 'block',
+      key: 'reasons',
+      columns: [{ name: 'at' }, { name: 'op' }, { name: 'why', text: true }],
     },
   ],
 }
@@ -208,6 +225,23 @@ function whatOf(event: StoreEvent): string {
     : [...kept, `more=${parts.length - kept.length}`].join(',')
 }
 
+/**
+ * A recorded reason as the one free-text cell of a row. `reason` is not among the keys
+ * `parseEventLine` holds to safe single-line text, so a hand edit of a committed log reaches
+ * this cell with anything at all: a delimiter, an unbounded value, or a U+202E override that
+ * reorders every character after it in a terminal. The first two would throw a render
+ * invariant out of a read and the third is threat-model finding F5's whole class, so the
+ * value is held to the domain's own text class here, at the read that prints it.
+ *
+ * A value that fails prints as the file's own unknown marker, which says a reason was
+ * recorded and that this one cannot be shown; `doctor` is the surface for the file that says
+ * it. The row is still emitted, because a reason nothing can print is itself the answer.
+ */
+function why(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_REASON) return UNKNOWN
+  return isSafeText(value, 'line') ? value : UNKNOWN
+}
+
 export type HistoryRequest = {
   readonly limit: number
   /** The event id to resume at, which is the id the previous page's `page` line named. */
@@ -250,6 +284,10 @@ export async function history(
     })),
   }
 
+  const recorded = page
+    .filter((event) => event.reason !== undefined)
+    .map((event): Row => ({ at: cell(event.at), op: cell(event.op), why: why(event.reason) }))
+
   const data: Record<string, Value> = { item: id, sort: 'at desc' }
   if (ordered.length === 0) data['none'] = `${id} has no recorded change`
 
@@ -260,5 +298,15 @@ export async function history(
     if (following !== undefined) data['page'] = line(following.id)
   }
   data['events'] = block
+  // An empty block still renders its opener, which would put `reasons 0 of 0` under every
+  // history of an item nothing was ever marked or moved with a reason for.
+  if (recorded.length > 0) {
+    data['reasons'] = {
+      columns: columnsOf(HISTORY_SHAPE, 'reasons'),
+      shown: recorded.length,
+      total: recorded.length,
+      rows: recorded,
+    }
+  }
   return okResult(HISTORY_SHAPE, { workspace, data })
 }

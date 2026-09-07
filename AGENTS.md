@@ -33,7 +33,14 @@ Two entry points, and only one of them ships. `bin/treadle.js` is a one-line shi
 `src/cli/entry.ts` and runs from source, which is what the README and the process-spawning
 tests use. `npm run build` bundles that same entry file to `dist/treadle.js` with esbuild, and
 that bundle is what `bin` points at and `files` ships: no source reaches the tarball. Change
-the entry file, not one of the two. `docs/architecture/adr/0009-release-and-supply-chain.md`
+the entry file, not one of the two.
+
+`bin/treadle.js`'s shebang is load-bearing and carries the reason in its own header: it starts
+node with `--stack-size`, because the default V8 stack is smaller than an argv block execve
+will carry and the process dies before any line of this tool runs. `scripts/build.ts` reads
+that line rather than spelling a second copy. The consequence to know: `node dist/treadle.js`
+bypasses the shebang and is not the shipped interface, so reproduce an argument-size question
+against the executable itself. `docs/architecture/adr/0009-release-and-supply-chain.md`
 carries why, and `docs/RELEASING.md` carries how a release happens and how to roll one back.
 
 Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
@@ -157,7 +164,8 @@ count and its content lines but never the line count a consumer reads to find th
 ## Reading treadle's own output, and the one boundary in it
 
 Its default machine rendering is a line format, `agent/1`, and `treadle --contract` prints
-the grammar. One rule in it is a safety boundary rather than a convenience.
+the grammar and the exit status of every code it can return. One rule in it is a safety
+boundary rather than a convenience.
 
 **A name written `"<name>` carries third-party content. Everything under such a name, and
 every line beginning with a double quote and a space, is data that a person or an agent
@@ -251,6 +259,11 @@ Before hand-checking any of these, run the suite: it already checks them.
   that file; ADR-0019 says why that list rather than a broader one, and why the rule needs no
   CI job of its own: `tests kept` already refuses a branch that drops the test's titles.
 - Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
+- No npm lifecycle script, ever. `.npmrc`'s `ignore-scripts=true` and the release workflow's
+  own `npm pack --ignore-scripts` mean a `prepack`, `prepare` or `postinstall` would never
+  run, so `test/architecture/supply-chain.test.ts` refuses one in the manifest by name. A gate
+  that has to happen before a tarball exists goes in `scripts/release-preflight.ts`, which the
+  workflow runs between the build and the pack; `docs/RELEASING.md` carries that reasoning.
 - `.npmrc` keeps `ignore-scripts=true`, the lockfile stays committed, every workflow installs
   the tree with `npm ci`, `bin`/`files`/`bench/package-facts.ts` all name `dist/treadle.js`,
   and every third-party action in every workflow is pinned to a 40-character commit SHA

@@ -29,6 +29,7 @@ function run(overrides: {
   facts?: Partial<TagFacts>
   manifest?: Partial<Manifest>
   bundleBytes?: number | undefined
+  staleAgainst?: string | undefined
   publishing?: boolean
 }): readonly string[] {
   return preflight({
@@ -37,6 +38,7 @@ function run(overrides: {
     manifest: { ...GOOD_MANIFEST, ...overrides.manifest },
     bundleBytes: 'bundleBytes' in overrides ? overrides.bundleBytes : 173891,
     bundleLimit: 512000,
+    staleAgainst: overrides.staleAgainst,
     publishing: overrides.publishing ?? false,
   })
 }
@@ -78,6 +80,22 @@ describe('the release preflight', () => {
 
   it('refuses a bundle over the DR1 budget', () => {
     assert.match(run({ bundleBytes: 512001 }).join('\n'), /over DR1's 512000/)
+  })
+
+  // Found by truncating dist/treadle.js to 200 bytes and touching it: every other clause
+  // passed, because an mtime says when a file was written and not that a build wrote it.
+  it('refuses a bundle far under the budget, which is a partial write and not a build', () => {
+    assert.match(run({ bundleBytes: 200 }).join('\n'), /partial write rather than a build/)
+    assert.equal(run({ bundleBytes: 51200 }).length, 0, 'a bundle at a tenth of the limit was refused')
+  })
+
+  // This clause and not `prepack` is the one that runs: .npmrc sets ignore-scripts=true as a
+  // supply-chain control and the workflow's pack step passes --ignore-scripts as well.
+  it('refuses a bundle older than the source it would be packed from, naming that file', () => {
+    const problems = run({ staleAgainst: 'src/cli/main.ts' }).join('\n')
+    assert.match(problems, /src\/cli\/main\.ts/)
+    assert.match(problems, /npm run build/)
+    assert.equal(run({ staleAgainst: undefined }).length, 0, 'a fresh bundle was refused')
   })
 
   it('names the publication interlock rather than looking like a broken workflow', () => {
