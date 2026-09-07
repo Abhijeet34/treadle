@@ -480,10 +480,16 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
     }
   }
 
-  for (const name of requiredAtCreation(item.type)) {
-    if (item[name as keyof WorkItem] === undefined) {
-      return invalid('V4', `${withArticle(item.type)} needs ${name} at creation`, item)
-    }
+  // Every missing one, in one sentence. Naming the first alone cost a caller filing a bug
+  // three refusals and three round trips for a fact the type already declares whole, which is
+  // ADR-0020's rule read the other way: a verdict is decided by a whole read of the record,
+  // not by the first thing in it that fails.
+  const missing = requiredAtCreation(item.type).filter((name) => item[name as keyof WorkItem] === undefined)
+  if (missing.length > 0) {
+    const named = missing.length === 1
+      ? missing[0] as string
+      : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1) as string}`
+    return invalid('V4', `${withArticle(item.type)} needs ${named} at creation`, item)
   }
 
   for (const name of present) {
