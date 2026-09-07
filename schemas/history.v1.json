@@ -90,6 +90,12 @@
             "null"
           ]
         },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "events": {
           "type": "object",
           "additionalProperties": false,

@@ -9,7 +9,7 @@ treadle takes the first horn: the human-readable files are the source of truth a
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
 The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy with roll-up, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs nineteen commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
+`bin/treadle.js` runs twenty commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -105,9 +105,9 @@ See [Status](#status) for the line between implemented and specified-only.
 | Store: ceremony records; `migrate` | Specified, not implemented; an impediment is a work-item type in the month shards rather than a record of its own, [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
 | Application services, the result object, the JSON Schemas | Implemented for the commands below |
 | Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
+| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `sprint`, `sprints`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
 | Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
-| Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, and `relation add` and `relation remove` are what the design called `link` and `unlink` |
+| Commands: `estimate`, `assign`, `split`, `undo`, `gate`, `config` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Specified, not implemented; `history <id>` is the entity-scoped half |
 | Hierarchy roll-up: points, done points, progress and descendant counts over a subtree | Implemented in the domain core; `rollUp` has no caller, so no command surfaces it |
 | `doctor`: eleven findings over records, the event log, the relation graph and impediments; the rest wait on entities that do not exist yet | Partly implemented |
