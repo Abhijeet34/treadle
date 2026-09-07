@@ -128,7 +128,10 @@ function sentence(next: () => number, words: number): string {
 }
 
 /** One item, fully determined by the index and the seed, with the fields its type requires. */
-function itemAt(index: number, next: () => number, months: readonly string[], epics: readonly string[]): WorkItem {
+function itemAt(
+  index: number, next: () => number, months: readonly string[],
+  epics: readonly { readonly id: string; readonly month: string }[],
+): WorkItem {
   const id = `wi-${String(index).padStart(6, '0')}`
   const month = months[Math.floor(next() * months.length)] as string
   const day = String(1 + Math.floor(next() * 28)).padStart(2, '0')
@@ -150,8 +153,15 @@ function itemAt(index: number, next: () => number, months: readonly string[], ep
   }
   // Parents point at epics generated before this item, so the hierarchy is a forest and the
   // cycle check on every refresh has real edges to walk rather than none.
+  //
+  // Filed no later than this item, because the shards go in a month at a time in month order:
+  // an epic filed in a later month is not in the store when this item's shard lands, and the
+  // store refuses a create that names a parent it does not hold, exactly as `file --parent`
+  // does (ADR-0025). The draw is one `next()` either way, so the stream stays where it was.
   if (type !== 'epic' && epics.length > 0 && next() < 0.6) {
-    base['parent_id'] = epics[Math.floor(next() * epics.length)]
+    const draw = next()
+    const eligible = epics.filter((epic) => epic.month <= month)
+    if (eligible.length > 0) base['parent_id'] = eligible[Math.floor(draw * eligible.length)]?.id
   }
   if (state === 'on_hold') {
     base['hold_reason'] = sentence(next, 6)
@@ -637,14 +647,14 @@ async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Gene
   const months = monthRange(spec.lastMonth, spec.months)
   const started = performance.now()
 
-  const epics: string[] = []
+  const epics: { id: string; month: string }[] = []
   const drawn: WorkItem[] = []
   const impedimentEvery = spec.impedimentsPerHundredItems <= 0
     ? 0 : Math.max(1, Math.round(100 / spec.impedimentsPerHundredItems))
   const impedimentIndexes: number[] = []
   for (let i = 1; i <= spec.items; i += 1) {
     const drawnItem = itemAt(i, next, months, epics)
-    if (drawnItem.type === 'epic' && epics.length < 64) epics.push(drawnItem.id)
+    if (drawnItem.type === 'epic' && epics.length < 64) epics.push({ id: drawnItem.id, month: drawnItem.filed_at.slice(0, 7) })
     // An epic is a parent to items already generated, so replacing one would leave those
     // parent edges pointing at an impediment.
     // The blocked item is drawn from the eight that follow, so an impediment in the last

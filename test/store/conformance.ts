@@ -421,6 +421,31 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    it('leaves nothing behind when one write of several is refused', async () => {
+      await withStore(async (store) => {
+        // The rule runs after the read set and before any shard is rewritten, so a refusal
+        // has written nothing. The good record beside the bad one is what proves it: a check
+        // placed inside the write loop would have landed the first and refused the second.
+        const refused = await store.apply({
+          txn: 't1',
+          writes: [
+            { item: anItem({ id: 'first-task' }) },
+            { item: anItem({ id: 'second-task', parent_id: 'never-filed' }) },
+            { item: anItem({ id: 'third-task' }) },
+          ],
+          events: [anEvent({ id: 'ev-1', entity: 'first-task' })],
+        })
+        assert.equal(refused.ok, false)
+        assert.equal(refused.ok ? '' : refused.error.rule, 'S10')
+        for (const id of ['first-task', 'second-task', 'third-task']) {
+          const found = await store.get(id)
+          assert.equal(found.ok && found.value, undefined, `${id} landed from a refused transaction`)
+        }
+        const events = await store.events()
+        assert.equal(events.ok && events.value.length, 0, 'a refused transaction appended an event')
+      })
+    })
+
     it('refuses a write that keeps a parent the same transaction removes', async () => {
       await withStore(async (store) => {
         await store.apply({
