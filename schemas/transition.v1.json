@@ -118,7 +118,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-trust": "data"
         },
         "guards": {
           "type": [

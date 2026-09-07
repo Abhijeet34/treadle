@@ -126,6 +126,12 @@
             "null"
           ]
         },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "items": {
           "type": "object",
           "additionalProperties": false,
@@ -149,6 +155,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

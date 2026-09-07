@@ -135,8 +135,8 @@ describe('a change to severity or priority is an event with a before and an afte
     const marked = await cli(['mark', 'sess-timeout', '--severity', 'S3', '--priority', '4',
       '--reason', 'the workaround holds until the next release', '--actor', 'kim'])
     assert.equal(marked.code, 0)
-    assert.match(marked.out, /^set severity S1 -> S3$/m)
-    assert.match(marked.out, /^set priority 1 -> 4$/m)
+    assert.match(marked.out, /^"set severity S1 -> S3$/m)
+    assert.match(marked.out, /^"set priority 1 -> 4$/m)
 
     const event = (await events()).find((entry) => entry['op'] === 'item.mark')
     assert.deepEqual(event?.['before'], { severity: 'S1', priority: '1' })
@@ -196,7 +196,7 @@ describe('mark and evidence answer the two anti-ambiguity modes the flag matrix 
     const run = await cli(['mark', 'sess-timeout', '--severity', 'S3', '--reason', 'it has a workaround', '--dry-run'])
     assert.equal(run.code, 0)
     assert.match(run.out, /^dry_run 1$/m)
-    assert.match(run.out, /^set severity S1 -> S3$/m)
+    assert.match(run.out, /^"set severity S1 -> S3$/m)
     assert.equal(await shardOf(), before, 'a dry run leaves the shard alone')
     await demo.dispose()
   })
@@ -394,7 +394,7 @@ describe('evidence is a bounded pointer list, and done requires one', () => {
     await cli(['evidence', 'add', 'retry-key', 'pr', 'https://example.test/pr/42'])
     const shown = await cli(['show', 'retry-key'])
     assert.match(shown.out, /^~evidence 2 2$/m)
-    assert.match(shown.out, /^#kind ref "label$/m)
+    assert.match(shown.out, /^#kind "ref "label$/m)
     assert.match(shown.out, /^run 8813 722 pass, 0 fail$/m)
     assert.match(shown.out, /^pr https:\/\/example\.test\/pr\/42 -$/m)
     assert.match(await shard(demo), /^## Evidence\n\n- run 8813 722 pass, 0 fail\n- pr https:\/\/example\.test\/pr\/42$/m)

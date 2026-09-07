@@ -50,7 +50,8 @@ The `~exits` block it prints is generated from the same constant `exitFor` retur
 
 **`ok` says whether the command produced its answer; `code` is the verdict the status is read from.**
 The two coincide on every command but one.
-`doctor`'s answer is itself a verdict on the store: it prints the findings table on stdout under an `ok doctor` envelope and exits `INTEGRITY` when the table is not empty, so a script or a CI job asks "is my store intact" from the status alone and a person reads the rows.
+`doctor`'s answer is itself a verdict on the store: it prints the findings table on stdout under an `ok doctor` envelope and exits `INTEGRITY` when a row on it hides a record or names a served record the audit flagged, so a script or a CI job asks "is my store intact" from the status alone and a person reads the rows.
+The verdict reads `hidesContent`, the same predicate that decides whether a read over the store is refused, so the one status meaning "no answer over this store is whole" is decided in one place; a table carrying only `SERVED_ANYWAY` rows exits `0` and says so on a `serving` line.
 Making that a refusal would have put the report on stderr under an `err` envelope that a consumer validates against `error/1`, with no place in that shape for the table that is the whole point of the command.
 The same code is a refusal everywhere else: a read over a store that holds a record it cannot serve exits `INTEGRITY` with the error object, because its answer would have been computed over a set with a hole.
 [ADR-0003](0003-record-format-and-migration.md) owns why that is a refusal rather than a partial answer with a count.

@@ -132,6 +132,12 @@
             "null"
           ]
         },
+        "note": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "draft": {
           "type": "object",
           "additionalProperties": false,
@@ -155,6 +161,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -239,6 +248,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }
@@ -321,6 +333,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -405,6 +420,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }
@@ -487,6 +505,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

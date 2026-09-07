@@ -8,6 +8,12 @@
 // row grammar's "only the last field may contain spaces" rule holds by construction, and a
 // non-final cell carrying a space is refused rather than silently shifting every value
 // after it. F2: a value that would end its own line never reaches a scalar or a cell.
+//
+// F12 is the third and it is a property of the shapes rather than of this file: a name or a
+// column carrying content a third party wrote prints under the `"` marker, whether it earned
+// it by being free text (`text`) or by being a bounded value a caller nonetheless supplied
+// (`data`). The two flags mean the same thing to a reader of the line and differ only in
+// placement, which is why one branch reads both.
 
 import { shapeFor } from '../../application/shapes.ts'
 import { isBlock, type Block, type ColumnSpec, type ResultObject, type Value } from '../../application/result.ts'
@@ -51,7 +57,7 @@ function renderBlock(key: string, block: Block): readonly string[] {
   const lines = [`~${key} ${block.shown} ${block.total}`]
   // A header declares the shape of the rows that follow it, and there are none to declare.
   if (block.rows.length > 0) {
-    lines.push(`#${columns.map((column) => (column.text === true ? `"${column.name}` : column.name)).join(' ')}`)
+    lines.push(`#${columns.map((column) => (column.text === true || column.data === true ? `"${column.name}` : column.name)).join(' ')}`)
   }
   for (const row of block.rows) {
     const cells = columns.map((column) => {
@@ -119,9 +125,10 @@ export const agentRenderer: Renderer = {
       }
       if (quiet) continue
       if (property.kind === 'list') {
+        const mark = property.data === true ? '"' : ''
         for (const entry of value as readonly string[]) {
           guardSingleLine(property.key, entry)
-          lines.push(`${property.key} ${entry}`)
+          lines.push(`${mark}${property.key} ${entry}`)
         }
         continue
       }
@@ -136,7 +143,7 @@ export const agentRenderer: Renderer = {
       // what the record grammar already says of a field that holds nothing.
       if (text.length === 0) continue
       guardSingleLine(property.key, text)
-      lines.push(`${property.key} ${text}`)
+      lines.push(`${property.data === true ? '"' : ''}${property.key} ${text}`)
     }
     return lines.length === 0 ? '' : `${lines.join('\n')}\n`
   },

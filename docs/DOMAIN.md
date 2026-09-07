@@ -122,6 +122,11 @@ On that path the store's S5 section ceiling is the bound and a stored value over
 A bound that refuses names the field, the observed length, the limit and the difference.
 Nothing here truncates.
 
+Every length in this table, every count a refusal prints, and every `<n> chars` and `(text:<n>)` marker a read surface writes count the same unit: JavaScript string length, which is UTF-16 code units.
+A character outside the Basic Multilingual Plane therefore counts as two, so `"ααααα 🙂"` is seven code points and counts eight.
+One unit is used everywhere on purpose, so the number in a refusal is the number the bound compares and the number an echo prints; naming it here is cheaper than a per-surface conversion that would leave the four disagreeing.
+`H18`'s 10,000 and `T7`'s 500 are the same unit.
+
 A required text field that is only whitespace is refused at write time, because a paragraph that says nothing is not a value: `proposed_resolution is only whitespace, and a text says something or is left unset` is `V4`, checked wherever `text(name, max)` is the field's check.
 It is write-time only, the same `storedProse` distinction every narrowed bound here uses, so a value an earlier version stored is still servable.
 
@@ -200,14 +205,19 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 ## Sprints
 
 A sprint is a period with a committed set, and not a work item: it is `open` or `closed`, and nothing else about it moves.
-`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at`, `carried`, the ids of the items still open when it closed, and the tally the close froze: `done`, `done_points` and `cancelled`.
+`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at`, `carried`, the ids of the members still open at that instant, `finished`, the ids of the rest, and the tally the close froze over the two together: `done`, `done_points`, `cancelled` and `points`.
+`membersOf(sprint)` is that union, which is what `sprints <id>` prints as `members` and what every frozen number is counted over.
+`finished` is stored as a `## Finished` section rather than a field, because a field value is bounded at 8 KiB and it grows with the whole sprint.
 `goal` is optional and bounded at `MAX_GOAL`, which is `MAX_REASON`.
 `validateSprint` checks the dictionary; `isCalendarDate` refuses a date the calendar does not have, so `2026-02-30` is `I1` rather than the second of March.
 
 The committed set is not a field.
-An item carries `sprint_id`, so what is committed to an open sprint is what points at it, and `carried` is the one list a close writes because the items it names move on and stop pointing back.
-`carryOver(items)` is what a close records: every committed item whose state is not terminal, in id order, so a cancelled item stays in the set and is not carried.
-A reopen clears `carried`, so once a carried item has been committed onward the reopen is refused with `I2`: the item would leave the record and the re-close would count a smaller sprint than the one a team already read.
+An item carries `sprint_id`, so what is committed to an OPEN sprint is what points at it.
+A closed sprint's set is `carried` plus `finished`, because it is no longer derivable: reviving or reopening a member that was terminal at close and committing it onward is two legal moves, and each used to take that member out of a set four frozen numbers were still counted against.
+`carryOver(items)` is one of the two lists a close records: every committed item whose state is not terminal, in id order, so a cancelled item is in `finished` and is not carried.
+A reopen clears every frozen field, so once a carried item has been committed onward the reopen is refused with `I2`: the item would leave the record and the re-close would count a smaller sprint than the one a team already read.
+A sprint an older build closed carries no `points`, and everything about it reads live, which is what it always did.
+[ADR-0023](architecture/adr/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) carries the argument.
 
 `dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
 `evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.

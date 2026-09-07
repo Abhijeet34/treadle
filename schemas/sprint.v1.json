@@ -82,7 +82,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-trust": "data"
         },
         "committed": {
           "type": "array",

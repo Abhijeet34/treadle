@@ -114,6 +114,9 @@
                   },
                   "text": {
                     "const": true
+                  },
+                  "data": {
+                    "const": true
                   }
                 }
               }
@@ -149,7 +152,8 @@
               "name": "op"
             },
             {
-              "name": "what"
+              "name": "what",
+              "trust": "data"
             },
             {
               "name": "by",
@@ -180,6 +184,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

@@ -48,6 +48,9 @@ export const BOARD_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'absent', type: 'string' },
     { kind: 'scalar', key: 'clause', type: 'string' },
     { kind: 'scalar', key: 'store', type: 'string' },
+    // Appended after the scalars already declared, which STABILITY's output-schema rule makes
+    // a non-breaking addition: which set a closed `--sprint` scope reads.
+    { kind: 'scalar', key: 'note', type: 'string' },
     ...BOARD_STATES.map((state) => ({ kind: 'block', key: state, columns: BOARD_COLUMNS } as const)),
   ],
 }
@@ -164,6 +167,12 @@ export async function board(store: Store, clock: Clock, request: BoardRequest): 
   }
   if (request.explainAbsence !== undefined) {
     Object.assign(data, absence(view.value, filters, request.explainAbsence))
+  }
+  // `help board` already declares this scope; the line says it where the numbers are, beside
+  // a `sprints <id>` that reads a different set and prints different counts.
+  const scoped = scope.kind === 'sprint' ? view.value.sprintById.get(scope.id) : undefined
+  if (scoped !== undefined && scoped.state === 'closed') {
+    data['note'] = `${scoped.id} is closed; this reads the live states of the items whose sprint_id is ${scoped.id} now, not the set its close recorded; treadle sprints ${scoped.id}`
   }
 
   for (const state of BOARD_STATES) {

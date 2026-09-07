@@ -5,6 +5,8 @@ status  acme-platform
   points  83
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
 
 states  7 of 7
   STATE        N
@@ -29,6 +31,7 @@ status  acme-platform
   points  83
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -53,6 +56,7 @@ status  acme-platform
   points  83
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -346,6 +350,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  8/11 pass
 
 gates  3 of 11
   GATE  RULE  VERDICT  NEED
@@ -354,11 +359,11 @@ gates  3 of 11
   done  DOD7  fail     treadle evidence add sso-saml <kin…
 
 moves  4 of 4
-  TO         GUARDS
-  in_review  G5
-  on_hold    -
-  cancelled  G7
-  ready      -
+  TO         GUARDS  RECORDS
+  in_review  G5      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
+  ready      -       reason,outcome
 
 ### explain @ 80
 explain  acme-platform
@@ -373,6 +378,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  8/11 pass
 
 gates  3 of 11
   GATE  RULE  VERDICT  NEED
@@ -381,11 +387,11 @@ gates  3 of 11
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
 moves  4 of 4
-  TO         GUARDS
-  in_review  G5
-  on_hold    -
-  cancelled  G7
-  ready      -
+  TO         GUARDS  RECORDS
+  in_review  G5      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
+  ready      -       reason,outcome
 
 ### explain @ 200
 explain  acme-platform
@@ -400,6 +406,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  8/11 pass
 
 gates  3 of 11
   GATE  RULE  VERDICT  NEED
@@ -408,11 +415,11 @@ gates  3 of 11
   done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
 
 moves  4 of 4
-  TO         GUARDS
-  in_review  G5
-  on_hold    -
-  cancelled  G7
-  ready      -
+  TO         GUARDS  RECORDS
+  in_review  G5      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
+  ready      -       reason,outcome
 
 ### history @ 60
 history  acme-platform
@@ -978,6 +985,8 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
 
 states  7 of 7
   STATE        N
@@ -1007,6 +1016,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1036,6 +1046,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1064,6 +1075,8 @@ status  acme-platform
   points  84
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
 
 states  7 of 7
   STATE        N
@@ -1088,6 +1101,7 @@ status  acme-platform
   points  84
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1112,6 +1126,7 @@ status  acme-platform
   points  84
   findings  0
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1188,6 +1203,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  6/11 pass
 
 gates  5 of 11
   GATE   RULE  VERDICT  NEED
@@ -1198,10 +1214,10 @@ gates  5 of 11
   done   DOD7  fail     treadle evidence add theme-dark <…
 
 moves  3 of 3
-  TO         GUARDS
-  ready      G1
-  on_hold    -
-  cancelled  G7
+  TO         GUARDS  RECORDS
+  ready      G1      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
 
 ### explain-blocked @ 80
 explain  acme-platform
@@ -1214,6 +1230,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  6/11 pass
 
 gates  5 of 11
   GATE   RULE  VERDICT  NEED
@@ -1224,10 +1241,10 @@ gates  5 of 11
   done   DOD7  fail     treadle evidence add theme-dark <kind> <ref> [label]
 
 moves  3 of 3
-  TO         GUARDS
-  ready      G1
-  on_hold    -
-  cancelled  G7
+  TO         GUARDS  RECORDS
+  ready      G1      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
 
 ### explain-blocked @ 200
 explain  acme-platform
@@ -1240,6 +1257,7 @@ explain  acme-platform
   blocks  -
   by
     dana
+  rules  6/11 pass
 
 gates  5 of 11
   GATE   RULE  VERDICT  NEED
@@ -1250,10 +1268,10 @@ gates  5 of 11
   done   DOD7  fail     treadle evidence add theme-dark <kind> <ref> [label]
 
 moves  3 of 3
-  TO         GUARDS
-  ready      G1
-  on_hold    -
-  cancelled  G7
+  TO         GUARDS  RECORDS
+  ready      G1      -
+  on_hold    -       reason
+  cancelled  G7      reason,resolution
 
 ### show-relations @ 60
 show  acme-platform
@@ -1540,6 +1558,8 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
 
 states  7 of 7
   STATE        N
@@ -1573,6 +1593,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1606,6 +1627,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1755,10 +1777,12 @@ sprint  acme-platform  1 changed  txn t0910
   v  1 -> 2
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
+  set  finished - -> webhook-retry
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
   set  cancelled - -> 0
+  set  points - -> 5
   carried  avatar-crop
   event  e0911
 
@@ -1769,10 +1793,12 @@ sprint  acme-platform  1 changed  txn t0910
   v  1 -> 2
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
+  set  finished - -> webhook-retry
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
   set  cancelled - -> 0
+  set  points - -> 5
   carried  avatar-crop
   event  e0911
 
@@ -1783,10 +1809,12 @@ sprint  acme-platform  1 changed  txn t0910
   v  1 -> 2
   set  state open -> closed
   set  closed_at - -> 2026-09-04T09:30:00Z
+  set  finished - -> webhook-retry
   set  carried - -> avatar-crop
   set  done - -> 1
   set  done_points - -> 3
   set  cancelled - -> 0
+  set  points - -> 5
   carried  avatar-crop
   event  e0911
 
@@ -1830,6 +1858,7 @@ sprints  acme-platform
     Sprint 31
   goal
     Ship the token refresh
+  members  avatar-crop,webhook-retry
 
 ### sprints-closed @ 80
 sprints  acme-platform
@@ -1849,6 +1878,7 @@ sprints  acme-platform
     Sprint 31
   goal
     Ship the token refresh
+  members  avatar-crop,webhook-retry
 
 ### sprints-closed @ 200
 sprints  acme-platform
@@ -1868,4 +1898,5 @@ sprints  acme-platform
     Sprint 31
   goal
     Ship the token refresh
+  members  avatar-crop,webhook-retry
 

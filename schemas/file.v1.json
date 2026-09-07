@@ -86,7 +86,8 @@
           "type": "array",
           "items": {
             "type": "string"
-          }
+          },
+          "x-trust": "data"
         },
         "event": {
           "type": [

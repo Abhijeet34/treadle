@@ -59,7 +59,11 @@ export const HISTORY_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'events',
-      columns: [{ name: 'at' }, { name: 'kind' }, { name: 'op' }, { name: 'what' }, { name: 'by', text: true }],
+      // `what` projects stored values: an assignee, a reviewer, a component, an evidence
+      // pointer. Every one of them is written by a caller, and the cell is arity-1 because
+      // `side` and `cell` refuse a value carrying whitespace, so it takes the marker
+      // without taking the free-text column's placement.
+      columns: [{ name: 'at' }, { name: 'kind' }, { name: 'op' }, { name: 'what', data: true }, { name: 'by', text: true }],
     },
     /**
      * Why, for the events on this page that recorded one. It is a block of its own and not a
@@ -155,6 +159,16 @@ const PROSE = /^(\d+) chars$/
 const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
 
 /**
+ * Fields whose value is a comma-joined list of ids, which is one comma too many for this
+ * cell: `what` joins its own `field=value` pairs with commas, so `carried=(unset)->t-four,
+ * t-three` reads as two pairs, and a four-id carry-over is 41 characters and printed as `(?)`
+ * instead, which says a value existed and nothing else. A list of more than one prints its
+ * count, which is unambiguous, bounded, and the part a reader of a close can act on;
+ * `sprints <id>` prints the list itself.
+ */
+const LISTED = new Set<string>(['carried', 'finished', 'labels'])
+
+/**
  * One side of a move as it prints. `-` is the snapshot's own marker for a field that was not
  * set, and it printed as an empty string: `reviewer=->dev` reads as a typo rather than as a
  * field that had no previous value. Every marker is parenthesised, and a stored value that
@@ -162,7 +176,9 @@ const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
  */
 function side(value: unknown, field: string): string {
   if (value === '-') return UNSET
-  if (typeof value !== 'string' || value.length === 0 || value.length > MAX_VALUE) return UNKNOWN
+  if (typeof value !== 'string' || value.length === 0) return UNKNOWN
+  if (LISTED.has(field) && value.includes(',') && !/\s/.test(value)) return `(list:${value.split(',').length})`
+  if (value.length > MAX_VALUE) return UNKNOWN
   const prose = NEVER_PROSE.has(field) ? null : PROSE.exec(value)
   if (prose !== null) return `(text:${prose[1] as string})`
   return /\s/.test(value) || value.startsWith('(') ? UNKNOWN : value

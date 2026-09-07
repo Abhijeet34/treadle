@@ -64,10 +64,17 @@ export type Effect = 'read' | 'mutate'
  * One column of a block. `text` marks free text that a person or an agent wrote: it renders
  * last so the row grammar's "only the last field may contain spaces" rule holds by
  * construction (F3), and its name carries the untrusted-content marker (F12).
+ *
+ * `data` carries the marker without the placement. A cell can hold third-party content and
+ * still be arity-1 by construction, because the value it projects is refused if it carries a
+ * space: `history`'s `what` and `show`'s `ref` are that shape, and both reached an unmarked
+ * column the agent contract tells a reader is the tool's own speech. Only one column of a
+ * block may be `text`; any number may be `data`.
  */
 export type ColumnSpec = {
   readonly name: string
   readonly text?: true
+  readonly data?: true
 }
 
 /**
@@ -75,8 +82,20 @@ export type ColumnSpec = {
  * carry newlines; every other kind is the tool's own speech and is single-line by contract.
  */
 export type PropertySpec =
-  | { readonly kind: 'scalar'; readonly key: string; readonly type: 'string' | 'integer' | 'boolean' }
-  | { readonly kind: 'list'; readonly key: string }
+  /**
+   * `data` is the marked scalar the contract already names: a value the tool prints under one
+   * of its own keys but did not choose. `evidence add` echoes the pointer it just stored, and
+   * `show` prints the same field back as a `data` column, so the two would otherwise disagree
+   * about whether one field's value is the tool's speech.
+   */
+  | { readonly kind: 'scalar'; readonly key: string; readonly type: 'string' | 'integer' | 'boolean'; readonly data?: true }
+  /**
+   * `data` marks a list whose entries carry third-party content, so each renders under the
+   * untrusted-content marker. Every `set` list is one: `set <field> <before> -> <after>` puts
+   * a caller's own title, description, goal, acceptance criteria or hold reason on a line the
+   * contract's `scalar` kind declares to be the tool's speech.
+   */
+  | { readonly kind: 'list'; readonly key: string; readonly data?: true }
   /**
    * `whole` never truncates: a refusal's sentence and a help page's prose are not excerpts,
    * and neither is a field the store already bounds. A.4 names `title` for that second

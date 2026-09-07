@@ -77,7 +77,7 @@ describe('the defects found by using the tool', () => {
         '--until', '2099-01-01T00:00:00Z',
       ])
       assert.equal(future.code, 0, future.err)
-      assert.match(future.out, /^set hold_until - -> 2099-01-01T00:00:00Z$/m)
+      assert.match(future.out, /^"set hold_until - -> 2099-01-01T00:00:00Z$/m)
     })
   })
 
@@ -165,7 +165,7 @@ describe('the defects found by using the tool', () => {
 
       const log = await cli(['history', 'i18n-dates'])
       assert.equal(log.code, 0, log.err)
-      assert.match(log.out, /^#at kind op what "by$/m, 'the actor column is marked as third-party content')
+      assert.match(log.out, /^#at kind op "what "by$/m, 'the two columns projecting stored values are marked as third-party content')
       // "when did this reach ready, and who moved it there" is answered by this one row, so
       // the `what` cell carries both states and not only the name of the field that moved.
       assert.match(log.out, /^\S+ human item\.transition state=draft->ready ravi$/m)
@@ -219,7 +219,7 @@ describe('set echoes a reported change the same way file does', () => {
 
     const edited = await cli(['set', 'card-decline', 'description=one\ntwo'])
     assert.equal(edited.code, 0, `${edited.out}${edited.err}`)
-    assert.match(edited.out, /^set description - -> 7 chars$/m)
+    assert.match(edited.out, /^"set description - -> 7 chars$/m)
 
     const shown = await cli(['show', 'card-decline', '--field', 'desc'])
     assert.equal(shown.code, 0, shown.err)
@@ -259,8 +259,8 @@ describe('a gate that demands a field names a command that can set it', () => {
 
     const set = await cli(['set', 'checkout-500', 'expected=both orders are listed', 'actual=one is charged'])
     assert.equal(set.code, 0, set.err)
-    assert.match(set.out, /^set expected - -> both orders are listed$/m)
-    assert.match(set.out, /^set actual - -> one is charged$/m)
+    assert.match(set.out, /^"set expected - -> both orders are listed$/m)
+    assert.match(set.out, /^"set actual - -> one is charged$/m)
 
     const ready = await cli(['transition', 'checkout-500', 'ready'])
     assert.equal(ready.code, 0, `${ready.out}${ready.err}`)
@@ -307,7 +307,7 @@ describe('the write path and the read path agree about a field\'s name', () => {
 
     const edited = await cli(['set', 'long-form', 'desc=written by the short name'])
     assert.equal(edited.code, 0, edited.err)
-    assert.match(edited.out, /^set description written long -> written by the short name$/m)
+    assert.match(edited.out, /^"set description written long -> written by the short name$/m)
   })
 
   it('names both accepted spellings when the field really is unknown', async () => {
@@ -490,7 +490,7 @@ describe('the defects the second adversarial pass found by using the tool', () =
     it('reports a multi-line description as its size and exits 0, because the write landed', async () => {
       const written = await cli(['set', 'auth-refresh', 'description=line one\nline two'])
       assert.equal(written.code, 0, written.err)
-      assert.match(written.out, /^set description .* -> 17 chars$/m)
+      assert.match(written.out, /^"set description .* -> 17 chars$/m)
       const shown = await cli(['show', 'auth-refresh', '--field', 'desc'])
       assert.match(shown.out, /^\|desc 2 \d+$/m)
     })

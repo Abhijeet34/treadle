@@ -12,6 +12,7 @@
 import {
   carryOver,
   dayOfSprint,
+  membersOf,
   dateOf,
   evaluateCommit,
   validateSprint,
@@ -38,7 +39,9 @@ export const SPRINT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'state', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'string' },
-    { kind: 'list', key: 'set' },
+    // F12: every `set` entry ends in a value the caller wrote, so the line carries the
+    // untrusted-content marker rather than reading as the tool's own speech.
+    { kind: 'list', key: 'set', data: true },
     { kind: 'list', key: 'committed' },
     { kind: 'scalar', key: 'carried', type: 'string' },
     { kind: 'scalar', key: 'already', type: 'string' },
@@ -80,6 +83,10 @@ export const SPRINTS_SHAPE: ResultShape = {
     // Last of the non-block properties, which is as late as the renderer's blocks-last rule
     // allows and moves nothing already declared.
     { kind: 'scalar', key: 'not_ready', type: 'string' },
+    // The committed set a close recorded, `carried` and `finished` read as the one list they
+    // are, which is what `committed`, `done`, `cancelled` and `pts` are counted over; printed
+    // so a reader can see the record those numbers describe.
+    { kind: 'scalar', key: 'members', type: 'string' },
     {
       kind: 'block',
       key: 'sprints',
@@ -92,8 +99,27 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
   return errorResult({ code: 'VALIDATION', command: 'sprint', workspace, effect: 'mutate', rule, entity, cause, fix })
 }
 
-/** The items committed to one sprint: what points at it, plus what its close carried away. */
+/**
+ * The items committed to one sprint. An open sprint's set is what points at it. A closed
+ * sprint's set is the list its close recorded, because that list is the record and nothing
+ * later may change it: recomputing it as "what points at it now, plus the carry-over" let a
+ * member that was terminal at close leave through two ordinary moves, a revive and a commit
+ * onward, and shrank `committed` under a frozen `done`. A sprint an older build closed has no
+ * `members` and reads the way it always did. The captain decision `closed-sprint-member-set`
+ * and ADR-0022 carry the argument.
+ *
+ * An id `members` names that the store no longer holds resolves to nothing here and is a
+ * doctor finding (`H28`); the tally counts the record's own length, so a hand-deleted record
+ * does not quietly shrink a frozen count the way a legal move used to.
+ */
 export function committedTo(view: WorkspaceView, sprint: Sprint): readonly WorkItemSummary[] {
+  const members = membersOf(sprint)
+  if (members !== undefined) {
+    return members.flatMap((id) => {
+      const item = view.byId.get(id)
+      return item === undefined ? [] : [item]
+    })
+  }
   const pointing = view.items.filter((item) => item.sprint_id === sprint.id)
   const seen = new Set(pointing.map((item) => item.id))
   const carried = (sprint.carried ?? []).flatMap((id) => {
@@ -123,12 +149,17 @@ function tallyOf(sprint: Sprint, items: readonly WorkItemSummary[]): Tally {
   const done = items.filter((item) => item.state === 'done')
   const frozen = sprint.state === 'closed' && sprint.done !== undefined
   return {
-    committed: items.length,
+    // The record of the set; its length is the count even where an id in it names a record
+    // the store no longer holds, so `committed` never disagrees with the numbers frozen
+    // beside it. Absent on a sprint an older build closed, which counts live.
+    committed: membersOf(sprint)?.length ?? items.length,
     done: frozen ? sprint.done as number : done.length,
     // A sprint closed before `cancelled` was recorded carries `done` alone and reads this
     // one live, which is what it did.
     cancelled: frozen && sprint.cancelled !== undefined ? sprint.cancelled : items.filter((item) => item.state === 'cancelled').length,
-    points: items.reduce((sum, item) => sum + (item.points ?? 0), 0),
+    // Frozen with the rest of the tally. Summing this one live beside a frozen `done_points`
+    // is what printed `pts 5/3`, five done points out of a total of three.
+    points: frozen && sprint.points !== undefined ? sprint.points : items.reduce((sum, item) => sum + (item.points ?? 0), 0),
     donePoints: frozen ? sprint.done_points ?? 0 : done.reduce((sum, item) => sum + (item.points ?? 0), 0),
   }
 }
@@ -208,6 +239,23 @@ export type CommitRequest = {
 
 type ItemMove = { readonly item: WorkItem; readonly before: string | undefined }
 
+/**
+ * A repeated id in one argument list, refused before anything is read. Two writes of one
+ * record inside one transaction is the second write finding the version the first one took,
+ * so the store answered `sprint commit s x x` with `S10 ... x is at version 4 and the write
+ * named 3; unknown moved it`, naming a concurrent writer that never existed. The list is the
+ * caller's own line and the refusal names the token on it.
+ */
+function repeatedId(
+  command: 'commit' | 'uncommit', workspace: string, prefix: readonly string[], ids: readonly ItemId[],
+): ResultObject | undefined {
+  const seen = new Set<ItemId>()
+  const repeat = ids.find((id) => (seen.has(id) ? true : (seen.add(id), false)))
+  if (repeat === undefined) return undefined
+  return refusal(workspace, 'C1', repeat, `sprint ${command} names ${repeat} twice, and an item enters or leaves a sprint once`,
+    [['treadle', 'sprint', command, ...prefix, ...seen].join(' ')])
+}
+
 async function itemsNamed(
   store: Store, view: WorkspaceView, ids: readonly ItemId[],
 ): Promise<readonly WorkItem[] | ResultObject> {
@@ -263,6 +311,8 @@ export async function commitItems(
   if (request.items.length === 0) {
     return refusal(workspace, 'C1', sprint.id, 'sprint commit names the sprint and then one or more item ids, and no item was given', [`treadle sprint commit ${sprint.id} <id>`])
   }
+  const repeated = repeatedId('commit', workspace, [sprint.id], request.items)
+  if (repeated !== undefined) return repeated
   const items = await itemsNamed(store, view.value, request.items)
   if (!Array.isArray(items)) return items as ResultObject
 
@@ -318,6 +368,8 @@ export async function uncommitItems(
   if (request.items.length === 0) {
     return refusal(workspace, 'C1', 'sprint', 'sprint uncommit names one or more item ids, and none was given', ['treadle sprint uncommit <id>'])
   }
+  const repeated = repeatedId('uncommit', workspace, [], request.items)
+  if (repeated !== undefined) return repeated
   const items = await itemsNamed(store, view.value, request.items)
   if (!Array.isArray(items)) return items as ResultObject
 
@@ -391,11 +443,20 @@ async function moveSprint(
   // Read off the open sprint, so these are the live states at the instant of the close; a
   // carried item is not terminal by definition, so it is not among them.
   const frozen = tallyOf(sprint, committed)
-  const { closed_at: _closedAt, carried: wasCarried, done: wasDone, done_points: wasDonePoints, cancelled: wasCancelled, ...rest } = sprint
+  const {
+    closed_at: _closedAt, carried: wasCarried, finished: wasFinished, done: wasDone,
+    done_points: wasDonePoints, cancelled: wasCancelled, points: wasPoints, ...rest
+  } = sprint
+  // The members that were finished at the close. With `carried`, which is every member that
+  // was not, this is the whole committed set; a reopen destructures both away, which is what
+  // returns the sprint to a live one.
+  const carriedSet = new Set(carried)
+  const finished = to === 'closed' ? committed.map((item) => item.id).filter((id) => !carriedSet.has(id)).sort() : []
   const after: Sprint = to === 'closed'
     ? {
       ...rest, state: 'closed', closed_at: now, ...(carried.length === 0 ? {} : { carried }),
-      done: frozen.done, done_points: frozen.donePoints, cancelled: frozen.cancelled,
+      ...(finished.length === 0 ? {} : { finished }),
+      done: frozen.done, done_points: frozen.donePoints, cancelled: frozen.cancelled, points: frozen.points,
     }
     : { ...rest, state: 'open' }
 
@@ -404,10 +465,12 @@ async function moveSprint(
   else if (sprint.closed_at !== undefined) set.push(`closed_at ${sprint.closed_at} -> -`)
   const carriedLine = (list: readonly string[] | undefined): string => (list === undefined || list.length === 0 ? '-' : list.join(','))
   const numberLine = (value: number | undefined): string => (value === undefined ? '-' : String(value))
+  if (to === 'closed' || wasFinished !== undefined) set.push(`finished ${carriedLine(wasFinished)} -> ${carriedLine(after.finished)}`)
   if (to === 'closed' || wasCarried !== undefined) set.push(`carried ${carriedLine(wasCarried)} -> ${carriedLine(after.carried)}`)
   if (to === 'closed' || wasDone !== undefined) set.push(`done ${numberLine(wasDone)} -> ${numberLine(after.done)}`)
   if (to === 'closed' || wasDonePoints !== undefined) set.push(`done_points ${numberLine(wasDonePoints)} -> ${numberLine(after.done_points)}`)
   if (to === 'closed' || wasCancelled !== undefined) set.push(`cancelled ${numberLine(wasCancelled)} -> ${numberLine(after.cancelled)}`)
+  if (to === 'closed' || wasPoints !== undefined) set.push(`points ${numberLine(wasPoints)} -> ${numberLine(after.points)}`)
 
   const data: Record<string, Value> = { sprint: sprint.id, state: `${sprint.state} -> ${to}`, v: `${sprint.version} -> ${sprint.version + 1}`, set }
   if (to === 'closed') data['carried'] = carriedLine(carried)
@@ -426,8 +489,19 @@ async function moveSprint(
     events: [makeEvent({
       id: eventId, at: now, actor: request.actor, entity: sprint.id, entityKind: 'sprint',
       op: to === 'closed' ? 'sprint.close' : 'sprint.reopen',
-      before: { state: sprint.state, carried: carriedLine(wasCarried) },
-      after: { state: to, carried: carriedLine(after.carried) },
+      // The whole frozen record travels with the state, on both sides, so a reading of the
+      // log alone can recover the tally a close froze: the event carried `state` and
+      // `carried` only, and none of the four numbers reached it.
+      before: {
+        state: sprint.state, finished: carriedLine(wasFinished), carried: carriedLine(wasCarried),
+        done: numberLine(wasDone), done_points: numberLine(wasDonePoints),
+        cancelled: numberLine(wasCancelled), points: numberLine(wasPoints),
+      },
+      after: {
+        state: to, finished: carriedLine(after.finished), carried: carriedLine(after.carried),
+        done: numberLine(after.done), done_points: numberLine(after.done_points),
+        cancelled: numberLine(after.cancelled), points: numberLine(after.points),
+      },
       txn, command: 'sprint',
     })],
   })
@@ -489,12 +563,15 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   const ungroomed = notGroomed(committed)
   if (ungroomed.length > 0) data['not_ready'] = ungroomed.join(',')
   data['pts'] = `${tally.donePoints}/${tally.points}`
-  // The list the close wrote, not the open items of the moment: after a close the two
-  // drift apart as carried items are committed onward, and the record is the answer. The
-  // `done` and `pts` above are frozen for the same reason and by the same record.
+  // The lists the close wrote, not the items of the moment: after a close the two drift
+  // apart as members are committed onward, and the record is the answer. The `committed`,
+  // `done`, `cancelled` and `pts` above are frozen for the same reason and by the same record.
   if (sprint.carried !== undefined) data['carried'] = sprint.carried.join(',')
   if (sprint.extra !== undefined && sprint.extra.size > 0) data['extra'] = sprint.extra.size
   data['title'] = sprint.title
   if (sprint.goal !== undefined) data['goal'] = sprint.goal
+  // The two stored lists as the one set they record, which is what every number above counts.
+  const recorded = membersOf(sprint)
+  if (recorded !== undefined && recorded.length > 0) data['members'] = recorded.join(',')
   return okResult(SPRINTS_SHAPE, { workspace, data })
 }

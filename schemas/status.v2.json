@@ -102,6 +102,12 @@
             "null"
           ]
         },
+        "audit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "states": {
           "type": "object",
           "additionalProperties": false,
@@ -125,6 +131,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -182,6 +191,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -242,6 +254,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }
@@ -306,6 +321,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

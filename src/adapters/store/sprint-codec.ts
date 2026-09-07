@@ -11,10 +11,21 @@ import { unwritableBodyLine, type ParsedRecord, type Section } from './grammar.t
 
 /** The single-line fields, in render order. `type` names the record kind for the grammar's resynchroniser. */
 const FIELD_ORDER = [
-  'type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried', 'done', 'done_points', 'cancelled',
+  'type', 'state', 'filed_at', 'version', 'start', 'end', 'closed_at', 'carried',
+  'done', 'done_points', 'cancelled', 'points',
 ] as const
 
 const GOAL_SECTION = 'Goal'
+
+/**
+ * `finished` is a section and `carried` is a field, and the asymmetry is a ceiling rather
+ * than a taste: a field value is bounded at 8 KiB and a section at 128 KiB. `carried` is
+ * bounded by the work a sprint left open, which is the smaller half by the time a sprint is
+ * worth closing; `finished` grows with the whole sprint, and at 8 KiB a 300-item sprint
+ * finished to the last item could not be closed at all. One id per line, because the shard
+ * is what a reviewer reads in a diff and a 12 KB single line is not one.
+ */
+const FINISHED_SECTION = 'Finished'
 
 /** `type: sprint` is a constant line: the grammar's damaged-heading rule keys on it, as it does on an item's. */
 const KIND = 'sprint'
@@ -34,11 +45,13 @@ export function decodeSprint(record: ParsedRecord): StoreResult<Sprint> {
       if (value !== KIND) return refuse('S1', `${record.id}: a record in the sprint file is type ${KIND}, not "${value}"`, record.id)
       continue
     }
-    if (!KNOWN.has(key) || key === 'extra' || key === 'id' || key === 'title' || key === 'goal') {
+    // `goal` and `finished` are sections, so a field line spelling either is a newer
+    // writer's key and is preserved verbatim rather than read as one of ours.
+    if (!KNOWN.has(key) || key === 'extra' || key === 'id' || key === 'title' || key === 'goal' || key === 'finished') {
       extra.set(key, value)
       continue
     }
-    if (key === 'version' || key === 'done' || key === 'done_points' || key === 'cancelled') {
+    if (key === 'version' || key === 'done' || key === 'done_points' || key === 'cancelled' || key === 'points') {
       if (!/^\d{1,15}$/.test(value)) return refuse('S1', `${record.id}: ${key} must be a whole number, not "${value}"`, record.id)
       draft[key] = Number(value)
       continue
@@ -53,6 +66,8 @@ export function decodeSprint(record: ParsedRecord): StoreResult<Sprint> {
 
   const goal = record.sections.find((section) => section.name === GOAL_SECTION)
   if (goal !== undefined) draft['goal'] = goal.body
+  const finished = record.sections.find((section) => section.name === FINISHED_SECTION)
+  if (finished !== undefined) draft['finished'] = finished.body.split('\n')
   if (extra.size > 0) draft['extra'] = extra
 
   const valid = validateSprint(draft as unknown as Sprint)
@@ -104,8 +119,13 @@ export function encodeSprint(sprint: Sprint, base?: ParsedRecord): StoreResult<E
     }
     sections.push({ name: GOAL_SECTION, body: sprint.goal })
   }
+  // Ids only, and `validateSprint` above has already held every one of them to the slug, so
+  // no body line here can start with `#` or carry a space.
+  if (sprint.finished !== undefined && sprint.finished.length > 0) {
+    sections.push({ name: FINISHED_SECTION, body: sprint.finished.join('\n') })
+  }
   for (const section of base?.sections ?? []) {
-    if (section.name !== GOAL_SECTION) sections.push(section)
+    if (section.name !== GOAL_SECTION && section.name !== FINISHED_SECTION) sections.push(section)
   }
   return storeOk({ id: sprint.id, title: sprint.title, fields, sections })
 }

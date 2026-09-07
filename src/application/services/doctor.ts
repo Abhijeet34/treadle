@@ -28,15 +28,17 @@ import {
   MAX_DESCRIPTION,
   findRelationCycle,
   relationGraphFrom,
+  membersOf,
   summaryOf,
   type ItemId,
+  type Sprint,
   type RelationGraph,
   type WorkItem,
   type WorkItemSummary,
 } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { hasReviewStep } from './context.ts'
+import { hasReviewStep, hidesContent } from './context.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const DOCTOR_SHAPE: ResultShape = {
@@ -48,10 +50,17 @@ export const DOCTOR_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'checked', type: 'integer' },
     { kind: 'scalar', key: 'clean', type: 'string' },
+    // Appended after `clean`, which STABILITY's output-schema rule makes a non-breaking
+    // addition: the table is not empty and nothing on it hides a record, which is the one
+    // shape that answers 0 with rows printed.
+    { kind: 'scalar', key: 'serving', type: 'string' },
     {
       kind: 'block',
       key: 'findings',
-      columns: [{ name: 'rule' }, { name: 'id' }, { name: 'where' }, { name: 'detail', text: true }],
+      // `rule` is the tool's own closed set; the other three all project bytes read from a
+      // damaged file, an id the record grammar never accepted included, so all three carry
+      // the marker. `cell` keeps the two non-final ones arity-1.
+      columns: [{ name: 'rule' }, { name: 'id', data: true }, { name: 'where', data: true }, { name: 'detail', text: true }],
     },
   ],
 }
@@ -119,11 +128,28 @@ type Audited = {
  */
 export class WorkspaceAudit {
   readonly #sprintIds: ReadonlySet<string>
+  readonly #heldItems: ReadonlySet<string>
+  readonly #heldSprints: ReadonlySet<string>
   readonly #entries: Audited[] = []
   readonly #byId = new Map<ItemId, Audited>()
 
-  constructor(sprintIds: ReadonlySet<string>) {
+  /**
+   * `sprintIds` and the item ids the records supply are the SERVED set. The two held sets are
+   * what the store holds and refused to serve, which it already reported as an S-row of its
+   * own: an id in one exists, so a neighbour pointing at it is not dangling. Testing served
+   * membership alone made every neighbour of one damaged record lie, and H26's remedy then
+   * told the reader to open a second sprint with the same id, which is an S3 waiting to
+   * happen. A record that is neither served nor held is genuinely absent, and the two held
+   * sets stay apart so a quarantined item never answers for a `sprint_id`.
+   */
+  constructor(
+    sprintIds: ReadonlySet<string>,
+    heldItems: ReadonlySet<string> = new Set(),
+    heldSprints: ReadonlySet<string> = new Set(),
+  ) {
     this.#sprintIds = sprintIds
+    this.#heldItems = heldItems
+    this.#heldSprints = heldSprints
   }
 
   record(item: WorkItem): void {
@@ -131,7 +157,7 @@ export class WorkspaceAudit {
     // No write path points an item at a sprint that is not a record: `file --sprint` and
     // `sprint commit` both resolve the id first. A value written before sprints were records,
     // or by hand, is reported rather than refused, because the item still serves.
-    if (item.sprint_id !== undefined && !this.#sprintIds.has(item.sprint_id)) {
+    if (item.sprint_id !== undefined && !this.#sprintIds.has(item.sprint_id) && !this.#heldSprints.has(item.sprint_id)) {
       before.push({
         rule: 'H26',
         id: item.id,
@@ -218,9 +244,14 @@ export class WorkspaceAudit {
     return only === undefined ? NONE : this.#ofItem(only)
   }
 
+  /** Every id this workspace holds, served or quarantined, which is what a neighbour points at. */
+  known(): ReadonlySet<ItemId> {
+    return new Set([...this.#byId.keys(), ...this.#heldItems])
+  }
+
   /** Every finding over the workspace, in item then rule order, the cycle check last. */
   findings(): readonly DoctorFinding[] {
-    const known = new Set(this.#byId.keys())
+    const known = this.known()
     return [
       ...this.#entries.flatMap((entry) => [
         ...this.#ofItem(entry),
@@ -290,6 +321,53 @@ export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | '
 }
 
 /**
+ * What one closed sprint's own record says about a set the store can be asked for. Both rules
+ * reach `sprints` output as facts and neither has a write path that produces it.
+ *
+ * `H28`: a `carried` or `finished` id no record holds. `sprints sp1` printed
+ * `carried beta-task,ghost-task` and counted the ghost in `committed`, so the sprint reads as
+ * one item larger than the workspace can show.
+ *
+ * `H29`: a frozen tally larger than the set it is counted over. A hand-edited `done: 99` over
+ * four members printed `99/4`, and a close writes each of these numbers off the set it froze,
+ * so no write path produces one over it.
+ */
+export function auditSprint(sprint: Sprint, known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
+  const findings: DoctorFinding[] = []
+  for (const field of ['carried', 'finished'] as const) {
+    for (const id of sprint[field] ?? []) {
+      if (known.has(id)) continue
+      findings.push({
+        rule: 'H28',
+        id: sprint.id,
+        where: field,
+        detail: `${field} names ${id} and no record here carries that id; the sprint counts it in its committed set and nothing can show it`,
+      })
+    }
+  }
+  const over = (where: string, detail: string): void => { findings.push({ rule: 'H29', id: sprint.id, where, detail }) }
+  // The set the close recorded; a sprint an older build closed recorded none, and there is
+  // then nothing on the record to count these against.
+  const size = membersOf(sprint)?.length
+  if (size !== undefined) {
+    for (const field of ['done', 'cancelled'] as const) {
+      const value = sprint[field]
+      if (value === undefined || value <= size) continue
+      over(field, `${field} is ${value} over a committed set of ${size}; a close writes this number off the set it froze, so no write path produces one above it`)
+    }
+    const { done, cancelled } = sprint
+    if (done !== undefined && cancelled !== undefined && done + cancelled > size) {
+      over('done', `done ${done} and cancelled ${cancelled} are ${done + cancelled} outcomes over a committed set of ${size}; an item has one outcome`)
+    }
+  }
+  const { points, done_points: donePoints } = sprint
+  if (points !== undefined && donePoints !== undefined && donePoints > points) {
+    over('done_points', `done_points is ${donePoints} over a committed total of ${points}; the done items are part of the set the total counts`)
+  }
+  return findings
+}
+
+/**
  * A `blocks` cycle the files carry (H25). `relation add` refuses one at write time (R2) and
  * cannot see one a hand edit or a merge put in; every item on it is blocked by itself.
  */
@@ -313,7 +391,13 @@ export async function doctor(store: Store): Promise<ResultObject> {
   if (!stored.ok) return storeRefusal('doctor', 'read', stored.error, workspace)
   const sprints = await store.sprints()
   if (!sprints.ok) return storeRefusal('doctor', 'read', sprints.error, workspace)
-  const audit = new WorkspaceAudit(new Set(sprints.value.map((sprint) => sprint.id)))
+  // A record the store holds and refused to serve still exists, and the S-row above names it.
+  // Its id is not free and nothing that points at it is dangling. The two kinds are kept
+  // apart: a quarantined ITEM must not answer for a `sprint_id`, which is what would turn a
+  // true `H26` into silence.
+  const held = (kind: 'item' | 'sprint'): ReadonlySet<string> =>
+    new Set(stored.value.flatMap((finding) => (finding.id !== undefined && finding.kind === kind ? [finding.id] : [])))
+  const audit = new WorkspaceAudit(new Set(sprints.value.map((sprint) => sprint.id)), held('item'), held('sprint'))
   // The audit reads every field of every record against its events, so this is the one
   // command that decodes the whole store; it holds one record and one event at a time.
   const records = await store.eachItem({}, (item) => audit.record(item))
@@ -321,6 +405,8 @@ export async function doctor(store: Store): Promise<ResultObject> {
   const events = await store.eachEvent({}, (event) => audit.event(event))
   if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
 
+  const known = audit.known()
+  const audited = [...audit.findings(), ...sprints.value.flatMap((sprint) => auditSprint(sprint, known))]
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
       rule: finding.rule,
@@ -328,8 +414,14 @@ export async function doctor(store: Store): Promise<ResultObject> {
       where: `${cell(finding.file)}:${finding.line}`,
       detail: finding.reason,
     })),
-    ...audit.findings(),
+    ...audited,
   ]
+  // The verdict is not "the table is empty". `H16` and `S12` report a fact about content the
+  // store still serves, and a CI job could not tell that CRLF checkout from a truncated shard,
+  // because both exited 7. The predicate is `readWorkspace`'s own, so the one status that says
+  // "no answer over this store is whole" is decided in one place; an audit finding is always
+  // over a served record and always counts.
+  const hiding = stored.value.filter(hidesContent).length + audited.length
 
   const block: Block = {
     columns: columnsOf(DOCTOR_SHAPE, 'findings'),
@@ -348,9 +440,11 @@ export async function doctor(store: Store): Promise<ResultObject> {
   }
   if (rows.length === 0) {
     data['clean'] = `checked ${items} ${items === 1 ? 'item' : 'items'} and ${logged} ${logged === 1 ? 'event' : 'events'}`
+  } else if (hiding === 0) {
+    data['serving'] = `${rows.length} ${rows.length === 1 ? 'finding reports' : 'findings report'} content this store still serves and the next write normalises; no record here is hidden`
   }
   data['findings'] = block
   // The table is the answer and the exit status is the verdict: a script or a CI job reads
   // "is my store intact" from the status alone, and a person reads the rows.
-  return okResult(DOCTOR_SHAPE, { workspace, data, ...(rows.length === 0 ? {} : { code: 'INTEGRITY' }) })
+  return okResult(DOCTOR_SHAPE, { workspace, data, ...(hiding === 0 ? {} : { code: 'INTEGRITY' }) })
 }

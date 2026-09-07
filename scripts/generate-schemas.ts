@@ -15,8 +15,10 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 type Json = Record<string, unknown>
 
 function propertySchema(property: PropertySpec): Json {
+  // F12 again, for the two kinds that carry the marker without being free text: a JSON
+  // consumer reads `x-trust` where a reader of the line reads the leading quote.
   if (property.kind === 'list') {
-    return { type: 'array', items: { type: 'string' } }
+    return { type: 'array', items: { type: 'string' }, ...(property.data === true ? { 'x-trust': 'data' } : {}) }
   }
   if (property.kind === 'text') {
     return {
@@ -38,7 +40,7 @@ function propertySchema(property: PropertySpec): Json {
             type: 'object',
             additionalProperties: false,
             required: ['name'],
-            properties: { name: { type: 'string' }, text: { const: true } },
+            properties: { name: { type: 'string' }, text: { const: true }, data: { const: true } },
           },
         },
         shown: { type: 'integer' },
@@ -51,12 +53,14 @@ function propertySchema(property: PropertySpec): Json {
           },
         },
       },
+      // Both flags mean "this column carries third-party content" to a reader of the line;
+      // `text` adds the placement rule on top of it, which `x-columns` does not describe.
       'x-columns': property.columns.map((column) =>
-        column.text === true ? { name: column.name, trust: 'data' } : { name: column.name }),
+        column.text === true || column.data === true ? { name: column.name, trust: 'data' } : { name: column.name }),
     }
   }
   const type = property.type === 'integer' ? 'integer' : property.type
-  return { type: [type, 'null'] }
+  return { type: [type, 'null'], ...(property.data === true ? { 'x-trust': 'data' } : {}) }
 }
 
 export function schemaFor(shape: ResultShape): Json {

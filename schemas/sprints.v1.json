@@ -164,6 +164,12 @@
             "null"
           ]
         },
+        "members": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "sprints": {
           "type": "object",
           "additionalProperties": false,
@@ -187,6 +193,9 @@
                     "type": "string"
                   },
                   "text": {
+                    "const": true
+                  },
+                  "data": {
                     "const": true
                   }
                 }

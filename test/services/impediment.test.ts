@@ -49,8 +49,8 @@ describe('raising an impediment', () => {
     const raised = await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', 'severity=S1', '--set', `proposed_resolution=${RESOLUTION}`])
     assert.equal(raised.code, 0, raised.err)
     assert.equal(line(raised, 'type'), 'type impediment')
-    assert.equal(line(raised, 'set severity'), 'set severity - -> S1')
-    assert.equal(line(raised, 'set proposed_resolution'), `set proposed_resolution - -> ${RESOLUTION}`)
+    assert.equal(line(raised, '"set severity'), '"set severity - -> S1')
+    assert.equal(line(raised, '"set proposed_resolution'), `"set proposed_resolution - -> ${RESOLUTION}`)
     assert.match((await cli(['history', 'cert-expired'])).out, /item\.file type=impediment,state=draft,filed_at=[^,]+,severity=S1/)
   })
 
