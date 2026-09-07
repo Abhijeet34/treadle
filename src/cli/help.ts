@@ -36,7 +36,7 @@ const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
   '--preview A': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
   '--actor A': 'accepted and ignored: this command records no event, so no actor is attributed',
   '--color A': 'accepted and ignored: no rendering emits colour at all, so there is no colour to switch',
-  '--width S': `supported: it lays the human rendering out at that many display cells, between ${MIN_WIDTH} and ${MAX_WIDTH}`,
+  '--width S': `supported: it lays the human rendering out at that many display cells, clamped to ${MIN_WIDTH} to ${MAX_WIDTH}`,
   '--contract S': `supported: it prints the ${CONTRACT} line grammar and runs no command`,
   '--out S': `supported: it selects the rendering, one of ${RENDERINGS.join(', ')}`,
   '--ascii S': 'supported: it writes the human rendering truncation mark as three dots, not an ellipsis',

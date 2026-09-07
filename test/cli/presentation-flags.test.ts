@@ -13,7 +13,7 @@
 // than a terse one, because a caller reads it as the rule.
 
 import assert from 'node:assert/strict'
-import { describe, it } from 'node:test'
+import { after, before, describe, it } from 'node:test'
 
 import { COMMANDS, GLOBAL_FLAGS, verdictFor } from '../../src/cli/inventory.ts'
 import { commandHelp } from '../../src/cli/help.ts'
@@ -21,6 +21,14 @@ import { MAX_WIDTH, MIN_WIDTH, humanRenderer } from '../../src/adapters/render/h
 import { displayWidth } from '../../src/adapters/render/width.ts'
 import { topLevelHelp } from '../../src/cli/help.ts'
 import { isBlock, type Block } from '../../src/application/result.ts'
+import { EXIT_OF } from '../../src/cli/exit.ts'
+import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
+import { runCli } from '../helpers/cli-run.ts'
+
+let demo: Demo
+let demoRoot: string
+before(async () => { demo = await aDemoWorkspace(); demoRoot = demo.root })
+after(async () => { await demo.dispose() })
 
 /** The `flags` block of one command's help page, as flag to note. */
 function notesOf(command: string): ReadonlyMap<string, { readonly verdict: string; readonly note: string }> {
@@ -65,6 +73,41 @@ describe('--width is supported, because every rendering of every command is laid
       !note.note.includes('nothing to present'),
       `show's help says of --width: ${note.note}`,
     )
+  })
+})
+
+// Found by attacking the change above: promoting `--width` to supported made its silent
+// fallback a lie. `Number.parseInt` salvages a prefix, so `--width 1_0` and `--width 1e9`
+// both laid the page out at 40 cells and `--width NaN` used the default 80, each without a
+// word. `--limit` reads its value through the same shape and had the same fault.
+describe('a flag that takes a count refuses a value that is not one', () => {
+  const cases: readonly (readonly [string, string])[] = [
+    ['--width', '0'], ['--width', 'abc'], ['--width', '1e9'], ['--width', '1_0'],
+    ['--width', 'NaN'], ['--width', 'Infinity'],
+    // Written inline, because a value opening with a dash is refused one layer earlier as a
+    // flag with no value, which is its own correct refusal and names this spelling.
+    ['--width=-0', ''], ['--width=-5', ''],
+    ['--limit', '0'], ['--limit', 'abc'], ['--limit', '1e9'],
+  ]
+  for (const [flag, value] of cases) {
+    it(`refuses ${flag} ${value} rather than guessing`, async () => {
+      const argv = value === '' ? ['backlog', flag] : ['backlog', flag, value]
+      const run = await runCli(argv, { cwd: demoRoot })
+      assert.equal(run.code, EXIT_OF.VALIDATION, `${flag} ${value} was accepted:\n${run.out}${run.err}`)
+      const named = flag.split('=')[0] as string
+      assert.match(run.err, new RegExp(`\\${named} takes a whole number`))
+      assert.ok(
+        run.err.includes(value === '' ? (flag.split('=')[1] as string) : value),
+        `the refusal does not name the value it refused:\n${run.err}`,
+      )
+    })
+  }
+
+  it('accepts a whole number, and clamps a width outside the rendering range', async () => {
+    for (const value of ['1', '40', '60', '200', '5000']) {
+      const run = await runCli(['backlog', '--width', value], { cwd: demoRoot })
+      assert.equal(run.code, 0, `--width ${value} was refused:\n${run.err}`)
+    }
   })
 })
 

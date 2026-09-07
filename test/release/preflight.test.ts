@@ -82,6 +82,13 @@ describe('the release preflight', () => {
     assert.match(run({ bundleBytes: 512001 }).join('\n'), /over DR1's 512000/)
   })
 
+  // Found by truncating dist/treadle.js to 200 bytes and touching it: every other clause
+  // passed, because an mtime says when a file was written and not that a build wrote it.
+  it('refuses a bundle far under the budget, which is a partial write and not a build', () => {
+    assert.match(run({ bundleBytes: 200 }).join('\n'), /partial write rather than a build/)
+    assert.equal(run({ bundleBytes: 51200 }).length, 0, 'a bundle at a tenth of the limit was refused')
+  })
+
   // This clause and not `prepack` is the one that runs: .npmrc sets ignore-scripts=true as a
   // supply-chain control and the workflow's pack step passes --ignore-scripts as well.
   it('refuses a bundle older than the source it would be packed from, naming that file', () => {

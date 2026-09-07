@@ -37,7 +37,7 @@
 // because a row carries exactly one space-bearing field and that is the actor, so it is a
 // block of its own keyed on `at` and `op`, which the table above prints.
 
-import { MAX_REASON, isKnownField, isSprintField, type ItemId } from '../../domain/index.ts'
+import { MAX_REASON, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
@@ -226,15 +226,20 @@ function whatOf(event: StoreEvent): string {
 }
 
 /**
- * A recorded reason as the one free-text cell of a row. `reason` is not among the keys the
- * event reader holds to safe single-line text, so a hand edit of a committed log could put a
- * delimiter or an unbounded value in one; either would be a render invariant thrown from a
- * read. It prints as the file's own unknown marker instead, which says a reason was recorded
- * and that this one cannot be shown, and `doctor` is the surface for the file that says it.
+ * A recorded reason as the one free-text cell of a row. `reason` is not among the keys
+ * `parseEventLine` holds to safe single-line text, so a hand edit of a committed log reaches
+ * this cell with anything at all: a delimiter, an unbounded value, or a U+202E override that
+ * reorders every character after it in a terminal. The first two would throw a render
+ * invariant out of a read and the third is threat-model finding F5's whole class, so the
+ * value is held to the domain's own text class here, at the read that prints it.
+ *
+ * A value that fails prints as the file's own unknown marker, which says a reason was
+ * recorded and that this one cannot be shown; `doctor` is the surface for the file that says
+ * it. The row is still emitted, because a reason nothing can print is itself the answer.
  */
 function why(value: unknown): string {
   if (typeof value !== 'string' || value.length === 0 || value.length > MAX_REASON) return UNKNOWN
-  return /[\n\r]/.test(value) ? UNKNOWN : value
+  return isSafeText(value, 'line') ? value : UNKNOWN
 }
 
 export type HistoryRequest = {

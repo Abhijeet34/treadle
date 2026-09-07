@@ -59,10 +59,17 @@ export function staleAgainst(root: string): string | undefined {
 
 /** One line per problem; an empty array means the tarball may be built from this tree. */
 export function distProblems(root: string): readonly string[] {
+  let mode: number
   try {
-    statSync(path.join(root, 'dist', 'treadle.js'))
+    mode = statSync(path.join(root, 'dist', 'treadle.js')).mode
   } catch {
     return ['dist/treadle.js does not exist; run npm run build, which the release workflow runs before its preflight']
+  }
+  // esbuild writes 0644, and a shebang the kernel never reads is a shebang that does nothing:
+  // the bundle chooses the runtime's stack size on that line, so a bundle without the bit runs
+  // under the default and crashes on an argument the shipped one refuses.
+  if ((mode & 0o111) === 0) {
+    return ['dist/treadle.js is not executable, so the kernel never reads its shebang; run npm run build']
   }
   if (newestUnder(path.join(root, 'src')) === undefined) {
     return ['src/ holds no file, so there is nothing this bundle could have been built from']

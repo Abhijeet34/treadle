@@ -85,6 +85,7 @@ export {
   MAX_EVIDENCE_LABEL,
   MAX_EVIDENCE_REF,
   MAX_RELATION_ENTRIES,
+  MAX_LINE,
   MAX_REASON,
   canonicalField,
   fieldsOf,

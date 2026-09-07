@@ -8,7 +8,7 @@
 
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
-import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
+import { chmod, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import process from 'node:process'
@@ -33,6 +33,7 @@ async function aTree(sourceAt: Date, bundleAt: Date | undefined): Promise<string
     await mkdir(path.join(root, 'dist'), { recursive: true })
     const bundle = path.join(root, 'dist', 'treadle.js')
     await writeFile(bundle, '#!/usr/bin/env -S node --stack-size=2000\n')
+    await chmod(bundle, 0o755)
     await utimes(bundle, bundleAt, bundleAt)
   }
   return root
@@ -49,6 +50,16 @@ describe('a bundle older than its source is not packed', () => {
       assert.equal(problems.length, 1, `a stale bundle was accepted: ${problems.join('; ')}`)
       assert.match(problems[0] as string, /src\/cli\/main\.ts/, 'the refusal does not name the file that is newer')
       assert.match(problems[0] as string, /npm run build/, 'the refusal does not name the remedy')
+    } finally { await rm(root, { recursive: true, force: true }) }
+  })
+
+  // Found by rebuilding and then running ./dist/treadle.js: esbuild writes 0644, so the
+  // shebang that chooses the runtime's stack size was never read from a checkout.
+  it('refuses a bundle the kernel would not read the shebang of', async () => {
+    const root = await aTree(OLD, NEW)
+    try {
+      await chmod(path.join(root, 'dist', 'treadle.js'), 0o644)
+      assert.match(distProblems(root)[0] as string, /not executable/)
     } finally { await rm(root, { recursive: true, force: true }) }
   })
 

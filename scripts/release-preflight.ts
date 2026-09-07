@@ -93,6 +93,15 @@ export function preflight(input: {
     problems.push('dist/treadle.js does not exist; run npm run build before packing')
   } else if (bundleBytes > bundleLimit) {
     problems.push(`dist/treadle.js is ${bundleBytes} bytes, over DR1's ${bundleLimit}`)
+  } else if (bundleBytes < bundleLimit / 10) {
+    // A floor as well as a ceiling, found by truncating a bundle and watching the freshness
+    // clause pass it: an mtime says when a file was written and not that a build wrote it. The
+    // measured bundle is 362,429 bytes against a 512,000 limit, so a tenth of the limit is far
+    // below any plausible build of this tool and far above a partial write.
+    problems.push(
+      `dist/treadle.js is ${bundleBytes} bytes, under a tenth of DR1's ${bundleLimit}; `
+        + 'that is a partial write rather than a build, so run npm run build again',
+    )
   } else if (staleAgainst !== undefined) {
     // The workflow builds one step above this one, so a bundle older than the source here
     // means the build did not land. `prepack` cannot be relied on to catch it: this

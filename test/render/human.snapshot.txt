@@ -739,7 +739,7 @@ flags  20 of 20
   --yes              A        accepted and ignored: this command has no confirmation to answer
   --no-input         A        accepted and ignored: this command has no confirmation to suppress
   --actor            S        supported: it changes what this command does or shows
-  --width            S        supported: it lays the human rendering out at that many display cells, between 40 and 200
+  --width            S        supported: it lays the human rendering out at that many display cells, clamped to 40 to 200
   --fields           X        refused: ignoring it would answer a question the caller did not ask
   --limit            X        refused: ignoring it would answer a question the caller did not ask
   --cursor           X        refused: ignoring it would answer a question the caller did not ask
