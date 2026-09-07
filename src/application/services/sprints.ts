@@ -12,10 +12,12 @@
 import {
   carryOver,
   dayOfSprint,
+  sprintDay,
   membersOf,
   dateOf,
   evaluateCommit,
   validateSprint,
+  type Instant,
   type ItemId,
   type Sprint,
   type WorkItem,
@@ -181,6 +183,23 @@ export type OpenRequest = {
   readonly actor: Actor
 }
 
+/**
+ * What a write says about a window already behind the clock, or nothing. One sentence, one
+ * home: `open` and `set` both print it, and it was two copies that had drifted from what the
+ * reads print (STR-8).
+ *
+ * Only the past arm says anything. A sprint that has not started yet is next week's sprint,
+ * which a team opens on purpose and needs no comment on; a sprint that ended before it was
+ * opened is either a record of work already run or a `--start` typed with the wrong year,
+ * and the sentence is what tells those two apart. `sprintDay` still reports both sides,
+ * because a day cell has to say something a reader can act on either way.
+ */
+function windowNote(sprint: Sprint, now: Instant): string | undefined {
+  const { day, days } = dayOfSprint(sprint, now)
+  if (day <= days) return undefined
+  return `this sprint's window closed on ${sprint.end}, ${day - days} days ago, so every read reports it as ended+${day - days}d/${days}; check --start and --end if that is not what you meant`
+}
+
 export async function openSprint(
   target: Target, clock: Clock, ids: IdGenerator, request: OpenRequest,
 ): Promise<ResultObject> {
@@ -222,12 +241,14 @@ export async function openSprint(
   const data: Record<string, Value> = { sprint: id, state: 'open', v: '1', set }
   // A sprint whose whole window is behind the clock opens, because a team recording a sprint
   // it has already run is a real thing to do and refusing it is a product call nobody has
-  // made. What it must not do is open silently: `status` then prints `day 250/14`, which
-  // reads as a defect in the tool rather than as a `--start` typed with the wrong year.
-  const where = dayOfSprint(sprint, now)
-  if (where.day > where.days) {
-    data['note'] = `this sprint's window closed on ${sprint.end}, so it opens at day ${where.day} of ${where.days}; check --start and --end if that is not what you meant`
-  }
+  // made. What it must not do is open silently: every read then reports it as ended+967d/14,
+  // which is a fact about the dates rather than an instruction to check them.
+  // Appended at each return rather than set here, because SPRINT_SHAPE declares `note` after
+  // `event` and after the dry run's pair, and a result object is built in its shape's own
+  // order (test/render/conformance.test.ts). No golden object carried a note before this
+  // change, so the order test had nothing to catch it on.
+  const note = windowNote(sprint, now)
+  const noted: Record<string, Value> = note === undefined ? {} : { note }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: id, state: 'open' })
 
   const txn = ids.txn()
@@ -240,8 +261,8 @@ export async function openSprint(
     })],
   })
   if (!applied.ok) return storeRefusal('sprint', 'mutate', applied.error, workspace)
-  if (mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0 } })
-  return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId } })
+  if (mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0, ...noted } })
+  return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId, ...noted } })
 }
 
 /** The fields `sprint set` writes, in the order a `set` line reports them. */
@@ -316,13 +337,11 @@ export async function setSprint(
     return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { already: sprint.id, state: sprint.state, v: String(sprint.version) } })
   }
   const data: Record<string, Value> = { sprint: sprint.id, state: sprint.state, v: `${sprint.version} -> ${sprint.version + 1}`, set }
-  // Moving a window a sprint is already past is the same fact `open` prints, from the same
-  // reading, so the same sentence: a `--end` typed with the wrong year is caught here too.
+  // Moving a window behind the clock is the same fact `open` prints, from the same reading,
+  // so the same sentence: a `--end` typed with the wrong year is caught here too.
   const now = clock.now()
-  const where = dayOfSprint(after, now)
-  if (where.day > where.days) {
-    data['note'] = `this sprint's window closed on ${after.end}, so it is at day ${where.day} of ${where.days}; check --start and --end if that is not what you meant`
-  }
+  const note = windowNote(after, now)
+  const noted: Record<string, Value> = note === undefined ? {} : { note }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: sprint.id, state: sprint.state })
 
   const txn = ids.txn()
@@ -347,8 +366,8 @@ export async function setSprint(
     })],
   })
   if (!applied.ok) return storeRefusal('sprint', 'mutate', applied.error, workspace)
-  if (mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0 } })
-  return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId } })
+  if (mode === 'dry-run') return okResult(SPRINT_SHAPE, { workspace, txn: null, changed: 0, data: { ...data, dry_run: 1, would_exit: 0, ...noted } })
+  return okResult(SPRINT_SHAPE, { workspace, txn, changed: 1, data: { ...data, event: eventId, ...noted } })
 }
 
 export type CommitRequest = {
@@ -683,8 +702,7 @@ export async function sprints(store: Store, clock: Clock, id?: string): Promise<
   if (sprint.closed_at !== undefined) data['closed'] = sprint.closed_at
   data['v'] = sprint.version
   if (sprint.state === 'open') {
-    const at = dayOfSprint(sprint, clock.now())
-    data['day'] = `${at.day}/${at.days}`
+    data['day'] = sprintDay(sprint, clock.now())
   }
   data['committed'] = tally.committed
   data['done'] = tally.done

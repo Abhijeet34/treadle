@@ -109,8 +109,8 @@ export function dateOf(instant: Instant): CalendarDate {
 /**
  * Where an instant falls in the sprint: `day` is 1 on `start` and `days` is the length,
  * both inclusive, so a two-week sprint reads `day 3/14`. Before the start `day` is 0 or
- * less and after the end it is past `days`; neither is clamped, because "day 16 of 14" is
- * the fact a reader of an overrunning sprint needs.
+ * less and after the end it is past `days`, and neither is clamped: the arithmetic is the
+ * fact, and `sprintDay` below is where it is turned into something a reader can act on.
  */
 export function dayOfSprint(sprint: Sprint, now: Instant): { readonly day: number; readonly days: number } {
   const start = Date.parse(`${sprint.start}T00:00:00Z`)
@@ -120,6 +120,28 @@ export function dayOfSprint(sprint: Sprint, now: Instant): { readonly day: numbe
     day: Math.floor((today - start) / DAY_MS) + 1,
     days: Math.floor((end - start) / DAY_MS) + 1,
   }
+}
+
+/**
+ * The day a read surface prints, which is `dayOfSprint` said in a way a reader can act on.
+ *
+ * STR-8: a sprint dated entirely in the past reported `day 981/14` on `status`, `sprints`
+ * and `board` alike. It is arithmetic nobody can use - day 981 of a 14-day sprint is not a
+ * day, it is a distance - and it reads as a defect in the tool rather than as a `--start`
+ * typed with the wrong year, which is what it usually is. Outside the window the distance
+ * from the boundary is therefore what is printed, and the window's length stays as the
+ * denominator so the column parses the same way in every row.
+ *
+ * No threshold decides it: `ended+2d/14` and `ended+967d/14` are the same sentence at two
+ * sizes, and any cut-off between them would be a number this file could not defend. One
+ * token, no spaces, because `status` prints this in a row cell that is not the last one and
+ * the row grammar splits on spaces.
+ */
+export function sprintDay(sprint: Sprint, now: Instant): string {
+  const { day, days } = dayOfSprint(sprint, now)
+  if (day > days) return `ended+${day - days}d/${days}`
+  if (day < 1) return `starts+${1 - day}d/${days}`
+  return `${day}/${days}`
 }
 
 /**

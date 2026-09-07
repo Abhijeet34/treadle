@@ -8,7 +8,7 @@
 
 import {
   BUG_SEVERITIES,
-  dayOfSprint,
+  sprintDay,
   edgeRequirements,
   daysOverdue,
   healthFindings,
@@ -457,10 +457,9 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
     .map((sprint) => ({ sprint, committed: committedTo(view.value, sprint) }))
   const sprintRows = running.map(({ sprint, committed }): Row => {
     const done = committed.filter((item) => item.state === 'done')
-    const at = dayOfSprint(sprint, now)
     return {
       id: sprint.id,
-      day: `${at.day}/${at.days}`,
+      day: sprintDay(sprint, now),
       items: `${done.length}/${committed.length}`,
       pts: `${done.reduce((sum, item) => sum + (item.points ?? 0), 0)}/${committed.reduce((sum, item) => sum + (item.points ?? 0), 0)}`,
       title: sprint.title,
