@@ -1,0 +1,144 @@
+# SPDX-License-Identifier: Apache-2.0
+# TEMPORARY. This workflow exists to answer one open decision - what each candidate launcher
+# does to a real Windows install - and is deleted in the same branch once the measurement is
+# recorded. It is `workflow_dispatch` only, so it costs nothing until someone runs it.
+#
+# It never edits `bin/treadle.js`: the shipped launcher is built as it stands, and the two
+# candidate first lines are written over `dist/treadle.js` after the build, in the runner, so
+# nothing about the shipped `bin` entry changes.
+
+name: Windows launcher measurement (temporary)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  measure:
+    name: ${{ matrix.launcher }}
+    runs-on: windows-2025
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        # env-node: what treadle ships today, the baseline the decision needs first.
+        # bin-sh:   the launcher data/treadle-platform-parity-m5/report.md designed.
+        # env-sh:   the same launcher through PATH rather than an absolute POSIX path, which
+        #           is the one shape that could resolve to a program a Windows shell has.
+        launcher: [env-node, bin-sh, env-sh]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: What this runner has
+        shell: bash
+        run: |
+          node --version
+          npm --version
+          echo "npm prefix -g: $(npm prefix -g)"
+          for p in sh bash node; do echo "which $p: $(which $p || echo none)"; done
+          ls -l /bin/sh || echo "no /bin/sh visible to Git Bash"
+
+      - run: npm ci
+        shell: bash
+
+      - name: Build, then write the candidate first line over the bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run build
+          case "${{ matrix.launcher }}" in
+            env-node) first='' ;;
+            bin-sh)   first='#!/bin/sh' ;;
+            env-sh)   first='#!/usr/bin/env sh' ;;
+          esac
+          if [ -n "$first" ]; then
+            {
+              printf '%s\n' "$first"
+              printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
+              tail -n +2 dist/treadle.js
+            } > dist/treadle.next
+            mv dist/treadle.next dist/treadle.js
+            chmod +x dist/treadle.js
+          fi
+          echo "--- first two lines of dist/treadle.js ---"
+          head -2 dist/treadle.js | od -c | head -8
+          echo "--- node --check on the bundle ---"
+          node --check dist/treadle.js && echo "valid JS" || echo "NOT valid JS"
+
+      - name: Pack the tarball and install it globally, as a user would
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p pack
+          npm pack --ignore-scripts --pack-destination pack
+          tgz=$(ls pack/treadle-*.tgz)
+          npm install --global --ignore-scripts "$tgz"
+          echo "installed from $tgz"
+
+      - name: Quote the bytes npm generated
+        shell: bash
+        run: |
+          set -uo pipefail
+          prefix=$(npm prefix -g)
+          echo "prefix: $prefix"
+          for f in treadle treadle.cmd treadle.ps1; do
+            echo "===================== $f ====================="
+            if [ -f "$prefix/$f" ]; then cat "$prefix/$f"; else echo "(no such file)"; fi
+          done
+          echo "===================== installed shebang ====================="
+          head -2 "$prefix/node_modules/treadle/dist/treadle.js" || true
+
+      - name: cmd.exe - treadle version
+        shell: cmd
+        run: |
+          treadle version
+          echo VERSION_EXIT=%ERRORLEVEL%
+
+      - name: cmd.exe - treadle init then treadle file
+        shell: cmd
+        run: |
+          mkdir "%RUNNER_TEMP%\cmdws"
+          cd /d "%RUNNER_TEMP%\cmdws"
+          treadle init --name cmd-smoke
+          echo INIT_EXIT=%ERRORLEVEL%
+          treadle file task "The installed binary filed this from cmd"
+          echo FILE_EXIT=%ERRORLEVEL%
+          treadle status
+          echo STATUS_EXIT=%ERRORLEVEL%
+
+      - name: PowerShell 7 (pwsh) - treadle version
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          treadle version
+          Write-Host "VERSION_EXIT=$LASTEXITCODE"
+          exit 0
+
+      - name: PowerShell 7 (pwsh) - treadle init then treadle file
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwshws" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\pwshws"
+          treadle init --name pwsh-smoke
+          Write-Host "INIT_EXIT=$LASTEXITCODE"
+          treadle file task "The installed binary filed this from PowerShell"
+          Write-Host "FILE_EXIT=$LASTEXITCODE"
+          treadle status
+          Write-Host "STATUS_EXIT=$LASTEXITCODE"
+          exit 0
+
+      - name: Windows PowerShell 5.1 - treadle version
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          treadle version
+          Write-Host "VERSION_EXIT=$LASTEXITCODE"
+          exit 0
