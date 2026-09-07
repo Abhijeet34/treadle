@@ -196,7 +196,7 @@ It takes the parent edges alone rather than a whole graph, because every node ha
 ## Dates
 
 `due` is the only date a person sets on a work item, and nothing in this layer writes it.
-`isOverdue(item, now)` is true when `due` has passed and the state is not terminal, and `daysOverdue(item, now)` is the whole days past it, clamped to `MAX_OVERDUE_DAYS`, which is 30.
+`isOverdue(item, now)` is true when `due` has passed and the state is not terminal, and `daysOverdue(item, now)` is the whole days past it, clamped to `MAX_OVERDUE_DAYS`, which is 60.
 A terminal item is never overdue: the date said when the work was wanted and the work has stopped.
 The clock is an argument, as everywhere in this layer.
 
