@@ -14,7 +14,7 @@ export const FIELD_KEY_PATTERN = /^[a-z_][a-z0-9_]*$/
 
 export const FORBIDDEN_FIELD_KEYS = ['__proto__', 'constructor', 'prototype'] as const
 
-export function isForbiddenFieldKey(key: string): boolean {
+function isForbiddenFieldKey(key: string): boolean {
   return (FORBIDDEN_FIELD_KEYS as readonly string[]).includes(key)
 }
 

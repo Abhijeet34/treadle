@@ -3,9 +3,7 @@
 // src/application/ports/store.ts, and the pieces a later layer needs by name.
 
 export {
-  FILE_MODE,
   DIR_MODE,
-  TEMP_SWEEP_MS,
   appendAndSync,
   isTempName,
   openExclusive,
@@ -28,7 +26,6 @@ export {
   renderFile,
   renderHeader,
   renderRecord,
-  sourceOf,
   unwritableBodyLine,
   type Chunk,
   type ParsedFile,
@@ -39,14 +36,13 @@ export {
 
 export { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts'
 
-export { decodeItem, encodeItem, STRUCTURAL_NOW } from './item-codec.ts'
+export { decodeItem, encodeItem } from './item-codec.ts'
 
 export { decodeSprint, encodeSprint, type EncodedSprint } from './sprint-codec.ts'
 
 export * from './limits.ts'
 
 export {
-  HEARTBEAT_MS,
   STALE_MS,
   acquireLock,
   processIsGone,
@@ -65,6 +61,5 @@ export {
   openWorkspace,
   resolveWorkspace,
   rowOf,
-  sprintRowOf,
   type ShardedStoreOptions,
 } from './sharded-store.ts'

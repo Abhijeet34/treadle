@@ -512,7 +512,7 @@ export function parseRecordSource(source: string, line: number): SegmentOutcome 
   return parseSegment(lines, line, source)
 }
 
-export function sourceOf(chunk: Chunk): string {
+function sourceOf(chunk: Chunk): string {
   return chunk.kind === 'record' ? chunk.record.source : chunk.quarantine.source
 }
 

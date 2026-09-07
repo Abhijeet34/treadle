@@ -17,11 +17,21 @@
 // would be refusing documentation. A value has no such second life: nothing can use it
 // without naming it.
 //
-// The reference scan is a word match over every `.ts` in the tree plus `bin/`. That is
-// deliberately lenient in one direction only: an unrelated local of the same name in another
-// file reads as a reference and lets an export through, which under-reports. It cannot
-// invent a reference for a name that appears nowhere else, which is the direction that
-// matters.
+// A barrel line is not a reader. `export { X } from './x.ts'` names X and reads nothing, so
+// a symbol whose only mention outside its own file is a barrel line is exported to nobody:
+// nothing is published (`"private": true`), only `dist/treadle.js` ships, and no external
+// consumer keeps one alive. Eleven values sat in that position when this rule was widened,
+// so the re-export clauses are stripped out of the reference text before the match.
+//
+// A document IS a reader. `MAX_GOAL`, `MAX_EVIDENCE_REF` and `nextTowardDone` are named in
+// docs/DOMAIN.md as the domain core's published surface, which is a deliberate claim about
+// the symbol and not an accident, so the tracked Markdown counts alongside the code.
+//
+// The reference scan is a word match over every `.ts` in the tree, `bin/`, and the tracked
+// Markdown. That is deliberately lenient in one direction only: an unrelated local or a
+// prose word of the same name reads as a reference and lets an export through, which
+// under-reports. It cannot invent a reference for a name that appears nowhere else, which is
+// the direction that matters.
 
 import assert from 'node:assert/strict'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -44,20 +54,32 @@ function filesUnder(dir: string, extensions: readonly string[]): readonly string
 const SOURCES = filesUnder(path.join(ROOT, 'src'), ['.ts'])
 const EVERYWHERE = ['src', 'test', 'bench', 'scripts'].flatMap(
   (dir) => filesUnder(path.join(ROOT, dir), ['.ts']),
-).concat(filesUnder(path.join(ROOT, 'bin'), ['.js']))
+  ).concat(filesUnder(path.join(ROOT, 'bin'), ['.js']))
+  .concat(filesUnder(path.join(ROOT, 'docs'), ['.md']))
+  .concat(['README.md', 'AGENTS.md', 'CONTRIBUTING.md'].map((name) => path.join(ROOT, name)))
 
 /** `export const X`, `export function X`, `export async function X`, `export class X`. */
 const VALUE_EXPORT = /^export (?:async )?(?:function|const|let|class) ([A-Za-z_$][\w$]*)/gm
 
-const text = new Map(EVERYWHERE.map((file) => [file, readFileSync(file, 'utf8')]))
+/** `export { a, b }` with no `from`: the file's own values, listed rather than prefixed. */
+const VALUE_LIST = /^export \{ ([A-Za-z_$][\w$, ]*) \}$/gm
+
+/** A re-export clause names a symbol and reads nothing, so it is not a reference. */
+const reference = (source: string): string =>
+  source.replace(/export\s*\{[^}]*\}\s*from\s*'[^']*'/g, ' ')
+
+const text = new Map(EVERYWHERE.map((file) => [file, reference(readFileSync(file, 'utf8'))]))
 
 describe('every value src exports is named outside the file that declares it', () => {
   it('names no export that only its own file uses', () => {
     const orphans: string[] = []
     for (const file of SOURCES) {
-      const source = text.get(file) as string
-      for (const match of source.matchAll(VALUE_EXPORT)) {
-        const name = match[1] as string
+      const source = readFileSync(file, 'utf8')
+      const names = [...source.matchAll(VALUE_EXPORT)].map((match) => match[1] as string)
+      for (const listed of source.matchAll(VALUE_LIST)) {
+        for (const name of (listed[1] as string).split(',')) names.push(name.trim())
+      }
+      for (const name of new Set(names)) {
         const named = EVERYWHERE.some((other) =>
           other !== file && new RegExp(`\\b${name}\\b`).test(text.get(other) as string))
         if (!named) orphans.push(`${path.relative(ROOT, file)}: ${name}`)
@@ -69,7 +91,7 @@ describe('every value src exports is named outside the file that declares it', (
 
   it('scans a set large enough to mean something', () => {
     const exports = SOURCES.reduce(
-      (sum, file) => sum + [...(text.get(file) as string).matchAll(VALUE_EXPORT)].length, 0)
+      (sum, file) => sum + [...readFileSync(file, 'utf8').matchAll(VALUE_EXPORT)].length, 0)
     assert.ok(exports >= 100, `only ${exports} value exports were found under src/`)
   })
 })

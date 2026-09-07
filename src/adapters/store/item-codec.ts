@@ -285,4 +285,3 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
 }
 
 export type { Encoded }
-export { STRUCTURAL_NOW }

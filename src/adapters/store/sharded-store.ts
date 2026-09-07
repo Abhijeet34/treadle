@@ -1138,7 +1138,7 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
   }
 }
 
-export function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
+function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
   return { id: sprint.id, file, line, state: sprint.state, filed_at: sprint.filed_at, source }
 }
 

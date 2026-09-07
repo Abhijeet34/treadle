@@ -17,11 +17,11 @@ import type { FileHandle } from 'node:fs/promises'
 import path from 'node:path'
 
 /** Project data, not secret (F9's own reading): the exclusive create is the control. */
-export const FILE_MODE = 0o644
+const FILE_MODE = 0o644
 export const DIR_MODE = 0o755
 
 /** The window a crashed writer's temp file survives before the next lock holder sweeps it. */
-export const TEMP_SWEEP_MS = 60 * 60 * 1000
+const TEMP_SWEEP_MS = 60 * 60 * 1000
 
 const TEMP_MARK = '.tmp.'
 

@@ -4,7 +4,7 @@
 // exit status; the rule id is what an error names so a caller can look it up instead of
 // reading the sentence. docs/DOMAIN.md carries the rule table.
 
-export const DOMAIN_ERROR_CODES = ['VALIDATION', 'GUARD_REFUSED', 'INTEGRITY'] as const
+const DOMAIN_ERROR_CODES = ['VALIDATION', 'GUARD_REFUSED', 'INTEGRITY'] as const
 
 export type DomainErrorCode = (typeof DOMAIN_ERROR_CODES)[number]
 

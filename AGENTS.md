@@ -244,10 +244,12 @@ Before hand-checking any of these, run the suite: it already checks them.
   or parameter fails `npm run typecheck` and cannot land. What tsc cannot see is an export
   nothing imports, which is therefore the only shape dead code takes here:
   `test/architecture/exported-surface.test.ts` refuses a value under `src/` that no other
-  file in the tree names, which is what two hand sweeps each missed part of. It holds values
-  and not types, so a type export still needs the reading below, as does a symbol whose only
-  reader outside its file is a barrel line in `src/domain/index.ts` or
-  `src/adapters/store/index.ts`. Nothing is published
+  file in the tree names, which is what two hand sweeps each missed part of. A barrel line in
+  `src/domain/index.ts` or `src/adapters/store/index.ts` does not count as a reader, because
+  it names a symbol and reads nothing, and eleven values sat behind one; a mention in a
+  tracked document does count, because docs/DOMAIN.md publishing a name is a deliberate claim
+  about it. It holds values and not types, so a type export still needs the reading below.
+  Nothing is published
   (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
   alive; a test-only caller does not either, with one exception that has already cost a
   sweep. A test that uses a symbol as an independent oracle for the production path is a

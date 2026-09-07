@@ -19,7 +19,7 @@ import { validateFieldKeys } from './record.ts'
 import { isSafeText } from './text.ts'
 import { isTerminal, type GateVerdict, type Instant, type ItemId, type WorkItemSummary } from './types.ts'
 
-export const SPRINT_STATES = ['open', 'closed'] as const
+const SPRINT_STATES = ['open', 'closed'] as const
 export type SprintState = (typeof SPRINT_STATES)[number]
 
 /** A calendar date, `YYYY-MM-DD`, read as a UTC day. `isCalendarDate` is the validator. */
