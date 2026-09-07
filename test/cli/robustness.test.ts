@@ -17,6 +17,7 @@ import { describe, it } from 'node:test'
 
 import { EXIT_OF } from '../../src/cli/exit.ts'
 import { runCli } from '../helpers/cli-run.ts'
+import { POSIX_MODES } from '../helpers/platform.ts'
 
 /** A stack trace on stderr is the shape being refused, in either of the two ways it prints. */
 function assertNoTrace(stream: string): void {
@@ -47,7 +48,7 @@ describe('a filesystem that refuses is a refusal, not a stack trace', () => {
     }
   })
 
-  it('file into a shard directory whose write bit is off', async () => {
+  it('file into a shard directory whose write bit is off', { skip: POSIX_MODES }, async () => {
     const at = await mkdtemp(path.join(tmpdir(), 'treadle-readonly-'))
     const items = path.join(at, '.work', 'items')
     try {
@@ -65,7 +66,7 @@ describe('a filesystem that refuses is a refusal, not a stack trace', () => {
     }
   })
 
-  it('leaves the store readable after the refusal', async () => {
+  it('leaves the store readable after the refusal', { skip: POSIX_MODES }, async () => {
     const at = await mkdtemp(path.join(tmpdir(), 'treadle-after-'))
     const items = path.join(at, '.work', 'items')
     try {

@@ -215,6 +215,23 @@ export type Workspace = {
   dispose(): Promise<void>
 }
 
+/**
+ * Removes the index the way the platform allows, for a test whose subject is D1: the committed
+ * files are the authority and deleting the cache is always safe.
+ *
+ * On POSIX that claim holds at an arbitrary moment, with the store's own connection still open,
+ * and the deletion below is exactly the one a person would run. Windows will not unlink a file
+ * another handle holds, so the equivalent moment there is between two opens: `close()` releases
+ * the index and nothing else, every store here reopens it lazily on the next read, and the
+ * answers either side are what the test compares. Without this, seven store and CLI tests
+ * failed on windows-2025 with `EBUSY: resource busy or locked, unlink index.sqlite` (run
+ * 34110894767), none of them measuring anything about this tool.
+ */
+export async function deleteIndex(root: string, store?: { close(): Promise<void> }): Promise<void> {
+  if (process.platform === 'win32' && store !== undefined) await store.close()
+  await rm(path.join(root, '.index'), { recursive: true, force: true, maxRetries: 10, retryDelay: 50 })
+}
+
 export async function aWorkspace(options: ShardedStoreOptions = {}): Promise<Workspace> {
   const root = await mkdtemp(path.join(tmpdir(), 'treadle-store-'))
   const made = await createWorkspace(root, {

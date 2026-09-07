@@ -96,12 +96,23 @@ function renderText(
   return lines
 }
 
+/**
+ * Line 1, which `--contract` promises the exit status is a function of and of nothing else.
+ *
+ * An `ok` answer whose code is not `OK` carries that code as its last field, because the rule
+ * was false without it: `doctor` over a store holding a hidden record answers `ok` and exits 7
+ * (`INTEGRITY`), so an agent that read line 1 and predicted 0, exactly as the contract told it
+ * to, was wrong. `OK` itself is never printed - it is what every other `ok` line already means,
+ * and printing it would cost every read a field that says nothing. The code goes last, after
+ * the mutate form's own two fields, so no position a caller already reads moves.
+ */
 function envelope(result: ResultObject): string {
   if (!result.ok) return `err ${result.code} ${result.workspace}`
+  const code = result.code === 'OK' ? '' : ` ${result.code}`
   if (result.effect === 'mutate') {
-    return `ok ${result.command} ${result.workspace} ${result.txn ?? '-'} ${result.changed ?? 0}`
+    return `ok ${result.command} ${result.workspace} ${result.txn ?? '-'} ${result.changed ?? 0}${code}`
   }
-  return `ok ${result.command} ${result.workspace}`
+  return `ok ${result.command} ${result.workspace}${code}`
 }
 
 export const agentRenderer: Renderer = {

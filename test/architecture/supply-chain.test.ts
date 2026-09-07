@@ -58,7 +58,9 @@ describe('F13 control one: install-time scripts are off', () => {
   // rather than reading the file a second time: a config npm ignores would still pass a text
   // match.
   it('npm actually reads ignore-scripts=true from the committed .npmrc', () => {
-    const value = execFileSync('npm', ['config', 'get', 'ignore-scripts'], {
+    // npm is a `.cmd` shim on Windows, which `execFileSync` will not resolve without a shell.
+    const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+    const value = execFileSync(npm, ['config', 'get', 'ignore-scripts'], {
       cwd: ROOT, encoding: 'utf8',
     }).trim()
     assert.equal(value, 'true')

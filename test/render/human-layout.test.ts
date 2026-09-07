@@ -134,10 +134,11 @@ describe('a scalar that follows a table is not part of it', () => {
         parts.push(`### ${name} @ ${width}`, humanRenderer.render(result, { width }).trimEnd(), '')
       }
     }
-    // The demo workspace lives under a fresh temporary directory, so `status` prints a path
-    // that is different every run. It is the one value in the artefact that is not the
-    // renderer's own output, and pinning it would pin the machine that recorded it.
-    const rendered = `${parts.join('\n')}\n`.replaceAll(/\S*treadle-cli-\S+/g, '<store>')
+    // Every golden object already reports `GOLDEN_ROOT` rather than the temporary directory it
+    // was built in (`cli-fixtures.ts`), so this artefact is the renderer's own output and
+    // nothing else: substituting the path here left its LENGTH in, and a macOS runner's
+    // 44-character `/var/folders/...` root wrapped the `store` scalar onto a second line.
+    const rendered = `${parts.join('\n')}\n`
     if (process.env['TREADLE_SNAPSHOT'] === 'update') {
       writeFileSync(SNAPSHOT, rendered)
       return

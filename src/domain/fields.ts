@@ -5,7 +5,7 @@
 
 import { fail, ok, type Failure, type Result } from './errors.ts'
 import { validateFieldKeys } from './record.ts'
-import { findUnsafeCharacter, isSafeText, withArticle } from './text.ts'
+import { andList, findUnsafeCharacter, isSafeText, withArticle } from './text.ts'
 import {
   BUG_SEVERITIES,
   DEFAULT_POINT_SCALE,
@@ -496,16 +496,16 @@ export function validateWorkItem(item: WorkItem, options: ValidateOptions): Resu
   // not by the first thing in it that fails.
   const missing = requiredAtCreation(item.type).filter((name) => item[name as keyof WorkItem] === undefined)
   if (missing.length > 0) {
-    const named = missing.length === 1
-      ? missing[0] as string
-      : `${missing.slice(0, -1).join(', ')} and ${missing.at(-1) as string}`
-    return invalid('V4', `${withArticle(item.type)} needs ${named} at creation`, item)
+    return invalid('V4', `${withArticle(item.type)} needs ${andList(missing)} at creation`, item)
   }
 
-  for (const name of present) {
-    const why = CHECKS[name]?.(item[name as keyof WorkItem], item, options)
-    if (why !== undefined) return invalid('V4', why, item)
-  }
+  // Every wrong value, in one sentence, for the same reason the missing ones above are named
+  // together: `file bug "x" --set severity=S9 --set found_in=1.0` refused severity, then
+  // found_in on the next try, for two facts one read of the record already holds.
+  const wrong = present
+    .map((name) => CHECKS[name]?.(item[name as keyof WorkItem], item, options))
+    .filter((why): why is string => why !== undefined)
+  if (wrong.length > 0) return invalid('V4', wrong.join('; '), item)
 
   if (item.state === 'on_hold') {
     for (const name of ['hold_reason', 'held_from'] as const) {

@@ -18,6 +18,7 @@ import {
 } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
 import { storeConformance } from './conformance.ts'
+import { POSIX_MODES } from '../helpers/platform.ts'
 
 storeConformance('sharded markdown store', async () => {
   const workspace = await aWorkspace()
@@ -205,7 +206,11 @@ describe('the sharded store on disk', () => {
       assert.match(await s12(reader) ?? '', /closes a cycle/, 'the added edge must be found')
 
       await writeFile(shard, clean)
-      assert.equal(await s12(new ShardedStore(workspace.root)), undefined, 'the removed edge must clear')
+      // Named and closed rather than left to the collector: an open index connection is the
+      // one thing a Windows `rm` of this directory cannot get past.
+      const second = new ShardedStore(workspace.root)
+      assert.equal(await s12(second), undefined, 'the removed edge must clear')
+      await second.close()
       await reader.close()
     } finally {
       await workspace.dispose()
@@ -272,6 +277,14 @@ describe('the sharded store on disk', () => {
         await readFile(path.join(workspace.root, '.gitattributes'), 'utf8'),
         'events/*.jsonl merge=union linguist-generated=true\n',
       )
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('writes that layout world-readable and no wider', { skip: POSIX_MODES }, async () => {
+    const workspace = await aWorkspace()
+    try {
       assert.equal((await stat(path.join(workspace.root, 'workspace.md'))).mode & 0o777, 0o644)
     } finally {
       await workspace.dispose()

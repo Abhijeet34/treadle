@@ -18,18 +18,24 @@ import { describe, it } from 'node:test'
 import { openExclusive, tempNameFor, writeFileAtomic } from '../../src/adapters/store/index.ts'
 import { acquireLock } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { POSIX_MODES, POSIX_SYMLINKS } from '../helpers/platform.ts'
 
 const NAMES = 1000
+
+/** A record path, in this platform's own separator, so the assertions below compare like with like. */
+const TARGET = path.join(path.sep, 'w', 'items', '2026-09.md')
 
 describe('the temp file cannot be aimed at anything', () => {
   it(`mints ${NAMES} distinct names, none of them derivable from the pid`, () => {
     const names = new Set<string>()
-    for (let i = 0; i < NAMES; i += 1) names.add(tempNameFor('/w/items/2026-09.md'))
+    for (let i = 0; i < NAMES; i += 1) names.add(tempNameFor(TARGET))
     assert.equal(names.size, NAMES, 'a repeated name is a guessable name')
     for (const name of names) {
-      assert.notEqual(name, `/w/items/2026-09.md.tmp.${process.pid}`, 'the design\'s own name')
+      assert.notEqual(name, `${TARGET}.tmp.${process.pid}`, 'the design\'s own name')
       assert.match(path.basename(name), /^\.2026-09\.md\.tmp\.[0-9a-f]{24}$/)
-      assert.equal(path.dirname(name), '/w/items', 'the rename must stay inside one directory')
+      // Compared through `node:path` on both sides: the separator the join produced is the
+      // platform's, and asserting a literal `/` measured the runner rather than the rename.
+      assert.equal(path.dirname(name), path.dirname(TARGET), 'the rename must stay inside one directory')
     }
   })
 
@@ -52,7 +58,7 @@ describe('the temp file cannot be aimed at anything', () => {
     }
   })
 
-  it('fails with EEXIST on an occupied path, including a dangling symlink', async () => {
+  it('fails with EEXIST on an occupied path', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
     const taken = path.join(root, 'taken')
     await writeFile(taken, 'squatted')
@@ -61,9 +67,14 @@ describe('the temp file cannot be aimed at anything', () => {
       (error: NodeJS.ErrnoException) => error.code === 'EEXIST',
     )
     assert.equal(await readFile(taken, 'utf8'), 'squatted')
+  })
 
-    // The whole of F9: a co-tenant's symlink is an existing path to O_EXCL, so the open
-    // fails rather than following the link to whatever it points at.
+  // The whole of F9's belt: a co-tenant's symlink is an existing path to O_EXCL, so the open
+  // fails rather than following the link to whatever it points at. Windows resolves the link
+  // first and creates its target, which is why the braces matter there: the name carries 96
+  // bits of randomness, so there is nothing for a co-tenant to pre-place.
+  it('fails with EEXIST on a dangling symlink rather than following it', { skip: POSIX_SYMLINKS }, async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
     const aimed = path.join(root, 'aimed')
     await symlink(path.join(root, 'nowhere'), aimed)
     await assert.rejects(
@@ -86,7 +97,7 @@ describe('the temp file cannot be aimed at anything', () => {
   })
 })
 
-describe('the permissions on every file the store owns', () => {
+describe('the permissions on every file the store owns', { skip: POSIX_MODES }, () => {
   it('writes records world-readable and the lock owner-only', async () => {
     const workspace = await aWorkspace()
     try {

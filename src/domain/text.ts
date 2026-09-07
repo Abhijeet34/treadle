@@ -107,6 +107,21 @@ export function withArticle(noun: string): string {
 }
 
 /**
+ * Several names as one English list: `a`, `a and b`, `a, b and c`.
+ *
+ * ADR-0020's rule, read the naming half: a verdict is decided by a whole read of the record
+ * rather than by the first thing in it that fails, so a refusal names every failure it found
+ * in one sentence and the caller pays one round trip. Three call sites share it - a creation
+ * missing required fields, a `--set` whose values are wrong, and a transition missing the
+ * values its edge records - because they are the same rule seen from three angles, and the
+ * one that stayed per-field cost a caller three refusals for a fact `explain` states whole.
+ */
+export function andList(names: readonly string[]): string {
+  if (names.length <= 1) return names[0] ?? ''
+  return `${names.slice(0, -1).join(', ')} and ${names.at(-1) as string}`
+}
+
+/**
  * A value as one word of a command line the reader runs as printed. A token of letters,
  * digits and the punctuation every shell leaves alone stays bare; anything else is
  * single-quoted, the one POSIX quoting under which nothing but the quote itself escapes.

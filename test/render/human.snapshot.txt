@@ -1,6 +1,6 @@
 ### status @ 60
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  24
   points  83
   findings  0
@@ -26,7 +26,7 @@ next  3 of 3
 
 ### status @ 80
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  24
   points  83
   findings  0
@@ -51,7 +51,7 @@ next  3 of 3
 
 ### status @ 200
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  24
   points  83
   findings  0
@@ -428,15 +428,15 @@ history  acme-platform
 
 events  3 of 3
   AT                    KIND   OP               WHAT
-  2026-08-21T09:00:00Z  human  item.transition 
+  2026-08-21T09:00:00Z  human  item.transition
     state=ready->in_progress
     dana
-  2026-08-21T09:00:00Z  human  item.transition 
+  2026-08-21T09:00:00Z  human  item.transition
     state=draft->ready
     dana
-  2026-08-21T09:00:00Z  human  item.file       
-    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,pri
-    ority=1,points=8,assignee=kim
+  2026-08-21T09:00:00Z  human  item.file
+    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,
+    priority=1,points=8,assignee=kim
     dana
 
 reasons  2 of 2
@@ -455,9 +455,9 @@ events  3 of 3
     dana
   2026-08-21T09:00:00Z  human  item.transition  state=draft->ready
     dana
-  2026-08-21T09:00:00Z  human  item.file       
-    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,ass
-    ignee=kim
+  2026-08-21T09:00:00Z  human  item.file
+    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,
+    assignee=kim
     dana
 
 reasons  2 of 2
@@ -817,7 +817,7 @@ transition  acme-platform  0 changed  txn -
 transition  acme-platform  0 changed  txn -
   preview  1
   item  csv-export
-  store  <store>
+  store  /w/platform/.work
   state  ready
   will_evaluate  G2 G3 G4
   will_write  item.transition
@@ -827,7 +827,7 @@ transition  acme-platform  0 changed  txn -
 transition  acme-platform  0 changed  txn -
   preview  1
   item  csv-export
-  store  <store>
+  store  /w/platform/.work
   state  ready
   will_evaluate  G2 G3 G4
   will_write  item.transition
@@ -837,7 +837,7 @@ transition  acme-platform  0 changed  txn -
 transition  acme-platform  0 changed  txn -
   preview  1
   item  csv-export
-  store  <store>
+  store  /w/platform/.work
   state  ready
   will_evaluate  G2 G3 G4
   will_write  item.transition
@@ -979,7 +979,7 @@ file  acme-platform  1 changed  txn t0902
 
 ### status-overdue @ 60
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1010,7 +1010,7 @@ next  3 of 3
 
 ### status-overdue @ 80
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1040,7 +1040,7 @@ next  3 of 3
 
 ### status-overdue @ 200
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1070,7 +1070,7 @@ next  3 of 3
 
 ### status-not-yet-overdue @ 60
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1096,7 +1096,7 @@ next  3 of 3
 
 ### status-not-yet-overdue @ 80
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1121,7 +1121,7 @@ next  3 of 3
 
 ### status-not-yet-overdue @ 200
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1552,7 +1552,7 @@ Do one of these
 
 ### status-sprint @ 60
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1587,7 +1587,7 @@ sprints  1 of 1
 
 ### status-sprint @ 80
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0
@@ -1621,7 +1621,7 @@ sprints  1 of 1
 
 ### status-sprint @ 200
 status  acme-platform
-  store  <store>
+  store  /w/platform/.work
   items  26
   points  84
   findings  0

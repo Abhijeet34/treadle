@@ -112,6 +112,31 @@ export async function aDemoWorkspace(): Promise<Demo> {
   }
 }
 
+/**
+ * The path every golden object below reports as its workspace, in place of the temporary
+ * directory the demo really lives in.
+ *
+ * Two suites measure these objects rather than read them, and both were measuring the runner's
+ * `mkdtemp` root: the A.3 byte budget counts the `store` line, and the human-layout snapshot
+ * lays that line out against the terminal width. A macOS `/var/folders/bl/vzjcvbz.../T` root
+ * is 44 characters where a Linux `/tmp` one is 4, which on macos-15 in run 34110894767 put
+ * `transition-preview` at 266 B against its 250 B budget and wrapped the snapshot's `store`
+ * scalar onto a second line. Neither is a fact about this tool.
+ */
+const GOLDEN_ROOT = '/w/platform/.work'
+
+/** Every string carrying the demo's real root, rewritten to `GOLDEN_ROOT`, at any depth. */
+function atGoldenRoot<T>(value: T, root: string): T {
+  if (typeof value === 'string') return value.replaceAll(root, GOLDEN_ROOT) as T
+  if (Array.isArray(value)) return value.map((entry: unknown) => atGoldenRoot(entry, root)) as T
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, entry]) => [key, atGoldenRoot(entry, root)]),
+    ) as T
+  }
+  return value
+}
+
 /** One result object per command, which is what the conformance and schema suites read. */
 export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>> {
   const demo = await aDemoWorkspace()
@@ -211,7 +236,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('sprint-close', await closeSprint(targetFor(demo.store, 'apply'), clock, ids, { sprint: 'sprint-31', actor: ACTOR }))
     golden.set('sprints', await sprints(demo.store, clock))
     golden.set('sprints-closed', await sprints(demo.store, clock, 'sprint-31'))
-    return golden
+    return new Map([...golden].map(([name, result]) => [name, atGoldenRoot(result, demo.root)]))
   } finally {
     await demo.dispose()
   }

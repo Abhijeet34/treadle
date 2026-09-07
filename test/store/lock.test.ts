@@ -19,6 +19,7 @@ import { describe, it } from 'node:test'
 
 import { acquireLock, parseFile, processIsGone } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { POSIX_SIGNALS } from '../helpers/platform.ts'
 
 const run = promisify(execFile)
 const WRITER = fileURLToPath(new URL('./fixtures/writer.ts', import.meta.url))
@@ -140,7 +141,7 @@ describe('a holder that dies never wedges the store', () => {
     }
   })
 
-  it('treats EPERM as alive, never as death', async () => {
+  it('treats EPERM as alive, never as death', { skip: POSIX_SIGNALS }, async () => {
     const workspace = await aWorkspace()
     try {
       const file = path.join(workspace.root, '.lock')
@@ -300,7 +301,7 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
     }
   })
 
-  it('refuses the write of a writer paused past the window, so the reclaimer\'s write is never overwritten', async () => {
+  it('refuses the write of a writer paused past the window, so the reclaimer\'s write is never overwritten', { skip: POSIX_SIGNALS }, async () => {
     const workspace = await aWorkspace()
     try {
       await workspace.store.apply({ txn: 't0', writes: [{ item: anItem({ priority: 1 }) }], events: [] })

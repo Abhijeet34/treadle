@@ -488,6 +488,21 @@ async function readBack(
   spec: CorpusSpec, root: string, generated: Generated | undefined, reused: boolean, cloneMs: number | undefined,
 ): Promise<Corpus> {
   const store = new ShardedStore(root)
+  try {
+    return await readBackWith(store, spec, root, generated, reused, cloneMs)
+  } finally {
+    // Every refusal below leaves this connection open otherwise, and a corpus directory whose
+    // index is still held cannot be removed on Windows at all: the isolation suite, whose
+    // whole subject is a corpus short of its spec, failed there on `EBUSY unlink
+    // index.sqlite-shm` in its own cleanup rather than on anything it asserts.
+    await store.close()
+  }
+}
+
+async function readBackWith(
+  store: ShardedStore,
+  spec: CorpusSpec, root: string, generated: Generated | undefined, reused: boolean, cloneMs: number | undefined,
+): Promise<Corpus> {
   const all = await store.list({})
   if (!all.ok) throw new Error(`corpus readback: ${all.error.message}`)
   // A corpus short of its spec is the failure this rig must never absorb: the figures it
@@ -508,7 +523,6 @@ async function readBack(
   if (!ready.ok) throw new Error(`corpus readback: ${ready.error.message}`)
   const sprints = await store.sprints()
   if (!sprints.ok) throw new Error(`corpus readback: ${sprints.error.message}`)
-  await store.close()
 
   const perMonth = new Map<string, number>()
   for (const item of all.value) {
@@ -608,9 +622,19 @@ export type Generated = {
  * both statements about the set and neither can be decided one record at a time.
  */
 async function generate(root: string, spec: CorpusSpec): Promise<Generated> {
+  const store = new ShardedStore(root)
+  try {
+    return await generateWith(store, spec)
+  } finally {
+    // Same reason as `readBack`: a corpus that fails part way through leaves a handle on its
+    // index, and the directory it sits in is then undeletable on Windows.
+    await store.close()
+  }
+}
+
+async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Generated> {
   const next = random(spec.seed)
   const months = monthRange(spec.lastMonth, spec.months)
-  const store = new ShardedStore(root)
   const started = performance.now()
 
   const epics: string[] = []
@@ -672,7 +696,6 @@ async function generate(root: string, spec: CorpusSpec): Promise<Generated> {
   }
 
   const elapsed = performance.now() - started
-  await store.close()
   return { ms: elapsed, sprints, impediments: impedimentIndexes.length, relations: tally, chain }
 }
 

@@ -5,6 +5,7 @@
 // the components and weights that produced it.
 
 import assert from 'node:assert/strict'
+import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
 import { backlog, fileItem } from '../../src/application/services/items.ts'
@@ -75,7 +76,8 @@ describe('--preview resolves the target and evaluates nothing', () => {
     })
     assert.equal(result.data['preview'], 1)
     assert.equal(result.data['item'], 'csv-export')
-    assert.match(String(result.data['store']), /platform\/\.work$/)
+    // Joined through `node:path`, so the separator asserted is this platform's own.
+    assert.ok(String(result.data['store']).endsWith(path.join('platform', '.work')), String(result.data['store']))
     assert.equal(result.data['will_evaluate'], 'G2 G3 G4')
     assert.equal(result.data['will_write'], 'item.transition')
   })
@@ -119,7 +121,7 @@ describe('an empty result and an absence are answered rather than left silent', 
       filters: [], columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'no-such-item',
     })
     assert.equal(result.data['absent'], 'no-such-item')
-    assert.match(String(result.data['store']), /platform\/\.work$/)
+    assert.ok(String(result.data['store']).endsWith(path.join('platform', '.work')), String(result.data['store']))
     assert.equal(result.data['clause'], 'unknown searched 24')
   })
 

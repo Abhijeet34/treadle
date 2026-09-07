@@ -159,12 +159,16 @@ const PROSE = /^(\d+) chars$/
 const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
 
 /**
- * Fields whose value is a comma-joined list of ids, which is one comma too many for this
- * cell: `what` joins its own `field=value` pairs with commas, so `carried=(unset)->t-four,
- * t-three` reads as two pairs, and a four-id carry-over is 41 characters and printed as `(?)`
- * instead, which says a value existed and nothing else. A list of more than one prints its
- * count, which is unambiguous, bounded, and the part a reader of a close can act on;
- * `sprints <id>` prints the list itself.
+ * Fields whose value is a comma-joined list of ids. A list over `MAX_VALUE` prints its count
+ * rather than `(?)`: a four-id carry-over is 41 characters, and `(?)` said a value existed and
+ * nothing else where `(list:4)` says how many, which is the part a reader of a close can act
+ * on. `sprints <id>` prints the list itself.
+ *
+ * The bound is the size and not the kind, which it was for one day: `set x labels=frontend,
+ * backend` renders 16 characters, well under the bound, and printed `labels=(list:2)`, hiding
+ * the whole content of a change whose whole content is which labels were set. A short list
+ * prints verbatim, and a reader splitting the cell on commas tells a continuation from a pair
+ * by the `=` a pair always carries.
  */
 const LISTED = new Set<string>(['carried', 'finished', 'labels'])
 
@@ -177,8 +181,11 @@ const LISTED = new Set<string>(['carried', 'finished', 'labels'])
 function side(value: unknown, field: string): string {
   if (value === '-') return UNSET
   if (typeof value !== 'string' || value.length === 0) return UNKNOWN
-  if (LISTED.has(field) && value.includes(',') && !/\s/.test(value)) return `(list:${value.split(',').length})`
-  if (value.length > MAX_VALUE) return UNKNOWN
+  if (value.length > MAX_VALUE) {
+    return LISTED.has(field) && value.includes(',') && !/\s/.test(value)
+      ? `(list:${value.split(',').length})`
+      : UNKNOWN
+  }
   const prose = NEVER_PROSE.has(field) ? null : PROSE.exec(value)
   if (prose !== null) return `(text:${prose[1] as string})`
   return /\s/.test(value) || value.startsWith('(') ? UNKNOWN : value
@@ -211,7 +218,11 @@ function movedBy(event: StoreEvent): readonly string[] {
   const keys = Object.keys(source)
   // A sprint event names sprint fields; an item event never does, so one filter serves both.
   const known = keys.filter((key) => isKnownField(key) || isSprintField(key))
-  const moves = known.map((key) => move(key, before, after))
+  // A pair whose two sides print the same moved nothing, and a log of moves is what this cell
+  // is: a sprint close over a sprint that finished nothing carried `finished=(unset)->(unset)`
+  // beside the six pairs that did move. A creation has no before at all and prints whole.
+  const moved = known.filter((key) => before === undefined || side(before[key], key) !== side(after?.[key], key))
+  const moves = moved.map((key) => move(key, before, after))
   // A key this build does not know is counted rather than printed: it is text from a file
   // that no dictionary bounds, and the count is the part a reader can act on.
   return known.length === keys.length ? moves : [...moves, `unknown=${keys.length - known.length}`]

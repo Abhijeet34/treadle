@@ -5,11 +5,11 @@
 // and in a loop, and asserts the answers never move.
 
 import assert from 'node:assert/strict'
-import { readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
+import { aWorkspace, anEvent, anItem, deleteIndex } from '../helpers/store-fixtures.ts'
 import { renderEvent } from '../../src/adapters/store/index.ts'
 import type { Store, StoreEvent } from '../../src/application/ports/store.ts'
 
@@ -43,7 +43,7 @@ describe('the index is a cache and deleting it is always harmless', () => {
       const reference = await snapshot(workspace.store)
 
       for (let i = 0; i < DELETIONS; i += 1) {
-        await rm(index, { recursive: true, force: true })
+        await deleteIndex(workspace.root, workspace.store)
         assert.equal(await snapshot(workspace.store), reference, `answers moved after deletion ${i + 1}`)
       }
       assert.ok(await stat(path.join(index, 'index.sqlite')), 'the index rebuilds itself')
@@ -54,7 +54,6 @@ describe('the index is a cache and deleting it is always harmless', () => {
 
   it('serves a write that landed while the index was deleted underneath it', async () => {
     const workspace = await aWorkspace()
-    const index = path.join(workspace.root, '.index')
     try {
       await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [anEvent()] })
       await workspace.store.apply({
@@ -62,7 +61,7 @@ describe('the index is a cache and deleting it is always harmless', () => {
         writes: [{ item: anItem({ state: 'ready' }), ifVersion: 1 }],
         events: [anEvent({ id: 'ev-2', op: 'transition' })],
       })
-      await rm(index, { recursive: true, force: true })
+      await deleteIndex(workspace.root, workspace.store)
 
       const found = await workspace.store.get('item-one')
       assert.equal(found.ok && found.value?.state, 'ready')
