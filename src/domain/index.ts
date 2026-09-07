@@ -89,6 +89,7 @@ export {
   MAX_REASON,
   canonicalField,
   fieldsOf,
+  asInstant,
   isInstant,
   isKnownField,
   overLength,

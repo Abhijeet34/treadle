@@ -4,6 +4,7 @@
 
 import {
   ALLOWED_PARENT_PAIRS,
+  asInstant,
   canonicalField,
   daysOverdue,
   evaluateCommit,
@@ -276,6 +277,7 @@ export type FileRequest = {
 }
 
 const INT_FIELDS = new Set(['priority', 'points', 'hours_estimate', 'timebox_hours'])
+
 const LIST_FIELDS = new Set(['labels'])
 const CRITERIA_FIELDS = new Set(['acceptance_criteria'])
 
@@ -294,6 +296,8 @@ const CRITERIA_TICK = /^\[([ x])\] /
  */
 export function coerce(name: string, value: string): unknown {
   if (value === '') return undefined
+  // `due` is a day to everyone who writes one; `asInstant` carries the rule and its why.
+  if (name === 'due') return asInstant(value)
   if (INT_FIELDS.has(name)) return Number.isInteger(Number(value)) ? Number(value) : value
   if (name === 'fix_confirmed') return value === 'true' ? true : value === 'false' ? false : value
   if (LIST_FIELDS.has(name)) return value.split(',').filter((part) => part.length > 0)

@@ -249,6 +249,25 @@ export function isInstant(value: unknown): value is Instant {
   return typeof value === 'string' && INSTANT.test(value)
 }
 
+const DAY = /^\d{4}-\d{2}-\d{2}$/
+
+/**
+ * A day written `YYYY-MM-DD` as its first instant in UTC, or the value unchanged.
+ *
+ * The two grammars this tool teaches disagreed: `sprint open --end 2026-09-30` takes a day and
+ * `set x due=2026-09-30` was refused for a value that names exactly the day meant. A due date
+ * and a hold's end are days, so both write paths widen here - `coerce` for `due`, the
+ * `--until` flag for `hold_until` - and one record format is stored either way. A malformed
+ * day such as `2026-13-40` still fails `isInstant` below and earns the refusal that names both
+ * forms; only a well-shaped day is widened.
+ */
+export function asInstant(value: string): string {
+  return DAY.test(value) ? `${value}T00:00:00Z` : value
+}
+
+/** The clause the two day-taking fields add to their refusal, so a caller learns the form. */
+export const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
+
 export type ValidateOptions = {
   readonly now: Instant
   /** The workspace's estimation scale; defaults to the model's 1,2,3,5,8,13. */
@@ -312,8 +331,9 @@ const slug = (name: string): Check => (value) =>
     ? undefined
     : `${name} must be a slug of 3 to 64 lowercase letters, digits and hyphens`
 
-const instant = (name: string): Check => (value) =>
-  isInstant(value) ? undefined : `${name} must be an RFC 3339 instant in UTC, such as 2026-09-05T12:00:00Z`
+const instant = (name: string, day = false): Check => (value) =>
+  (isInstant(value) ? undefined
+    : `${name} must be an RFC 3339 instant in UTC, such as 2026-09-05T12:00:00Z${day ? DAY_OR_INSTANT : ''}`)
 
 const CHECKS: Readonly<Record<string, Check>> = {
   id: slug('id'),
@@ -350,7 +370,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
     return new Set(labels).size === labels.length ? undefined : 'labels must be unique within one item'
   },
 
-  due: instant('due'),
+  due: instant('due', true),
   evidence: (value) => {
     if (!Array.isArray(value)) return 'evidence must be a list of pointers'
     const entries = value as readonly unknown[]
@@ -408,7 +428,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
   hold_reason: line('hold_reason', MAX_REASON),
   hold_until: (value, _item, options) => {
-    if (!isInstant(value)) return 'hold_until must be an RFC 3339 instant in UTC'
+    if (!isInstant(value)) return `hold_until must be an RFC 3339 instant in UTC${DAY_OR_INSTANT}`
     return value > options.now ? undefined : `hold_until ${value} is not in the future`
   },
   held_from: oneOf('held_from', ['draft', 'ready', 'in_progress', 'in_review']),

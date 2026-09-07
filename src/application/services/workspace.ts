@@ -39,6 +39,10 @@ export const CREATED_FILES: readonly (readonly [string, string])[] = [
 ]
 
 export const NEXT_STEPS: readonly string[] = [
+  // First, because the line above it says `actor unknown` and nothing else in the tool said
+  // how to change that: every event this workspace records carries `by unknown` until it is
+  // set, and a workspace whose pitch is "with who made it" has to say how the who is set.
+  'export TREADLE_ACTOR=<your-name>   # and TREADLE_ACTOR_KIND=agent for an agent',
   'treadle file story "The first thing you want to fix"',
   'treadle status',
 ]

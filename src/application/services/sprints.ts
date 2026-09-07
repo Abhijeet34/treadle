@@ -220,6 +220,14 @@ export async function openSprint(
   const set = [`start - -> ${sprint.start}`, `end - -> ${sprint.end}`]
   if (sprint.goal !== undefined) set.push(`goal - -> ${echoed(sprint.goal)}`)
   const data: Record<string, Value> = { sprint: id, state: 'open', v: '1', set }
+  // A sprint whose whole window is behind the clock opens, because a team recording a sprint
+  // it has already run is a real thing to do and refusing it is a product call nobody has
+  // made. What it must not do is open silently: `status` then prints `day 250/14`, which
+  // reads as a defect in the tool rather than as a `--start` typed with the wrong year.
+  const where = dayOfSprint(sprint, now)
+  if (where.day > where.days) {
+    data['note'] = `this sprint's window closed on ${sprint.end}, so it opens at day ${where.day} of ${where.days}; check --start and --end if that is not what you meant`
+  }
   if (mode === 'preview') return previewOf(SPRINT_SHAPE, workspace, view.value, { sprint: id, state: 'open' })
 
   const txn = ids.txn()
