@@ -29,6 +29,138 @@ permissions:
   contents: read
 
 jobs:
+  test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    # A backstop the step timeout below should always reach first.
+    timeout-minutes: 35
+    strategy:
+      # One red platform should not hide the state of the others.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-15, windows-2025]
+    defaults:
+      run:
+        # bash on all three, so one script body works everywhere; the Windows runner's
+        # default is pwsh.
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          # The floor, on every platform. ci.yml is where current Node is tested.
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # Windows gets its own bound. The suite spawns a real child process for a large part of
+      # its CLI and durability coverage, and that is where Windows is slowest and least
+      # predictable: measured 2026-09-07 on the same tree within one hour, run 34123933241
+      # finished this step in 6.4 minutes and run 34125065085 was killed at 15 with the same
+      # suites reporting 16 to 22 seconds each rather than 2 to 5. A timeout is here to stop a
+      # hang, not to price a slow runner, so it is set where a hang is still obvious.
+      - name: Test
+        timeout-minutes: ${{ matrix.os == 'windows-2025' && 30 || 15 }}
+        run: npm test 2>&1 | tee "$RUNNER_TEMP/test.log"
+
+      - name: Build the bundle and weigh it against DR1
+        run: npm run build
+
+      # A green tick does not carry how many tests ran, and on Windows that is exactly the
+      # thing that can go wrong: npm hands a script to cmd.exe, cmd keeps the quotes around
+      # `"test/**/*.test.ts"`, `node --test` matches no file and exits 0 over an empty set.
+      # Measured on a sibling repository with the identical command shape, where one platform
+      # reported green having run nothing. A run that cannot say how many tests it ran fails.
+      - name: Say how many tests this platform ran
+        if: always()
+        run: |
+          set -uo pipefail
+          # The largest count in the log, not the last. A test that runs `node --test` in a
+          # child prints that child's own TAP summary, and on windows-2025 the security suite's
+          # nested `# tests 215` landed after the run's own `tests 1728`: `tail -1` read the
+          # child and failed a green job for running 215 tests. The run's own count is always
+          # the largest, because every nested set is a subset of it.
+          ran=$(grep -Eo ' tests [0-9]+$' "$RUNNER_TEMP/test.log" 2>/dev/null | grep -Eo '[0-9]+' | sort -n | tail -1 || true)
+          if [ -z "${ran:-}" ]; then
+            echo "::error::${{ matrix.os }}: the suite reported no test count, so nothing here is evidence" >&2
+            echo "${{ matrix.os }} - NO VERDICT: the suite never reported a test count" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          # A floor far below the suite's real size, so it catches a run that matched no
+          # files or a small fraction of them and never fails on a test being deleted.
+          if [ "$ran" -lt 500 ]; then
+            echo "::error::${{ matrix.os }} ran only $ran tests; the suite was 1,734 on 2026-09-07" >&2
+            echo "${{ matrix.os }} - ran $ran tests, which is short" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "${{ matrix.os }} - ran $ran tests" >> "$GITHUB_STEP_SUMMARY"
+
+  # The tool as a user installs it, on the two userlands the shebang has to satisfy. The three
+  # matrix jobs above all run the suite from a checkout, so none of them ever executes the
+  # shipped bundle through its own first line, and that is exactly where the regression this
+  # job exists for lived: `#!/usr/bin/env -S node --stack-size=3072` shipped on 2026-09-07 and
+  # `treadle version` answered `env: unrecognized option: S` and exited 1 on node:24-alpine,
+  # the smallest official Node image. `release.yml` gates `artifacts` on this workflow, so a
+  # tool that cannot start on BusyBox cannot reach a release.
+  #
+  # The tarball is packed here rather than downloaded, because the release's own smoke job runs
+  # after `npm publish` and a first-start failure has to be caught long before that.
+  installed:
+    name: installed on ${{ matrix.image }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # BusyBox and glibc: the two `env` implementations a POSIX userland ships.
+        image: [node:24-alpine, node:24-trixie-slim]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build and pack the tarball a user would install
+        run: |
+          set -euo pipefail
+          npm run build
+          node scripts/check-dist-fresh.ts
+          mkdir -p pack
+          npm pack --ignore-scripts --pack-destination pack
+          ls -l pack
+
+      - name: Install it and run the happy path
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
+            set -eu
+            npm install --global --ignore-scripts /pack/treadle-*.tgz >/dev/null 2>&1
+            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadle/dist/treadle.js)"
+            treadle version
+            mkdir -p /tmp/ws && cd /tmp/ws
+            treadle init --name installed-smoke
+            treadle file story "The installed binary filed this"
+            treadle status | head -1 | grep -q "^ok "
+            echo "the packed tarball installs and answers on this userland"
+          '
+
+  # The same question as `installed` above, for the two shells npm shims rather than links.
+  # Nothing else anywhere starts the shipped binary from `cmd.exe` or PowerShell: npm's
+  # `cmd-shim` reads the bundle's first line and writes the program it names into
+  # `treadle.cmd` and `treadle.ps1`, so a launcher edit that is invisible on POSIX can stop
+  # the tool starting here and no POSIX job can see it. Measured 2026-09-08 in run
+  # 34152092418 on windows-2025: the shipped `#!/usr/bin/env node` answers `ok version -` at
+  # exit 0 from cmd, PowerShell 7 and Windows PowerShell 5.1, and a `#!/bin/sh` first line
+  # makes the same install answer `The system cannot find the path specified.` at exit 1.
   installed-windows:
     name: installed on windows-2025
     runs-on: windows-2025
@@ -82,72 +214,11 @@ jobs:
         run: |
           # The exit code alone is not evidence here. Measured 2026-09-08 in run 34152092418:
           # with a `#!/bin/sh` first line the `.ps1` shim named `/bin/sh.exe`, PowerShell
-          # raised CommandNotFoundException, nothing ran, and `$LASTEXITCODE` stayed 0. So
-          # each command is checked for the ok line it should have printed as well.
-          $version = (treadle version 2>&1 | Out-String)
-          Write-Host $version
-          if ($LASTEXITCODE -ne 0) { throw "treadle version exited $LASTEXITCODE from PowerShell" }
-          if ($version -notmatch 'ok version') { throw "treadle version answered no ok line from PowerShell" }
-          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwsh-ws" | Out-Null
-          Set-Location "$env:RUNNER_TEMP\pwsh-ws"
-          $init = (treadle init --name pwsh-smoke 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadle init exited $LASTEXITCODE from PowerShell" }
-          if ($init -notmatch 'ok init') { Write-Host $init; throw "treadle init answered no ok line from PowerShell" }
-          $filed = (treadle file task "The installed binary filed this from PowerShell" 2>&1 | Out-String)
-          Write-Host $filed
-          if ($LASTEXITCODE -ne 0) { throw "treadle file exited $LASTEXITCODE from PowerShell" }
-          if ($filed -notmatch 'ok file') { throw "treadle file answered no ok line from PowerShell" }
-
-  # TEMPORARY. The same job with the `#!/bin/sh` launcher written over the bundle and the
-  # cmd step dropped, so the PowerShell guard alone has to catch it. It exists because that
-  # guard cannot rest on the exit code: PowerShell left `$LASTEXITCODE` at 0 on this exact
-  # launcher in run 34152092418. This job must be RED; it comes out before the branch ships.
-  installed-windows-broken-ps:
-    name: broken launcher, PowerShell guard only
-    runs-on: windows-2025
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-
-      - run: npm ci
-        shell: bash
-
-      - name: Build, pack and install the tarball a user would install
-        shell: bash
-        run: |
-          set -euo pipefail
-          npm run build
-          node scripts/check-dist-fresh.ts
-          {
-            printf '%s\n' '#!/bin/sh'
-            printf '%s\n' "':' //; exec node --stack-size=2048 \"\$0\" \"\$@\""
-            tail -n +2 dist/treadle.js
-          } > dist/treadle.next
-          mv dist/treadle.next dist/treadle.js
-          chmod +x dist/treadle.js
-          mkdir -p pack
-          npm pack --ignore-scripts --pack-destination pack
-          # `./` is load-bearing: npm reads `pack/treadle-0.1.0.tgz` as the `owner/repo`
-          # GitHub shorthand and tries `git ls-remote ssh://git@github.com/pack/...`, which
-          # failed this job at exit 128 in run 34151979303.
-          npm install --global --ignore-scripts "./$(ls pack/treadle-*.tgz)"
-          prefix=$(npm prefix -g)
-          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadle/dist/treadle.js")"
-          echo "the program npm's shim will run:"
-          grep -E '^\s+SET "_prog=' "$prefix/treadle.cmd"
-
-      - name: PowerShell starts the installed binary
-        shell: pwsh
-        run: |
-          # The exit code alone is not evidence here. Measured 2026-09-08 in run 34152092418:
-          # with a `#!/bin/sh` first line the `.ps1` shim named `/bin/sh.exe`, PowerShell
-          # raised CommandNotFoundException, nothing ran, and `$LASTEXITCODE` stayed 0. So
-          # each command is checked for the ok line it should have printed as well.
+          # raised CommandNotFoundException, nothing ran, and `$LASTEXITCODE` stayed 0. What
+          # fails this step on that launcher is the runner's own `$ErrorActionPreference` of
+          # `stop`, measured red in run 34152591740 - but a user's PowerShell defaults to
+          # `continue`, and a shim that runs something harmless raises nothing at all. So each
+          # command is also checked for the ok line it should have printed.
           $version = (treadle version 2>&1 | Out-String)
           Write-Host $version
           if ($LASTEXITCODE -ne 0) { throw "treadle version exited $LASTEXITCODE from PowerShell" }
