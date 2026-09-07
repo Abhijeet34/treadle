@@ -645,7 +645,7 @@ export class ShardedStore implements Store {
 
   /**
    * Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an edge
-   * a hand edit or a git merge put in a file, and the roll-up runs over exactly that data.
+   * a hand edit or a git merge put in a file, and every parent walk reads exactly that data.
    * The walk needs the parent edges and nothing else, so it reads two index columns rather
    * than decoding every record.
    *

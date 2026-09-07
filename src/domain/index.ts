@@ -136,10 +136,8 @@ export {
   cycleAbove,
   findParentCycle,
   hierarchyFrom,
-  rollUp,
   setParent,
   type HierarchyGraph,
-  type RollUp,
 } from './hierarchy.ts'
 
 export {

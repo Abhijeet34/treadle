@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-// Parent/child hierarchy and roll-up (domain model 2.3).
+// Parent/child hierarchy (domain model 2.3).
 //
 // Threat-model finding F8. Write-time cycle detection is not enough on its own, because
 // decision D1 makes the committed file authoritative and a hand edit or a git merge never
-// passes through a write. So every traversal here carries a visited set and a stated depth
-// ceiling, and reports a cycle as a named refusal rather than recursing into it.
+// passes through a write. So every traversal here ends on a visited set rather than recursing
+// into a cycle, and the walk a write runs above its chosen parent carries a stated depth
+// ceiling as well, because that is the one a caller can hand an arbitrarily long chain.
 
 import { fail, ok, type Result } from './errors.ts'
 import { withArticle } from './text.ts'
 import {
   type ItemId,
   type WorkItemSummary,
-  type WorkItemState,
   type WorkItemType,
 } from './types.ts'
 
@@ -31,34 +31,15 @@ export type HierarchyGraph = {
   readonly parentOf: ReadonlyMap<ItemId, ItemId>
   readonly childrenOf: ReadonlyMap<ItemId, readonly ItemId[]>
   readonly typeOf: ReadonlyMap<ItemId, WorkItemType>
-  readonly stateOf: ReadonlyMap<ItemId, WorkItemState>
-  readonly pointsOf: ReadonlyMap<ItemId, number>
-}
-
-export type RollUp = {
-  readonly id: ItemId
-  /** Points summed over every non-cancelled descendant. A cancelled subtree is excluded whole. */
-  readonly points: number
-  readonly donePoints: number
-  /** Done points over total points, or null when nothing in the subtree is estimated. */
-  readonly progress: number | null
-  readonly children: number
-  readonly doneChildren: number
-  readonly descendants: number
-  readonly doneDescendants: number
 }
 
 function index(items: Iterable<WorkItemSummary>): HierarchyGraph {
   const parentOf = new Map<ItemId, ItemId>()
   const childrenOf = new Map<ItemId, ItemId[]>()
   const typeOf = new Map<ItemId, WorkItemType>()
-  const stateOf = new Map<ItemId, WorkItemState>()
-  const pointsOf = new Map<ItemId, number>()
 
   for (const item of items) {
     typeOf.set(item.id, item.type)
-    stateOf.set(item.id, item.state)
-    if (item.points !== undefined) pointsOf.set(item.id, item.points)
     if (item.parent_id !== undefined) {
       parentOf.set(item.id, item.parent_id)
       const siblings = childrenOf.get(item.parent_id)
@@ -66,7 +47,7 @@ function index(items: Iterable<WorkItemSummary>): HierarchyGraph {
       else siblings.push(item.id)
     }
   }
-  return { parentOf, childrenOf, typeOf, stateOf, pointsOf }
+  return { parentOf, childrenOf, typeOf }
 }
 
 /** Builds the graph from a set of items. This is the load path, so it validates nothing. */
@@ -81,7 +62,8 @@ export function childrenOf(graph: HierarchyGraph, id: ItemId): readonly ItemId[]
 /**
  * Walks the parent chain of every item that has one and returns the first cycle it finds,
  * as a path that closes on itself. This is the load-time check F8 asks for: it runs before
- * a roll-up, so a hand-edited cycle is a reported finding rather than a stack overflow.
+ * any walk above a node, so a hand-edited cycle is a reported finding rather than a stack
+ * overflow.
  *
  * Every node has at most one parent, so a cycle is reachable only from a node that has one:
  * a start without a parent walks one step and stops. Taking the edge map alone is therefore
@@ -203,58 +185,4 @@ export function setParent(
     else siblings.push(child)
   }
   return ok({ ...graph, parentOf, childrenOf: childrenIndex })
-}
-
-/**
- * Rolls a subtree up to one summary. Cancelled descendants are excluded together with
- * their own subtrees, which is what "cancelled children excluded from both" means once
- * the tree is more than one level deep.
- */
-export function rollUp(graph: HierarchyGraph, id: ItemId): Result<RollUp> {
-  if (!graph.typeOf.has(id)) {
-    return fail('VALIDATION', 'P4', `${id} is not an item in this workspace`, [id])
-  }
-
-  const visited = new Set<ItemId>([id])
-  let points = 0
-  let donePoints = 0
-  let descendants = 0
-  let doneDescendants = 0
-
-  const stack: { readonly node: ItemId; readonly depth: number }[] = [{ node: id, depth: 0 }]
-  while (stack.length > 0) {
-    const frame = stack.pop() as { node: ItemId; depth: number }
-    if (frame.depth > MAX_HIERARCHY_DEPTH) {
-      return fail('INTEGRITY', 'P3',
-        `the subtree below ${id} is deeper than the ceiling of ${MAX_HIERARCHY_DEPTH}`, [id, frame.node])
-    }
-    for (const child of childrenOf(graph, frame.node)) {
-      if (visited.has(child)) {
-        return fail('INTEGRITY', 'P2',
-          `the hierarchy below ${id} closes a cycle at ${child}`, [id, child])
-      }
-      if (graph.stateOf.get(child) === 'cancelled') continue
-      visited.add(child)
-      descendants += 1
-      const childPoints = graph.pointsOf.get(child) ?? 0
-      points += childPoints
-      if (graph.stateOf.get(child) === 'done') {
-        donePoints += childPoints
-        doneDescendants += 1
-      }
-      stack.push({ node: child, depth: frame.depth + 1 })
-    }
-  }
-
-  const direct = childrenOf(graph, id).filter((c) => graph.stateOf.get(c) !== 'cancelled')
-  return ok({
-    id,
-    points,
-    donePoints,
-    progress: points === 0 ? null : donePoints / points,
-    children: direct.length,
-    doneChildren: direct.filter((c) => graph.stateOf.get(c) === 'done').length,
-    descendants,
-    doneDescendants,
-  })
 }

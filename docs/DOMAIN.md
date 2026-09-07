@@ -183,11 +183,6 @@ No pair in the table can form a cycle on its own, so the cycle check exists for 
 That is not hypothetical: the committed files are authoritative, so a hand edit never passes through a write, which is why the load-time check below stays beside the write-time one.
 A chain that already closes a cycle above the chosen parent is refused as `INTEGRITY` with `doctor` as the fix, because the write that made it is not this one.
 
-`rollUp(graph, id)` walks the subtree and returns points, done points, progress, direct child counts and descendant counts.
-It has no caller: no command surfaces a roll-up today, and the README's Status table records that rather than leaving the function to read as a feature.
-Points are summed over every non-cancelled descendant, and a cancelled descendant is excluded together with its own subtree.
-Progress is `null` rather than a division by zero when nothing in the subtree is estimated.
-
 `findParentCycle(parentOf)` is the load-time check, returning the path that closes the cycle.
 It takes the parent edges alone rather than a whole graph, because every node has at most one parent and no other column decides the answer, which is what lets the store read it as two index columns.
 `cycleAbove(id, parentOf)` is the same walk from one node, for a caller that knows which edges moved.
@@ -325,11 +320,11 @@ A `Map` has no prototype chain to poison; the deny-list means a later change bac
 `validateFieldKeys` applies the same check to a record that already exists, which is the load-time half.
 That is threat-model finding F6.
 
-Every graph traversal in this layer carries a visited set and a stated depth ceiling, and reports a cycle as a named refusal rather than recursing into it.
-Write-time cycle detection cannot see an edge that a hand edit or a git merge put in the file, and the roll-up runs over exactly that data.
+Every graph traversal in this layer ends on a visited set rather than recursing into a cycle, and reports it as a named refusal; the walk a write runs above its chosen parent carries `MAX_HIERARCHY_DEPTH` as well.
+Write-time cycle detection cannot see an edge that a hand edit or a git merge put in the file, and every walk in this section runs over exactly that data.
 That is threat-model finding F8.
 
-Both were shown to fail before they passed: with the deny-list deleted, three of the nine F6 tests go red; with the visited set and the ceiling deleted, the hierarchy suite does not terminate and is killed at 45 seconds.
+Both were shown to fail before they passed: with the deny-list deleted, three of the nine F6 tests go red; with the visited set and the ceiling deleted from the parent walk, the two bounded-walk tests go red, one of them after 2.1 seconds of unbounded growth ending in `RangeError: Invalid array length` out of `ancestors`.
 
 ## Text safety
 
