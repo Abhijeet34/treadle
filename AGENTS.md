@@ -41,10 +41,13 @@ reads that line rather than spelling a second copy, and `scripts/shebang.ts`'s
 BusyBox does not have, and the day the line carried `-S node --stack-size=3072` the installed
 tool answered `env: unrecognized option: S` and exited 1 on `node:24-alpine`. The cost is one
 platform limit rather than a crash protection: on macOS an argv-plus-environment block over
-about 984 KiB kills the process inside Node's own bootstrap, which no code here can catch.
+about 955 KB kills the process inside Node's own bootstrap, which no code here can catch. That
+limit is removable by a `#!/bin/sh` launcher, and that trade was measured and declined on
+2026-09-08: on `windows-2025` the sh launcher stops the tool starting in every native Windows
+shell, and both PowerShells report exit 0 while doing so.
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
-measurements; `docs/architecture/adr/0009-release-and-supply-chain.md` carries the release
-design, and `docs/RELEASING.md` how a release happens and how to roll one back.
+measurements and the trade; `docs/architecture/adr/0009-release-and-supply-chain.md` carries
+the release design, and `docs/RELEASING.md` how a release happens and how to roll one back.
 
 Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
 the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release

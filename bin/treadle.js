@@ -14,12 +14,15 @@
 //
 // WHAT THAT COSTS, AND WHERE IT IS WRITTEN DOWN. The flag bought one thing: on macOS the
 // kernel puts argv and the environment at the top of the main thread's stack and V8 sets its
-// limit `--stack-size` KiB below that top, so a block over roughly 984 KiB leaves the isolate
+// limit `--stack-size` KiB below that top, so a block over about 955 KB leaves the isolate
 // with no stack and the process dies in Node's own bootstrap, before this file's first line.
-// That is a platform limit and not a defect this tool can catch: `node /dev/null "$(cat
-// 1mb)"` dies the same way with an empty script, so no check at an entry point can run early
-// enough to fire. `docs/STABILITY.md`, "The macOS argument-block limit", carries the measured
-// number and the remedy. Linux does not charge the block against the stack: CI run
+// No check at an entry point can catch it: `node /dev/null "$(cat 1mb)"` dies the same way
+// with an empty script. A `#!/bin/sh` launcher can, because a shell survives the block and
+// can hand node a larger stack. That trade was measured and declined on 2026-09-08: on
+// `windows-2025` the sh launcher stops the tool starting in every native Windows shell, and
+// both PowerShells report exit 0 while it does. `docs/STABILITY.md`, "The supported
+// userlands, and the macOS argument-block limit", carries every number and both rejected
+// launchers. Linux does not charge the block against the stack: CI run
 // 34106349134 answered, typed, behind 4,140,820 bytes of argv under the default stack.
 //
 // The bounds that make an oversized argument readable rather than fatal are in the tool and
