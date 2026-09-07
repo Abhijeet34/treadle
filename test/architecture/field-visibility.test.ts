@@ -116,8 +116,8 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   at: readable('history:at'),
   actor: readable('history:by'),
   actor_kind: readable('history:kind'),
-  entity_kind: hidden('`history <id>` is asked for one entity, and every row it prints belongs to that entity, so the kind is the same on every row: a column of it would restate what the caller typed. `item` and `sprint` are the two values written, and which one a log is about is decided by the id the reader named.'),
-  entity: hidden('it is the argument. `history <id>` and `explain <id>` are both asked for one entity and every row they print is that entity, so the column would restate the `item` line above it.'),
+  entity_kind: hidden('`item` and `sprint` are the two values written, and no command in this build writes both under one transaction, so the kind is the same on every row of either scope: a column of it would restate what the caller typed under `history <id>` and one op prefix under `history --txn`.'),
+  entity: readable('history:what', 'as `entity=<id>`, and under `history --txn` alone: there the rows span records and the record is the only thing telling two rows of one op apart, where under `history <id>` every row is the id the caller named and the column would restate the `item` line above it'),
   op: readable('history:op'),
   before: hidden('the values a change moved away from. `history` names the fields a change moved and `show` prints what they are now, so a `before` column would put a per-row copy of the old record inside a list whose budget is per row. The one question the old value answers alone is whether the record still agrees with the log, and `doctor` H20 asks it against the record rather than printing it.'),
   after: readable('history:what', 'the field names, not the values: a value may carry a space and the row grammar allows one space-bearing column, which the actor is'),
@@ -125,7 +125,7 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   reason: readable('history:why', 'every recorded reason on the page, in a block of its own: a row carries one space-bearing field and that is the actor. `explain` prints the same field for the one event that put the item in the state it is in'),
   outcome: readable('history:what', 'as `outcome=<v>`'),
   cmd: hidden('`op` is the same fact in the vocabulary the store owns: `item.mark` for `mark`. `cmd` is kept in the log so a later rename of a command stays traceable against old events, and printing both prints one fact twice.'),
-  txn: hidden('the envelope of the mutation that wrote it already carries it, which is where a caller correlates a write. Resolving one back to the events it wrote is `history --txn`, which the project\'s own backlog files as the other half of R4; as a column it would group each event with itself, because no command in this build writes more than one entity.'),
+  txn: readable('history:transaction', 'as the scope of the read rather than as a column: `history --txn <txn>` is asked for one transaction and every row it prints belongs to it, so a column would restate the scalar above it. The mutation\'s own envelope is where a caller gets the id, and this is what spends it (R4).'),
 }
 
 /** Every field of the sprint dictionary, and the surface that prints it. */
@@ -162,7 +162,7 @@ const EVENT_CONTENT_HELD_BACK: Readonly<Record<string, string>> = {
   before: 'the values a change moved away from; `history` prints them inside `field=from->to` under the marker convention, which is a projection and not the stored object',
   after: 'the same, from the other side: prose is stored as its length and a value over 40 characters falls back to its field name, so the stored object is not what prints',
   guards: 'a guard verdict is an object; `history` prints the overridden ones as `override=<guard>` and a passing guard is every row\'s answer',
-  id: 'the event id names one event, and `explain` prints the one it was asked about. Every event\'s id in a column is what `history --txn` is filed to answer; as a sweep it would demand a key no list prints',
+  id: 'the event id names one event, and `explain` prints the one it was asked about. `history` carries an event id in the cursor of its `page` line, which is what resumes a page rather than a column of every id; as a sweep it would demand a key no list prints',
 }
 
 /**
@@ -422,6 +422,13 @@ describe('every persisted field carries a visibility decision', () => {
   })
 })
 
+/** The transaction of one event this entity's log holds, which `history --txn` is read with. */
+async function aTransactionOf(store: Store, entity: string): Promise<string> {
+  const log = await store.events({ entity })
+  assert.ok(log.ok && log.value.length > 0, `${entity} has no recorded event to take a transaction from`)
+  return (log.value[0] as { txn: string }).txn
+}
+
 describe('a real record and a real log print what the decisions claim', () => {
   let rig: Rig
   let itemKeys: ReadonlySet<string>
@@ -443,7 +450,12 @@ describe('a real record and a real log print what the decisions claim', () => {
     assert.equal(log.ok, true)
     const why = await explain(rig.store, 'every-bug')
     assert.equal(why.ok, true)
-    for (const result of [log, why] as readonly ResultObject[]) {
+    // The other scope is a second reading and not a variation of the first: `transaction` and
+    // the `entity=` part of `what` reach no output at all under `history <id>`, so a decision
+    // naming either would pass the sweep below on a surface that never prints it.
+    const scoped = await history(rig.store, { scope: { kind: 'txn', txn: await aTransactionOf(rig.store, 'every-bug') }, limit: 20 })
+    assert.equal(scoped.ok, true)
+    for (const result of [log, why, scoped] as readonly ResultObject[]) {
       for (const key of printedKeys(agentRenderer.render(result))) printed.add(key)
     }
     // `what` names the column; the values it carries are what the three decisions claim.
@@ -451,6 +463,10 @@ describe('a real record and a real log print what the decisions claim', () => {
     assert.match(rows, /override=G2/, 'an overridden guard reaches the what column')
     assert.match(rows, /outcome=failed/, 'the attempt outcome reaches the what column')
     assert.match(rows, /item\.mark severity/, 'the fields a change moved reach the what column')
+    // The entity decision claims `history:what`, and `printedKeys` sees the column whether or
+    // not the record is in it: `every-bug` is also the `item` scalar of the read above, so
+    // the content sweep passes on that line alone. This is what holds the claim where it is made.
+    assert.match(agentRenderer.render(scoped), /entity=every-bug/, 'the record an event moved reaches the what column of a transaction-scoped read')
     eventKeys = printed
   })
 
@@ -532,9 +548,12 @@ describe('a real record and a real log print what the decisions claim', () => {
       const log = await rig.store.events({ entity })
       assert.ok(log.ok, `the log for ${entity} is unreadable`)
       assert.ok(log.value.length > 0, `${entity} has no recorded event, so this sweep is vacuous`)
+      const transactions = [...new Set(log.value.map((event) => event.txn))]
       const printed = [
         agentRenderer.render(await history(rig.store, { scope: { kind: 'item', id: entity }, limit: 200 })),
         agentRenderer.render(await explain(rig.store, entity)),
+        ...await Promise.all(transactions.map(async (txn) =>
+          agentRenderer.render(await history(rig.store, { scope: { kind: 'txn', txn }, limit: 200 })))),
       ].join('\n')
       for (const event of log.value) {
         for (const [key, decision] of Object.entries(EVENT_FIELDS)) {

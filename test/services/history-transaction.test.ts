@@ -14,7 +14,7 @@
 // and constant on every row.
 
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
@@ -139,6 +139,34 @@ describe('history --txn lists every event one command wrote', () => {
       assert.ok(run.out.includes(commit), `${rendering} does not name the transaction`)
       assert.ok(run.out.includes('auth-refresh'), `${rendering} does not name the record`)
     }
+  })
+
+  it('refuses --txn with no value, rather than a refusal that names no id', async () => {
+    // Measured before the guard: `--txn=` reached the store as an empty transaction id and
+    // came back `"cause  names no transaction here`, with the `entity` line dropped for being
+    // empty. A refusal that names nothing is the one thing this flag's refusals must not be.
+    const run = await cli(['history', '--txn='])
+    assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
+    assert.match(run.err, /^"cause --txn needs the transaction id a write returned/m, run.err)
+    assert.doesNotMatch(run.err, /^entity $/m, run.err)
+  })
+
+  it('cannot be made to forge a marker by a hand edit of the log', async () => {
+    // The file's own rule: a stored value that would collide with a marker prints as the
+    // absent cell, so no record's own content can forge one. `side` held it and `cell` did
+    // not, and the entity is projected through `cell`: an event whose entity was the literal
+    // `(unset)` printed `entity=(unset)`, which reads as no entity having been recorded.
+    const forged = path.join(root, '.work', 'events', '2026-03.jsonl')
+    const event = (id: string, entity: string): string => JSON.stringify({
+      id, at: '2026-03-04T09:00:00Z', actor: 'dana', actor_kind: 'human', entity_kind: 'item',
+      entity, op: 'item.set', after: { assignee: 'kim' }, cmd: 'set', txn: 'tforged',
+    })
+    await writeFile(forged, [event('eforged1', '(unset)'), event('eforged2', 'one two'), ''].join('\n'))
+    const run = await cli(['history', '--txn', 'tforged'])
+    assert.equal(run.code, 0, run.err)
+    assert.doesNotMatch(run.out, /entity=\(/, run.out)
+    assert.equal(run.out.split('\n').filter((line) => line.includes('entity=-')).length, 2, run.out)
+    await rm(forged, { force: true })
   })
 
   it('is named by help, so a caller finds it by asking', async () => {

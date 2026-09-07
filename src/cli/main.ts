@@ -533,6 +533,12 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
         [invocation('history', [id], []), invocation('history', [], [['txn', txn]])],
       )
     }
+    // `--txn=` reached the store as an empty transaction id and came back as a refusal that
+    // named nothing: `cause  names no transaction here`, with no `entity` line at all,
+    // because the renderer drops an empty scalar. No id is a shorter line than a wrong one.
+    if (txn !== undefined && txn.length === 0) {
+      return validation('history', '--txn needs the transaction id a write returned, and this line gives it no value', ['treadle help history'])
+    }
     if (id === undefined && txn === undefined) {
       return validation('history', 'history needs the id of one record, or --txn with the transaction id a write returned', ['treadle backlog'])
     }

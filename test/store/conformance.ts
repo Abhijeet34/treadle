@@ -257,15 +257,15 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
-    it('reads events by entity and by time range, in instant order', async () => {
+    it('reads events by entity, by transaction and by time range, in instant order', async () => {
       await withStore(async (store) => {
         await store.apply({
           txn: 't1',
           writes: [{ item: anItem() }],
           events: [
-            anEvent({ id: 'ev-2', at: '2026-09-02T10:00:00Z', op: 'transition' }),
-            anEvent({ id: 'ev-1', at: '2026-09-01T10:00:00Z', op: 'file' }),
-            anEvent({ id: 'ev-3', at: '2026-10-01T10:00:00Z', entity: 'item-two', op: 'file' }),
+            anEvent({ id: 'ev-2', at: '2026-09-02T10:00:00Z', op: 'transition', txn: 'txn-3' }),
+            anEvent({ id: 'ev-1', at: '2026-09-01T10:00:00Z', op: 'file', txn: 'txn-2' }),
+            anEvent({ id: 'ev-3', at: '2026-10-01T10:00:00Z', entity: 'item-two', op: 'file', txn: 'txn-2' }),
           ],
         })
         const all = await store.events()
@@ -277,6 +277,14 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
 
         const window = await store.events({ from: '2026-09-02T00:00:00Z', to: '2026-10-01T00:00:00Z' })
         assert.deepEqual(window.ok ? window.value.map((e) => e.id) : [], ['ev-2'])
+
+        // The transaction cuts across entities where the entity cuts across transactions,
+        // which is the whole difference between `history <id>` and `history --txn`: `ev-3`
+        // belongs to a second record and to the same write.
+        const written = await store.events({ txn: 'txn-2' })
+        assert.deepEqual(written.ok ? written.value.map((e) => e.id) : [], ['ev-1', 'ev-3'])
+        const neither = await store.events({ txn: 'txn-nothing' })
+        assert.deepEqual(neither.ok ? neither.value.map((e) => e.id) : ['not read'], [])
       })
     })
 

@@ -102,9 +102,17 @@ const MAX_CELL = 200
  * A value from a stored event as a non-final row cell. A cell that carries whitespace would
  * split into two fields and move every value after it, so it is reported absent instead:
  * `doctor` is the surface for a file that says something no write path would have accepted.
+ *
+ * A value opening with `(` is reported absent for the second reason `side` gives: the markers
+ * below are parenthesised, and a committed log a hand edit can reach must not be able to forge
+ * one. Measured on a hand-edited log, an event whose entity was the literal string `(unset)`
+ * printed `entity=(unset)` in the transaction-scoped `what` cell, which reads as the log
+ * having recorded no entity at all. The bound is here rather than at that one caller because
+ * the invariant is stated over the whole cell vocabulary, not over one part of it.
  */
 function cell(value: unknown): string {
-  return typeof value === 'string' && value.length > 0 && value.length <= MAX_CELL && !/\s/.test(value)
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_CELL
+    && !/\s/.test(value) && !value.startsWith('(')
     ? value
     : '-'
 }
