@@ -116,7 +116,10 @@ function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
 function consequence(view: WorkspaceView, item: WorkItem): string | undefined {
   const parts: string[] = []
   const sprint = item.sprint_id === undefined ? undefined : view.sprintById.get(item.sprint_id)
-  if (sprint !== undefined) {
+  // The state is read rather than assumed. `namedBy` refuses a member of a closed sprint
+  // before this runs, so the sentence below is only ever true; asserting "is open" of
+  // whatever the id resolved to is how it would stop being true after the next change.
+  if (sprint !== undefined && sprint.state === 'open') {
     const remaining = view.items.filter((other) => other.sprint_id === sprint.id && other.id !== item.id).length
     parts.push(`${sprint.id} is open and now holds ${remaining} ${remaining === 1 ? 'item' : 'items'}`)
   }
