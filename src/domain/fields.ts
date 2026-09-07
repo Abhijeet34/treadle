@@ -250,6 +250,22 @@ export function isInstant(value: unknown): value is Instant {
 }
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
+
+/**
+ * A real calendar date, `YYYY-MM-DD`. The shape alone lets `2026-02-30` through, and
+ * `Date.parse` then reads it as the second of March; a sprint boundary that two people read
+ * differently is the failure the date rule exists to prevent, so a date names the day it
+ * denotes or is refused. Checked against the calendar rather than through a `Date`, because
+ * this layer touches no clock and the layering test reads the constructor as one.
+ */
+export function isCalendarDate(value: unknown): value is string {
+  if (typeof value !== 'string' || !DAY.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number) as [number, number, number]
+  const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
+  const days = month === 2 && leap ? 29 : DAYS_IN_MONTH[month - 1]
+  return days !== undefined && day >= 1 && day <= days
+}
 
 /**
  * A day written `YYYY-MM-DD` as its first instant in UTC, or the value unchanged.
@@ -258,11 +274,12 @@ const DAY = /^\d{4}-\d{2}-\d{2}$/
  * `set x due=2026-09-30` was refused for a value that names exactly the day meant. A due date
  * and a hold's end are days, so both write paths widen here - `coerce` for `due`, the
  * `--until` flag for `hold_until` - and one record format is stored either way. A malformed
- * day such as `2026-13-40` still fails `isInstant` below and earns the refusal that names both
- * forms; only a well-shaped day is widened.
+ * day such as `2026-13-40` is not widened at all, so it reaches `isInstant` as itself and earns
+ * the refusal that names both forms: widening it first would have manufactured a well-shaped
+ * instant out of a day that does not exist, which the shape regex cannot tell from a real one.
  */
 export function asInstant(value: string): string {
-  return DAY.test(value) ? `${value}T00:00:00Z` : value
+  return isCalendarDate(value) ? `${value}T00:00:00Z` : value
 }
 
 /** The clause the two day-taking fields add to their refusal, so a caller learns the form. */

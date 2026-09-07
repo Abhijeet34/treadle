@@ -218,10 +218,17 @@ function movedBy(event: StoreEvent): readonly string[] {
   const keys = Object.keys(source)
   // A sprint event names sprint fields; an item event never does, so one filter serves both.
   const known = keys.filter((key) => isKnownField(key) || isSprintField(key))
-  // A pair whose two sides print the same moved nothing, and a log of moves is what this cell
-  // is: a sprint close over a sprint that finished nothing carried `finished=(unset)->(unset)`
-  // beside the six pairs that did move. A creation has no before at all and prints whole.
-  const moved = known.filter((key) => before === undefined || side(before[key], key) !== side(after?.[key], key))
+  // A pair that was not set before and is not set after moved nothing, and a log of moves is
+  // what this cell is: a sprint close over a sprint that finished nothing carried
+  // `finished=(unset)->(unset)` beside the six pairs that did move. A creation has no before at
+  // all and prints whole.
+  //
+  // The test is `(unset)` on both sides and never "the two sides render the same", which was
+  // the first shape of this filter and hid a real edit: prose is recorded as its length, so a
+  // description replaced by another of the same length renders `(text:14)` either side, and
+  // the whole `what` cell became `-` for a write that happened.
+  const unset = (value: unknown, key: string): boolean => side(value, key) === UNSET
+  const moved = known.filter((key) => before === undefined || !(unset(before[key], key) && unset(after?.[key], key)))
   const moves = moved.map((key) => move(key, before, after))
   // A key this build does not know is counted rather than printed: it is text from a file
   // that no dictionary bounds, and the count is the part a reader can act on.

@@ -219,6 +219,53 @@ describe('STR-7: the two variables that decide who every event names', () => {
   })
 })
 
+// Two defects this branch introduced and then found by attacking its own change. Both are
+// here because the shape that produced them - a rule stated over a rendering rather than over
+// the record, and a widening that manufactures a well-shaped value out of a malformed one -
+// is the shape a later round would find again.
+describe('the change log still reports an edit whose two sides render alike', () => {
+  let root: string
+  let cli: Cli
+  before(async () => {
+    ({ root, cli } = await aWorkspace())
+    must(await cli(['file', 'task', 'Prose probe', '--id', 'prose-probe']), 'file')
+  })
+  after(async () => { await rm(root, { recursive: true, force: true }) })
+
+  it('prints a description replaced by another of the same length', async () => {
+    // Prose reaches the event log as its length, so both sides render `(text:14)`. A filter
+    // that dropped a pair whose two sides rendered alike made the whole cell `-` for a write
+    // that happened; the filter is `(unset)` on both sides and nothing else.
+    must(await cli(['set', 'prose-probe', 'description=aaaaaaaaaaaaaa']), 'first')
+    must(await cli(['set', 'prose-probe', 'description=bbbbbbbbbbbbbb']), 'second')
+    const log = must(await cli(['history', 'prose-probe']), 'history')
+    const rows = log.out.split('\n').filter((line) => line.includes('item.set'))
+    assert.equal(rows.length, 2, log.out)
+    for (const row of rows) assert.doesNotMatch(row, / - unknown| - dana/, `a write that happened reports no move: ${row}`)
+    assert.match(rows[0] as string, /description=\(text:14\)->\(text:14\)/, rows[0] as string)
+  })
+})
+
+describe('a day that does not exist is refused rather than widened into one that does', () => {
+  let root: string
+  let cli: Cli
+  before(async () => {
+    ({ root, cli } = await aWorkspace())
+    must(await cli(['file', 'task', 'Key rotation', '--id', 'key-rotation']), 'file')
+  })
+  after(async () => { await rm(root, { recursive: true, force: true }) })
+
+  it('takes a real calendar day and refuses one the calendar does not have', async () => {
+    for (const day of ['2026-99-99', '2026-02-31', '2027-02-29', '2026-13-01']) {
+      const refused = await cli(['set', 'key-rotation', `due=${day}`])
+      assert.equal(refused.code, 2, `${day} was accepted: ${refused.out}`)
+    }
+    must(await cli(['set', 'key-rotation', 'due=2028-02-29']), 'a leap day is a real day')
+    const refusedHold = await cli(['transition', 'key-rotation', 'on_hold', '--until', '2026-02-31', '--reason', 'x'])
+    assert.equal(refusedHold.code, 2, refusedHold.out)
+  })
+})
+
 describe('STR-9: a due date and a hold both take the day the rest of the tool takes', () => {
   let root: string
   let cli: Cli
