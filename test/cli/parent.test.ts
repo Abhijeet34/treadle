@@ -112,7 +112,6 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     const edited = text.replace(/(# epic-one: Epic one\n\ntype: epic\nstate: draft\nfiled_at: [^\n]+\nversion: \d+\n)/, '$1parent_id: spare-task\n')
     assert.notEqual(edited, text, 'the epic section was not found where the hand edit expects it')
     await writeFile(shard, edited)
-    await rm(path.join(dir, '.work', '.index'), { recursive: true, force: true })
 
     const run = await cli(['set', 'spare-task', 'parent_id=epic-one'])
     assert.equal(run.code, 3, run.err)
@@ -122,7 +121,6 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     assert.equal(await parentOf('spare-task'), undefined)
 
     await writeFile(shard, text)
-    await rm(path.join(dir, '.work', '.index'), { recursive: true, force: true })
   })
 
   it('a dry run refuses the same edge, and a legal parent it accepts is not written', async () => {

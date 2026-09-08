@@ -129,7 +129,7 @@ describe(`a writer killed mid-transaction, over ${KILL_TRIALS} trials`, () => {
           }
           assert.ok(landed, `trial ${trial}: a later writer was wedged`)
 
-          const pending = await readdir(path.join(workspace.root, '.index', 'txn')).catch(() => [])
+          const pending = await readdir(path.join(workspace.root, '.txn')).catch(() => [])
           assert.deepEqual(pending.filter((n) => n.endsWith('.json')), [],
             `trial ${trial}: a journal was left unreplayed`)
         } finally {

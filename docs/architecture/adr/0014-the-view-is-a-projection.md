@@ -4,6 +4,7 @@
 **Date:** 2026-09-06
 **Implements:** DR8's peak-memory budgets, over the read the product actually performs
 **Overtaken in part by:** [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md), which widened `READ_OPS` to seven operations, so the DR8 read row is no longer weighed over the four this record names and now reports `doctor`'s decode churn rather than the view's peak; the projection and the on-demand record below still stand
+**Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the index the summary fields were columns of, so a scan field is now a name in `SUMMARY_FIELDS` rather than a column and a format bump; the projection and the on-demand record still stand, and the read holds the same `WorkItemSummary` it did
 
 ## Context
 

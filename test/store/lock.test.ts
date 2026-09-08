@@ -328,10 +328,9 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
       // the next lock holder's journal replay to finish; one more writer is that holder.
       assert.ok((await writer(workspace.root, 'item-one')).ok)
 
-      // Read from disk, not through any index: one version per distinct update event landed
-      // means no write was overwritten. Distinct, because a line the paused writer appends
-      // after the reclaimer already replayed its journal repeats an id rather than losing a
-      // write, and S14 is the finding that owns a repeated id.
+      // Read from disk: one version per distinct update event landed means no write was
+      // overwritten. Distinct, because a line the paused writer appends after the reclaimer
+      // already replayed its journal repeats an id rather than losing a write.
       const shard = parseFile(await readFile(path.join(workspace.root, 'items', '2026-09.md'), 'utf8'), 'items/2026-09.md')
       assert.ok(shard.ok)
       const version = Number(shard.value.records[0]?.fields.get('version'))

@@ -17,11 +17,10 @@
 // the graph build and the cycle walk, once per scale, because both are superlinear in the
 // edge count and a total would hide which half.
 
-import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { dropIndex, type Corpus } from '../corpus.ts'
+import type { Corpus } from '../corpus.ts'
 import { launchOnce, measure, type Measurement } from '../timing.ts'
 import type { AxisResult } from './axis.ts'
 
@@ -34,10 +33,6 @@ export type ScaleRow = {
   readonly largestShardRecords: number
   readonly readyMatches: number
   readonly operations: Readonly<Record<string, Measurement>>
-  /** DR8 row: the cost of the first command on a fresh clone, index absent. */
-  readonly firstIndexBuildMs: number | string
-  /** DR8 row: re-index after a hand edit of the largest shard. */
-  readonly reindexAfterHandEditMs: number | string
   /** The load-time relation check, split into building the graph and walking it. */
   readonly relationCycle: RelationCycleRow | string
 }
@@ -88,19 +83,13 @@ export async function runA4(
       samples += m.wall.n
     }
 
-    const cycle = relationCycle(corpus)
-    const reindex = await reindexAfterHandEdit(corpus)
     rows.push({
       items: corpus.itemsInStore,
       shards: corpus.months.length,
       largestShardRecords: corpus.largestMonthItems,
       readyMatches: corpus.readyMatches,
       operations: operationsHere,
-      relationCycle: cycle,
-      // Order matters: the hand edit is priced against a warm index, and dropping the index
-      // for the first-build figure has to come after everything that needs a warm one.
-      reindexAfterHandEditMs: reindex,
-      firstIndexBuildMs: await firstIndexBuild(corpus),
+      relationCycle: relationCycle(corpus),
     })
   }
 
@@ -149,28 +138,4 @@ function relationCycle(corpus: Corpus): RelationCycleRow | string {
     findMs: Number(detail['findMs'] ?? -1),
     cycle: String(detail['cycle'] ?? 'NOT MEASURED'),
   }
-}
-
-/** DR8: the first command on a fresh clone pays the whole index build, once. */
-async function firstIndexBuild(corpus: Corpus): Promise<number | string> {
-  await dropIndex(corpus.root)
-  const sample = launchOnce(process.execPath, [OP, corpus.root, 'list', 'ready'], { samples: 1 })
-  if (sample.failure !== undefined) return `NOT MEASURED: ${sample.failure}`
-  return Math.round(sample.report?.inProcessMs ?? -1)
-}
-
-/**
- * DR8: a hand edit of the largest shard re-indexes that one file on the next command. The
- * edit changes one title character, which is what a person doing it in an editor would do.
- */
-async function reindexAfterHandEdit(corpus: Corpus): Promise<number | string> {
-  const file = path.join(corpus.root, 'items', `${corpus.largestMonth}.md`)
-  const text = await readFile(file, 'utf8')
-  const at = text.lastIndexOf('\n# ')
-  if (at < 0) return 'NOT MEASURED: the largest shard carries no record heading to edit'
-  const lineEnd = text.indexOf('\n', at + 1)
-  await writeFile(file, `${text.slice(0, lineEnd)} (hand edited)${text.slice(lineEnd)}`)
-  const sample = launchOnce(process.execPath, [OP, corpus.root, 'get', corpus.probeIds.get], { samples: 1 })
-  if (sample.failure !== undefined) return `NOT MEASURED: ${sample.failure}`
-  return Number((sample.report?.inProcessMs ?? -1).toFixed(1))
 }

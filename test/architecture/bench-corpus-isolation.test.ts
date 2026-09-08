@@ -71,7 +71,6 @@ describe('the benchmark rig isolates each run from every other run', () => {
 
     const entry = path.join(cache, (await readdir(cache)).find((name) => !name.startsWith('.')) as string)
     await rm(path.join(entry, 'items', `${first.largestMonth}.md`))
-    await rm(path.join(entry, '.index'), { recursive: true, force: true })
 
     await assert.rejects(
       () => acquireCorpus(cache, path.join(base, 'run-b'), SPEC, false),

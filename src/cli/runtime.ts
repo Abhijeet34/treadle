@@ -1,9 +1,19 @@
 // SPDX-License-Identifier: Apache-2.0
 // Two floors, because they answer different questions.
 //
-// `engines.node` in package.json is the supported floor: 24.15.0, where `node:sqlite`
-// reaches Stability 1.2 and the index is on a supported API. The hard floor here is what the
-// code cannot run at all below: type stripping and `node:sqlite` both arrive in 24.0.0.
+// `engines.node` in package.json is the supported floor: 24.15.0. It used to be a capability
+// claim, the version where `node:sqlite` reached Stability 1.2 and the index was on a
+// supported API; the index is gone and the number is now a support statement. 24.15.0 is
+// what `.nvmrc` pins, what the first CI leg runs, what every figure in docs/BENCHMARKS.md
+// was measured on, and the runtime `@types/node` is held not to outrun
+// (test/architecture/supply-chain.test.ts).
+//
+// The hard floor is what running this repository from its TypeScript sources needs, which
+// the test suite and the benchmark rig both do: type stripping without a flag, from 24.0.0.
+// The shipped bundle is plain JavaScript and needs nothing newer than
+// `module.enableCompileCache`, which arrived in 22.1.0 and is called optionally, so no
+// measurement supports a hard floor lower than this one and none is claimed.
+//
 // Between the two the tool runs and says nothing, because a warning on every invocation
 // would reach stderr on every call and R9 keeps stderr for the error object.
 

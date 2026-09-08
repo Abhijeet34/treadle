@@ -432,10 +432,16 @@ export async function doctor(store: Store, clock: Clock): Promise<ResultObject> 
   if (!records.ok) return storeRefusal('doctor', 'read', records.error, workspace)
   const events = await store.eachEvent({}, (event) => audit.event(event))
   if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
+  // Asked again, because the log's own findings are known only once the log has been read
+  // and this is the command that reads it whole. It reports them rather than refusing over
+  // them: the refusal every other read prints names `doctor` as the way back, so it has to
+  // answer over the file that says it (ADR-0020).
+  const all = await store.findings()
+  if (!all.ok) return storeRefusal('doctor', 'read', all.error, workspace)
 
   const audited = audit.findings()
   const rows: DoctorFinding[] = [
-    ...stored.value.map((finding): DoctorFinding => ({
+    ...all.value.map((finding): DoctorFinding => ({
       rule: finding.rule,
       id: finding.id === undefined ? '-' : cell(finding.id),
       where: `${cell(finding.file)}:${finding.line}`,
@@ -452,7 +458,7 @@ export async function doctor(store: Store, clock: Clock): Promise<ResultObject> 
   // audit derived it: does it name content this store holds and does not serve. `H03` and
   // `H04` report a threshold a team set over records that serve whole, so they print and
   // this exits 0; ADR-0026 records the classification.
-  const hiding = [...stored.value, ...audited].filter(hidesContent).length
+  const hiding = [...all.value, ...audited].filter(hidesContent).length
 
   const block: Block = {
     columns: columnsOf(DOCTOR_SHAPE, 'findings'),

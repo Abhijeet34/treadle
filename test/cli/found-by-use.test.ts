@@ -7,7 +7,6 @@
 import assert from 'node:assert/strict'
 import { chmod, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { DatabaseSync } from 'node:sqlite'
 import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
@@ -521,41 +520,6 @@ describe('the defects the second adversarial pass found by using the tool', () =
         assert.match(run.err, /^"cause --cursor nosuch names nothing in this list/m)
       })
     }
-  })
-
-  describe('the index is a cache, so a damaged one is rebuilt and never a stack trace', () => {
-    const index = () => path.join(demo.root, '.index', 'index.sqlite')
-    // The fixture's own connection is closed first: a real run is one process, and a second
-    // connection holding the file open across the damage is the fixture's shape, not the tool's.
-    before(async () => { await demo.store.close() })
-
-    it('rebuilds over garbage bytes at the index path', async () => {
-      assert.equal((await cli(['status'])).code, 0)
-      await writeFile(index(), Buffer.from('not a database, not even close'))
-      const run = await cli(['status'])
-      assert.equal(run.code, 0, run.err)
-      assert.match(run.out, /^items \d+$/m)
-    })
-
-    it('recomputes over a meta row that is not JSON', async () => {
-      assert.equal((await cli(['status'])).code, 0)
-      const db = new DatabaseSync(index())
-      db.prepare("insert or replace into meta (key, value) values ('hierarchy_cycle', 'not json')").run()
-      db.close()
-      const run = await cli(['status'])
-      assert.equal(run.code, 0, run.err)
-    })
-
-    it('refuses with S13 naming the path when a directory sits where the index goes', async () => {
-      await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
-      await mkdir(index(), { recursive: true })
-      const run = await cli(['status'])
-      assert.equal(run.code, 6, run.out)
-      assert.match(run.err, /^rule S13$/m)
-      assert.match(run.err, /could not be opened or rebuilt/)
-      await rm(path.join(demo.root, '.index'), { recursive: true, force: true })
-      assert.equal((await cli(['status'])).code, 0)
-    })
   })
 
   describe('a nearer workspace the walk cannot read is a refusal, not a step past it', () => {

@@ -4,7 +4,6 @@
 // every emitted row can carry them.
 
 import { cpus, totalmem, arch, platform, release } from 'node:os'
-import { execFileSync } from 'node:child_process'
 
 export type Machine = {
   readonly platform: string
@@ -15,24 +14,9 @@ export type Machine = {
   readonly memoryBytes: number
   readonly node: string
   readonly v8: string
-  readonly sqlite: string
   /** The floor this package declares. It is stated because this machine may be under it. */
   readonly declaredNodeFloor: string
   readonly nodeMeetsFloor: boolean
-}
-
-function sqliteVersion(): string {
-  try {
-    // `node:sqlite` is the index engine (DR2); its version is part of what a read costs.
-    const out = execFileSync(process.execPath, [
-      '-e',
-      'const {DatabaseSync}=require("node:sqlite");const d=new DatabaseSync(":memory:");' +
-      'process.stdout.write(String(d.prepare("select sqlite_version() as v").get().v))',
-    ], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
-    return out.trim()
-  } catch (error) {
-    return `NOT MEASURED: ${(error as Error).message}`
-  }
 }
 
 function meetsFloor(actual: string, floor: string): boolean {
@@ -57,7 +41,6 @@ export function describeMachine(declaredNodeFloor: string): Machine {
     memoryBytes: totalmem(),
     node: process.versions.node,
     v8: process.versions.v8,
-    sqlite: sqliteVersion(),
     declaredNodeFloor,
     nodeMeetsFloor: meetsFloor(process.versions.node, declaredNodeFloor),
   }

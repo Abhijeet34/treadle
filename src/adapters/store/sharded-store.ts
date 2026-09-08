@@ -1,29 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
-// DR2's store: a directory of month-sharded record files, an append-only monthly event log
-// and a gitignored SQLite index that is re-derived from a size, mtime and content-hash
-// fingerprint before any query runs.
+// DR2's store: a directory of month-sharded record files and an append-only monthly event
+// log, read by parsing them.
 //
-// The committed files are the authority (decision D1). Every read establishes freshness
-// first, one corrupt record is quarantined rather than costing the file, and a mutation
-// re-reads what it touches under the lock, so the tool never writes from stale memory and
-// never overwrites a hand edit it did not see.
+// The committed files are the authority (decision D1), and nothing derived from them is
+// kept between commands. A read parses the shards it answers from, one corrupt record is
+// quarantined rather than costing the file, and a mutation re-reads under the lock, so the
+// tool never writes from stale memory and never overwrites a hand edit it did not see.
+//
+// ADR-0030 records why the SQLite index that used to sit in front of this went: at 347
+// records it bought 20 to 25 ms a read for a quarter of the store's lines, five rules and
+// the only defect that has ever bricked a workspace.
 
-import { createHash } from 'node:crypto'
 import { lstat, mkdir, readFile, readdir, readlink, rm, stat } from 'node:fs/promises'
-import { createReadStream } from 'node:fs'
 import path from 'node:path'
 
 import {
-  cycleAbove,
   defaultConfig,
   findParentCycle,
-  type BugSeverity,
-  type Resolution,
-  type StoredRelation,
+  summaryOf,
   type WorkItem,
-  type WorkItemState,
   type WorkItemSummary,
-  type WorkItemType,
 } from '../../domain/index.ts'
 import {
   duplicateRefusal,
@@ -54,7 +50,6 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { decodeWorkspace, encodeWorkspace, type WorkspaceRecord } from './workspace-codec.ts'
 import { parentMissing, stillNamed, type Referrer } from './referential.ts'
@@ -66,12 +61,15 @@ import { setImmediate as yieldToLoop } from 'node:timers/promises'
 export const SCHEMA = 1
 
 export const WORKSPACE_FILE = 'workspace.md'
-/** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
-const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'
 const EVENTS_DIR = 'events'
-const INDEX_DIR = '.index'
-const JOURNAL_DIR = path.join(INDEX_DIR, 'txn')
+/**
+ * Where a transaction's journal waits between the moment it is durable and the moment it
+ * has been applied. It used to live under the derived index directory, which is gone; it is
+ * ignored by git for the reason the lock is, because both are transient and neither is a
+ * record.
+ */
+const JOURNAL_DIR = '.txn'
 const LOCK_FILE = '.lock'
 
 /**
@@ -81,18 +79,53 @@ const LOCK_FILE = '.lock'
  * would put every write outside the directory `init` promised to stay inside. The root
  * itself is on the list because the walk that found it went through `stat`.
  */
-const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, INDEX_DIR, JOURNAL_DIR] as const
+const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, JOURNAL_DIR] as const
 
 export type ShardedStoreOptions = {
   readonly lockTimeoutMs?: number
   readonly onWaiting?: AcquireOptions['onWaiting']
+}
+
+/** One file under the root, and what a stat says about it. */
+type Stamped = {
+  readonly file: string
+  readonly size: number
+  readonly mtime: number
+}
+
+/** What is under the root right now: the files to read, and the proof of what they were. */
+type Listing = {
+  readonly records: readonly Stamped[]
+  readonly logs: readonly string[]
+  /** Every file with its size and mtime, which is what says the parse below is still it. */
+  readonly stamp: string
+}
+
+/** One served record, with the file and the line a refusal about it names. */
+type Held = {
+  readonly item: WorkItem
+  readonly file: string
+  readonly line: number
+}
+
+/**
+ * Every record the shards hold, as one command sees them. Nothing here is written back:
+ * it is the parse of the committed files that this command answers from, discarded when
+ * the process ends and taken again under the lock before any write decides anything.
+ */
+type Records = {
+  /** In `filed_at, id` order, which is the order every list answers in. */
+  readonly items: readonly Held[]
+  readonly byId: ReadonlyMap<string, Held>
+  /** In file and line order, with the one hierarchy verdict appended. */
+  readonly findings: readonly Finding[]
   /**
-   * Forget every fingerprint before the first refresh, so every answer this store gives is
-   * re-derived from the files rather than served from what the index held. `doctor` opens
-   * with it: its answer is a verdict on the files, and a verdict served from a cache that
-   * disagreed with them once locked a workspace with no printed way back (ADR-0020).
+   * The log's month files, oldest first. Named on every read even though only a command
+   * that answers from the log opens one: the containment rule (S15) is over the layout and
+   * not over what a command happens to want, and a linked `events/2026-09.jsonl` was
+   * refused on a read of the records before this was.
    */
-  readonly rederive?: boolean
+  readonly logFiles: readonly string[]
 }
 
 type Journal = {
@@ -105,14 +138,10 @@ function monthOf(instant: string): string {
   return instant.slice(0, 7)
 }
 
-function hashOf(text: string | Buffer): string {
-  return createHash('sha256').update(text).digest('hex')
-}
-
 /**
- * Writes the layout DR2 draws, including the two git attributes it depends on: the index
- * and the lock are ignored because they are derived and transient, and the event log merges
- * union because two branches appending in one month must not conflict.
+ * Writes the layout DR2 draws, including the two git attributes it depends on: the journal
+ * and the lock are ignored because they are transient and neither is a record, and the
+ * event log merges union because two branches appending in one month must not conflict.
  */
 export async function createWorkspace(
   root: string,
@@ -133,7 +162,7 @@ export async function createWorkspace(
         sections: [],
       })}`,
     )
-    await writeFileAtomic(path.join(root, '.gitignore'), `${INDEX_DIR}/\n${LOCK_FILE}\n`)
+    await writeFileAtomic(path.join(root, '.gitignore'), `${JOURNAL_DIR}/\n${LOCK_FILE}\n`)
     // `linguist-generated` collapses the log in a forge's diff view by default. It is 7.7
     // times the record bytes per mutation and no reviewer reads it line by line, so the
     // review surface becomes the shard while the log stays committed and authoritative.
@@ -154,23 +183,25 @@ export async function createWorkspace(
 
 export class ShardedStore implements Store {
   readonly #root: string
-  readonly #index: IndexCache
   readonly #options: ShardedStoreOptions
-  /** Set from `rederive`, and spent by the first refresh. */
-  #rederive: boolean
-  #cycleFindings: readonly Finding[] = []
   /**
-   * Shards the refresh inside `apply` re-parsed, for the write that follows it under the
-   * same lock. Only the write path fills it, because a read that retained a 1 MB parse for
-   * the rest of the process would pay in resident memory for something nothing reads.
+   * The shards as this command read them. One parse serves every question a command asks,
+   * because `status` alone asks four; it is taken again from the files under the lock
+   * before a write, and never survives the process.
    */
-  #parsedUnderLock = new Map<string, { readonly size: number; readonly mtime: number; readonly parsed: ParsedFile }>()
+  #records: Records | undefined
+  /** The `#listFiles` stamp `#records` was parsed from, and the whole of what makes it reusable. */
+  #stamp: string | undefined
+  /**
+   * What reading the log said about the log, kept because `doctor` asks for the findings
+   * after it has read it. A command that never reads the log never pays for the scan that
+   * would fill this, which is the whole reason it is not part of `#records`.
+   */
+  #logFindings: readonly Finding[] = []
 
   constructor(root: string, options: ShardedStoreOptions = {}) {
     this.#root = root
-    this.#index = new IndexCache(path.join(root, INDEX_DIR))
     this.#options = options
-    this.#rederive = options.rederive === true
   }
 
   async identity(): Promise<StoreResult<StoreIdentity>> {
@@ -180,8 +211,8 @@ export class ShardedStore implements Store {
     let info: Awaited<ReturnType<typeof stat>>
     try {
       info = await stat(file)
-    } catch {
-      return storeFail('STORE_UNAVAILABLE', 'S1', `${file} is not there, so this directory is not a treadle workspace`, [this.#root])
+    } catch (error) {
+      return this.#absentOrUnreadable(file, error)
     }
     if (info.size > MAX_FILE_BYTES) {
       return storeFail(
@@ -193,8 +224,8 @@ export class ShardedStore implements Store {
     let text: string
     try {
       text = await readFile(file, 'utf8')
-    } catch {
-      return storeFail('STORE_UNAVAILABLE', 'S1', `${file} is not there, so this directory is not a treadle workspace`, [this.#root])
+    } catch (error) {
+      return this.#absentOrUnreadable(file, error)
     }
     const parsed = parseFile(text, WORKSPACE_FILE)
     if (!parsed.ok) return parsed
@@ -231,78 +262,51 @@ export class ShardedStore implements Store {
   }
 
   async get(id: string): Promise<StoreResult<WorkItem | undefined>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    const row = this.#index.itemRow(id)
-    if (row === undefined) return storeOk(undefined)
-    return this.#decodeRow(row)
+    const read = await this.#read()
+    if (!read.ok) return read
+    return storeOk(read.value.byId.get(id)?.item)
   }
 
   async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
+    const read = await this.#read()
+    if (!read.ok) return read
     let visited = 0
-    for (const row of this.#index.listItems(query)) {
-      const item = this.#decodeRow(row)
-      if (!item.ok) return item
-      if (item.value === undefined) continue
-      visit(item.value)
+    for (const held of selected(read.value.items, query)) {
+      visit(held.item)
       visited += 1
     }
     return storeOk(visited)
   }
 
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    const items: WorkItemSummary[] = []
-    // SQLite hands back a fresh string per cell, so 50,000 rows carried 50,000 copies of
-    // `task`. One copy of each value the bounded columns take is what the view then holds.
-    const seen = new Map<string, string>()
-    const intern = (value: string): string => {
-      const held = seen.get(value)
-      if (held !== undefined) return held
-      seen.set(value, value)
-      return value
-    }
-    for (const row of this.#index.listSummaries(query)) items.push(summaryOf(row, intern))
-    return storeOk(items)
+    const read = await this.#read()
+    if (!read.ok) return read
+    return storeOk(selected(read.value.items, query).map((held) => summaryOf(held.item)))
   }
 
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    return storeOk([...this.#index.iterateEvents(query)])
+    const out: StoreEvent[] = []
+    const scanned = await this.#eachLogEvent(query, (event) => out.push(event))
+    return scanned.ok ? storeOk(out) : scanned
   }
 
   async eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    let visited = 0
-    for (const event of this.#index.iterateEvents(query)) {
-      visit(event)
-      visited += 1
-    }
-    return storeOk(visited)
+    return this.#eachLogEvent(query, visit)
   }
 
+  /**
+   * What the store read and would not serve. The records are always read, because every
+   * command answers over the record set; the log's own findings join them once something
+   * has read the log, which is `doctor` and the two commands that answer from it.
+   */
   async findings(): Promise<StoreResult<readonly Finding[]>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    return storeOk([...this.#index.findings(), ...this.#cycleFindings])
+    const read = await this.#read()
+    if (!read.ok) return read
+    if (this.#logFindings.length === 0) return storeOk(read.value.findings)
+    return storeOk([...read.value.findings, ...this.#logFindings])
   }
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
-    // Warm the index before the lock is taken. The refresh under the lock is then the delta
-    // since this instant rather than a cold rebuild, which at 1.1 million events is two
-    // minutes of synchronous work during which no heartbeat fires and the lock is forfeit.
-    // The shards this transaction writes keep their parse from whichever refresh read them,
-    // because a create after a create was parsing the largest shard twice, 25 MiB of the
-    // 76 MiB one mutation allocated; `#readShard` proves the bytes have not moved before
-    // reusing one.
-    const writing = new Set(transaction.writes.map((write) => `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`))
-    const warm = await this.#refresh(writing)
-    if (!warm.ok) return warm
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
       ...(this.#options.lockTimeoutMs === undefined ? {} : { timeoutMs: this.#options.lockTimeoutMs }),
       ...(this.#options.onWaiting === undefined ? {} : { onWaiting: this.#options.onWaiting }),
@@ -311,11 +315,16 @@ export class ShardedStore implements Store {
     try {
       await this.#recoverJournals(lock.value)
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
-      // Freshness first, inside the lock: the conflict message and the cross-shard id check
-      // both read the index, and a check that decides a refusal may not read a stale cache.
-      const fresh = await this.#refresh(writing)
+      // The read is taken here and nowhere earlier. Every check below decides a refusal -
+      // the read set, the cross-shard id, the referential rule - and a check that decides a
+      // refusal may not read anything but the files as they are under this lock.
+      // A write inside one mtime tick that leaves the file the same size is invisible to
+      // the listing's stat, so the read this transaction decides against is taken from the
+      // files rather than proved fresh against them.
+      this.#records = undefined
+      const fresh = await this.#read()
       if (!fresh.ok) return fresh
-      return await this.#applyUnderLock(transaction, lock.value)
+      return await this.#applyUnderLock(transaction, fresh.value, lock.value)
     } catch (error) {
       if (error instanceof LockLost) return error.refusal
       // The signature says every failure leaves as a result, so an errno the filesystem
@@ -330,24 +339,19 @@ export class ShardedStore implements Store {
         [transaction.txn],
       )
     } finally {
-      this.#parsedUnderLock.clear()
+      // The write moved the files this read came from, so the next question over this store
+      // reads them again rather than answering from what they said before the write.
+      this.#records = undefined
       await lock.value.release()
     }
   }
 
   async close(): Promise<void> {
-    this.#index.close()
+    this.#records = undefined
+    this.#logFindings = []
   }
 
   // -- reading ---------------------------------------------------------------------------
-
-  #decodeRow(row: IndexedSource): StoreResult<WorkItem | undefined> {
-    const parsed = parseRecordSource(row.source, row.line)
-    if (!parsed.ok) {
-      return storeFail('INTEGRITY', parsed.rule, `${row.file} line ${row.line}: ${parsed.reason}`, [row.id])
-    }
-    return decodeItem(parsed.record)
-  }
 
   #schemaRefusal(file: ParsedFile, name: string): StoreError | undefined {
     if (file.schema > SCHEMA) {
@@ -360,106 +364,10 @@ export class ShardedStore implements Store {
     return undefined
   }
 
-  async #storeFiles(): Promise<readonly string[]> {
-    const out: string[] = [WORKSPACE_FILE]
-    for (const [dir, ext] of [[ITEMS_DIR, '.md'], [EVENTS_DIR, '.jsonl']] as const) {
-      let names: string[]
-      try {
-        names = await readdir(path.join(this.#root, dir))
-      } catch {
-        continue
-      }
-      for (const name of names.sort()) {
-        if (isTempName(name) || !name.endsWith(ext)) continue
-        out.push(`${dir}/${name}`)
-      }
-    }
-    return out
-  }
-
-  /**
-   * DR2's freshness rule. A stat per file decides; only a file whose size or mtime moved is
-   * re-read, and an event file that only grew has its old prefix hash checked so an append
-   * costs the append rather than the file.
-   */
-  async #refresh(keepParses: ReadonlySet<string> = NO_FILES): Promise<StoreResult<undefined>> {
-    const layout = await this.#checkLayout()
-    if (layout !== undefined) return layout
-    try {
-      return await this.#refreshIndex(keepParses)
-    } catch (error) {
-      // A busy index is a lock not acquired within its bound, and the refresh runs before
-      // any file is written, so the caller can retry with nothing to undo.
-      if (error instanceof IndexBusy) {
-        return storeFail(
-          'LOCK_TIMEOUT', 'S11',
-          `the index at ${error.path} was busy for ${error.waitedMs} ms while another process wrote it; nothing was written, so retry`,
-          [this.#root],
-        )
-      }
-      if (!(error instanceof IndexUnavailable)) throw error
-      return storeFail(
-        'STORE_UNAVAILABLE', 'S13',
-        `the index at ${error.path} could not be opened or rebuilt: ${error.message}; delete ${INDEX_DIR} and retry`,
-        [this.#root],
-      )
-    }
-  }
-
-  /**
-   * A pass re-reads every file whose fingerprint moved. A duplicate-id clash is the one
-   * finding whose truth depends on a second file, so a pass that changed or dropped a file
-   * other clashes name drops those files' fingerprints, and one more pass re-decides them.
-   * Two files clashing both ways settle on the second pass; the bound is a guard, not a budget.
-   */
-  async #refreshIndex(keepParses: ReadonlySet<string>): Promise<StoreResult<undefined>> {
-    // A re-derivation forgets the fingerprints and keeps the rows, so a command running
-    // beside it still answers from whole files; the names are carried into the pass because
-    // a file that has gone is otherwise only noticed by a fingerprint it no longer has.
-    const forgotten = this.#rederive ? this.#index.forgetFingerprints() : NO_FILES
-    this.#rederive = false
-    for (let pass = 0; pass < 3; pass += 1) {
-      const again = await this.#refreshPass(keepParses, forgotten)
-      if (!again.ok) return again
-      if (!again.value) break
-    }
-    this.#cycleFindings = this.#hierarchyFindings()
-    return storeOk(undefined)
-  }
-
-  async #refreshPass(keepParses: ReadonlySet<string>, forgotten: ReadonlySet<string>): Promise<StoreResult<boolean>> {
-    const known = this.#index.fingerprints()
-    const seen = new Set<string>()
-    let invalidated = false
-
-    for (const file of await this.#storeFiles()) {
-      const full = path.join(this.#root, file)
-      let info
-      try {
-        info = await lstat(full)
-      } catch {
-        continue
-      }
-      if (info.isSymbolicLink()) return this.#symlinkRefusal(file)
-      seen.add(file)
-      const previous = known.get(file)
-      if (previous !== undefined && previous.size === info.size && previous.mtime === info.mtimeMs) continue
-
-      const outcome = file.endsWith('.jsonl')
-        ? await this.#indexEventFile(file, full, info.size, info.mtimeMs, previous)
-        : await this.#indexRecordFile(file, full, info.size, info.mtimeMs, keepParses)
-      if (!outcome.ok) return outcome
-      invalidated ||= outcome.value
-    }
-
-    for (const file of [...known.keys(), ...forgotten]) if (!seen.has(file)) invalidated ||= this.#index.dropFile(file)
-    return storeOk(invalidated)
-  }
-
   /**
    * The symbolic-link rule (S15), applied to the layout before anything under the root is
-   * opened. A link is refused rather than reported as a finding because a finding lives in
-   * the index, and a linked `.index` is one of the paths this refuses.
+   * opened. A link is refused rather than reported as a finding because a finding is a
+   * verdict on a file this store read, and the point of this check is that it did not.
    */
   async #checkLayout(): Promise<StoreResult<never> | undefined> {
     for (const relative of LAYOUT) {
@@ -485,46 +393,174 @@ export class ShardedStore implements Store {
     )
   }
 
-  /** The S12 finding a cycle raises, from the verdict this refresh is entitled to reuse. */
-  #hierarchyFindings(): readonly Finding[] {
-    const cycle = this.#hierarchyCycle()
-    if (cycle === null || cycle === undefined) return []
-    return [{
-      file: WORKSPACE_FILE, line: 1, rule: 'S12',
-      reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
-      id: cycle[0] as string,
-    }]
+  /**
+   * An errno on a path this store must read. Before this, every one of them was swallowed:
+   * a `.work/items` directory the process may not open answered `items 0` at exit 0 over a
+   * workspace holding 347 records, and an unreadable shard escaped as an `INTERNAL` stack
+   * trace naming no rule. Both are the store being unavailable, which is what the write
+   * path has always called an errno it cannot act on.
+   */
+  #unreadable(full: string, error: unknown): StoreResult<never> {
+    const errno = error as NodeJS.ErrnoException
+    return storeFail(
+      'STORE_UNAVAILABLE', 'S13',
+      `${full} could not be read: ${errno.syscall ?? 'a read'} failed with ${errno.code ?? 'an error'}`,
+      [this.#root],
+    )
   }
 
-  async #indexRecordFile(
-    file: string, full: string, size: number, mtime: number, keepParses: ReadonlySet<string> = NO_FILES,
-  ): Promise<StoreResult<boolean>> {
-    // The ceiling is checked against the size the stat already gave us, before the file is
-    // read: a limit that only fires after the read has happened is not a limit (F8).
-    if (size > MAX_FILE_BYTES) {
-      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: '', lines: 0 }, [], [{
-        file, line: 1, rule: 'S4',
-        reason: `${file} is ${size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
-      }]))
+  /** The same, where the path being absent is the ordinary answer rather than a failure. */
+  #absentOrUnreadable(full: string, error: unknown): StoreResult<never> {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return storeFail('STORE_UNAVAILABLE', 'S1', `${full} is not there, so this directory is not a treadle workspace`, [this.#root])
     }
-    const text = await readFile(full, 'utf8')
+    return this.#unreadable(full, error)
+  }
+
+  /**
+   * The shards, parsed.
+   *
+   * A stat per file decides whether the parse this store already took is still the answer,
+   * which is DR2's freshness rule and all that is left of it: `status` asks the store four
+   * questions and a parse per question was four passes over the same bytes, while two
+   * stores open on one root have to see each other's writes. What a moved file costs is the
+   * whole read again rather than that file's rows, because there is no longer a row to
+   * replace - and inside one command nothing moves that this store did not write.
+   */
+  async #read(): Promise<StoreResult<Records>> {
+    const layout = await this.#checkLayout()
+    if (layout !== undefined) return layout
+    const listing = await this.#listFiles()
+    if (!listing.ok) return listing
+    const held = this.#records
+    if (held !== undefined && this.#stamp === listing.value.stamp) return storeOk(held)
+
+    const items: Held[] = []
+    const byId = new Map<string, Held>()
+    const findings: Finding[] = []
+    for (const stamped of listing.value.records) {
+      const read = await this.#readRecordFile(stamped, items, byId, findings)
+      if (!read.ok) return read
+    }
+    // Every list answers in this order, and it is the order the index's own queries ended
+    // in; a shard walk alone would order by month and then by position in the file.
+    items.sort((a, b) => (a.item.filed_at === b.item.filed_at
+      ? (a.item.id < b.item.id ? -1 : 1)
+      : (a.item.filed_at < b.item.filed_at ? -1 : 1)))
+    findings.sort((a, b) => (a.file === b.file ? a.line - b.line : (a.file < b.file ? -1 : 1)))
+
+    // Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an
+    // edge a hand edit or a git merge put in a file, and every parent walk reads exactly
+    // this data. It is recomputed on every read because there is nowhere left to remember
+    // it: 10.3 ms at 10,000 records, against the 39 MB of index that used to carry the
+    // verdict, the dirty marker that decided when to trust it and the walk that repaired it.
+    const edges = new Map<string, string>()
+    for (const one of items) if (one.item.parent_id !== undefined) edges.set(one.item.id, one.item.parent_id)
+    const cycle = findParentCycle(edges)
+    if (cycle !== undefined) {
+      findings.push({
+        file: WORKSPACE_FILE, line: 1, rule: 'S12',
+        reason: `the stored hierarchy closes a cycle: ${cycle.join(' -> ')}`,
+        id: cycle[0] as string,
+      })
+    }
+
+    const records: Records = { items, byId, findings, logFiles: listing.value.logs }
+    this.#records = records
+    this.#stamp = listing.value.stamp
+    return storeOk(records)
+  }
+
+  /**
+   * Every file under the root the store reads, with the stat that both bounds it and says
+   * whether it has moved. The symbolic-link rule (S15) is applied here, before anything
+   * below the root is opened, and over the log as well as the records: a linked
+   * `events/2026-09.jsonl` is a path outside the workspace whether or not the command in
+   * hand happens to want the log.
+   */
+  async #listFiles(): Promise<StoreResult<Listing>> {
+    const names: string[] = [WORKSPACE_FILE]
+    for (const [dir, ext] of [[ITEMS_DIR, '.md'], [EVENTS_DIR, '.jsonl']] as const) {
+      const full = path.join(this.#root, dir)
+      let listed: readonly string[]
+      try {
+        listed = await readdir(full)
+      } catch (error) {
+        // A directory that has been removed holds no records, which is what it says. One
+        // this process may not open holds whatever it holds, and says that instead.
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+        return this.#unreadable(full, error)
+      }
+      for (const name of [...listed].sort()) {
+        if (isTempName(name) || !name.endsWith(ext)) continue
+        names.push(`${dir}/${name}`)
+      }
+    }
+
+    const found: Stamped[] = []
+    for (const file of names) {
+      const full = path.join(this.#root, file)
+      let info
+      try {
+        info = await lstat(full)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+        return this.#unreadable(full, error)
+      }
+      if (info.isSymbolicLink()) return this.#symlinkRefusal(file)
+      found.push({ file, size: info.size, mtime: info.mtimeMs })
+    }
+    const isLog = (one: Stamped): boolean => one.file.startsWith(`${EVENTS_DIR}/`)
+    return storeOk({
+      records: found.filter((one) => !isLog(one)),
+      logs: found.filter(isLog).map((one) => one.file),
+      stamp: found.map((one) => `${one.file} ${one.size} ${one.mtime}`).join('\n'),
+    })
+  }
+
+  /**
+   * One file's records, decoded into the read. A record the dictionary refuses is a finding
+   * and not a hole the caller cannot see, and an id a second shard repeats is `S3`: the
+   * parser refuses a repeat inside one file, so `already` here can only mean another shard.
+   */
+  async #readRecordFile(
+    stamped: Stamped, items: Held[], byId: Map<string, Held>, findings: Finding[],
+  ): Promise<StoreResult<undefined>> {
+    const { file } = stamped
+    const full = path.join(this.#root, file)
+    // The ceiling is checked against the size the listing already gave us, before the file
+    // is read: a limit that only fires after the read has happened is not a limit (F8).
+    if (stamped.size > MAX_FILE_BYTES) {
+      findings.push({
+        file, line: 1, rule: 'S4',
+        reason: `${file} is ${stamped.size} bytes, over the ${MAX_FILE_BYTES} byte ceiling for a record file; it is not served`,
+      })
+      return storeOk(undefined)
+    }
+
+    let text: string
+    try {
+      text = await readFile(full, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') return storeOk(undefined)
+      return this.#unreadable(full, error)
+    }
     const parsed = parseFile(text, file)
     if (!parsed.ok) {
-      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
-        { file, line: 1, rule: parsed.error.rule, reason: parsed.error.message },
-      ]))
+      findings.push({ file, line: 1, rule: parsed.error.rule, reason: parsed.error.message })
+      return storeOk(undefined)
     }
     const schema = this.#schemaRefusal(parsed.value, file)
     if (schema !== undefined) {
-      return storeOk(this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, [], [
-        { file, line: 1, rule: schema.rule, reason: schema.message },
-      ]))
+      findings.push({ file, line: 1, rule: schema.rule, reason: schema.message })
+      return storeOk(undefined)
     }
 
-    const items: IndexedItem[] = []
-    const findings: Finding[] = parsed.value.quarantined.map((q) => (q.id === undefined
-      ? { file, line: q.line, rule: q.rule, reason: q.reason }
-      : { file, line: q.line, rule: q.rule, reason: q.reason, id: q.id }))
+    for (const quarantined of parsed.value.quarantined) {
+      findings.push(quarantined.id === undefined
+        ? { file, line: quarantined.line, rule: quarantined.rule, reason: quarantined.reason }
+        : { file, line: quarantined.line, rule: quarantined.rule, reason: quarantined.reason, id: quarantined.id })
+    }
 
     if (file === WORKSPACE_FILE) {
       // The one decode `identity` performs, run again here so a configuration this build
@@ -541,135 +577,107 @@ export class ShardedStore implements Store {
       }
     } else {
       for (const record of parsed.value.records) {
-        const item = decodeItem(record)
-        if (!item.ok) {
-          findings.push({ file, line: record.line, rule: item.error.rule, reason: item.error.message, id: record.id })
+        const decoded = decodeItem(record)
+        if (!decoded.ok) {
+          findings.push({ file, line: record.line, rule: decoded.error.rule, reason: decoded.error.message, id: record.id })
           continue
         }
-        items.push(rowOf(item.value, file, record.line, record.source))
+        if (byId.has(record.id)) {
+          findings.push({
+            file, line: record.line, rule: 'S3', id: record.id,
+            reason: `${record.id} is already a record in this store; the copy in ${file} line ${record.line} is quarantined`,
+          })
+          continue
+        }
+        const one: Held = { item: decoded.value, file, line: record.line }
+        items.push(one)
+        byId.set(record.id, one)
       }
     }
     if (parsed.value.crlf) {
       findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
     }
-    const invalidated = this.#replaceRecordFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, items, findings)
-    // A shard the transaction writes keeps its parse; any other refresh keeps the last shard
-    // it read, one file, because the shard a write touches is usually the shard the previous
-    // write changed, and `get` before `apply` in one process was parsing it twice.
-    if (!keepParses.has(file)) {
-      for (const kept of this.#parsedUnderLock.keys()) if (!keepParses.has(kept)) this.#parsedUnderLock.delete(kept)
-    }
-    this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
-    return storeOk(invalidated)
-  }
-
-  #replaceRecordFile(
-    file: string, fingerprint: Fingerprint, items: readonly IndexedItem[], findings: readonly Finding[],
-  ): boolean {
-    return this.#index.replaceRecordFile(file, fingerprint, items, findings).invalidated
-  }
-
-  async #indexEventFile(
-    file: string, full: string, size: number, mtime: number, previous: Fingerprint | undefined,
-  ): Promise<StoreResult<boolean>> {
-    if (size > MAX_EVENT_FILE_BYTES) {
-      return storeOk(this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [{
-        file, line: 1, rule: 'S6',
-        reason: `${file} is ${size} bytes, over the ${MAX_EVENT_FILE_BYTES} byte ceiling for an event file; it is not served`,
-      }], false).invalidated)
-    }
-    const grew = previous !== undefined && size > previous.size
-    const appendOnly = grew && await this.#prefixUnchanged(full, previous)
-
-    const from = appendOnly ? (previous as Fingerprint).size : 0
-    const fromLine = appendOnly ? (previous as Fingerprint).lines : 0
-    const read = await scanEventFile(full, file, from, fromLine)
-    if (!read.ok) {
-      return storeOk(this.#index.replaceEventFile(file, { size, mtime, hash: '', lines: 0 }, [], [], [
-        { file, line: 1, rule: read.error.rule, reason: read.error.message },
-      ], false).invalidated)
-    }
-    const whole = await readFile(full)
-    const outcome = this.#index.replaceEventFile(
-      file,
-      { size, mtime, hash: hashOf(whole), lines: read.value.lines },
-      read.value.events, read.value.at, read.value.findings, appendOnly, appendOnly ? from : undefined,
-    )
-    if (outcome.wholePass === true) return this.#indexEventFile(file, full, size, mtime, undefined)
-    return storeOk(outcome.invalidated)
-  }
-
-  async #prefixUnchanged(full: string, previous: Fingerprint): Promise<boolean> {
-    if (previous.size === 0) return true
-    const hash = createHash('sha256')
-    let read = 0
-    try {
-      for await (const chunk of createReadStream(full, { start: 0, end: previous.size - 1 })) {
-        hash.update(chunk as Buffer)
-        read += (chunk as Buffer).byteLength
-      }
-    } catch {
-      return false
-    }
-    return read === previous.size && hash.digest('hex') === previous.hash
+    return storeOk(undefined)
   }
 
   /**
-   * Load-time hierarchy validation (finding F8). A write-time cycle check cannot see an edge
-   * a hand edit or a git merge put in a file, and every parent walk reads exactly that data.
-   * The walk needs the parent edges and nothing else, so it reads two index columns rather
-   * than decoding every record.
+   * The log, one month file at a time, holding one file's events and never the log. At
+   * 10,000 records that is 100,000 lines, and `doctor` looks at each once.
    *
-   * The verdict is then written back beside the rows it came from, in the same call that
-   * clears the durable dirty marker it accounts for. Every transaction that moves an item row
-   * merges into that marker, so this recomputes exactly when the row set moved: at 50,000
-   * items the walk is 111 ms of a 218 ms read, and a command that changed nothing was paying
-   * it to reach the same answer as the command before it.
+   * The order is the file name, then `at` within the file. A write puts an event in the file
+   * its own month names, so the file name is the coarse order and a stable sort inside one
+   * file is the fine one; a hand-written line filed under another month is ordered where the
+   * file puts it, which is where a reader looking for it will be.
    */
-  #recheckHierarchy(): readonly string[] | null {
-    const cycle = findParentCycle(this.#index.parentEdges()) ?? null
-    this.#index.setHierarchyVerdict(JSON.stringify(cycle))
-    return cycle
+  async #eachLogEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>> {
+    const records = await this.#read()
+    if (!records.ok) return records
+
+    const findings: Finding[] = []
+    let visited = 0
+    for (const file of records.value.logFiles) {
+      const full = path.join(this.#root, file)
+      let info
+      try {
+        info = await lstat(full)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') continue
+        return this.#unreadable(full, error)
+      }
+      if (info.size > MAX_EVENT_FILE_BYTES) {
+        findings.push({
+          file, line: 1, rule: 'S6',
+          reason: `${file} is ${info.size} bytes, over the ${MAX_EVENT_FILE_BYTES} byte ceiling for an event file; it is not served`,
+        })
+        continue
+      }
+
+      const read = await scanEventFile(full, file)
+      if (!read.ok) {
+        // A file the store may not open is the store being unavailable, not a verdict on
+        // what the file holds; answering with the lines it did read is the empty answer this
+        // store no longer gives. A ceiling the file is over is a verdict, and stays a finding.
+        if (read.error.rule === 'S13') return read
+        findings.push({ file, line: 1, rule: read.error.rule, reason: read.error.message })
+        continue
+      }
+
+      const events = [...read.value.events].sort((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0))
+      for (const event of events) {
+        if (query.entity !== undefined && event.entity !== query.entity) continue
+        if (query.txn !== undefined && event.txn !== query.txn) continue
+        if (query.from !== undefined && event.at < query.from) continue
+        if (query.to !== undefined && event.at >= query.to) continue
+        visit(event)
+        visited += 1
+        if (query.limit !== undefined && visited >= query.limit) {
+          this.#logFindings = [...findings, ...read.value.findings]
+          return storeOk(visited)
+        }
+      }
+      findings.push(...read.value.findings)
+    }
+    this.#logFindings = findings
+    return storeOk(visited)
   }
 
   /**
-   * The verdict this refresh is entitled to, read from the index rather than from anything
-   * only this process's memory carries: a marker written and merged in the same transaction
-   * as the rows it describes survives a crash between a commit and this recompute, which an
-   * in-memory tally of what a refresh touched cannot.
-   *
-   * No dirty marker reuses the stored verdict outright. One that names moved parent edges,
-   * over a store already known to be acyclic, walks up from those nodes alone: a cycle that
-   * was not there before has to pass through an edge that moved. One marked `full`, from a
-   * moved-edge count past the cap a meta row is worth carrying, recomputes whole.
-   *
-   * A store already reported cyclic recomputes whole as soon as any row moved, edge or not.
-   * An edit clears a cycle as easily as it closes one, and dropping the edge that closed it
-   * moves no edge at all, so a rule that watched only for moved edges would report a cycle
-   * that a hand edit had already removed.
+   * The write that last moved a record, which a conflict names (interface A.6 rule 5). The
+   * newest month file that carries an event for the record holds it, so the walk is newest
+   * first and stops at that file rather than reading the log.
    */
-  #hierarchyCycle(): readonly string[] | null {
-    const stored = this.#index.hierarchyVerdict()
-    if (stored === undefined) return this.#recheckHierarchy()
-    const dirty = this.#index.hierarchyDirty()
-    if (dirty === undefined) return JSON.parse(stored) as readonly string[] | null
-
-    const known = JSON.parse(stored) as readonly string[] | null
-    if (known !== null) {
-      if (dirty.rows) return this.#recheckHierarchy()
-      this.#index.setHierarchyVerdict(stored)
-      return known
+  async #lastEventFor(entity: string, records: Records): Promise<StoreEvent | undefined> {
+    for (const file of [...records.logFiles].reverse()) {
+      const read = await scanEventFile(path.join(this.#root, file), file)
+      if (!read.ok) continue
+      // `at` is second-resolution, so two writes in one second are routine under an agent;
+      // the later line in the file is the later write, which is why this takes the last
+      // match in file order rather than the greatest `at`.
+      let last: StoreEvent | undefined
+      for (const event of read.value.events) if (event.entity === entity) last = event
+      if (last !== undefined) return last
     }
-    if (dirty.full) return this.#recheckHierarchy()
-    for (const id of dirty.moved) {
-      const cycle = cycleAbove(id, (at) => this.#index.parentOf(at))
-      if (cycle !== undefined) {
-        this.#index.setHierarchyVerdict(JSON.stringify(cycle))
-        return cycle
-      }
-    }
-    this.#index.setHierarchyVerdict(stored)
-    return known
+    return undefined
   }
 
   // -- writing ---------------------------------------------------------------------------
@@ -692,7 +700,7 @@ export class ShardedStore implements Store {
    * leaves nothing behind, and one it rewrites answers as this transaction leaves it rather
    * than as the index still holds it.
    */
-  #referentialRefusal(transaction: StoreTransaction): StoreResult<never> | undefined {
+  #referentialRefusal(transaction: StoreTransaction, records: Records): StoreResult<never> | undefined {
     const removed = new Set((transaction.removes ?? []).map((removal) => removal.id))
     const written = new Map(transaction.writes.map((write) => [write.item.id, write.item]))
 
@@ -709,8 +717,8 @@ export class ShardedStore implements Store {
     for (const write of transaction.writes) {
       const parent = write.item.parent_id
       if (parent === undefined || written.has(parent)) continue
-      if (!removed.has(parent) && this.#index.versionOf(parent) !== undefined) continue
-      if (!removed.has(parent) && this.#index.itemRow(write.item.id)?.parent === parent) continue
+      if (!removed.has(parent) && records.byId.has(parent)) continue
+      if (!removed.has(parent) && records.byId.get(write.item.id)?.item.parent_id === parent) continue
       return parentMissing(parent, write.item.id)
     }
 
@@ -720,34 +728,23 @@ export class ShardedStore implements Store {
     // and a record being rewritten is judged above, and neither is what the index still says.
     const touched = [...removed, ...written.keys()]
     for (const id of removed) {
-      const referrer = this.#referrerOf(id, touched)
+      const referrer = referrerOf(records, id, touched)
       if (referrer !== undefined) return stillNamed(id, referrer)
     }
     return undefined
   }
 
-  /**
-   * The first record this transaction would leave naming `id`, or `undefined`. The two kinds
-   * are the two ways one record holds another's id: a child's parent and a stored relation edge.
-   */
-  #referrerOf(id: string, skip: readonly string[]): Referrer | undefined {
-    const child = this.#index.childOf(id, skip)
-    if (child !== undefined) return { kind: 'parent', id: child }
-    const edge = this.#index.relationTo(id, skip)
-    if (edge !== undefined) return { kind: 'relation', id: edge.id, relation: edge.kind }
-    return undefined
-  }
-
-  async #applyUnderLock(transaction: StoreTransaction, lock: LockHandle): Promise<StoreResult<Applied>> {
+  async #applyUnderLock(
+    transaction: StoreTransaction, records: Records, lock: LockHandle,
+  ): Promise<StoreResult<Applied>> {
     const shards = new Map<string, ParsedFile>()
     const applied: AppliedWrite[] = []
-    const findings = this.#index.findings()
+    const findings = records.findings
 
-    // The read set is checked against the index, which the refresh under this lock has
-    // just brought level with the files, so a record another process moved between the
-    // caller's read and this lock is seen here at its new version.
+    // The read set is checked against the read taken under this lock, so a record another
+    // process moved between the caller's read and this lock is seen here at its new version.
     for (const read of transaction.reads ?? []) {
-      const actual = this.#index.versionOf(read.id)
+      const actual = records.byId.get(read.id)?.item.version
       if (actual === read.version) continue
       return storeFail(
         'CONFLICT', 'S10',
@@ -758,7 +755,7 @@ export class ShardedStore implements Store {
       )
     }
 
-    const dangling = this.#referentialRefusal(transaction)
+    const dangling = this.#referentialRefusal(transaction, records)
     if (dangling !== undefined) return dangling
 
     for (const write of transaction.writes) {
@@ -772,10 +769,10 @@ export class ShardedStore implements Store {
       if (!('chunks' in shard)) return shard
       shards.set(file, shard)
 
-      const resolved = this.#resolve(write.item.id, file, shard, findings)
+      const resolved = this.#resolve(write.item.id, file, shard, findings, records)
       if (!resolved.ok) return resolved
       const stored = resolved.value
-      const conflict = await this.#compareAndSet(write.item.id, stored, write.ifVersion)
+      const conflict = await this.#compareAndSet(write.item.id, stored, write.ifVersion, records)
       if (conflict !== undefined) return conflict
 
       const version = (stored === undefined ? 0 : Number(stored.fields.get('version') ?? 0)) + 1
@@ -801,10 +798,10 @@ export class ShardedStore implements Store {
 
     for (const removal of transaction.removes ?? []) {
       await yieldToLoop()
-      // The record's own shard, found through the index rather than from its `filed_at`: the
+      // The record's own shard, found through the read rather than from its `filed_at`: the
       // caller hands in an id and a version, not a record, and a record never moves between
-      // shards, so the row is the one place that knows which file holds it.
-      const row = this.#index.itemRow(removal.id)
+      // shards, so the file the read found it in is what says which shard holds it.
+      const row = records.byId.get(removal.id)
       if (row === undefined) {
         return storeFail('CONFLICT', 'S10', `${removal.id} is not in the store, so version ${removal.ifVersion} cannot be matched`, [removal.id], { expected: removal.ifVersion })
       }
@@ -812,9 +809,9 @@ export class ShardedStore implements Store {
       if (!('chunks' in shard)) return shard
       shards.set(row.file, shard)
 
-      const resolved = this.#resolve(removal.id, row.file, shard, findings)
+      const resolved = this.#resolve(removal.id, row.file, shard, findings, records)
       if (!resolved.ok) return resolved
-      const conflict = await this.#compareAndSet(removal.id, resolved.value, removal.ifVersion)
+      const conflict = await this.#compareAndSet(removal.id, resolved.value, removal.ifVersion, records)
       if (conflict !== undefined) return conflict
       shards.set(row.file, withoutRecord(shard, removal.id))
     }
@@ -837,7 +834,7 @@ export class ShardedStore implements Store {
       // and takes version 1 on its first configured write; two `config set` calls racing
       // therefore refuse the second with `S10` naming who moved it, rather than one of them
       // rewriting the whole record over the other.
-      const conflict = await this.#compareAndSet(chunk.record.id, chunk.record, workspace.ifVersion)
+      const conflict = await this.#compareAndSet(chunk.record.id, chunk.record, workspace.ifVersion, records)
       if (conflict !== undefined) return conflict
 
       const next: WorkspaceRecord = { ...stored.value, version: workspace.ifVersion + 1, config: workspace.config }
@@ -872,23 +869,20 @@ export class ShardedStore implements Store {
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
   }
 
+  /**
+   * The one shard a write is about to rewrite, read again under the lock. A transaction
+   * touches one or two of them, so this is a twenty-fourth of the read at the corpus DR2
+   * measures against, and holding every shard's parse from the read above to save it would
+   * cost the whole store's text in resident memory for the life of the command.
+   */
   async #readShard(file: string): Promise<ParsedFile | StoreResult<never>> {
     const full = path.join(this.#root, file)
-    // The refresh that ran a moment ago, under this same lock, may already have parsed this
-    // shard. A stat is what proves the bytes have not moved since, and it is what the
-    // freshness rule uses everywhere else, so reusing that parse re-reads nothing the rule
-    // does not already treat as unchanged.
-    const kept = this.#parsedUnderLock.get(file)
-    if (kept !== undefined) {
-      const now = await stat(full).catch(() => undefined)
-      if (now !== undefined && now.size === kept.size && now.mtimeMs === kept.mtime) {
-        return this.#writableShard(kept.parsed, file)
-      }
-    }
     let text: string
     try {
       text = await readFile(full, 'utf8')
-    } catch {
+    } catch (error) {
+      // A month with no shard yet is the ordinary case on the first write into it.
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return this.#unreadable(full, error)
       return { schema: SCHEMA, header: renderHeader(SCHEMA), chunks: [], chunkById: new Map(), records: [], quarantined: [], crlf: false }
     }
     const parsed = parseFile(text, file)
@@ -914,7 +908,7 @@ export class ShardedStore implements Store {
 
   /** DR4: a stale version is a structured conflict naming who moved it, never an overwrite. */
   async #compareAndSet(
-    id: string, stored: ParsedRecord | undefined, ifVersion: number | undefined,
+    id: string, stored: ParsedRecord | undefined, ifVersion: number | undefined, records: Records,
   ): Promise<StoreResult<never> | undefined> {
     const actual = stored === undefined ? undefined : Number(stored.fields.get('version') ?? 0)
     if (ifVersion === undefined) {
@@ -926,7 +920,7 @@ export class ShardedStore implements Store {
     }
     if (actual === ifVersion) return undefined
 
-    const last = this.#index.lastEventFor(id)
+    const last = await this.#lastEventFor(id, records)
     const details: Record<string, string | number> = { expected: ifVersion, actual: actual as number }
     if (last !== undefined) { details['actor'] = last.actor; details['at'] = last.at; details['txn'] = last.txn }
     return storeFail(
@@ -946,13 +940,13 @@ export class ShardedStore implements Store {
    *
    * The two owners it reads are the two that already refuse a duplicate. In-file it is the
    * parser's `chunkById`, which quarantines every copy of a repeated id rather than naming a
-   * winner; across shards it is the index's `id text primary key`, whose refusal is the S3
-   * finding. A chunk the parser quarantined for any other reason is a record the read path
-   * does not serve, so a write to it is refused too: without that, a create found no record
-   * chunk and filed a second copy of the id into the same shard.
+   * winner; across shards it is the read, which serves the first shard to carry an id and
+   * raises `S3` on every later copy. A chunk the parser quarantined for any other reason is
+   * a record the read path does not serve, so a write to it is refused too: without that, a
+   * create found no record chunk and filed a second copy of the id into the same shard.
    */
   #resolve(
-    id: string, home: string, shard: ParsedFile, findings: readonly Finding[],
+    id: string, home: string, shard: ParsedFile, findings: readonly Finding[], records: Records,
   ): StoreResult<ParsedRecord | undefined> {
     const clash = duplicateRefusal(id, findings)
     if (clash !== undefined) return clash
@@ -967,7 +961,7 @@ export class ShardedStore implements Store {
       )
     }
 
-    const row = this.#index.itemRow(id)
+    const row = records.byId.get(id)
     if (row !== undefined && row.file !== home) {
       return storeFail('CONFLICT', 'S3', `${id} is already a record in ${row.file}; a record never moves between shards`, [id])
     }
@@ -1057,46 +1051,29 @@ function groupEvents(events: readonly StoreEvent[]): Journal['events'] {
   }
   return [...byFile].map(([file, entry]) => ({ path: file, lines: entry.lines, ids: entry.ids }))
 }
-
-export function rowOf(item: WorkItem, file: string, line: number, source: string): IndexedItem {
-  return {
-    id: item.id, file, line, type: item.type, state: item.state,
-    parent: item.parent_id ?? null,
-    priority: item.priority ?? null,
-    version: item.version,
-    assignee: item.assignee ?? null,
-    filed_at: item.filed_at,
-    title: item.title,
-    resolution: item.resolution ?? null,
-    due: item.due ?? null,
-    severity: item.severity ?? null,
-    relations: item.relations === undefined ? null : JSON.stringify(item.relations),
-    labels: item.labels === undefined ? null : JSON.stringify(item.labels),
-    source,
-  }
+/** The items a query selects, in the order the read holds them. */
+function selected(items: readonly Held[], query: ItemQuery): readonly Held[] {
+  const matched = items.filter((held) => (query.state === undefined || held.item.state === query.state)
+    && (query.type === undefined || held.item.type === query.type))
+  return query.limit === undefined ? matched : matched.slice(0, query.limit)
 }
 
 /**
- * The inverse of `rowOf` over the columns a summary carries. An absent field is absent, not
- * null, so a summary reads exactly as the whole item decodes from the same record.
+ * The first record this transaction would leave naming `id`, or `undefined`. The two kinds
+ * are the two ways one record holds another's id: a child's parent and a stored relation edge.
+ * `skip` names every id the transaction touches, which are the ones judged from it instead.
  */
-export function summaryOf(row: SummaryRow, intern: (value: string) => string = (value) => value): WorkItemSummary {
-  return {
-    id: row.id,
-    type: intern(row.type) as WorkItemType,
-    state: intern(row.state) as WorkItemState,
-    title: row.title,
-    filed_at: row.filed_at,
-    version: row.version,
-    ...(row.priority === null ? {} : { priority: row.priority }),
-    ...(row.parent === null ? {} : { parent_id: row.parent }),
-    ...(row.assignee === null ? {} : { assignee: intern(row.assignee) }),
-    ...(row.resolution === null ? {} : { resolution: intern(row.resolution) as Resolution }),
-    ...(row.due === null ? {} : { due: row.due }),
-    ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),
-    ...(row.relations === null ? {} : { relations: JSON.parse(row.relations) as readonly StoredRelation[] }),
-    ...(row.labels === null ? {} : { labels: JSON.parse(row.labels) as readonly string[] }),
+function referrerOf(records: Records, id: string, skip: readonly string[]): Referrer | undefined {
+  for (const held of records.items) {
+    if (skip.includes(held.item.id)) continue
+    if (held.item.parent_id === id) return { kind: 'parent', id: held.item.id }
   }
+  for (const held of records.items) {
+    if (skip.includes(held.item.id)) continue
+    const edge = held.item.relations?.find((relation) => relation.target === id)
+    if (edge !== undefined) return { kind: 'relation', id: held.item.id, relation: edge.kind }
+  }
+  return undefined
 }
 
 export async function openWorkspace(

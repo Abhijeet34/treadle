@@ -200,7 +200,8 @@ describe('the referential rule under the orders that attack it', () => {
     // is the only caller that can name two removals in one transaction.
     for (const [at, child] of ['onboard-copy', 'avatar-crop'].entries()) {
       // A fresh seed per write: two `set`s off one sequential generator mint the same event
-      // id, which is `S14` and makes the read below fail for a reason this test is not about.
+      // id, and one id naming two events makes the read below fail for a reason this test is
+      // not about.
       const set = await setFields(...apply(demo.store, 600 + at * 10), { id: child, assignments: ['parent_id=auth-refresh'], actor: ACTOR })
       assert.equal(set.ok, true, String(set.data['cause']))
     }

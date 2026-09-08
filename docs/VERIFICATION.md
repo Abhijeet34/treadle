@@ -3,8 +3,8 @@
 What this project claims about itself, what was measured, and what is not proven.
 
 Every figure here comes from a run of the suite in this repository, on Node 24.11.1.
-That is below the declared floor of 24.15 in `package.json`, so `npm install` warns and `node:sqlite` prints one experimental notice per process.
-Both are expected here and neither changes a number below.
+That is below the declared floor of 24.15 in `package.json`, so `npm install` warns.
+The warning is expected here and changes no number below; nothing the tool needs is newer than Node 24.0.
 
 Counts are per run, and every property suite prints its own count as a test diagnostic, so a run that generated less than it claims says so rather than reporting a silent pass.
 
@@ -39,15 +39,16 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A done item points at evidence | `DOD7` is the only failing rule on an otherwise complete bug, and its remedy is the command that fixes it; a hand edit removing the section is `H21` | Proven |
 | A paused lock holder never overwrites the writer that reclaimed it | A writer stopped with `SIGSTOP` inside its critical section, a competitor reclaiming after the 5 s window: before, 1 lost update in 117 writes with `doctor` clean; after, 5 runs of 5 with version equal to update events plus one, the paused writer refusing `LOCK_LOST`/`S16` or `CONFLICT`/`S10` (`test/store/lock.test.ts`) | Proven |
 | No symbolic link at or below the workspace root is followed | 7 paths each replaced by a link to a directory outside the workspace, `items` among them: before, `file` wrote its shard through the link; after, every read and write refuses `S15` naming the link and its target, 0 bytes written outside (`test/store/symlink.test.ts`) | Proven |
-| The event log holds the same property the record files hold | A repeated event id across two month files replaced the real creation event in `history` and `explain` with `doctor` clean; now `S14` at the line, every read refusing at 7. An instant naming month 13 sorted after every real event; now refused. A blank line moved the reported line of an appended bad line by one; now the line the file has (`test/store/event-log-integrity.test.ts`, `test/services/event-audit.test.ts`) | Proven |
-| A duplicate-id finding goes with the file it clashed against | A shard copied to a second month and then removed left `S3` refusing every read until the surviving shard changed or the index was deleted; the index now records which file a clash was decided against and re-reads the survivor when that file changes or goes, for `S3` and `S14` alike (`test/store/event-log-integrity.test.ts`) | Proven |
-| A finding recorded by a partial read never locks the workspace | One process running `set` in a loop beside one running `show`, 200 iterations a side through the entry point: before, the reader re-indexed the tail the writer had just indexed and recorded one false `S14` per line, the workspace locked after the 17th write, 183 of 200 sets and 182 of 200 shows exited 7; now 400 of 400 exit 0 and `doctor` is clean at 202 events. An append that meets a moved base or a clashing line is handed back with nothing written and the whole pass decides, held by construction on the index (`test/store/event-log-integrity.test.ts`) and as 60 sets beside 60 shows in real processes (`test/cli/index-append-race.test.ts`); a repeat the tail really carries is still `S14` at its line | Proven |
-| A locked workspace is recovered by the step the refusal prints | A finding planted in the index under a file's true fingerprint, which no refresh would re-read: `show` exits 7 naming `S14` with `fix treadle doctor`, running exactly that line re-derives the index from the files, reports `clean`, and `show` exits 0; with the duplicate really in the log, `doctor` exits 7 naming the file and line and `show` stays at 7 (`test/cli/doctor-recovery.test.ts`) | Proven |
+| The event log holds the same property the record files hold | An instant naming month 13 sorted after every real event; now refused. A blank line moved the reported line of an appended bad line by one; now the line the file has (`test/store/event-log-integrity.test.ts`, `test/services/event-audit.test.ts`). The repeated-event-id half of this row went with the index that owned it: `S14` was a primary key over the whole log, ADR-0030 removed the table, and both copies of a repeated id are now served in file and line order | Partly proven, and narrower than it was |
+| A duplicate-id finding goes with the file it clashed against | A shard copied to a second month and then removed left `S3` refusing every read until the surviving shard changed. Every read now decides `S3` from the shards it just parsed, so a clash cannot outlive the file it was decided against and the column that used to make that true is gone (`test/store/event-log-integrity.test.ts`) | Proven, by construction |
+| A finding recorded by a partial read never locks the workspace | One process running `set` in a loop beside one running `show`, 200 iterations a side through the entry point: before, the reader re-indexed the tail the writer had just indexed and recorded one false finding per line, the workspace locked after the 17th write, 183 of 200 sets and 182 of 200 shows exited 7. There is no partial read left to record one: ADR-0030 removed the tail re-index with the index, and a read that finds a file changed parses it whole | Proven, by construction |
+| A locked workspace is recovered by the step the refusal prints | A finding could be planted under a file's true fingerprint, which no refresh would re-read, and `doctor` was the one command that forgot every fingerprint. Nothing outlives a command to plant a finding in: every finding a read reports was decided by that read, from the file it names (ADR-0030) | Proven, by construction |
+| An unreadable store refuses rather than answering empty | `EACCES` on the items directory answered `items 0` at exit 0 from `status`, `doctor` and `backlog`, `NOT_FOUND` from `show`, and `history` answered "no recorded change" over an unreadable log; an unreadable shard escaped as exit 1 `INTERNAL` with no rule id. All five now refuse `STORE_UNAVAILABLE`/`S13` at exit 6 naming the path and the failing syscall, in all three renderings (`test/cli/unreadable-store.test.ts`) | Proven |
 | The store never writes a record it would not serve back | `set acceptance_criteria="a\nb"` landed and every read after it exited 7; now refused at 2 as `V4`, and the store parses every record it renders before the write (`test/cli/found-by-use.test.ts`) | Proven |
 | The lock reclaim race resolves without an overlapping hold | 24 waiters over 600 contended reclaims, 0 overlapping holds | Proven |
 | A symlinked or a foreign-pid lock does not wedge the store | both forms reclaimed within the 5 s window | Proven |
-| No field injects into the index's SQL | every query is parameterised, and `backlog` answers byte-identical across a rebuild | Proven |
-| A poisoned index does not survive a rebuild | hand-written rows in the index did not survive the next rebuild | Proven |
+| No field injects into a query | Measured while the store held a SQL index, where every query was parameterised and `backlog` answered byte-identical across a rebuild. ADR-0030 removed the index, so there is no query language left to inject into: a read is `parseFile` and `decodeItem` over bytes | Proven, and the surface is gone |
+| A hand-written row cannot be served as a record | Measured as hand-written rows in the index not surviving the next rebuild. ADR-0030 removed the index, so the only place a record can be written is the shard, where it is a record and `doctor` audits it like any other | Proven, and the surface is gone |
 | The store holds under its declared ceilings | 1.1 million events at 239 MB: the index rebuilds in 123 s and still serves | Proven |
 | No write leaves a record naming an id the store does not hold | The interleavings, two store instances on one workspace with the first held at its `apply`: before, each landed - a `blocks` edge on a removed item, and two orders leaving a `parent_id` on one, both of which `doctor` reported clean at exit 0. After, each is refused inside the write lock, `S17` for the removal and `S10` for the parent write, with the store holding no edge and no parent to a missing record (`test/services/removal-race.test.ts`) | Proven |
 | The rule costs nothing the 24-writer proof can see | Five interleaved rounds a side at a 1-minute load of 2.6: 24 of 24 writes persisted in all ten, 0 lost updates, 0 corrupt shards, 0 quarantined; compare-and-set attempts 56 to 76 before and 58 to 78 after, wall 2,353 to 2,679 ms before and 2,389 to 2,635 ms after (`test/store/lock.test.ts`) | Proven |
@@ -239,6 +240,61 @@ rule S13
 `test/cli/robustness.test.ts` fails 3 of 3 against the old sources and passes against the new ones.
 
 A return type that says it reports failures has to report them.
+
+## The unreadable store that read as empty, red then green
+
+The read path swallowed every errno the filesystem gave it, and a store nothing could open
+answered as a store holding nothing. Driven through the built bundle on a workspace holding
+two records, with `chmod 000` on the paths, at `1bc0049`:
+
+```text
+$ chmod 000 .work/items && treadle status --out agent
+ok status <workspace>
+items 0
+findings 0
+rc=0
+$ treadle doctor --out agent
+ok doctor <workspace>
+checked 0
+clean checked 0 items and 3 events
+rc=0
+$ treadle show first-task --out agent
+err NOT_FOUND <workspace>
+"cause first-task is in no record here; this workspace holds 0 items
+rc=5
+$ chmod 755 .work/items && chmod 000 .work/items/*.md && treadle status --out agent
+err INTERNAL -
+"cause status did not complete: Error: EACCES: permission denied, open '.../.work/items/2026-09.md'
+fix treadle version
+rc=1
+$ chmod 644 .work/items/*.md && chmod 000 .work/events && treadle history first-task --out agent
+ok history <workspace>
+none first-task has no recorded change
+rc=0
+```
+
+Four commands reported an empty workspace at exit 0 over records that exist, one reported a
+record that exists as `NOT_FOUND`, and the shard case escaped as `INTERNAL` with a raw path
+and no rule id. The events directory was the fourth surface and was not in the report that
+found the first three.
+
+After, on the same script, every one of the same paths:
+
+```text
+err STORE_UNAVAILABLE -
+rule S13
+entity .../.work
+"cause .../.work/items could not be read: scandir failed with EACCES
+fix treadle status
+rc=6
+```
+
+with `.../.work/items/2026-09.md could not be read: open failed with EACCES` for the shard and
+`.../.work/events could not be read: scandir failed with EACCES` for the log, in all three
+renderings, at exit 6. `test/cli/unreadable-store.test.ts` is the regression, and it fails
+against the sources before this change.
+
+A store that cannot be read says so. It does not answer.
 
 ## The gate that demanded a field nothing could set
 

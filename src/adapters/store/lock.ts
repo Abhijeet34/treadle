@@ -30,7 +30,7 @@ import { storeFail, storeOk, type StoreResult } from '../../application/ports/st
 import { openExclusive } from './atomic.ts'
 
 const HEARTBEAT_MS = 200
-export const STALE_MS = 5_000
+const STALE_MS = 5_000
 const RETRY_MIN_MS = 5
 const RETRY_MAX_MS = 25
 const NOTE_AFTER_MS = 1_000

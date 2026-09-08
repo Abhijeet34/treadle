@@ -19,12 +19,11 @@ import { EXIT_INTERRUPTED } from './exit.ts'
 // any one workspace. It is an optimisation, so a runtime that declines it is not an error.
 module.enableCompileCache?.()
 
-// The runtime's own notices are filtered by name so one can never precede the envelope
-// (DR5). node:sqlite is Stability 1.2 and prints one experimental warning per process below
-// the supported floor; everything else the runtime says still reaches stderr.
+// The runtime's own notices are routed through one writer so none can precede the envelope
+// (DR5). Nothing is filtered by name any more: the one notice that was filtered, an
+// experimental warning from the index's database engine, is gone because the index is.
 process.removeAllListeners('warning')
 process.on('warning', (warning) => {
-  if (warning.name === 'ExperimentalWarning' && warning.message.includes('SQLite')) return
   process.stderr.write(`${warning.name}: ${warning.message}\n`)
 })
 
