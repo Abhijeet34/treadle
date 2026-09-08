@@ -50,6 +50,19 @@ export function actorRefusal(actor: Actor): string | undefined {
     : 'an actor must be a single line with no control or bidi override characters'
 }
 
+/**
+ * Why an actor kind cannot be recorded, or `undefined`. `help` says
+ * `TREADLE_ACTOR_KIND=human|agent`, and every other value was silently recorded as `human`:
+ * `robot` and `AGENT` both landed there, so the field the purpose statement's "user-agent
+ * interactions" is read from carried a value nobody wrote. It is the same class as an actor
+ * with a control character in it, and it is refused the same way, on mutations only, because
+ * that is where the kind reaches the log.
+ */
+export function actorKindRefusal(kind: string | undefined): string | undefined {
+  if (kind === undefined || kind === 'human' || kind === 'agent') return undefined
+  return `TREADLE_ACTOR_KIND is ${kind}, and an actor kind is human or agent`
+}
+
 export type EventInput = {
   readonly id: string
   readonly at: string

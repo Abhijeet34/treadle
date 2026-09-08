@@ -22,7 +22,7 @@ import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/servic
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { removeItem } from '../application/services/removal.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
+import { actorKindRefusal, actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
 import { randomIds } from '../adapters/ids.ts'
@@ -440,6 +440,13 @@ async function execute(env: Environment): Promise<number> {
     const badActor = actorRefusal(actorOf(env, flags))
     if (badActor !== undefined) {
       return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)
+    }
+    // The raw variable, because `actorOf` above has already resolved it to one of the two
+    // words: anything else was recorded as `human` in silence, against a `help` line that
+    // names the pair. There is no flag for it, so the remedy is the export itself.
+    const badKind = actorKindRefusal(env.env['TREADLE_ACTOR_KIND'])
+    if (badKind !== undefined) {
+      return emit(env, validation(command ?? 'treadle', badKind, ['export TREADLE_ACTOR_KIND=agent']), flags)
     }
   }
 
