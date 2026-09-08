@@ -154,6 +154,12 @@ type FlagToken = {
   readonly inline: boolean
   /** The next argv entry, which is where a non-inline value would have to come from. */
   readonly next: string | undefined
+  /**
+   * The whole argv entry this token came from. A short cluster explodes one entry into one
+   * `FlagToken` per letter, so `raw` alone would name `-1` for the entry `-100` - a token the
+   * caller never wrote. A refusal that names the argv token names this instead.
+   */
+  readonly source: string
 }
 
 /** Every flag on the line, in order, with a short letter resolved through the option table. */
@@ -169,7 +175,7 @@ function flagTokens(argv: readonly string[], options: OptionConfig): readonly Fl
     const next = argv[index + 1]
     if (token.startsWith('--') && token.length > 2) {
       const name = token.slice(2).split('=')[0] as string
-      out.push({ raw: `--${name}`, name, inline: token.includes('='), next })
+      out.push({ raw: `--${name}`, name, inline: token.includes('='), next, source: token })
       continue
     }
     if (!token.startsWith('-') || token.length < 2) continue
@@ -185,6 +191,7 @@ function flagTokens(argv: readonly string[], options: OptionConfig): readonly Fl
         name: shorts.get(letter) ?? letter,
         inline: equals >= 0 && last,
         next: last ? next : undefined,
+        source: token,
       })
     }
   }
@@ -216,10 +223,10 @@ function flagFault(
       // sentence about the wrong thing - the caller wrote a value, and the sentence sent
       // them to a flag list that could not hold one. `--` is what carries it through, and
       // the value is then refused by the key's own rule, which is the answer they asked for.
-      if (NEGATIVE_NUMBER.test(token.raw)) {
+      if (NEGATIVE_NUMBER.test(token.source)) {
         return {
           ok: false,
-          cause: `${token.raw} was read as a flag of ${scope}, and an operand beginning with a dash is written after --`,
+          cause: `${token.source} was read as a flag of ${scope}, and an operand beginning with a dash is written after --`,
           fix,
         }
       }

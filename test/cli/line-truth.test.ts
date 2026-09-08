@@ -269,6 +269,22 @@ describe('a value this line cannot mean is refused wherever the line writes it',
     assert.equal(run.code, EXIT_OF.VALIDATION, run.err)
     assert.match(run.err, /^"cause --nope is not a flag of backlog$/m, run.err)
   })
+
+  it('names a multi-digit or non-integer dash-led operand whole, not the letter a cluster split it into', async () => {
+    const multiDigit = await cli(['config', 'set', 'aging_days', '-100'])
+    assert.equal(multiDigit.code, EXIT_OF.VALIDATION, multiDigit.err)
+    assert.match(multiDigit.err, /^"cause -100 was read as a flag of config, and an operand beginning with a dash is written after --$/m, multiDigit.err)
+
+    const decimal = await cli(['config', 'set', 'aging_days', '-0.5'])
+    assert.equal(decimal.code, EXIT_OF.VALIDATION, decimal.err)
+    assert.match(decimal.err, /^"cause -0\.5 was read as a flag of config, and an operand beginning with a dash is written after --$/m, decimal.err)
+  })
+
+  it('still names the flag, not the dash-led value, when a flag needing a value is written first', async () => {
+    const run = await cli(['backlog', '--priority', '-1'])
+    assert.equal(run.code, EXIT_OF.VALIDATION, run.err)
+    assert.match(run.err, /^"cause --priority needs a value, and one starting with a dash is written --priority=-1$/m, run.err)
+  })
 })
 
 describe('the first sentence the tool says about itself', () => {
