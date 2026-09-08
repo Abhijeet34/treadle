@@ -510,10 +510,9 @@ function relationTally(items: readonly WorkItem[]): Corpus['relations'] {
   return tally
 }
 
-export type Generated = {
+/** What a generation run reports back: how long it took, and the longest blocks chain in it. */
+type Generated = {
   readonly ms: number
-  readonly impediments: number
-  readonly relations: { readonly total: number; readonly blocks: number; readonly duplicates: number; readonly relates_to: number }
   readonly chain: number
 }
 
@@ -562,16 +561,6 @@ async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Gene
     const relations = byIndex.get(index)
     return relations === undefined ? item : { ...item, relations }
   })
-  const tally = { total: 0, blocks: 0, duplicates: 0, relates_to: 0 }
-  for (const list of byIndex.values()) {
-    for (const relation of list) {
-      tally.total += 1
-      if (relation.kind === 'blocks') tally.blocks += 1
-      else if (relation.kind === 'duplicates') tally.duplicates += 1
-      else if (relation.kind === 'relates_to') tally.relates_to += 1
-    }
-  }
-
   const byMonth = new Map<string, { writes: { item: WorkItem }[]; events: StoreEvent[] }>()
   for (const item of items) {
     const month = item.filed_at.slice(0, 7)
@@ -593,7 +582,7 @@ async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Gene
   }
 
   const elapsed = performance.now() - started
-  return { ms: elapsed, impediments: impedimentIndexes.length, relations: tally, chain }
+  return { ms: elapsed, chain }
 }
 
 /** Deletes the derived index so the next open pays DR8's first-index-build budget. */

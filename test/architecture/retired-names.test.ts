@@ -7,6 +7,9 @@
 // one live argv passing a flag the CLI now refuses, which aborted `npm run bench` on the branch.
 // Its review caught five of them by reading; a sweep afterwards found the rest.
 //
+// The apparatus cut that followed it adds its own names below: the unenforced budget keys, the
+// gate status that printed them, and three dead members the same sweep found.
+//
 // The proof of done that should have caught them could not. It was
 // `git grep -niE '...\bpoints\b...\bboard\b'`, and `git grep -E` treats `\b` as a literal, so
 // those two terms matched zero lines and 139 locations were never looked at. A search that
@@ -71,6 +74,27 @@ const RETIRED: readonly Retired[] = [
   { name: 'H28', by: 'ADR-0029' },
   { name: 'H29', by: 'ADR-0029' },
   { name: 'I5', by: 'ADR-0029, which moved the rule to V9' },
+  // The apparatus cut: the benchmark budgets that could not fail a build, and the gate
+  // status that served them. PR "cut the weight from treadle's apparatus", 2026-09-08.
+  { name: 'OPEN MISS', by: 'the apparatus cut', spelling: /OPEN MISS|'open miss'/ },
+  { name: 'openMisses', by: 'the apparatus cut' },
+  { name: 'timingEnforced', by: 'the apparatus cut' },
+  { name: 'timingWhy', by: 'the apparatus cut' },
+  { name: 'worstRss', by: 'the apparatus cut' },
+  { name: 'peakRssReadKb', by: 'the apparatus cut' },
+  { name: 'peakRssMutationKb', by: 'the apparatus cut' },
+  { name: 'indexToTextRatio', by: 'the apparatus cut' },
+  // `firstIndexBuildMs` and `reindexAfterHandEditMs` are NOT listed: the budgets that read
+  // them went, and the two measurements they read are still taken and still reported.
+  // The `enforced` key on a budget row, which only ever meant `false`; every row is armed now.
+  { name: 'enforced', by: 'the apparatus cut', spelling: /"enforced":/ },
+  // `deps` as a commit type. It stays legitimate as a scope, which `chore(deps)` and
+  // `ci(deps)` are, so this matches only the quoted type-enum entry.
+  { name: 'deps', by: 'the apparatus cut', spelling: /'deps'/ },
+  // Dead code the litter sweep found, each with no reader anywhere in the tree.
+  { name: 'Diagnostics.level', by: 'the litter sweep', spelling: /\bDiagnostics\.level\b/ },
+  { name: 'Generated.impediments', by: 'the litter sweep', spelling: /\bGenerated\.impediments\b/ },
+  { name: 'Generated.relations', by: 'the litter sweep', spelling: /\bGenerated\.relations\b/ },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]

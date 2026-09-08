@@ -87,7 +87,8 @@ fix(store): release the lock when an atomic write fails
 docs: record the pre-1.0 stability policy
 ```
 
-Types in use: `feat`, `fix`, `docs`, `chore`, `deps`, `ci`, `test`, `perf`, `refactor`.
+Types in use: `feat`, `fix`, `docs`, `chore`, `build`, `ci`, `test`, `perf`, `refactor`.
+Each is a section in `release-please-config.json`; a dependency bump is a scope, `chore(deps)` or `ci(deps)`, not a type.
 The subject is imperative, at most 72 characters, and has no trailing period.
 A breaking change carries `!` after the type or a `BREAKING CHANGE:` footer, and [docs/STABILITY.md](docs/STABILITY.md) says what counts as one.
 

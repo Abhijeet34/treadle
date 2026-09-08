@@ -43,7 +43,7 @@ It refuses a tag that is lightweight, that carries no signature `git verify-tag`
 It does not check the tag's name; the next section says why.
 
 It also refuses a `dist/` older than any file under `src/`.
-`package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory has eighteen.
+`package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory then had nineteen (2026-09-07).
 The obvious remedy is a `prepack`, and this repository cannot have one.
 `.npmrc` sets `ignore-scripts=true` for the whole lifecycle as a supply-chain control, the workflow's own pack step passes `--ignore-scripts` on top of that, and `test/architecture/supply-chain.test.ts` refuses a manifest that declares `prepack` by name, because a declared script the lifecycle never executes is a gate that looks green and is not.
 So the clause sits in `scripts/release-preflight.ts`, which the workflow runs one step after `npm run build` and one step before it packs.
@@ -162,7 +162,7 @@ It clones this repository into a temporary directory, signs real tags in the clo
 It pushes nothing and never touches the real repository, which is why it is a script anyone can run rather than a workflow.
 
 Eight scenarios, all passing on 2026-09-07 and first on 2026-09-05: the signed annotated tag the release path accepts, five it refuses (lightweight, unsigned, wrong version, off the released branch, no bundle built), the publication interlock refusing a publish, and the hotfix path branched from the released tag, landed and tagged again.
-Re-run on 2026-09-07 because the preflight had gained its bundle-freshness and runtime-floor clauses since the first run, and a drill that predates the gate it rehearses proves nothing about it.
+Re-run on 2026-09-07 because the preflight had gained its bundle-freshness clause since the first run, and a drill that predates the gate it rehearses proves nothing about it.
 
 ```text
 drill: 8 passed, 0 failed

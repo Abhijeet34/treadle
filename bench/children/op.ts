@@ -173,12 +173,6 @@ switch (op) {
     }
     break
   }
-  case 'findings': {
-    const found = unwrap(await store.findings())
-    ops = 1
-    detail = { findings: found.length }
-    break
-  }
   default:
     process.stderr.write(`unknown op ${op}\n`)
     process.exit(2)

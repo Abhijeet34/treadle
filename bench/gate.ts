@@ -41,25 +41,25 @@ export type Budgets = {
 export const AXIS_BUDGET_KEYS = [
   'a1Durability', 'a1Crashes', 'a5SilentDrops', 'a5WholeStoreRefusals', 'a5Crashes',
 ] as const
-export type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
+type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
 
 export const ABSOLUTE_KEYS = [
   'doctorRssOverWorkspace', 'nextCostOverWorkspace',
   'runtimeDependencies', 'installUnpackedBytes', 'bundleBytes',
 ] as const
-export type AbsoluteKey = (typeof ABSOLUTE_KEYS)[number]
+type AbsoluteKey = (typeof ABSOLUTE_KEYS)[number]
 
 /** `why` carries what closed the budget or what it is watching, where the number alone does
  *  not say it. Every budget in this file is armed: a row that fails, fails the build. */
-export type AbsoluteBudget = {
+type AbsoluteBudget = {
   readonly limit: number
   readonly source: string
   readonly why?: string
 }
 
-export type GateStatus = 'pass' | 'fail' | 'pending'
+type GateStatus = 'pass' | 'fail' | 'pending'
 
-export type GateRow = {
+type GateRow = {
   readonly budget: string
   readonly observed: number | string
   readonly limit: number | string

@@ -26,7 +26,7 @@ function schemaNamed(name: string): Record<string, unknown> {
 }
 
 describe('every shape generates a schema', () => {
-  it('generates one per shape, and there is more than one shape', () => {
+  it('generates one schema per shape, and there is more than one shape', () => {
     assert.ok(SHAPES.length >= 9, `only ${SHAPES.length} shapes are registered`)
     assert.equal(written.size, SHAPES.length)
   })

@@ -96,8 +96,8 @@ export function preflight(input: {
   } else if (bundleBytes < bundleLimit / 10) {
     // A floor as well as a ceiling, found by truncating a bundle and watching the freshness
     // clause pass it: an mtime says when a file was written and not that a build wrote it. The
-    // measured bundle is 362,429 bytes against a 512,000 limit, so a tenth of the limit is far
-    // below any plausible build of this tool and far above a partial write.
+    // measured bundle sits at about half the limit, so a tenth of it is far below any plausible
+    // build of this tool and far above a partial write.
     problems.push(
       `dist/treadle.js is ${bundleBytes} bytes, under a tenth of DR1's ${bundleLimit}; `
         + 'that is a partial write rather than a build, so run npm run build again',

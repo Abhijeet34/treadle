@@ -47,7 +47,7 @@ function runWriter(root: string, id: string, month: string): Promise<WriterOutco
   })
 }
 
-export type ParallelRound = {
+type ParallelRound = {
   readonly writers: number
   readonly reportedOk: number
   readonly reportedRefused: number
@@ -139,7 +139,6 @@ export async function runA1(
       : `${worst?.writers} writers: ${worst?.persisted} persisted of ${worst?.reportedOk} reported ok`,
     operations,
     samples: writerCounts.length,
-    detail: { rounds, crashed, misTargetScenarios: 'NOT MEASURED: the A6 scenarios resolve a store from a working directory, which is the command layer' },
-    blockedOn: 'the mis-target half of this target is axis A6, which resolves a store from a working directory and needs the command layer',
+    detail: { rounds, crashed },
   }
 }

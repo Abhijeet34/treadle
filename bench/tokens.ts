@@ -15,7 +15,7 @@ import { createRequire } from 'node:module'
 
 const require_ = createRequire(import.meta.url)
 
-export type TokenizerName = 'claude' | 'o200k' | 'cl100k'
+type TokenizerName = 'claude' | 'o200k' | 'cl100k'
 
 export type TokenizerLoad =
   | { readonly ok: true; readonly name: TokenizerName; readonly package: string; readonly version: string; readonly count: (text: string) => number }

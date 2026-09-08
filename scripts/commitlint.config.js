@@ -5,7 +5,12 @@
 export default {
   extends: ['@commitlint/config-conventional'],
   rules: {
-    'type-enum': [2, 'always', ['feat', 'fix', 'docs', 'chore', 'deps', 'ci', 'test', 'perf', 'refactor']],
+    // `build` and not `deps`, decided against the evidence rather than by taste:
+    // release-please-config.json maps `build` to a changelog section and has no `deps`
+    // section at all, history holds two `build` commits and zero `deps` ones, and
+    // Dependabot writes `ci(deps)` and `chore(deps)`, where `deps` is the scope and not
+    // the type. A type this file allows and the changelog drops is a commit nobody reads.
+    'type-enum': [2, 'always', ['feat', 'fix', 'docs', 'chore', 'build', 'ci', 'test', 'perf', 'refactor']],
     'subject-case': [2, 'never', ['start-case', 'pascal-case', 'upper-case']],
     'header-max-length': [2, 'always', 72],
     'body-max-line-length': [0],

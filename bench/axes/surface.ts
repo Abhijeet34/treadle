@@ -20,7 +20,8 @@ import { runCli } from '../../test/helpers/cli-run.ts'
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BIN = path.join(ROOT, 'bin', 'treadle.js')
 
-export const ACTOR = 'dana'
+/** The actor every surface axis writes as, so a record's provenance names one name. */
+const ACTOR = 'dana'
 
 export type Invocation = {
   readonly argv: readonly string[]
@@ -91,7 +92,7 @@ export function dataOf(call: Invocation): Record<string, unknown> {
   return typeof data === 'object' && data !== null ? data as Record<string, unknown> : {}
 }
 
-export type Spawned = {
+type Spawned = {
   readonly argv: readonly string[]
   readonly code: number
   readonly out: string

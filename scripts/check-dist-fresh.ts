@@ -3,10 +3,11 @@
 //
 // Found by walking into it on 2026-09-07: a checked-out tree carried a `dist/treadle.js`
 // from 2026-09-05 beside a `src/` from 2026-09-07, and `treadle help` reported fourteen
-// commands where the inventory has nineteen. `package.json` lists `dist/` in `files`, points
-// `bin` at `dist/treadle.js` and gitignores the directory, and no `prepare`, `prepack` or
-// `prepublishOnly` script existed, so `npm pack` in that tree would have shipped the
-// fourteen-command tool with a nineteen-command README and nothing would have said so.
+// commands where the inventory then had nineteen (2026-09-07). `package.json` lists `dist/`
+// in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, and no
+// `prepare`, `prepack` or `prepublishOnly` script existed, so `npm pack` in that tree would
+// have shipped the fourteen-command tool with a nineteen-command README and nothing would
+// have said so.
 //
 // THE OBVIOUS REMEDY IS A `prepack`, AND IT WOULD NOT RUN. This repository's `.npmrc` sets
 // `ignore-scripts=true` for the whole lifecycle (threat-model finding F13, control one),
@@ -25,7 +26,7 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 /** The newest modification time under one directory, in milliseconds, or undefined if empty. */
-export function newestUnder(directory: string): { readonly at: number; readonly file: string } | undefined {
+function newestUnder(directory: string): { readonly at: number; readonly file: string } | undefined {
   let newest: { at: number; file: string } | undefined
   const walk = (at: string): void => {
     for (const entry of readdirSync(at, { withFileTypes: true })) {

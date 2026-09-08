@@ -33,6 +33,7 @@ const A3: readonly { readonly name: string; readonly budget: number; readonly re
   { name: 'show', budget: 310, reference: 322 },
   { name: 'next', budget: 510, reference: 659 },
   { name: 'explain', budget: 750 },
+  { name: 'history', budget: 630 },
   { name: 'transition', budget: 230 },
   { name: 'transition-already', budget: 110 },
   { name: 'transition-dry-run', budget: 250 },
