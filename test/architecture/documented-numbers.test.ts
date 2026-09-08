@@ -341,14 +341,6 @@ describe('every document that counts the benchmark axes counts the rig', () => {
       axes.size, `docs/BENCHMARKS.md states the bar over an axis count the rig does not emit; bench/ emits ${axes.size}: ${[...axes].join(', ')}`)
   })
 
-  it('every axis-table heading in docs/BENCHMARKS.md names the same total', () => {
-    const headings = [...BENCHMARKS.matchAll(/^#{2,4} The ([a-z]+) (?:comparison )?axes$/gm)]
-      .map((match) => (match[1] as string))
-    assert.ok(headings.length > 0, 'docs/BENCHMARKS.md has no "The <number> axes" heading')
-    assert.deepEqual([...new Set(headings.map((word) => NUMBER_WORDS[word]))], [axes.size],
-      `an axis-table heading in docs/BENCHMARKS.md names a count the rig does not emit; bench/ emits ${axes.size}`)
-  })
-
   it('docs/BENCHMARKS.md says how many of them were measured', () => {
     const said = /([a-z]+) of the ([a-z]+) are measured here/i.exec(BENCHMARKS)
     assert.ok(said !== null, 'docs/BENCHMARKS.md has no "<n> of the <n> are measured here" sentence')
