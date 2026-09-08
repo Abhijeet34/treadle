@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // The presentation flags, against what the tool actually does with them.
 //
-// Measured on 2026-09-07: `treadle help <cmd>` said of `--width` and `--color`, on nine
+// Measured on 2026-09-07, before ADR-0029 removed the colour flag: `treadle help <cmd>`
+// said of `--width` and `--color`, on nine
 // commands that all present something, "accepted and ignored: it only changes presentation,
 // and here there is nothing to present". Half of that verdict was wrong in each direction.
 // `--width` is read by the human rendering on every command, so it is supported and a caller

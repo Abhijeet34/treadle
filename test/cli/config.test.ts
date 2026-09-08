@@ -281,7 +281,7 @@ describe('a workspace record the grammar quarantines names the line to edit', ()
 
   it('does not offer treadle init, which answers already and fixes nothing', async () => {
     const file = path.join(rig.root, 'workspace.md')
-    await writeFile(file, `${await readFile(file, 'utf8')}\n## Ready gate\n\nR1 all field_present:title A title\n\n## Ready gate\n\nR2 all estimate_set Estimated\n`, 'utf8')
+    await writeFile(file, `${await readFile(file, 'utf8')}\n## Ready gate\n\nR1 all field_present:title A title\n\n## Ready gate\n\nR2 all no_active_blocker Nothing blocks it\n`, 'utf8')
 
     for (const argv of [['status'], ['doctor'], ['config']]) {
       const run = await cli(argv)

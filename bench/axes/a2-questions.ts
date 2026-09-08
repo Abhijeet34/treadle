@@ -17,7 +17,7 @@
 // and for one release after it was not, and 14 and 15 asserted there was no history verb
 // from #21 onward. So an absence is put to the tool rather than remembered: a question with
 // a command to aim at is aimed at it, including when the expected answer is a refusal, and
-// only a question the inventory can offer nothing for carries its verdict in prose. Five
+// only a question the inventory can offer nothing for carries its verdict in prose. Four
 // questions carry prose again after the purpose ADR removed sprints, estimation and the
 // board, and each says what was removed rather than that it never existed.
 

@@ -18,10 +18,11 @@ The design was written before the code, so prefer reading a doc over inferring f
 the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams),
 `docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
 name), `docs/STABILITY.md` (what counts as a breaking change), `docs/PROVENANCE.md`
-(clean-room process). `README.md`'s Status table says what is implemented and what is only
-specified. `docs/architecture/adr/` holds one record per built decision, with the store's
-closed set of `S` rule ids in its `README.md`; each record ends with what it departs from in
-the design that preceded it.
+(clean-room process). `README.md`'s Status table says what is Shipped, Queued, Declined or
+Removed, each with the record that holds it.
+`docs/architecture/adr/` holds one record per built decision, with the store's closed set of
+`S` rule ids in its `README.md`; each record ends with what it departs from in the design that
+preceded it.
 
 ## Build and test
 
@@ -514,15 +515,18 @@ and none of those four recorded one. Read that record before proposing any of th
 argument for each is still in ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028, all five
 marked superseded.
 
-A field leaving the dictionary is not a file migration and must not become one. `isKnownField`
-is what `decodeItem` asks, so `sprint_id`, `points`, `hours_estimate`, `timebox_hours` and
-`component` are unknown keys now: they land in `extra`, travel with the item, and `encodeItem`
-writes them back unchanged (DR3). A workspace written before the cut therefore loads, serves and
-round-trips whole, `show` reports an `extra` count rather than values this build cannot
-validate, and `doctor` says nothing about it because nothing is wrong. `test/store/retired-fields.test.ts`
-is that behaviour as a test. Removing a field means removing it from the dictionary and from
-the surfaces that print it, and nothing else; adding it to `RETIRED_FIELDS` would be the wrong
-move, because that map renames a key rather than retiring one.
+A field leaving the dictionary is not a file migration and must not become one. Declare it in
+`RETIRED_FIELDS` in `src/adapters/store/item-codec.ts`, mapped to the key it is read as now, or
+to `null` when nothing replaces it. A declared key is read and then not carried, so it never
+reaches `extra` and the next ordinary write drops it: no user action, no cleanup command, no
+file rewritten, and no cost pushed onto whoever stored a record before the field went. That is
+the whole migration `target_date` needed and the whole one the five fields ADR-0029 retired
+needed. A key this build has simply never seen, from a NEWER writer, is the other case and is
+still carried into `extra` untouched, which is why the declared set is safe where dropping every
+unknown key would be data loss. `test/store/retired-fields.test.ts` holds both cases side by
+side. Removing a field means taking it out of the dictionary and the surfaces that print it AND
+declaring it retired; leaving that declaration out is what makes a removed field ride every
+record forever.
 
 ## Where a terminal nuance goes, and where a derived flag goes
 

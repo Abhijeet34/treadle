@@ -75,7 +75,7 @@ export const HISTORY_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'events',
-      // `what` projects stored values: an assignee, a reviewer, a component, an evidence
+      // `what` projects stored values: an assignee, a reviewer, a label, an evidence
       // pointer. Every one of them is written by a caller, and the cell is arity-1 because
       // `side` and `cell` refuse a value carrying whitespace, so it takes the marker
       // without taking the free-text column's placement.

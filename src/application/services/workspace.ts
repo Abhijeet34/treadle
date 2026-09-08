@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // `init`'s result, and the shape it is generated from. The directory creation itself is an
-// adapter (src/adapters/init.ts) because it is filesystem work; what a workspace reports
-// having created, and what it reports NOT having created, is contract and lives here.
+// adapter (`initWorkspace` in src/adapters/workspace.ts) because it is filesystem work; what
+// a workspace reports having created, and what it reports NOT having created, is contract and
+// lives here.
 //
 // The `not_created` line is not decoration. A tool an agent runs under someone else's
 // account has to make its blast radius checkable, and a negative that is never printed

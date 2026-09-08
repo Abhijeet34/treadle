@@ -163,7 +163,7 @@ It restores the state the item was held from, so an `on_hold` item's only non-te
 The model names `hold_reason` and `hold_until` and does not name a field to keep the held-from state in, so `held_from` is this implementation's storage of the rule.
 
 G2, G3 and G7 yield to an explicit override that carries a reason.
-G1, G4, G5, G6 and G8 never do: the answer there is to fix the item.
+G1, G5, G6 and G8 never do: the answer there is to fix the item.
 
 ## Hierarchy
 
@@ -272,7 +272,7 @@ Together they are the anti-attestation pair: the item was accepted by someone ot
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
-The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
+The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
 A workspace gate composes those; there is no custom predicate, because a gate is loaded from a text file and a text file cannot carry one.
 
 ## Workspace configuration

@@ -72,8 +72,10 @@ describe('the parser', () => {
   })
 
   it('refuses a flag no command declares rather than accepting it silently', () => {
+    // `--preview` was removed by ADR-0029, so no command declares it any more.
     const parsed = parse(['transition', 'a', 'ready', '--preview'])
     assert.equal(parsed.ok, false)
+    // The refusal names the removed flag, so a script still passing it is told which one.
     assert.match(parsed.ok ? '' : parsed.cause, /--preview is not a flag of transition/)
   })
 

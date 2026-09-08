@@ -10,8 +10,8 @@
 // application seam, and are here because the memory budgets are weighed over the worst of
 // these rows: a `list` bounded at 50 rows prices none of what a backlog at 50,000 items
 // actually holds. `workspace` is `readWorkspace`, the unbounded read every command performs;
-// `board --all`, `next` and `doctor` are the three commands that pay something on top of it,
-// and each was unmeasured until a corpus with relations in it existed to measure them on.
+// `next` and `doctor` are the two commands that pay something on top of it, and each was
+// unmeasured until a corpus with relations in it existed to measure them on.
 //
 // `relationCycle` is not a latency row. It is the load-time relation check taken apart into
 // the graph build and the cycle walk, once per scale, because both are superlinear in the

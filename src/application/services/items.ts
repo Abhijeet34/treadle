@@ -680,7 +680,7 @@ function columnRefusal(
       fix: [`treadle help ${command}`],
     })
   }
-  // G4, and the same rule the CLI's repeated-flag refusal takes one layer up: a line that
+  // The same rule the CLI's repeated-flag refusal takes one layer up: a line that
   // says one thing twice is answered once, and picking in silence is what makes it a defect.
   // `--fields id,id` printed the id column twice, which is honest and useless, and `--fields
   // +id` did it by adding a default column the caller could not see in their own line.

@@ -127,7 +127,7 @@ export function toMarkdown(report: RunReport): string {
 
   push('## Latency, one cold process per sample', '')
   push('`net p95` is the wall p95 with the spawn floor removed. `in-process p95` excludes Node startup and module loading entirely, which is the form axis A4 targets.')
-  push('`identity`, `get`, `list`, `create` and `transition` are store operations: the timed children call the store directly so a millisecond is not mostly argument parsing. `workspace` is the read every command performs, and `next` and `doctor` are the two commands whose cost is not the store\'s; none of the seven renders. What a caller gets back is scored by axes A2, A6, A7, A8, A10 and A12 below, which weigh behaviour rather than time.')
+  push('`identity`, `get`, `list`, `create` and `transition` are store operations: the timed children call the store directly so a millisecond is not mostly argument parsing. `workspace` is the read every command performs, and `next` and `doctor` are the two commands whose cost is not the store\'s; none of the eight renders. What a caller gets back is scored by axes A2, A6, A7, A8, A10 and A12 below, which weigh behaviour rather than time.')
   push('')
   for (const scale of report.latency) {
     push(`### ${scale.items} items, ${scale.shards} shards, largest shard ${scale.largestShardRecords} records`, '')

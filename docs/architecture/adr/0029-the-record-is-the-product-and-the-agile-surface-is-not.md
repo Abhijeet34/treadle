@@ -60,7 +60,7 @@ docs/STABILITY.md makes removing a field from a result object breaking, and pre-
 ## Consequences
 
 The bundle is 368,359 bytes against 476,647 before, measured by `npm run build` on the same tree: 108,288 bytes, 22.7 percent of the product, for capability the purpose does not ask for.
-Seven source files, four schemas and six test files leave the tree entirely.
+Seven source files, four schemas and seven test files leave the tree entirely.
 
 Four things a caller could do are gone and are not coming back under another name: a time box, a velocity tally, a state-grouped overview in one call, and an estimate.
 The last of them was already the weakest: `points` was validated against a scale and read by exactly one gate rule and one sort column, and no guard, gate or refusal anywhere else in the tool consulted it.

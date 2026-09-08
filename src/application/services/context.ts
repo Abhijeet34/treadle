@@ -40,7 +40,7 @@ export type WorkspaceView = {
   readonly identity: StoreIdentity
   /**
    * The workspace's own configuration, off the same record the identity came from: the
-   * review step, the point scale, the ranking weights, the column limits, `G4`'s boolean and
+   * review step, the ranking weights, the column limits, the aging threshold and
    * the two gates. Every consumer reads it from here rather than from a constant of its own,
    * which is what makes the Policy seam's second implementation data instead of a code path.
    */

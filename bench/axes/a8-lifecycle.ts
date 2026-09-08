@@ -17,8 +17,8 @@ import type { AxisResult } from './axis.ts'
 
 /** The rule ids a refusal on this axis may name: the transition rules and the guards. */
 const RULE_IDS = new Set([
-  'T1', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7',
-  'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8',
+  'T1', 'T3', 'T4', 'T5', 'T6', 'T7',
+  'G1', 'G2', 'G3', 'G5', 'G6', 'G7', 'G8',
 ])
 
 /** A held item restores the state it was held from, and every seed here is held from draft. */
@@ -81,7 +81,7 @@ export async function runA8(): Promise<{ readonly axis: AxisResult; readonly row
         const id = `pair-${n}-${from}-${to}`.replace(/_/g, '-')
         const filed = await surface.run([
           'file', seed.type, `Pair ${n}: ${from} to ${to}`, '--id', id,
-          '--points', '3', '--priority', '3',
+          '--priority', '3',
           ...(seed.type === 'story' ? ['--set', 'acceptance_criteria=the pair was attempted'] : []),
           '--out', 'json',
         ])

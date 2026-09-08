@@ -24,12 +24,11 @@
 // so the re-export clauses are stripped out of the reference text before the match.
 //
 // docs/DOMAIN.md IS a reader, and it is the only document that is. It publishes the domain
-// core's surface, so naming a symbol there is a deliberate claim about it; `MAX_GOAL`,
-// `MAX_EVIDENCE_REF` and `nextTowardDone` are exported for that and nothing else. No other
+// core's surface, so naming a symbol there is a deliberate claim about it; `MAX_EVIDENCE_REF`
+// and `nextTowardDone` are exported for that and nothing else. No other
 // document counts, and a decision record least of all: an ADR names the symbols it argued
 // about at the time it was written and goes on naming them after they are gone, so counting
-// one would have let `gateContextFor` through on the
-// strength of ADR-0023, ADR-0022 and ADR-0018 respectively.
+// one would have let `gateContextFor` through on the strength of ADR-0022.
 //
 // Only `src/` is held. Nine values under `test/`, `bench/` and `scripts/` are in the same
 // position and are left alone deliberately: a helper exported for symmetry inside a suite

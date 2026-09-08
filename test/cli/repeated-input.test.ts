@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// G1 and G4: a line that says one thing twice was answered once, in silence.
+// The operand guard's repeated-input gaps: a line that says one thing twice was answered
+// once, in silence.
 //
 // `backlog --state draft --state ready` listed the ready work and printed `filter state
 // ready`; nothing said `draft` had been read and dropped. `backlog --fields id,id` printed

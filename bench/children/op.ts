@@ -4,9 +4,9 @@
 // budget is about neither.
 //
 // Six of these are store operations and are labelled as such. The rest sit one layer up, at
-// the application seam: `workspace` is the read every command performs, `board`, `next` and
-// `doctor` are the three commands whose cost is not the store's, and `cycle` is the load-time
-// relation check on its own. None of them renders, so a figure here prices the work and not
+// the application seam: `workspace` is the read every command performs, `next` and `doctor`
+// are the two commands whose cost is not the store's, and `cycle` is the load-time relation
+// check on its own. None of them renders, so a figure here prices the work and not
 // the renderer; the six behaviour axes drive the command surface itself (bench/axes/surface.ts).
 //
 // Usage: op.ts <root> <op> [argument]
