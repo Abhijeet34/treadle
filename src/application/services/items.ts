@@ -347,7 +347,9 @@ export async function fileItem(
 
   const now = clock.now()
   const spoken = namedByRecord(view.value)
-  const id = request.id ?? slugFor(request.title, request.type, new Set([...view.value.byId.keys(), ...view.value.sprintById.keys(), ...spoken.keys()]))
+  const id = request.id ?? slugFor(request.title, request.type, new Set([
+    ...view.value.byId.keys(), ...view.value.sprintById.keys(), ...view.value.ceremonyById.keys(), ...spoken.keys(),
+  ]))
   if (id === undefined) {
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'C1', entity: request.type,
@@ -376,6 +378,15 @@ export async function fileItem(
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
       cause: `${id} is a sprint here, and an id names one thing: an item cannot share a sprint's id`,
       fix: [`treadle sprints ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
+    })
+  }
+  // The third kind, held the same way and for the same reason: the log `history` reads is
+  // keyed by id alone, so a ceremony and an item that shared one would share their trail.
+  if (view.value.ceremonyById.has(id)) {
+    return errorResult({
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      cause: `${id} is a ceremony here, and an id names one thing: an item cannot share a ceremony's id`,
+      fix: [`treadle ceremonies ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
     })
   }
   // The same answer `sprint open --id` gives for a sprint id already taken. Left to the store
@@ -909,7 +920,7 @@ export function absence(
 }
 
 /** Up to three candidates by edit distance then id order, never auto-corrected (A.6 rule 4). */
-function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
+export function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
   return [...known]
     .map((id) => ({ id, distance: editDistance(id, wanted) }))
     .filter((candidate) => candidate.distance <= Math.max(2, Math.ceil(wanted.length * 0.4)))
@@ -951,6 +962,13 @@ function editDistance(a: string, b: string): number {
 export function notFound(
   command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
+  if (view.ceremonyById.has(id)) {
+    return errorResult({
+      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
+      cause: `${id} is a ceremony here, not an item, and ${command} takes an item id`,
+      fix: [`treadle ceremonies ${id}`, 'treadle ceremonies'],
+    })
+  }
   if (view.sprintById.has(id)) {
     // `set` is the one command whose caller was reaching for a sprint's own field editor, so
     // it gets the line that does what they meant. The other callers of this refusal were
@@ -971,7 +989,7 @@ export function notFound(
     // The workspace's own id is in the near set because the log is keyed by entity and the
     // workspace is one: `history <workspace>` is what reads a configuration change back, and
     // a typed id that missed it had no way of learning which of three kinds it was near.
-    near: nearIds([...view.byId.keys(), ...view.sprintById.keys(), view.identity.id], id),
+    near: nearIds([...view.byId.keys(), ...view.sprintById.keys(), ...view.ceremonyById.keys(), view.identity.id], id),
     fix: ['treadle backlog'],
   })
 }
@@ -983,6 +1001,13 @@ export function notFound(
  * item" with two fix lines. Both refusals now answer the same way from either side.
  */
 export function noSprint(command: string, effect: Effect, workspace: string, view: WorkspaceView, id: string): ResultObject {
+  if (view.ceremonyById.has(id)) {
+    return errorResult({
+      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
+      cause: `${id} is a ceremony here, not a sprint, and ${command} takes a sprint id`,
+      fix: [`treadle ceremonies ${id}`, 'treadle sprints'],
+    })
+  }
   if (view.byId.has(id)) {
     return errorResult({
       code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
@@ -994,7 +1019,7 @@ export function noSprint(command: string, effect: Effect, workspace: string, vie
   return errorResult({
     code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
     cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
-    near: nearIds([...view.sprintById.keys(), ...view.byId.keys()], id),
+    near: nearIds([...view.sprintById.keys(), ...view.byId.keys(), ...view.ceremonyById.keys()], id),
     fix: ['treadle sprints'],
   })
 }

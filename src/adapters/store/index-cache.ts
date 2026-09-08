@@ -81,6 +81,19 @@ export type IndexedSprint = {
   readonly source: string
 }
 
+/**
+ * A ceremony's row. It carries the one column a read orders on and the record text, as a
+ * sprint's does; the action list is not a column here because the one query over it asks the
+ * opposite question, and `ceremony_actions` below is the side that answers it.
+ */
+export type IndexedCeremony = {
+  readonly id: string
+  readonly file: string
+  readonly line: number
+  readonly filed_at: string
+  readonly source: string
+}
+
 const SCHEMA = `
 create table if not exists files (
   path text primary key, size integer not null, mtime real not null,
@@ -109,6 +122,21 @@ create index if not exists items_parent on items(parent) where parent is not nul
 create table if not exists sprints (
   id text primary key, file text not null, line integer not null, state text not null,
   filed_at text not null, source text not null);
+-- Ceremonies are month-sharded as items are, so the id is a primary key here for the same
+-- reason: a duplicate inside one file is the parser's to quarantine, and a duplicate ACROSS
+-- two shards is a clash no single file can see.
+create table if not exists ceremonies (
+  id text primary key, file text not null, line integer not null,
+  filed_at text not null, source text not null);
+create index if not exists ceremonies_file on ceremonies(file);
+-- The retro-to-chore link, from the side S17 asks it from: given an id being removed, is any
+-- retrospective left naming it. Stored as its own rows rather than read out of the record's
+-- \`actions\` field, because that read is a scan that decodes every ceremony under the write
+-- lock, and this one is an index lookup of the shape \`items_parent\` already serves.
+create table if not exists ceremony_actions (
+  ceremony text not null, item text not null, file text not null);
+create index if not exists ceremony_actions_item on ceremony_actions(item);
+create index if not exists ceremony_actions_file on ceremony_actions(file);
 create table if not exists events (
   id text primary key, at text not null, entity text not null, op text not null,
   actor text not null, txn text not null, file text not null, rest text not null);
@@ -136,12 +164,14 @@ const META_SCHEMA = 'create table if not exists meta (key text primary key, valu
  * one: the index is a cache, so dropping it is the cheapest correct answer and the only one
  * that cannot leave a half-migrated table behind.
  */
-const INDEX_FORMAT = '6'
+const INDEX_FORMAT = '7'
 const FORMAT_KEY = 'index_format'
 const RESET = `
 drop table if exists files;
 drop table if exists items;
 drop table if exists sprints;
+drop table if exists ceremonies;
+drop table if exists ceremony_actions;
 drop table if exists events;
 drop table if exists findings;
 `
@@ -469,6 +499,89 @@ export class IndexCache {
   }
 
   /**
+   * Replaces one ceremony shard's rows as a unit, and reports the cross-shard clashes the
+   * primary key refused. A shard holds the retrospectives of one month, so it is dropped and
+   * reloaded rather than diffed; what it cannot see on its own is an id a DIFFERENT shard
+   * already holds, which is what the insert below turns into an `S3` finding, exactly as
+   * `replaceRecordFile` does for items.
+   */
+  replaceCeremonyFile(
+    file: string, fingerprint: Fingerprint, ceremonies: readonly IndexedCeremony[],
+    actions: readonly { readonly ceremony: string; readonly item: string }[],
+    findings: readonly Finding[],
+  ): { readonly clashes: readonly Finding[]; readonly invalidated: boolean } {
+    const db = this.#open()
+    db.exec('begin immediate')
+    try {
+      db.prepare('delete from ceremonies where file = ?').run(file)
+      db.prepare('delete from ceremony_actions where file = ?').run(file)
+      db.prepare('delete from findings where file = ?').run(file)
+      const insert = db.prepare('insert into ceremonies (id, file, line, filed_at, source) values (?, ?, ?, ?, ?)')
+      const holder = db.prepare('select file from ceremonies where id = ?')
+      const link = db.prepare('insert into ceremony_actions (ceremony, item, file) values (?, ?, ?)')
+      const clashes: { finding: Finding; against: string }[] = []
+      const landed = new Set<string>()
+      for (const ceremony of ceremonies) {
+        try {
+          insert.run(ceremony.id, ceremony.file, ceremony.line, ceremony.filed_at, ceremony.source)
+          landed.add(ceremony.id)
+        } catch {
+          clashes.push({
+            against: (holder.get(ceremony.id) as unknown as { file: string } | undefined)?.file ?? file,
+            finding: {
+              file, line: ceremony.line, rule: 'S3', id: ceremony.id,
+              reason: `${ceremony.id} is already a record in this store; the copy in ${file} line ${ceremony.line} is quarantined`,
+            },
+          })
+        }
+      }
+      // Only a ceremony the store serves contributes an edge. A quarantined copy names no
+      // single record, so its action list may not hold a chore in place.
+      for (const action of actions) {
+        if (landed.has(action.ceremony)) link.run(action.ceremony, action.item, file)
+      }
+      this.#insertFindings(findings)
+      this.#insertClashes(clashes)
+      this.#setFingerprint(file, fingerprint)
+      // The other shard carrying a clash against this one is re-read next pass, so a
+      // duplicate removed from one month clears the `S3` standing on the other.
+      const invalidated = this.#invalidateAgainst(file)
+      db.exec('commit')
+      return { clashes: clashes.map((clash) => clash.finding), invalidated }
+    } catch (error) {
+      db.exec('rollback')
+      throw error
+    }
+  }
+
+  /** One ceremony's row, by id: the indexed lookup the write path resolves an identity with. */
+  ceremonyRow(id: string): IndexedCeremony | undefined {
+    const row = this.#open()
+      .prepare('select id, file, line, filed_at, source from ceremonies where id = ?')
+      .get(id)
+    return row === undefined ? undefined : (row as unknown as IndexedCeremony)
+  }
+
+  /** Every ceremony's row, oldest first, which is the order `ceremonies` prints. */
+  listCeremonies(): readonly IndexedCeremony[] {
+    return this.#open()
+      .prepare('select id, file, line, filed_at, source from ceremonies order by filed_at, id')
+      .all() as unknown as readonly IndexedCeremony[]
+  }
+
+  /**
+   * The first retrospective left naming this id in its action list, or undefined. `skip`
+   * bounds the rows returned, for the reason `childOf`'s does, and `ceremony_actions_item`
+   * is the index that makes it a lookup rather than a scan under the write lock.
+   */
+  ceremonyNaming(item: string, skip: readonly string[] = []): string | undefined {
+    const rows = this.#open()
+      .prepare('select ceremony from ceremony_actions where item = ? limit ?')
+      .all(item, skip.length + 1) as unknown as readonly { ceremony: string }[]
+    return rows.find((row) => !skip.includes(row.ceremony))?.ceremony
+  }
+
+  /**
    * Drops the fingerprint of every other file carrying a clash against `file`, so the next
    * refresh pass re-reads it and re-decides the clash against what `file` now holds.
    */
@@ -619,6 +732,8 @@ export class IndexCache {
     const db = this.#open()
     db.prepare('delete from items where file = ?').run(file)
     db.prepare('delete from sprints where file = ?').run(file)
+    db.prepare('delete from ceremonies where file = ?').run(file)
+    db.prepare('delete from ceremony_actions where file = ?').run(file)
     db.prepare('delete from events where file = ?').run(file)
     db.prepare('delete from findings where file = ?').run(file)
   }

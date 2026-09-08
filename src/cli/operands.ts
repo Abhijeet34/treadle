@@ -25,7 +25,14 @@ import { COMMANDS, commandNamed, type Command } from './inventory.ts'
 const ENTITY_OPERANDS: ReadonlyMap<string, string> = new Map([
   ['id', 'id'],
   ['sprint', 'sprint id'],
+  ['ceremony', 'ceremony id'],
   ['other', 'id'],
+])
+
+/** The listing a refusal about one of these points at, since `backlog` lists neither kind. */
+const LISTING_FOR: ReadonlyMap<string, string> = new Map([
+  ['sprint id', 'treadle sprints'],
+  ['ceremony id', 'treadle ceremonies'],
 ])
 
 /**
@@ -130,7 +137,7 @@ export function operandRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
       cause: `the ${what} in operand ${at + 1} carries ${found.label} at character ${found.at + 1}, and no ${what} holds one: an id is a single line of lowercase letters, digits and hyphens`,
-      fix: [what === 'sprint id' ? 'treadle sprints' : 'treadle backlog'],
+      fix: [LISTING_FOR.get(what) ?? 'treadle backlog'],
     })
   }
   return undefined

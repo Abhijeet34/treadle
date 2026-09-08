@@ -67,9 +67,9 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
 type Reference = { readonly cause: string; readonly fix: readonly string[] }
 
 /**
- * The first record that would be left naming this item, or `undefined`. The three kinds are
- * the three ways one record can hold another's id: a closed sprint's committed set, a stored
- * relation edge, and a child's parent.
+ * The first record that would be left naming this item, or `undefined`. The four kinds are
+ * the four ways one record can hold another's id: a closed sprint's committed set, a stored
+ * relation edge, a child's parent, and a retrospective's action list.
  *
  * A closed sprint is read two ways because two eras of record exist. This build's close
  * writes `carried` and `finished`, so a member is named by one of them; a sprint an older
@@ -105,6 +105,17 @@ function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
     return {
       cause: `${child} has ${id} as its parent, and removing ${id} would leave that record naming no parent`,
       fix: [`treadle set ${child} parent_id=`, `treadle backlog --fields id,type,state,title`],
+    }
+  }
+  // A retrospective's action list is the one place the retro-to-chore link is stored, so a
+  // chore taken out from under it leaves the record unable to say what it produced. There is
+  // no fix line that edits the list, because no command edits a filed retrospective: the
+  // record is the answer, and `transition <id> cancelled` is what stops the work instead.
+  const ceremony = view.ceremonies.find((held) => (held.actions ?? []).includes(id))
+  if (ceremony !== undefined) {
+    return {
+      cause: `${ceremony.id} names ${id} in its action list, and a retrospective's actions are the record of what it produced`,
+      fix: [`treadle ceremonies ${ceremony.id}`, `treadle transition ${id} cancelled`],
     }
   }
   return undefined

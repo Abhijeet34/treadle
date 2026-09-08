@@ -156,6 +156,13 @@ export {
 } from './hierarchy.ts'
 
 export {
+  CEREMONY_FIELDS,
+  validateCeremony,
+  type Ceremony,
+  type CeremonyState,
+} from './ceremony.ts'
+
+export {
   MAX_GOAL,
   SPRINT_FIELDS,
   carryOver,

@@ -18,6 +18,7 @@ import {
   type HierarchyGraph,
   type ItemId,
   type RelationGraph,
+  type Ceremony,
   type Sprint,
   type TransitionContext,
   type WorkItem,
@@ -71,6 +72,13 @@ export type WorkspaceView = {
    */
   readonly sprints: readonly Sprint[]
   readonly sprintById: ReadonlyMap<string, Sprint>
+  /**
+   * Every retrospective, whole, for the reason the sprints are: a retro is filed once a
+   * sprint, so the set is tens of records against tens of thousands of items, and the id
+   * namespace every command resolves an id against is the three kinds together (ADR-0028).
+   */
+  readonly ceremonies: readonly Ceremony[]
+  readonly ceremonyById: ReadonlyMap<string, Ceremony>
 }
 
 /**
@@ -114,6 +122,8 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   if (!items.ok) return items
   const sprints = await store.sprints()
   if (!sprints.ok) return sprints
+  const ceremonies = await store.ceremonies()
+  if (!ceremonies.ok) return ceremonies
   const findings = await store.findings()
   if (!findings.ok) return findings
 
@@ -139,6 +149,8 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
       relations: relationGraphFrom(items.value),
       sprints: sprints.value,
       sprintById: new Map(sprints.value.map((sprint) => [sprint.id, sprint])),
+      ceremonies: ceremonies.value,
+      ceremonyById: new Map(ceremonies.value.map((ceremony) => [ceremony.id, ceremony])),
     },
   }
 }

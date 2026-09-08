@@ -211,7 +211,7 @@ export async function openSprint(
 
   // Deduplicated against items as well as sprints: the two are different entities in
   // different files, and a reader of `backlog --sprint s31` should not have to wonder which.
-  const taken = new Set([...view.value.byId.keys(), ...view.value.sprintById.keys()])
+  const taken = new Set([...view.value.byId.keys(), ...view.value.sprintById.keys(), ...view.value.ceremonyById.keys()])
   const id = request.id ?? slugFor(request.title, 'sprint', taken)
   if (id === undefined) {
     return refusal(workspace, 'C1', 'sprint',
@@ -225,6 +225,9 @@ export async function openSprint(
   // a `history`; an id names one thing here, whichever file it lives in.
   if (view.value.byId.has(id)) {
     return refusal(workspace, 'I5', id, `${id} is an item here, and an id names one thing: a sprint cannot share an item's id`, [`treadle show ${id}`, 'treadle sprint open "<title>" --end <date> --id <slug>'])
+  }
+  if (view.value.ceremonyById.has(id)) {
+    return refusal(workspace, 'I5', id, `${id} is a ceremony here, and an id names one thing: a sprint cannot share a ceremony's id`, [`treadle ceremonies ${id}`, 'treadle sprint open "<title>" --end <date> --id <slug>'])
   }
   const sprint: Sprint = {
     id, title: request.title, state: 'open', filed_at: now, version: 1,

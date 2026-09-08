@@ -16,6 +16,7 @@ ADR-0024 carries the next free number for the same reason, over a second audit's
 ADR-0025 carries the next free number because it answers a scout report's measurement of ADR-0024's own rule at the wrong layer.
 ADR-0026 carries the next free number because workspace configuration is the fifth of the absent capabilities the sprint, the impediment and the board were three of, and it fills the Policy seam DR6 named.
 ADR-0027 carries the next free number for ADR-0009's reason: it moves a number DR8 set, and the argument for moving it is the thing worth reading.
+ADR-0028 carries the next free number because the retrospective is the sixth of the absent capabilities, and because its own draft claimed ADR-0026, which workspace configuration took while it was queued.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -46,6 +47,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0025](0025-the-referential-rule-lives-under-the-write-lock.md) | No transaction may leave a record naming an id the store does not hold, checked inside the lock the write already takes rather than against a read taken before it, with `H30` reporting the ones the files already carry |
 | [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md) | Workspace configuration is a closed set of optional fields and two gate sections on `workspace.md`, a configured gate replaces the default whole through the one evaluator, a configuration this build cannot read hides content, and the record is written under the same compare-and-set as every other |
 | [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
+| [ADR-0028](0028-a-retrospective-is-a-record-of-its-own-kind.md) | The retrospective is the one ceremony that gets a record, a kind of its own in `ceremonies/YYYY-MM.md` with no lifecycle and no family around it, its actions named once on the record and held there by `S17`'s fourth referrer |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -79,7 +81,7 @@ The set is closed.
 | `S14` | Two events in the store share an id |
 | `S15` | A path inside the store is a symbolic link, which the store never follows |
 | `S16` | The lock was lost while held: the holder stalled past the heartbeat window and another writer reclaimed it |
-| `S17` | A removal would leave a record naming the removed id: a child's parent, a stored relation edge, or a closed sprint's committed set |
+| `S17` | A removal would leave a record naming the removed id: a child's parent, a stored relation edge, a closed sprint's committed set, or a retrospective's action list |
 
 ## The doctor's finding ids
 

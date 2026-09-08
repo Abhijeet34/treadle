@@ -532,6 +532,27 @@ is held to the same rules. Guard `G4` reads the workspace's `start_requires_spri
 is `false` by default so that a workspace running no sprints starts work as it always did;
 arming it makes the guard exactly its sprint half, which is the half that exists.
 
+## The retrospective is the third record kind, and the only ceremony that gets one
+
+`ceremonies/YYYY-MM.md` holds retrospectives in the record grammar the item shards use,
+month-sharded by `filed_at` and indexed in its own table with `type: retro` and
+`state: recorded` as constants, because the grammar's damaged-heading resynchroniser keys on
+four mandatory field lines. `src/domain/ceremony.ts` is the dictionary and
+`src/adapters/store/ceremony-codec.ts` the codec; `ceremonies [<id>]` is the read and
+ADR-0028 argues every judgement call, including why the standup and the review get no
+record at all. Do not add a `CeremonyType` union or a `kind` discriminator: one kind is the
+decision, and a second one is a task on top of this rather than a slot left open for it.
+
+A retrospective's `actions` are chores named once, on the record, because relations target
+items only. That link is `S17`'s fourth referrer, so `remove` of a named chore is `R6` from
+`namedBy` in `removal.ts` before the lock and `S17` from `#referrerOf` under it; the edge is
+kept in the `ceremony_actions` table with an index on the item, because `S17` runs inside
+the write lock on every removal and a scan of the records' `actions` field would decode
+every ceremony there. The three kinds share one id namespace, since the event log is keyed
+by entity id alone: `file`, `sprint open` and `slugFor` all treat a ceremony id as taken,
+and the store refuses a ceremony written under an item's or a sprint's id with `S3`.
+`doctor` does not audit these records yet; `H31` and `H32` are the findings that will.
+
 ## A board stores nothing, and its columns are blocks of one shape
 
 `board` is `backlog` grouped by state: `src/application/services/board.ts` reuses the

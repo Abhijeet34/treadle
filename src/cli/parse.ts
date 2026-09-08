@@ -120,6 +120,7 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     title: { type: 'string' },
   },
   sprints: {},
+  ceremonies: {},
   doctor: {},
   next: { for: { type: 'string' } },
   explain: {},

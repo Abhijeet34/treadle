@@ -10,6 +10,7 @@
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { BOARD_SHAPE } from '../application/services/board.ts'
+import { CEREMONIES_SHAPE } from '../application/services/ceremonies.ts'
 import { CONFIG_SHAPE } from '../application/services/config.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
 import { SET_SHAPE } from '../application/services/editing.ts'
@@ -225,6 +226,16 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle sprints', 'every sprint with its dates and how much of its committed set is done'],
       ['treadle sprints sprint-31', 'one sprint: its dates, goal, tally, and what carried over when it closed'],
+    ],
+  },
+  {
+    name: 'ceremonies', shape: CEREMONIES_SHAPE, effect: 'read', record: 'list',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: ['treadle ceremonies [<ceremony>]'],
+    examples: [
+      ['treadle ceremonies', 'every retrospective, oldest first, with the sprint it looked back over and how many chores it produced'],
+      ['treadle ceremonies retro-sprint-31', 'one retrospective: what went well, what went badly, and the chores it named'],
     ],
   },
   {

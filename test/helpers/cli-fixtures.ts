@@ -15,6 +15,7 @@ import type { ResultObject } from '../../src/application/result.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
+import { ceremonies } from '../../src/application/services/ceremonies.ts'
 import { DEFAULT_BOARD_COLUMNS, board } from '../../src/application/services/board.ts'
 import { history } from '../../src/application/services/history.ts'
 import { readConfig, setConfig } from '../../src/application/services/config.ts'
@@ -250,6 +251,27 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       key: 'wip_limits', value: 'in_progress=5, in_review=2', actor: ACTOR,
     }))
     golden.set('config', await readConfig(demo.store))
+    // The third record kind, written straight through the store because no command in this
+    // build files one: `ceremony retro` is T4b's, and a shape no golden object carries
+    // reaches neither the render conformance suite nor the human snapshot.
+    await fileItem(targetFor(demo.store, 'apply'), clock, ids, {
+      type: 'chore', title: 'Split the carried stories', id: 'split-carried', fields: {}, actor: ACTOR,
+    })
+    const retro = await demo.store.apply({
+      txn: 'txn-retro', writes: [], events: [],
+      ceremonies: [{
+        ceremony: {
+          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded',
+          filed_at: '2026-09-18T16:00:00Z', version: 1, sprint_id: 'sprint-31',
+          actions: ['split-carried'],
+          well: 'The token refresh shipped without a hotfix.',
+          badly: 'Two stories carried for the third sprint running.',
+        },
+      }],
+    })
+    if (!retro.ok) throw new Error(retro.error.message)
+    golden.set('ceremonies', await ceremonies(demo.store))
+    golden.set('ceremonies-one', await ceremonies(demo.store, 'retro-sprint-31'))
     return new Map([...golden].map(([name, result]) => [name, atGoldenRoot(result, demo.root)]))
   } finally {
     await demo.dispose()

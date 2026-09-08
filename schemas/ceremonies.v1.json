@@ -1,0 +1,196 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "ceremonies.v1.json",
+  "title": "ceremonies/1",
+  "description": "List the retrospectives, or print one with its prose and the chores it produced.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "ok",
+    "code",
+    "command",
+    "workspace",
+    "effect",
+    "txn",
+    "changed",
+    "data"
+  ],
+  "properties": {
+    "schema": {
+      "const": "ceremonies/1"
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "code": {
+      "enum": [
+        "OK",
+        "VALIDATION",
+        "GUARD_REFUSED",
+        "CONFLICT",
+        "NOT_FOUND",
+        "STORE_UNAVAILABLE",
+        "INTERNAL",
+        "INTEGRITY"
+      ]
+    },
+    "command": {
+      "const": "ceremonies"
+    },
+    "workspace": {
+      "type": "string"
+    },
+    "effect": {
+      "const": "read"
+    },
+    "txn": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "changed": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "data": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "ceremony": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "filed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "v": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sprint": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "actions": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "extra": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "well": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "badly": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "ceremonies": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  },
+                  "data": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "id"
+            },
+            {
+              "name": "filed"
+            },
+            {
+              "name": "sprint"
+            },
+            {
+              "name": "actions"
+            },
+            {
+              "name": "title",
+              "trust": "data"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
