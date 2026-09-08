@@ -64,7 +64,7 @@ That is why the domain core validates on load rather than only on write: a hand 
 
 ## The decision records
 
-[architecture/adr/](architecture/adr/README.md) carries one record per decision that a later change has to argue with: the storage layout, the record grammar and its migration path, concurrency and durability, the output and exit-code contract, the store seam, and every decision since, through relations, impediments, the two performance reshapes, and [ADR-0029](architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removed the sprint, the board, the retrospective and the estimate against the tool's statement of purpose.
+[architecture/adr/](architecture/adr/README.md) carries one record per decision that a later change has to argue with: the storage layout, the record grammar and its migration path, concurrency and durability, the output and exit-code contract, the store seam, and every decision since, through relations, impediments and the two performance reshapes.
 Each names where it departs from the design that preceded it, and a record a later one overtook says so in its header rather than being rewritten.
 
 ## Extension

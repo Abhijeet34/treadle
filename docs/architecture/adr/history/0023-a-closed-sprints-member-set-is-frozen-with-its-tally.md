@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-07
 **Implements:** the sixteen findings of the round-five adversarial audit
-**Superseded by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
+**Superseded by:** [ADR-0029](../0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
 
 ## Context
 

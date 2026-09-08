@@ -22,7 +22,7 @@ Two landed changes calibrate what a feature costs, each built from a `git archiv
 
 | Change | Bytes added | What it carried |
 |---|---|---|
-| `fbab9fb`, sprints ([0016-sprints.md](0016-sprints.md)) | 38,711 | a domain module of 302 lines, a codec of 131, a service, an index table, a port method, the CLI verbs |
+| `fbab9fb`, sprints ([0016-sprints.md](history/0016-sprints.md)) | 38,711 | a domain module of 302 lines, a codec of 131, a service, an index table, a port method, the CLI verbs |
 | `91916bf`, #55: labels, sprint editing, title search, removal | 19,083 | a 224-line service, three filters, a store transaction kind, an index column |
 
 Against those two points the design estimated the remaining eleven tasks at about 128,000 bytes, which is 31,000 over the margin.
@@ -93,7 +93,7 @@ Refused: a budget nothing enforces is prose. [0009-release-and-supply-chain.md](
 
 - `bench/budgets.json`'s `bundleBytes` limit becomes 768,000 and its `source` becomes `DR8 raised by ADR-0027, 750 KB bundle`, so a reader of the build line sees both the design record that set the rule and the record that moved the number.
 - `scripts/release-preflight.ts`'s "under a tenth of the limit" floor rises with it, from 51,200 to 76,800 bytes. The current bundle is 448,772, so the floor is not near.
-- The README's two quotations of the figure and `docs/BENCHMARKS.md`'s move with it, held by `test/architecture/documented-numbers.test.ts`.
+- The README's two quotations of the figure and `docs/architecture/history/BENCHMARKS-2026-09.md`'s move with it, held by `test/architecture/documented-numbers.test.ts`.
 - The measured margin becomes 319,228 bytes, which is 2.9 times what the remaining nine tasks estimate and 1.8 times what they estimate scaled by T1's own over-run.
 
 ## Departures from the design record

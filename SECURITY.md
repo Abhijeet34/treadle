@@ -51,7 +51,7 @@ In scope:
 - Resource exhaustion that gets past the tool's stated file-size, record-count, and depth ceilings rather than merely reaching a performance budget.
 - A prototype-pollution or parser-abuse path through the record grammar or the event log.
 - Any outbound connection opened by the process.
-- State written where another user on the machine can read or redirect it: a predictable temp file, a followed symlink, or a world-writable index.
+- State written where another user on the machine can read or redirect it: a predictable temp file, a followed symlink, or a world-writable store directory.
 
 Out of scope:
 

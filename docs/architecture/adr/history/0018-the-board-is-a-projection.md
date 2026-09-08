@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** section 4 of the shared design for the four absent capabilities
-**Superseded by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
+**Superseded by:** [ADR-0029](../0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
 
 ## Context
 

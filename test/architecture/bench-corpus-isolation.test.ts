@@ -3,7 +3,7 @@
 // than of the product, and it is tested here for the reason the rig exists at all: every
 // axis mutates the corpus it measures, so two runs sharing one root produce figures that
 // look ordinary and describe a corpus neither of them was ever in. A crash would be safe;
-// silent agreement on wrong numbers is not, and docs/BENCHMARKS.md publishes them as fact.
+// silent agreement on wrong numbers is not, and docs/architecture/history/BENCHMARKS-2026-09.md publishes them as fact.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'

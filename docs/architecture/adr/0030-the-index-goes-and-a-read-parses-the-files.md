@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** the captain's decision `replace-the-index-with-a-plain-read`, on the measurement in `treadle-apparatus-weight-audit-w4`
-**Supersedes:** [ADR-0020](0020-a-finding-is-decided-by-a-whole-read.md), whose whole subject is a partial re-index of a file
+**Supersedes:** [ADR-0020](history/0020-a-finding-is-decided-by-a-whole-read.md), whose whole subject is a partial re-index of a file
 **Overtakes in part:** [ADR-0002](0002-storage-layout.md)'s derived index, [ADR-0014](0014-the-view-is-a-projection.md)'s index columns as the place a scan field lives, [ADR-0004](0004-concurrency-and-durability.md)'s index-contention ordering and journal path, [ADR-0006](0006-the-store-seam.md)'s description of `ShardedStore` as reading through the index, and [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md)'s recap of the layout as still carrying one
 
 ## Context
@@ -130,5 +130,5 @@ that PR #41 turned into a bricked workspace.
 `engines.node` stays at 24.15.0 and its justification changes. It was the version where
 `node:sqlite` reached Stability 1.2, which is a capability claim about a dependency this record
 removes. It is now a support statement: 24.15.0 is what `.nvmrc` pins, what the first CI leg
-runs, what every figure in docs/BENCHMARKS.md was measured on, and the runtime `@types/node` is
+runs, what every figure in docs/architecture/history/BENCHMARKS-2026-09.md was measured on, and the runtime `@types/node` is
 held not to outrun. Nothing in the shipped bundle needs a Node newer than 24.0.0.

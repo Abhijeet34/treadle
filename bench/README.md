@@ -23,9 +23,9 @@ the malformed-input corpus. `TREADLE_BENCH_DIR` overrides the base the rig works
 ## Two runs at once
 
 Every axis mutates the corpus it measures: A1 writes records through parallel processes, A5
-edits shard lines, A4 deletes the index. Two runs sharing one corpus root therefore do not
+edits shard lines, A4 creates and transitions items at four scales. Two runs sharing one corpus root therefore do not
 collide loudly. They agree on numbers taken from a store neither of them was ever in, and
-`docs/BENCHMARKS.md` publishes those as measured fact.
+`docs/architecture/history/BENCHMARKS-2026-09.md` publishes those as measured fact.
 
 So a run never measures a corpus another run can reach. Under the base directory:
 
@@ -63,7 +63,7 @@ free, and it turns the dangerous failure into the safe one.
 
 ## What it measures, and what it cannot
 
-`docs/BENCHMARKS.md` carries the run, the twelve comparison axes and what each unfilled one
+`docs/architecture/history/BENCHMARKS-2026-09.md` carries the run, the twelve comparison axes and what each unfilled one
 is waiting for. Three rules govern every figure in it.
 
 - A value that could not be taken is the string `NOT MEASURED: <reason>`, in the JSON and in
