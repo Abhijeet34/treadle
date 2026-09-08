@@ -93,7 +93,7 @@ Refused: a budget nothing enforces is prose. [0009-release-and-supply-chain.md](
 
 - `bench/budgets.json`'s `bundleBytes` limit becomes 768,000 and its `source` becomes `DR8 raised by ADR-0027, 750 KB bundle`, so a reader of the build line sees both the design record that set the rule and the record that moved the number.
 - `scripts/release-preflight.ts`'s "under a tenth of the limit" floor rises with it, from 51,200 to 76,800 bytes. The current bundle is 448,772, so the floor is not near.
-- The README's two quotations of the figure and `docs/BENCHMARKS.md`'s move with it, held by `test/architecture/documented-numbers.test.ts`.
+- The README's two quotations of the figure and `docs/architecture/history/BENCHMARKS-2026-09.md`'s move with it, held by `test/architecture/documented-numbers.test.ts`.
 - The measured margin becomes 319,228 bytes, which is 2.9 times what the remaining nine tasks estimate and 1.8 times what they estimate scaled by T1's own over-run.
 
 ## Departures from the design record

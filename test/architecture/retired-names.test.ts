@@ -152,7 +152,7 @@ const ALLOWED_FILES: readonly (readonly [RegExp, string])[] = [
   // instead. So an ADR naming a removed thing is the record working, not a stale reference.
   [/^docs\/architecture\/adr\//, 'a decision record is never rewritten; a later record marks it overtaken or superseded'],
   [/^CHANGELOG\.md$/, 'generated release history, which records what each version removed'],
-  [/^docs\/BENCHMARKS\.md$/, 'dated measurements of runs that happened; a figure is a fact about its run'],
+  [/^docs\/architecture\/history\/BENCHMARKS-2026-09\.md$/, 'dated measurements of runs that happened; a figure is a fact about its run'],
   [/^docs\/VERIFICATION\.md$/, 'the same, plus the one sentence that names what the cut removed'],
   [/^\.work\/events\//, 'the append-only event log, which is never edited'],
   [/^\.work\/items\//, 'a stored record may carry a retired key by design until its next write; test/store/retired-fields.test.ts holds that behaviour'],

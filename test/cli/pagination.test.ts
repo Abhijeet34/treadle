@@ -13,7 +13,7 @@
 // first pages with nothing in the output to read it from.
 //
 // The pages themselves are exact and are proved by counting rather than asserted here, under
-// "Deep pagination, proved by counting" in docs/BENCHMARKS.md: 50,021 items over 101 pages
+// "Deep pagination, proved by counting" in docs/architecture/history/BENCHMARKS-2026-09.md: 50,021 items over 101 pages
 // returned 50,021 rows and 50,021 distinct ids, and 402 events over 134 pages returned 402
 // rows and 402 distinct rows, with zero duplicates in either.
 

@@ -130,5 +130,5 @@ that PR #41 turned into a bricked workspace.
 `engines.node` stays at 24.15.0 and its justification changes. It was the version where
 `node:sqlite` reached Stability 1.2, which is a capability claim about a dependency this record
 removes. It is now a support statement: 24.15.0 is what `.nvmrc` pins, what the first CI leg
-runs, what every figure in docs/BENCHMARKS.md was measured on, and the runtime `@types/node` is
+runs, what every figure in docs/architecture/history/BENCHMARKS-2026-09.md was measured on, and the runtime `@types/node` is
 held not to outrun. Nothing in the shipped bundle needs a Node newer than 24.0.0.

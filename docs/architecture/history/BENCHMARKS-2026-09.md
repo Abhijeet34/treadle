@@ -1,4 +1,7 @@
-# Benchmarks
+# Benchmarks, September 2026
+
+This is a record of runs taken in September 2026, kept in `history/` rather than in `docs/` because every figure below was measured on a tree that carried surfaces this repository has since removed, and no run has been taken on the current one.
+The method, the confounds and the mechanism behind each figure are what it is kept for.
 
 The acceptance bar for treadle is a measured margin over the reference on twelve axes, not an adjective.
 Ten of the twelve are measured here.
@@ -12,9 +15,9 @@ Reproduce it with `npm run bench`, which writes `bench/results/bench.json` and `
 "The appended run" throughout is run `2026-09-05T12-08-34-931Z`, and every figure this page quotes from it is quoted inline.
 Its tables, and those of the three four-scale runs on 2026-09-05 and 2026-09-06 that followed it, were re-derived on this page until 2026-09-08: 576 lines of output the run artefacts already held, kept here as a second copy that went out of date on its own.
 What is kept is what no artefact carries - the method, the confounds, the mechanism behind each figure, and what happened to each miss.
-[ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
+[ADR-0008](../adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
 
-Every run recorded below was taken against a tree that carried the sprint, the board, the retrospective and story points, all of which [ADR-0029](architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removed on 2026-09-08.
+Every run recorded below was taken against a tree that carried the sprint, the board, the retrospective and story points, all of which [ADR-0029](../adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removed on 2026-09-08.
 The figures are not re-derived here, because a measurement is a fact about the run that produced it and rewriting one would make this file a fiction rather than a record.
 What a re-run scores differently is named where it is known: five of A2's 25 questions were answered or part-answered by a sprint or a board and now carry prose, A12 drives fewer verbs because the inventory is shorter, and `board` has left `READ_OPS` so the peak-RSS read budget is weighed over one operation fewer.
 Read a paragraph below against the tree it names.
@@ -67,7 +70,7 @@ Five nested floors, each a strict superset of the one above, so a difference pri
 Subtract 2.2 ms of spawn from any wall figure to get the program's own cost.
 Type stripping costs 36.4 ms and loading the store costs 57.3 ms on top of it, so 94 ms of every cold invocation is module loading that a bundle would mostly remove.
 Both are above their own series: type stripping ran 32.6 to 33.3 ms in the runs either side of this one, which is the machine and not the code, and is why the fixed costs are taken from the best of fifty rather than the median.
-The tree now builds one, weighed in the run's package table, and `npm run build` prints that count against DR8's limit, 768,000 bytes since [architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md](architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and fails rather than warns if it goes over.
+The tree now builds one, weighed in the run's package table, and `npm run build` prints that count against DR8's limit, 768,000 bytes since [architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md](../adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and fails rather than warns if it goes over.
 The timed children still launch from TypeScript source, so these figures and DR1's 45 ms budget on a 406 KB bundle are still not the same measurement.
 
 The floors are measured after the corpora are generated and immediately before the operations they are subtracted from, so both share their conditions.
@@ -391,7 +394,7 @@ Two axes, and neither is blocked on a harness any more.
 | Axis | Why it cannot be scored |
 |---|---|
 | A9 metric coverage | no metric is implemented in this tree; nothing under `src` computes velocity, cycle time or a burndown series, so there is nothing to score and a figure here would be a figure about a harness |
-| A11 harness neutrality | half its target has nothing to score: no adapter generator exists, because [ADR-0012](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) refuses A.8 rule 3 for v1 |
+| A11 harness neutrality | half its target has nothing to score: no adapter generator exists, because [ADR-0012](../adr/0012-the-extension-surface-that-does-not-ship.md) refuses A.8 rule 3 for v1 |
 
 A11's other half, counting the files the full feature set writes outside the workspace, is reachable through the same harness the six new axes use.
 It is not run here rather than reported half done, because A6 already measures the property that half exists to catch and a second partial row would add a number without adding a fact.
@@ -812,7 +815,7 @@ Four shapes of "written by a newer version" were driven against a build that has
 | What a newer version wrote | This build's answer |
 |---|---|
 | An unknown field key, `risk_tier: gold` | **Preserved.** It survives a `set`, is re-rendered after the known fields in dictionary order, and is counted by `extra` on `show` |
-| An unknown H2 section | **Preserved.** It survives a `set` and is re-attached after the sections this build knows. `## Ready gate` and `## Done gate` are no longer in this case: [ADR-0026](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) made both a recognized surface, read by `evaluateGate` and validated on load |
+| An unknown H2 section | **Preserved.** It survives a `set` and is re-attached after the sections this build knows. `## Ready gate` and `## Done gate` are no longer in this case: [ADR-0026](../adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) made both a recognized surface, read by `evaluateGate` and validated on load |
 | An unknown event op, `item.escalate`, carrying an unknown field in its `after` and an unknown key of its own | **Ignored, and preserved.** `history` prints the op verbatim and counts the unknown field in `after` as `+1`, `doctor` reports the store clean, and the log is append-only so nothing rewrites it. The event's own unknown key round-trips through the index, by `eventRest` and `eventFrom` in `src/adapters/store/event-log.ts`, and is printed by nothing |
 | An unknown item type, `type: gadget` | **Refused, workspace-wide.** Every read exits 7 naming `V4` and the record; `doctor` lists one finding per bad record. The refusal hides the other records in the same workspace, which is `readWorkspace`'s stated contract rather than an accident |
 | A file at a newer schema, `schema: 2` | **Refused.** `S8` names the file, `doctor` lists it, and every read and every write over that workspace exits 7. `workspace.md` at a newer schema refuses at `S1`/`S8` with exit 6 |

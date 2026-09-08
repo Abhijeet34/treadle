@@ -9,7 +9,7 @@
 //
 // This file is the gate that makes a fourth one a failing test rather than a benchmark
 // finding. The rule is not "print everything": adding every field to every output would
-// blow the byte budgets in docs/BENCHMARKS.md that this product competes on. The rule is
+// blow the byte budgets in docs/architecture/history/BENCHMARKS-2026-09.md that this product competes on. The rule is
 // that every persisted field carries a decision, and that a hidden field is declared with
 // its reason rather than silently missing.
 //

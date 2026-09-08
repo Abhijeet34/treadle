@@ -49,7 +49,7 @@ checked-in rulesets under `.github/`.
 Do not tag, release or publish without the captain saying so.
 
 `package.json` declares `engines.node` at the product's floor of 24.15, which is what `.nvmrc`
-pins, what the first CI leg runs, and what every figure in `docs/BENCHMARKS.md` was measured
+pins, what the first CI leg runs, and what every figure in `docs/architecture/history/BENCHMARKS-2026-09.md` was measured
 on. This machine may be below it; nothing the tool needs is newer than 24.0, so an
 `EBADENGINE` warning from `npm install` here is expected and is not a defect to fix. The fix,
 if the warning is unwelcome, is `nvm use` against `.nvmrc` rather than a lower floor.
@@ -59,13 +59,13 @@ exit on a regression.
 A full four-scale run takes about five and a half minutes and writes about 430 MB of corpora
 under `TREADLE_BENCH_DIR`, so pass `--scales 100,1000` while iterating.
 Two runs at once are safe without setting anything; `bench/README.md` has the flags and
-`bench/bench.config.json` the parameters, `docs/BENCHMARKS.md` the method and what each figure
+`bench/bench.config.json` the parameters, `docs/architecture/history/BENCHMARKS-2026-09.md` the method and what each figure
 meant, and ADR-0008 the design.
 Two things are worth knowing before reading a figure: a value that could not be taken is the
 string `NOT MEASURED: <reason>` and never a zero, and this machine is shared and never idle, so
 judge a number against the load recorded beside it rather than on its own.
 Every budget the gate weighs is armed; a budget nobody has met is a finding, and a finding
-belongs in `docs/BENCHMARKS.md` rather than in a row that prints red and stops nothing.
+belongs in `docs/architecture/history/BENCHMARKS-2026-09.md` rather than in a row that prints red and stops nothing.
 
 The corpus carries what the product stores, and adding a shape to it is how a cost stops
 hiding: it had no relation edge until 2026-09-06, and three superlinear paths went unpriced
@@ -162,7 +162,7 @@ same audit for one item off the events it already reads. `doctor` raises eleven 
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017, and
-`H30` with ADR-0025; ADR-0029 removed `H26`, `H28` and `H29` with the sprint.
+`H30` with ADR-0025.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
 raises. A membership test here asks whether the store HOLDS an id, served or quarantined: a
 quarantined record still exists, so a neighbour pointing at it is not dangling. `doctor`'s exit reads
@@ -286,13 +286,10 @@ A record boundary is a line, so it cannot be made unreformattable; it is made lo
 
 ## What a read is, and what a read is allowed to keep
 
-A read parses the record files. There is no derived store in front of them any more:
+A read parses the record files. There is no derived store in front of them:
 `src/adapters/store/sharded-store.ts` reads `workspace.md` and every month shard, decodes each
-record, and answers from what it decoded. ADR-0030 carries the measurement that removed the
-SQLite index, and the shape of the argument is worth keeping: at 347 records the index bought
-20 to 25 ms a read and charged 1,214 lines, a quarter of the store, five rules and the only
-defect that has ever bricked a workspace. If you find yourself adding a derived file, that is
-the decision to reopen with a measurement, not a patch to write.
+record, and answers from what it decoded. If you find yourself adding a derived file, that is
+a decision to reopen with a measurement, and ADR-0030 has the one it was closed on.
 
 One parse serves one command. `#read` holds the parse and a stat per file - name, size and
 mtime - and reuses it only while that stat is unchanged, because `status` alone asks the store
@@ -311,7 +308,7 @@ because neither outlives the call.
 Take the before and the after under the same conditions or do not take them. This machine is
 shared: a before and an after forty minutes apart, at 1-minute loads of 68.77 and 6.45, moved
 the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code.
-`docs/BENCHMARKS.md` carries the method, the interleaved-run shape and the floors table, and
+`docs/architecture/history/BENCHMARKS-2026-09.md` carries the method, the interleaved-run shape and the floors table, and
 `bench/budgets.json` says which budgets are armed and why the timing ones are not.
 
 A figure taken at the store seam is not a figure about a command. Every command goes through
@@ -332,17 +329,13 @@ above was 416 MiB at 50,000 and 984 MiB at 200,000 while it held whole records, 
 must bucket the log by entity first: `doctor` scanned the whole log once per item and had no
 answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path only, so a
 month past 8 MiB is written happily and then refused by every command with `S4` and no way
-back. "Where it stops scaling" in `docs/BENCHMARKS.md` carries the measurements.
+back. "Where it stops scaling" in `docs/architecture/history/BENCHMARKS-2026-09.md` carries the measurements.
 
 ## There is one record kind, and a retired field is not a migration
 
-The store holds work items and events. It held sprints in `sprints.md` and retrospectives in
-`ceremonies/YYYY-MM.md` until ADR-0029 removed both, along with the board, story points, the
-`component` field, `--preview`, `--color`, `--no-input` and two configuration keys, against
-the tool's statement of purpose: what treadle records is an interaction, a decision or a task,
-and none of those four recorded one. Read that record before proposing any of them back; the
-argument for each is still in ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028, all five
-marked superseded.
+The store holds work items and events, and that is the whole of it. ADR-0029 is where a
+proposal to add a second record kind argues, and `docs/architecture/adr/history/` is where the
+records for the kinds this repository has already tried and removed are kept.
 
 A field leaving the dictionary is not a file migration and must not become one. Declare it in
 `RETIRED_FIELDS` in `src/adapters/store/item-codec.ts`, mapped to the key it is read as now, or
@@ -407,7 +400,7 @@ A `workflow_dispatch` only fires for a workflow that already exists on the defau
 Three quarters of what a Windows job reports is the suite asserting POSIX at it, so the rules are short.
 Compare paths through `node:path` and never against a literal `/`, and never build a regex out of a path.
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
-The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF, but no longer the schemas, which this branch untracked; without it 30 tests fail there and every shard reads as an `H16`.
+The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
 
 Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:
 `npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;

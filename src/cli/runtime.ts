@@ -1,12 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Two floors, because they answer different questions.
 //
-// `engines.node` in package.json is the supported floor: 24.15.0. It used to be a capability
-// claim, the version where `node:sqlite` reached Stability 1.2 and the index was on a
-// supported API; the index is gone and the number is now a support statement. 24.15.0 is
-// what `.nvmrc` pins, what the first CI leg runs, what every figure in docs/BENCHMARKS.md
-// was measured on, and the runtime `@types/node` is held not to outrun
-// (test/architecture/supply-chain.test.ts).
+// `engines.node` in package.json is the supported floor: 24.15.0. It is a support statement
+// rather than a capability claim: nothing here needs an API newer than 24.0. It is what
+// `.nvmrc` pins, what the first CI leg runs, and what the runtime `@types/node` is held not
+// to outrun (test/architecture/supply-chain.test.ts).
 //
 // The hard floor is what running this repository from its TypeScript sources needs, which
 // the test suite and the benchmark rig both do: type stripping without a flag, from 24.0.0.

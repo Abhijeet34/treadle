@@ -14,7 +14,7 @@ Until this record that read was `store.list()` with no query, which decoded ever
 
 The measurement rig weighed DR8's 100 MiB read budget over `store.list` bounded at 50 rows, which no command performs, and reported 99.2 MiB.
 Weighed over `readWorkspace` the same budget read 418,336 KiB, 4.06x over, and the read took 1.2 s at 50,000 items where `get` took 7 ms.
-`docs/BENCHMARKS.md` recorded that as the wall the tool meets first and left it for a change to what the command layer promises the domain.
+`docs/architecture/history/BENCHMARKS-2026-09.md` recorded that as the wall the tool meets first and left it for a change to what the command layer promises the domain.
 This is that change.
 
 An allocation profile of the read at 50,021 items, taken with the inspector's sampling heap profiler with collected objects included, put the cost in two places.

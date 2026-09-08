@@ -133,7 +133,7 @@ Every reference figure in the axes table is quoted from the prior-art report and
 - Every axis mutates the corpus it measures, so a run measures a private clone of a shared, content-addressed cache entry rather than a shared root. The cost is one copy-on-write clone per corpus, reported as `cloneMs`; the alternative was a shared mutable path where two concurrent runs agreed on figures taken from a store neither was in. `bench/README.md` carries the layout.
 - The timing limits are calibrated to one machine and are not yet armed anywhere else.
 - Axis A1's 200-writer round alone takes about 70 seconds, because 200 cold Node processes serialise through one store lock.
-- The figures are bounded by confounds this rig cannot remove: a shared machine, a runtime below the product's floor, and no bundle. `docs/BENCHMARKS.md` lists all seven.
+- The figures are bounded by confounds this rig cannot remove: a shared machine, a runtime below the product's floor, and no bundle. `docs/architecture/history/BENCHMARKS-2026-09.md` lists all seven.
 
 ## Departures from the design record
 

@@ -1,6 +1,6 @@
 # Adapters layer
 
-The concrete sides of the seams: the sharded Markdown store and its SQLite index, the
+The concrete sides of the seams: the sharded Markdown store, the
 overlay store that backs `--dry-run`, the system and fixed clocks, the
 random and sequential id generators, the event log, and the three renderers.
 There is no hook dispatcher: [ADR-0012](../../docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md)

@@ -117,7 +117,10 @@ describe("the README's figures for treadle's own backlog are what .work holds", 
       `the README's "treadle's own backlog" section spells an item count .work does not hold; the records under .work/items carry ${total}`)
   })
 
-  for (const state of ['done', 'ready', 'draft', 'cancelled']) {
+  // The states are the ones .work holds rather than a list written here, so a workspace
+  // that empties a state moves this loop with it instead of failing on a sentence nobody
+  // has any reason to write.
+  for (const state of [...states.keys()].sort()) {
     it(`states how many items are ${state}, the same in every sentence that says so`, () => {
       assert.equal(spelled(section, `(?:(?:that )?(?:is|are)|in) \`${state}\``), states.get(state) ?? 0,
         `the README's "treadle's own backlog" section spells a ${state} count .work does not hold; the records under .work/items carry ${states.get(state) ?? 0}`)
@@ -277,7 +280,7 @@ function filesUnderBench(): string {
 
 const AGENTS = read('AGENTS.md')
 const ARCHITECTURE = read('docs/ARCHITECTURE.md')
-const BENCHMARKS = read('docs/BENCHMARKS.md')
+const BENCHMARKS = read('docs/architecture/history/BENCHMARKS-2026-09.md')
 const DOMAIN = read('docs/DOMAIN.md')
 
 describe("every document that counts doctor's findings counts what doctor raises", () => {
@@ -336,18 +339,18 @@ describe('every document that counts the benchmark axes counts the rig', () => {
   const axes = new Set([...filesUnderBench().matchAll(/axis: '(A\d+)'/g)].map((match) => match[1] as string))
   const unmeasured = [...read('bench/axes/remaining.ts').matchAll(/notMeasured\(\{/g)].length
 
-  it('the acceptance bar in docs/BENCHMARKS.md is stated over every axis', () => {
-    assert.equal(spelled(lineWith('docs/BENCHMARKS.md', BENCHMARKS, 'The acceptance bar for treadle'), 'axes'),
-      axes.size, `docs/BENCHMARKS.md states the bar over an axis count the rig does not emit; bench/ emits ${axes.size}: ${[...axes].join(', ')}`)
+  it('the acceptance bar in docs/architecture/history/BENCHMARKS-2026-09.md is stated over every axis', () => {
+    assert.equal(spelled(lineWith('docs/architecture/history/BENCHMARKS-2026-09.md', BENCHMARKS, 'The acceptance bar for treadle'), 'axes'),
+      axes.size, `docs/architecture/history/BENCHMARKS-2026-09.md states the bar over an axis count the rig does not emit; bench/ emits ${axes.size}: ${[...axes].join(', ')}`)
   })
 
-  it('docs/BENCHMARKS.md says how many of them were measured', () => {
+  it('docs/architecture/history/BENCHMARKS-2026-09.md says how many of them were measured', () => {
     const said = /([a-z]+) of the ([a-z]+) are measured here/i.exec(BENCHMARKS)
-    assert.ok(said !== null, 'docs/BENCHMARKS.md has no "<n> of the <n> are measured here" sentence')
+    assert.ok(said !== null, 'docs/architecture/history/BENCHMARKS-2026-09.md has no "<n> of the <n> are measured here" sentence')
     assert.deepEqual(
       [NUMBER_WORDS[(said[1] as string).toLowerCase()], NUMBER_WORDS[(said[2] as string).toLowerCase()]],
       [axes.size - unmeasured, axes.size],
-      `docs/BENCHMARKS.md says ${said[1]} of ${said[2]} axes are measured; bench/axes/remaining.ts leaves ${unmeasured} of ${axes.size} unmeasured`)
+      `docs/architecture/history/BENCHMARKS-2026-09.md says ${said[1]} of ${said[2]} axes are measured; bench/axes/remaining.ts leaves ${unmeasured} of ${axes.size} unmeasured`)
   })
 
   it("the README's Status row counts the measured axes and the ones that are not", () => {
@@ -368,11 +371,6 @@ describe('every document that counts the benchmark axes counts the rig', () => {
     assert.ok(stays !== null, 'AGENTS.md has no "<n> axes stay `NOT MEASURED`" sentence')
     assert.equal(NUMBER_WORDS[(stays[1] as string).toLowerCase()], unmeasured,
       `AGENTS.md names a NOT MEASURED count bench/axes/remaining.ts does not report; it reports ${unmeasured}`)
-  })
-
-  it('the README Documentation list names the same axis count', () => {
-    assert.equal(spelled(lineWith('README.md', README, 'docs/BENCHMARKS.md](docs/BENCHMARKS.md)'), 'axes'),
-      axes.size, `the README's Documentation entry for docs/BENCHMARKS.md names an axis count the rig does not emit; bench/ emits ${axes.size}`)
   })
 })
 
@@ -463,7 +461,7 @@ describe('docs/DOMAIN.md counts the closed sets the domain declares', () => {
 describe("the README's Status table points at something this tree holds", () => {
   // The State column had "Specified, not implemented" and "Partly implemented" on nine rows,
   // and neither said who owned the gap: a row could sit there for a release naming work
-  // nobody had queued and nobody had declined. The vocabulary is four words now, each
+  // nobody had queued and nobody had declined. The vocabulary is three words now, each
   // carrying a pointer, and this is what makes the pointer real rather than decorative.
   // A Shipped row names a record or a commit and is not held here, because a commit hash is
   // not a file and the record link is already held by the ADR index test above.
@@ -486,11 +484,11 @@ describe("the README's Status table points at something this tree holds", () => 
     }
   }
 
-  it('has rows to check, and every State is one of the four words plus Blocked', () => {
+  it('has rows to check, and every State is one of the three words plus Blocked', () => {
     assert.ok(rows.length >= 10, `only ${rows.length} Status rows parsed; the table or its State column has changed shape`)
     const bare = section.split('\n').filter((line) => line.startsWith('| ') && !line.startsWith('| Area') && !line.startsWith('|---'))
     assert.equal(rows.length, bare.length,
-      `${bare.length - rows.length} Status rows carry a State that is not one of Shipped, Queued, Declined, Removed or Blocked`)
+      `${bare.length - rows.length} Status rows carry a State that is not one of Shipped, Queued, Declined or Blocked`)
   })
 
   it('names, on every Queued row, an item .work holds in ready or draft', () => {

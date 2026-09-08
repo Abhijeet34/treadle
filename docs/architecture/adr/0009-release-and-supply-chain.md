@@ -12,7 +12,7 @@ Two workflows, no build step, no version management, no changelog, no release, n
 Three specific gaps made that concrete.
 
 DR1 specifies "one bundled entry file, at most 500 KB, built with esbuild", priced at 8.7 ms per invocation against the 60 unbundled modules.
-Nothing built one, so the DR8 bundle-size budget reported `NOT MEASURED: there is no build step in this tree` and `docs/BENCHMARKS.md` listed "there is no bundle" as one of seven confounds on every figure it prints.
+Nothing built one, so the DR8 bundle-size budget reported `NOT MEASURED: there is no build step in this tree` and `docs/architecture/history/BENCHMARKS-2026-09.md` listed "there is no bundle" as one of seven confounds on every figure it prints.
 
 Threat-model finding F13 names three supply-chain controls the design left unstated: `ignore-scripts`, a committed lockfile installed with `npm ci`, and an SBOM with provenance at publish.
 Two of the three were partly true by accident. The lockfile was committed and CI did use `npm ci`, but nothing said so and nothing checked.
