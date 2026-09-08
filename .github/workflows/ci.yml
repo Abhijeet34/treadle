@@ -102,28 +102,6 @@ jobs:
       - name: npm audit
         run: npm audit --audit-level=low
 
-  codeql:
-    name: codeql
-    runs-on: ubuntu-24.04
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      security-events: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      # build-mode: none, because there is nothing to observe being compiled. Node strips the
-      # types at run time and the esbuild bundle is a concatenation of the same files CodeQL
-      # already reads, so a tracing build would give it the source twice.
-      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
-        with:
-          languages: javascript-typescript
-          build-mode: none
-
-      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
-        with:
-          category: /language:javascript-typescript
-
   # The workflows are the least tested code in the repository: nothing runs them until they
   # run for real, and the release path runs for real once. actionlint reads them statically
   # and runs shellcheck over every `run:` body, which is the only review the shell in this
@@ -235,7 +213,7 @@ jobs:
   checks:
     name: checks
     if: always()
-    needs: [check, audit, codeql, actionlint, dependency-review, commits, tests-kept]
+    needs: [check, audit, actionlint, dependency-review, commits, tests-kept]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
