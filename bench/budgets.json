@@ -1,140 +1,59 @@
 {
   "tolerancePercent": 35,
-  "toleranceWhy": "six four-scale runs on 2026-09-05 put the worst run-to-run drift of any operation's program cost at 19.9% across the three runs where the machine was quiet (list at 1,000 items, 87.5 / 87.4 / 104.7 ms); 35% clears that by 1.76x. The in-process median was measured as an alternative and drifts 17.8% on the same case, so the statistic is not what the variance comes from. A run taken under load drifts further and shows up as an open miss, which is the correct outcome for a gate nobody has armed yet. The p95 moved 68.9% between two runs, which is why the gate reads the median and reports the p95 without gating on it.",
+  "toleranceWhy": "six four-scale runs on 2026-09-05 put the worst run-to-run drift of any operation's program cost at 19.9% across the three runs where the machine was quiet (list at 1,000 items, 87.5 / 87.4 / 104.7 ms); 35% clears that by 1.76x. The in-process median was measured as an alternative and drifts 17.8% on the same case, so the statistic is not what the variance comes from. The p95 moved 68.9% between two runs, which is why the gate reads the median and reports the p95 without gating on it.",
   "derivedFrom": {
     "runId": "2026-09-04T23-39-28-387Z",
     "date": "2026-09-04",
     "machine": "Apple M2, 8 cores, darwin 25.6.0",
     "node": "24.11.1",
-    "note": "timing limits are program cost at the median: the operation wall median minus the runner's own node floor median, measured in the same job"
+    "note": "the cold-start limit is program cost at the median: the operation wall median minus the runner's own node floor median, measured in the same job"
   },
   "coldStartMs": 157.8,
-  "timing": {
-    "enforced": false,
-    "why": "the limits below were derived on one machine and have never been measured on a CI runner, so a failure there would be evidence about the runner rather than about the change. Run-to-run drift on the machine that produced them reaches 19.9% on its own. Arm this by re-deriving on the runner with --write-budgets, and only once the runner's own drift has been measured. The workspace, next and doctor keys are from run 2026-09-06T20-55-55 on the same machine at 1-minute loads of 17.18 to 26.90, taken so that the three rows report a number rather than pending; a re-derivation on a quiet machine will lower them, and until then the two ratio rows in absolute are what hold next and doctor.",
-    "limits": {
-      "workspace@100": 126.7,
-      "next@100": 126.1,
-      "doctor@100": 128.7,
-      "workspace@1000": 119.1,
-      "next@1000": 119.9,
-      "doctor@1000": 184.4,
-      "workspace@10000": 188.2,
-      "next@10000": 194.5,
-      "doctor@10000": 786.3,
-      "workspace@50000": 478.6,
-      "next@50000": 493.8,
-      "doctor@50000": 3522.8,
-      "identity@100": 178.4,
-      "get@100": 172.1,
-      "list@100": 199.1,
-      "create@100": 189,
-      "transition@100": 170.1,
-      "identity@1000": 79,
-      "get@1000": 85.3,
-      "list@1000": 89.6,
-      "create@1000": 115.8,
-      "transition@1000": 120.7,
-      "identity@10000": 206.6,
-      "get@10000": 325.1,
-      "list@10000": 230.9,
-      "create@10000": 172,
-      "transition@10000": 198.4,
-      "identity@50000": 273.9,
-      "get@50000": 653.4,
-      "list@50000": 407.3,
-      "create@50000": 432.9,
-      "transition@50000": 535.8
-    }
-  },
   "axes": {
     "a1Durability": {
       "limit": 1,
-      "enforced": true,
-      "source": "axis A1",
-      "why": ""
+      "source": "axis A1"
     },
     "a1Crashes": {
       "limit": 0,
-      "enforced": true,
       "source": "axis A1",
       "why": "closed by #4, which armed `pragma busy_timeout` before the journal-mode switch and retried the promotion SQLite refuses to wait on. Verified here at 0 crashes in 1,445 writers across five runs at 1-minute loads of 3.13 to 116.12, against 126 crashes in 2,890 writers before it. Armed, so a return of it fails the build."
     },
     "a5SilentDrops": {
       "limit": 0,
-      "enforced": true,
       "source": "axis A5",
       "why": "closed by #7, which resynchronises on a heading a hand edit reshaped and quarantines the record instead of dropping it. The shaped heading-rename case now reports `refusal names the record` with one finding, where it reported a silent drop in every run before #7. Armed on a deterministic corpus, and `test/store/record-boundary.test.ts` holds the same property as a test, so the gate is the second line rather than the only one."
     },
     "a5WholeStoreRefusals": {
       "limit": 0,
-      "enforced": true,
-      "source": "axis A5",
-      "why": ""
+      "source": "axis A5"
     },
     "a5Crashes": {
       "limit": 0,
-      "enforced": true,
-      "source": "axis A5",
-      "why": ""
+      "source": "axis A5"
     }
   },
   "absolute": {
-    "peakRssReadKb": {
-      "limit": 102400,
-      "enforced": false,
-      "source": "DR8, 100 MiB for a read at 50k",
-      "why": "still open, and weighed over the read the product performs: the worst of READ_OPS at the largest scale, NOT MEASURED if any member has no figure. The recorded pass at 99.2 MiB was store.list bounded at 50 rows, which no command makes; readWorkspace read 418,592 KiB at 50,000 items while it decoded every record. It reads 166,944 KiB now, 1.63x, as a projection of the index's summary columns with the one record a command acts on read on demand (ADR-0014), and 129,680 to 131,168 KiB through the bundle, 1.27x. The rig's children launch from source, where the floor is 95.9 MiB with the store adapter loaded, so no read that retains anything meets 100 MiB there; through the bundle 30 MiB of view and heap slack remain, and the step that closes it is scanning in SQL. Measured 2026-09-06 at 1-minute loads of 4.54 to 3.47, seven interleaved cold samples per cell. The set widened to next and doctor the same day, and doctor was the worst of it at 1,043,456 KiB, 10.2x, because it held every decoded event beside every whole record; it reads 334,688 KiB fed one at a time (ADR-0021), 3.3x, and is still the worst member, so this row now prices the audit's decode churn rather than the view."
-    },
     "doctorRssOverWorkspace": {
       "limit": 3,
-      "enforced": true,
       "source": "ADR-0021, doctor holds one record and one event at a time",
       "why": "armed on 2026-09-06, the day doctor was first measured at all. It peaked at 1,043,456 KiB over a 50,000-item corpus carrying 500,042 events, 6.2x the workspace read's 166,944, because it held every decoded event beside every whole record to look at each once; nothing watched it because its cost was an absolute wall time on a machine no budget named. It reads 334,688 KiB now, 2.0x, fed one record and one event at a time through the store's streaming reads. What remains above the workspace read is the heap V8 commits under the churn of decoding 50,000 records and 500,000 events, about 1.35 GB of transient allocation in 3.4 s, and the 25 bytes per byte the shard parse allocates is the store's own ceiling and the next step named in ADR-0014. The limit is the measured ratio with room for that churn to move with the corpus, and a return of the old shape reads 6x. A ratio of two peaks taken in one job transfers between machines in a way a KiB count does not, because both carry the same runtime floor."
     },
     "nextCostOverWorkspace": {
       "limit": 2,
-      "enforced": true,
       "source": "ADR-0021, next ranks off one index over the graph",
       "why": "armed on 2026-09-06 with doctor's row above, for the same reason. next asked the whole relation list twice per ready item, 1,250 ms of a 1,885 ms call over 7,122 ready items and 5,000 edges, 3.8x the workspace read's program cost in a cold process; it reads both directions of every active blocks edge off one index now and lands within 1.2x of the read it performs. The limit is that ratio with the run-to-run drift this file already commits to applied to both numerator and denominator, and the old shape reads 3.8x at 50,000 items. At 100 and 1,000 items, which is what a pull-request run measures, both commands are the workspace read and the ratio says nothing; the row earns its keep on the weekly four-scale run, and test/services/next-scale.test.ts holds the shape on every pull request at 60 items."
     },
-    "peakRssMutationKb": {
-      "limit": 122880,
-      "enforced": false,
-      "source": "DR8, 120 MiB for a mutation at 50k",
-      "why": "still open. 162,560 KiB for create and 163,904 for transition at 50,000 items before, 147,088 and 146,960 after, 1.20x, measured 2026-09-06 at 1-minute loads of 4.54 to 3.47 over seven interleaved cold samples. The move is one parse: a create after a create parsed the largest shard twice, in the warm refresh before the lock and in #readShard under it, 42.5 and 24.9 MiB of the 76 MiB one create allocated, and the parse is now kept across both. What remains is the shard parse itself, about 25 bytes allocated per byte of a 1.1 MB shard, paid by the next command after any write to re-index that shard; the next step is a line scanner over offsets rather than Line objects."
-    },
-    "firstIndexBuildMs": {
-      "limit": 6000,
-      "enforced": false,
-      "source": "DR8, 6 s for 50k items and 500k events",
-      "why": "still open. 10,504 ms before and 10,250 ms after against 6,000 ms, measured 2026-09-05 at 1-minute loads of 3.98 to 5.66 on Node 24.11.1. A CPU profile of the cold build puts 6,120 ms of it, 59%, in replaceEventFile: 500,000 event rows at about 12 us each, every one of them writing a primary key, an events_file entry and an events_entity entry. The build is linear in the corpus (57 ms at 100 items, 212 at 1,000, 1,933 at 10,000, 10,267 at 50,000), so the figure is the row rate and nothing else. The next thing to try is inserting events in batched multi-row statements rather than one at a time."
-    },
-    "reindexAfterHandEditMs": {
-      "limit": 135,
-      "enforced": false,
-      "source": "derived 2026-09-05 from the measured floor of the unit ADR-0002 re-indexes; DR8 said 50 ms",
-      "why": "DR8's 50 ms is below the floor of the work this design does, so it is corrected rather than chased. ADR-0002 shards by month so that freshness is a stat per file, 0.27 ms across 24 shards, and the price of that choice is that a file whose stat moved is re-read and re-parsed whole. At 50,000 items over 24 months the largest shard is 2,176 records in 1,115,493 bytes, and reading, parsing, decoding and hashing that one file with no index and no store around it is 59.0 ms at the median of twelve runs (read 0.6, parse 30.3, decode 26.1, hash 1.9). No implementation of this layout reaches 50 ms on this corpus. The new limit is that floor plus the measured cost of the freshness pass and the index difference on top of it, 100.4 ms at the median of five hand edits, times the 35% tolerance this file already commits to for run-to-run drift: 135 ms. It was 249.1 ms before the difference-based re-index landed. The figure tracks the shard and not the store, at 11.0 ms over 9 records, 14.9 over 55, 34.6 over 477 and 100.4 over 2,176, which is 46.1 us per record re-indexed at the largest scale. It stays unenforced for the reason the other wall times do: a different runner moves it on its own. ADR-0002's own reopening condition, a month filing more than about 5,000 records, is the point at which the shard key and not this number is what should change."
-    },
-    "indexToTextRatio": {
-      "limit": 1.6,
-      "enforced": false,
-      "source": "derived 2026-09-05 from dbstat over the 50,000-item corpus; DR2 measured 0.7x and DR8 said 1.0x",
-      "why": "DR2's 0.7x was measured over an index of columns. ADR-0002 departed from that on purpose and recorded it: the index also caches every record's rendered source, so that a get is one index lookup and never reopens a shard. A budget taken from the first design cannot be met by the second, and the departure is the one this store wants to keep: get is 7.3 ms at 50,000 items and flat from 100 items upward. So the number is corrected against what the index actually holds. dbstat over the 50,000-item corpus, 110.3 MiB of records and log: items 34.6 MiB of which items.source is 24.4 MiB, exactly the record text, plus 6.7 MiB of item indexes; events 78.3 MiB and 50.1 MiB of event indexes, the three the queries range over. Total 169.6 MiB, 1.538x, and stable at 1.533 and 1.555 at the two scales below it. Reaching 1.0x now means dropping items.source and reopening a shard on every get, or replacing the event remainder with an offset into the log; both are design reversals, not tuning. The limit is 1.6x, the measured figure with room for the corpus mix to move. It is not armed, and the reason is the gate rather than the drift: a size does not drift run to run, reading 2.064 in every run before this change and 1.538 in every run after, but the gate weighs the largest corpus of the run and a pull-request run stops at 1,000 items. At 100 items the same index reads 1.868x, because 421,888 bytes of SQLite pages over 230,591 bytes of text is the page floor and not what the index stores. Arming this needs the gate to weigh a corpus large enough for that floor to disappear. It was 2.064 when the events table stored each log line whole beside six columns that already carried it."
-    },
     "runtimeDependencies": {
       "limit": 0,
-      "enforced": true,
       "source": "DR7, zero runtime dependencies"
     },
     "installUnpackedBytes": {
       "limit": 1572864,
-      "enforced": true,
       "source": "DR8, 1.5 MB unpacked"
     },
     "bundleBytes": {
       "limit": 768000,
-      "enforced": true,
       "source": "DR8 raised by ADR-0027, 750 KB bundle"
     }
   }

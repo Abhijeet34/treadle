@@ -100,12 +100,6 @@ async function accountArtefacts(corpus: Corpus): Promise<readonly { label: strin
 
 function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budgets {
   const floor = report.floors.nodeMedianMs
-  const timing: Record<string, number> = {}
-  for (const scale of report.latency) {
-    for (const [op, m] of Object.entries(scale.operations)) {
-      timing[`${op}@${scale.items}`] = Number(programCost(m.wall.p50.ms, floor).toFixed(1))
-    }
-  }
   const coldStart = report.floors.rows.find((r) => r.label.startsWith('node + the store adapter'))
   return {
     tolerancePercent: previous.tolerancePercent,
@@ -115,10 +109,9 @@ function deriveBudgets(report: Omit<RunReport, 'gate'>, previous: Budgets): Budg
       date: report.startedAt.slice(0, 10),
       machine: `${report.machine.cpuModel}, ${report.machine.cores} cores, ${report.machine.platform} ${report.machine.release}`,
       node: report.machine.node,
-      note: 'timing limits are program cost at the median: the operation wall median minus the runner\'s own node floor median, measured in the same job',
+      note: 'the cold-start limit is program cost at the median: the operation wall median minus the runner\'s own node floor median, measured in the same job',
     },
     coldStartMs: coldStart === undefined ? previous.coldStartMs : Number(programCost(coldStart.wall.p50.ms, floor).toFixed(1)),
-    timing: { ...previous.timing, limits: timing },
     axes: Object.fromEntries(AXIS_BUDGET_KEYS.map((k) => [k, previous.axes[k]])) as Budgets['axes'],
     absolute: Object.fromEntries(ABSOLUTE_KEYS.map((k) => [k, previous.absolute[k]])) as Budgets['absolute'],
   }
@@ -254,10 +247,10 @@ async function main(): Promise<void> {
     outputBudgets: a3.rows,
     axes,
   }
-  // With --write-budgets the limits come from this run, so the gate is reported against the
-  // budgets it just established rather than against the stale ones it is replacing. Every
-  // timing row then reads as a pass by construction, which is what establishing a baseline
-  // is; the derivedFrom block in budgets.json says which run it was.
+  // With --write-budgets the cold-start limit comes from this run, so the gate is reported
+  // against the budget it just established rather than against the stale one it is replacing.
+  // That row then reads as a pass by construction, which is what establishing a baseline is;
+  // the derivedFrom block in budgets.json says which run it was.
   const budgets = flags.writeBudgets ? deriveBudgets(skeleton, committed) : committed
   const report: RunReport = { ...skeleton, gate: runGate(skeleton, budgets) }
 
@@ -276,9 +269,9 @@ async function main(): Promise<void> {
   await rm(runDir, { recursive: true, force: true })
 
   const g = report.gate
-  say(`bench: ${g.rows.length} budgets, ${g.passed} pass, ${g.failed} fail, ${g.openMisses} open miss, ${g.pending} pending`)
+  say(`bench: ${g.rows.length} budgets, ${g.passed} pass, ${g.failed} fail, ${g.pending} pending`)
   for (const row of g.rows) {
-    if (row.status === 'fail' || row.status === 'open miss') say(`  ${row.status.toUpperCase()}: ${row.budget} = ${row.observed} ${row.unit}, limit ${row.limit}`)
+    if (row.status === 'fail') say(`  FAIL: ${row.budget} = ${row.observed} ${row.unit}, limit ${row.limit}`)
   }
   for (const axis of report.axes) {
     say(`  ${axis.axis} ${axis.verdict}: ${axis.observed}`)

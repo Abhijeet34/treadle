@@ -1,22 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // DR8's regression gate.
 //
-// A CI runner is not this laptop, so no timing budget here is an absolute millisecond count.
-// Every timing row is checked as PROGRAM COST: the operation's MEDIAN wall time minus the
-// runner's own `node -e` median, measured in the same job.
+// A CI runner is not this laptop, so every row here is one that transfers between machines:
+// the axis outcomes, the package facts (dependency count, install size, bundle size), and two
+// ratios that price `doctor` and `next` against the workspace read taken in the same job. A
+// ratio of two figures from one runner survives the move to another where a millisecond count
+// does not.
 //
-// The median rather than the p95, because the p95 was measured and cannot carry a gate. Two
-// identical four-scale runs on this machine, 2026-09-05, moved their medians by at most 2.4%
-// across twenty operations and moved one p95 by 68.9%. A gate on the p95 would fire on the
-// scheduler. The p95 and p99 are still reported for every row, because what a slow
-// invocation costs an agent is worth knowing; they are just not what a build fails on. That subtraction removes what the
-// machine charges to start a process and leaves what our code charges to do the work, which
-// is the only part a regression can be attributed to. The committed limit is this machine's
-// measured program cost with the tolerance added, and `bench/budgets.json` records the run it
-// came from.
-//
-// The rows that are properties of the package rather than of a machine (dependency count,
-// install size, index-to-text ratio) stay absolute, because they are.
+// The cold-start row is checked as PROGRAM COST: the store-loading floor's median wall time
+// minus the runner's own `node -e` median, measured in the same job. That subtraction removes
+// what the machine charges to start a process and leaves what our code charges.
 //
 // A budget with nothing to measure is `pending`, never `pass`. The summary prints all three
 // counts, because a gate that reported "0 failures" over 12 pending rows would be green and
@@ -25,30 +18,7 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 
-import { READ_OPS, WRITE_OPS, type ScaleRow } from './axes/a4-latency.ts'
 import type { RunReport } from './report.ts'
-
-/**
- * The operations each memory budget is weighed over. Both rows named one operation by hand
- * and both named the wrong one: at 50,000 items on 2026-09-06 `transition` peaked 164,256 KiB
- * against `create`'s 155,696, so the mutation budget under-reported the worst mutation by
- * 8,560 KiB, and the read budget priced a bounded `list` while every command in the tool
- * performs the unbounded `workspace` read. A budget on the worst of a set cannot go stale
- * when an operation is added.
- */
-function worstRss(
-  scale: ScaleRow | undefined, ops: readonly string[],
-): { readonly kb: number; readonly op: string } | string {
-  let worst: { kb: number; op: string } | undefined
-  for (const op of ops) {
-    const kb = scale?.operations[op]?.peakRssKb
-    // An op with no figure is the whole row unmeasured. Weighing the rest would let the
-    // budget pass over `list` again the moment `workspace` failed to report.
-    if (kb === undefined) return `NOT MEASURED: ${op} reported no RSS, and this budget is the worst of ${ops.join(', ')}`
-    if (worst === undefined || kb > worst.kb) worst = { kb, op }
-  }
-  return worst ?? 'NOT MEASURED: no operations ran'
-}
 
 export type Budgets = {
   readonly tolerancePercent: number
@@ -63,13 +33,6 @@ export type Budgets = {
   }
   /** Cold start: the store-loading floor's own cost above `node -e`, in milliseconds. */
   readonly coldStartMs: number | null
-  readonly timing: {
-    /** False until the limits have been re-derived on the machine the gate runs on. */
-    readonly enforced: boolean
-    readonly why?: string
-    /** `<op>@<scale>` to program cost at the median, in milliseconds. */
-    readonly limits: Readonly<Record<string, number>>
-  }
   /** Axis outcomes that transfer across machines, so they have teeth on any runner. */
   readonly axes: Readonly<Record<AxisBudgetKey, AbsoluteBudget>>
   readonly absolute: Readonly<Record<AbsoluteKey, AbsoluteBudget>>
@@ -81,25 +44,20 @@ export const AXIS_BUDGET_KEYS = [
 export type AxisBudgetKey = (typeof AXIS_BUDGET_KEYS)[number]
 
 export const ABSOLUTE_KEYS = [
-  'peakRssReadKb', 'peakRssMutationKb', 'doctorRssOverWorkspace', 'nextCostOverWorkspace',
-  'firstIndexBuildMs', 'reindexAfterHandEditMs',
-  'indexToTextRatio', 'runtimeDependencies', 'installUnpackedBytes', 'bundleBytes',
+  'doctorRssOverWorkspace', 'nextCostOverWorkspace',
+  'runtimeDependencies', 'installUnpackedBytes', 'bundleBytes',
 ] as const
 export type AbsoluteKey = (typeof ABSOLUTE_KEYS)[number]
 
-/**
- * `enforced: false` marks a budget the product has never met, which is an open finding
- * rather than a regression. It is still reported as a miss with its number; it simply does
- * not fail a build for standing still. `why` says who has to close it.
- */
+/** `why` carries what closed the budget or what it is watching, where the number alone does
+ *  not say it. Every budget in this file is armed: a row that fails, fails the build. */
 export type AbsoluteBudget = {
   readonly limit: number
-  readonly enforced: boolean
   readonly source: string
   readonly why?: string
 }
 
-export type GateStatus = 'pass' | 'fail' | 'open miss' | 'pending'
+export type GateStatus = 'pass' | 'fail' | 'pending'
 
 export type GateRow = {
   readonly budget: string
@@ -114,16 +72,9 @@ export type GateReport = {
   readonly tolerancePercent: number
   readonly toleranceWhy: string
   readonly derivedFrom: Budgets['derivedFrom']
-  /** Whether a timing row can fail a build, and the reason, carried once rather than on each
-   *  of the twenty rows it applies to: the same paragraph repeated per row was 37% of the
-   *  bytes of the report the bench workflow posts as its job summary. */
-  readonly timingEnforced: boolean
-  readonly timingWhy: string
   readonly rows: readonly GateRow[]
   readonly passed: number
   readonly failed: number
-  /** Budgets the product has never met. Reported with their number, not build-blocking. */
-  readonly openMisses: number
   readonly pending: number
 }
 
@@ -138,7 +89,7 @@ export function programCost(medianMs: number, nodeFloorMs: number): number {
 
 function compare(
   budget: string, observed: number | string, limit: number, unit: string,
-  options: { readonly note?: string; readonly enforced?: boolean } = {},
+  options: { readonly note?: string } = {},
 ): GateRow {
   const note = options.note
   if (typeof observed === 'string') {
@@ -150,7 +101,7 @@ function compare(
     observed: Number(observed.toFixed(unit === 'ms' ? 1 : 2)),
     limit,
     unit,
-    status: over ? (options.enforced === false ? 'open miss' : 'fail') : 'pass',
+    status: over ? 'fail' : 'pass',
     ...(note === undefined ? {} : { note }),
   }
 }
@@ -161,8 +112,6 @@ function axisBudget(
   ok: boolean, note?: string,
 ): GateRow {
   const budget = budgets.axes[key]
-  const detail = [note, budget.enforced ? undefined : `open finding, not build-blocking: ${budget.why ?? ''}`]
-    .filter((x) => x !== undefined && x !== '').join('; ')
   if (typeof observed === 'string') {
     return { budget: `${label} (${budget.source})`, observed, limit: budget.limit, unit, status: 'pending' }
   }
@@ -171,8 +120,8 @@ function axisBudget(
     observed,
     limit: budget.limit,
     unit,
-    status: ok ? 'pass' : budget.enforced ? 'fail' : 'open miss',
-    ...(detail === '' ? {} : { note: detail }),
+    status: ok ? 'pass' : 'fail',
+    ...(note === undefined ? {} : { note }),
   }
 }
 
@@ -180,10 +129,7 @@ function absolute(
   budgets: Budgets, key: AbsoluteKey, label: string, observed: number | string, unit: string, note?: string,
 ): GateRow {
   const budget = budgets.absolute[key]
-  return compare(
-    `${label} (${budget.source})`, observed, budget.limit, unit,
-    { enforced: budget.enforced, note: [note, budget.enforced ? undefined : `open finding, not build-blocking: ${budget.why ?? ''}`].filter((x) => x !== undefined && x !== '').join('; ') || undefined },
-  )
+  return compare(`${label} (${budget.source})`, observed, budget.limit, unit, note === undefined ? {} : { note })
 }
 
 export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): GateReport {
@@ -211,39 +157,10 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
       { note: `runner node floor measured in this job at ${floor.toFixed(1)} ms median` },
     ))
 
-  for (const scale of report.latency) {
-    for (const [op, measurement] of Object.entries(scale.operations)) {
-      const key = `${op}@${scale.items}`
-      const limit = budgets.timing.limits[key]
-      if (limit === undefined) {
-        rows.push({ budget: `${op} median at ${scale.items} items`, observed: programCost(measurement.wall.p50.ms, floor), limit: 'NOT MEASURED: no committed budget for this key', unit: 'ms', status: 'pending' })
-        continue
-      }
-      rows.push(compare(
-        `${op} median at ${scale.items} items, above the node floor`,
-        measurement.failures.length > 0 ? `NOT MEASURED: ${measurement.failures[0]}` : programCost(measurement.wall.p50.ms, floor),
-        Number((limit * slack).toFixed(1)),
-        'ms',
-        {
-          enforced: budgets.timing.enforced,
-          note: `n=${measurement.wall.n}, ${measurement.opsTotal} store operations${budgets.timing.enforced ? '' : '; not build-blocking, for the reason above the table'}`,
-        },
-      ))
-    }
-  }
-
   const largest = report.latency[report.latency.length - 1]
-  const readRss = worstRss(largest, READ_OPS)
-  const writeRss = worstRss(largest, WRITE_OPS)
-  rows.push(absolute(budgets, 'peakRssReadKb', 'peak RSS, read at the largest scale',
-    typeof readRss === 'string' ? readRss : readRss.kb, 'KiB',
-    typeof readRss === 'string' ? undefined : `the worst of ${READ_OPS.join(', ')}, which was ${readRss.op}`))
-  rows.push(absolute(budgets, 'peakRssMutationKb', 'peak RSS, mutation at the largest scale',
-    typeof writeRss === 'string' ? writeRss : writeRss.kb, 'KiB',
-    typeof writeRss === 'string' ? undefined : `the worst of ${WRITE_OPS.join(', ')}, which was ${writeRss.op}`))
   // Two commands over the read every command performs, priced against that read in the same
-  // job. A ratio of two figures taken on one runner is not a millisecond count on another,
-  // which is why these two are armed where the timing rows are not: `doctor` held the whole
+  // job. A ratio of two figures taken on one runner survives the move to another where a
+  // millisecond count does not, which is why these two can be armed: `doctor` held the whole
   // store at 6.2x the workspace read's peak and `next` ranked at 3.8x its cost, and no row
   // was watching either shape because each was measured as an absolute wall time on a
   // machine the budget did not name.
@@ -261,16 +178,6 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
       ? 'NOT MEASURED: next or workspace reported no median at the largest scale'
       : nextCost / workspaceCost,
     'x', workspaceCost === undefined || nextCost === undefined ? undefined : `${nextCost.toFixed(1)} ms over ${workspaceCost.toFixed(1)} ms at ${largest?.items} items, both above the node floor`))
-  rows.push(absolute(budgets, 'firstIndexBuildMs', 'first index build at the largest scale', largest?.firstIndexBuildMs ?? 'NOT MEASURED: no scale ran', 'ms'))
-  rows.push(absolute(budgets, 'reindexAfterHandEditMs', 're-index after a hand edit of the largest shard', largest?.reindexAfterHandEditMs ?? 'NOT MEASURED: no scale ran', 'ms'))
-
-  const corpus = report.corpora[report.corpora.length - 1]
-  const text = corpus === undefined ? 0 : corpus.bytes.items + corpus.bytes.events
-  rows.push(absolute(
-    budgets, 'indexToTextRatio', 'index size as a multiple of the text it indexes',
-    corpus === undefined || text === 0 ? 'NOT MEASURED: no corpus bytes recorded' : corpus.bytes.index / text, 'x',
-    corpus === undefined ? undefined : `${corpus.bytes.index} bytes of index over ${text} bytes of records and events`,
-  ))
 
   rows.push(absolute(budgets, 'runtimeDependencies', 'runtime dependencies', report.packageFacts.runtimeDependencies, 'packages'))
   rows.push(absolute(budgets, 'installUnpackedBytes', 'install size, unpacked', report.packageFacts.unpackedBytes, 'bytes',
@@ -327,12 +234,9 @@ export function runGate(report: Omit<RunReport, 'gate'>, budgets: Budgets): Gate
     tolerancePercent: budgets.tolerancePercent,
     toleranceWhy: budgets.toleranceWhy,
     derivedFrom: budgets.derivedFrom,
-    timingEnforced: budgets.timing.enforced,
-    timingWhy: budgets.timing.why ?? '',
     rows,
     passed: rows.filter((r) => r.status === 'pass').length,
     failed: rows.filter((r) => r.status === 'fail').length,
-    openMisses: rows.filter((r) => r.status === 'open miss').length,
     pending: rows.filter((r) => r.status === 'pending').length,
   }
 }

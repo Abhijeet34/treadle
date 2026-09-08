@@ -187,14 +187,11 @@ export function toMarkdown(report: RunReport): string {
   push(...axisDetail(report))
 
   push('## DR8 budget gate', '')
-  push(`Timing limits are program cost at the median: the operation's wall median minus the runner's own \`node -e\` median, measured in the same job.`)
+  push(`Every row here is armed: a row that fails, fails the build. The cold-start row is program cost at the median, the operation's wall median minus the runner's own \`node -e\` median, measured in the same job.`)
   push(`Tolerance ${report.gate.tolerancePercent}% over the committed limit, because ${report.gate.toleranceWhy}`)
   push(`Limits derived from run ${report.gate.derivedFrom.runId} on ${report.gate.derivedFrom.date} (${report.gate.derivedFrom.machine}, Node ${report.gate.derivedFrom.node}).`)
-  push(`${report.gate.rows.length} budgets: ${report.gate.passed} pass, ${report.gate.failed} fail, ${report.gate.openMisses} open miss, ${report.gate.pending} pending.`)
-  if (!report.gate.timingEnforced) {
-    push(`Every timing row below reads "not build-blocking, for the reason above the table", and this is that reason: ${report.gate.timingWhy}`)
-  }
-  push('An open miss is a budget the product has never met. It is reported with its number and does not fail a build for standing still; a regression against a budget that was met does.')
+  push(`${report.gate.rows.length} budgets: ${report.gate.passed} pass, ${report.gate.failed} fail, ${report.gate.pending} pending.`)
+  push('A pending row is one with nothing to measure. It is never a pass, so a gate cannot report a clean run over rows that never ran.')
   push('')
   push('| Budget | Observed | Limit | Unit | Status | Note |', '|---|---|---|---|---|---|')
   for (const r of report.gate.rows) {
