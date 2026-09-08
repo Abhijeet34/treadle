@@ -354,6 +354,12 @@ side. Removing a field means taking it out of the dictionary and the surfaces th
 declaring it retired; leaving that declaration out is what makes a removed field ride every
 record forever.
 
+A retired *value* of a closed set is a different thing and is a record migration, because no
+`RETIRED_FIELDS` entry can reach one: `type` has no writer, so folding `chore` into `task` meant
+`remove` then `file` under the same id, driven through the tool. `doctor` used to fault every
+event of the record that left as `H23`, dated before the new record's `filed_at`, with no way to
+clear it; `test/services/refile-audit.test.ts` is what holds that path open.
+
 ## Where a terminal nuance goes, and where a derived flag goes
 
 Neither is a state.
