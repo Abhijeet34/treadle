@@ -42,7 +42,7 @@ export type ScaleRow = {
   readonly relationCycle: RelationCycleRow | string
 }
 
-export type RelationCycleRow = {
+type RelationCycleRow = {
   readonly edges: number
   readonly buildMs: number
   readonly findMs: number

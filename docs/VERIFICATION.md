@@ -22,7 +22,7 @@ Counts are per run, and every property suite prints its own count as a test diag
 | A stale lock is recovered | Both forms: a holder whose process is provably gone, reclaimed in under 1 s; a live process whose heartbeat stopped, reclaimed. `EPERM` is treated as alive and the lock is not stolen | Proven |
 | A hand edit during an operation is handled | 12 trials: 6 broken records quarantined and reported as findings with the record either side still serving, 6 concurrent edits leaving a shard that still parses, 0 stores left unreadable | Proven |
 | Zero injection escapes across an adversarial corpus | 4,840 rendered cases over 11 result shapes: 1,239 decoded back to exactly the values that went in, 1,181 refused by the grammar naming the key, 0 escapes | Proven |
-| The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 37 golden objects through 4 renderers, 148 renderings, the fourth written against 2 types and no code | Proven |
+| The seams take a second implementation | Store: 12 conformance tests against 2 real implementations. Renderer: 26 golden objects through 4 renderers, 104 renderings on 2026-09-08, the fourth written against 2 types and no code | Proven |
 | No network egress | 18 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.54% lines and 89.81% branches against a 90/85 gate; every one of the 7 named files over its 95/90 bar | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 0 failures, and the same test count in all 20, which is the condition `scripts/flake.ts` fails on if it moves; 50.9 s to 84.5 s each, 1,437 s in total | Proven |
@@ -162,7 +162,7 @@ That is the third instance of one defect: a field captured faithfully on every w
 So this branch answered the question and then swept the whole dictionary for the same shape.
 
 **The sweep, measured.**
-The store persists 35 work-item fields and 14 event keys.
+The store persisted 35 work-item fields and 14 event keys at this branch's base; ADR-0029 retired three of them on 2026-09-08 and the union over the seven types is 32 now.
 Counted against the shapes at the branch base, 18 of the 35 and 11 of the 14 reached no read surface at all: `actual`, `component`, `expected`, `extra`, `findings`, `fix_confirmed`, `found_in`, `held_from`, `hold_reason`, `hold_until`, `hours_estimate`, `labels`, `outcome`, `question`, `reporter`, `repro_steps`, `reviewer` and `timebox_hours` on the record, and `actor`, `actor_kind`, `entity_kind`, `entity`, `op`, `before`, `after`, `guards`, `outcome`, `cmd` and `txn` in the log.
 Of those 29, 24 are readable now and 5 are declared hidden with a reason.
 

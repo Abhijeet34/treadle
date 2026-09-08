@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // Generates schemas/<command>.v<n>.json from the shapes the services declare, so the shipped
-// schema and the projection a renderer performs have one source (R8). `npm run schemas`
-// writes them; test/cli/schemas.test.ts fails when what is shipped is not what this writes.
+// schema and the projection a renderer performs have one source (R8). Nothing here is
+// committed: `npm run build` writes the files beside dist/ and `npm run schemas` writes them
+// on their own, and test/cli/schemas.test.ts validates every golden result object against what
+// this generates rather than against a second copy on disk.
 
 import { writeFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -63,7 +65,7 @@ function propertySchema(property: PropertySpec): Json {
   return { type: [type, 'null'], ...(property.data === true ? { 'x-trust': 'data' } : {}) }
 }
 
-export function schemaFor(shape: ResultShape): Json {
+function schemaFor(shape: ResultShape): Json {
   const id = `${shape.command}/${shape.version}`
   const data: Json = {}
   for (const property of shape.properties) data[property.key] = propertySchema(property)

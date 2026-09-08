@@ -27,7 +27,7 @@ Versions move; the licence and the reason are what this table is for.
 | `@commitlint/cli` | MIT | the Conventional Commits check CI runs over a pull request |
 | `@commitlint/config-conventional` | MIT | the rule set that check uses |
 | `@types/node` | MIT | type declarations for the runtime, which is the only API treadle's code calls |
-| `esbuild` | MIT | DR1's bundler: one entry file, at most 500 KB |
+| `esbuild` | MIT | DR1's bundler: one entry file, weighed against bench/budgets.json's bundle budget |
 | `gpt-tokenizer` | MIT | the second tokenizer the rig reports, so no single vocabulary decides a budget |
 | `typescript` | Apache-2.0 | type checking; Node strips the types at run time and never compiles them |
 

@@ -24,10 +24,9 @@ export type BenchConfig = {
   readonly a5: { readonly corpusScale: number; readonly randomEdits: number }
 }
 
-export function loadConfig(root: string, overrides: Partial<BenchConfig> = {}): BenchConfig {
+export function loadConfig(root: string): BenchConfig {
   const file = JSON.parse(readFileSync(path.join(root, 'bench', 'bench.config.json'), 'utf8')) as BenchConfig
-  const corpusDir = process.env['TREADLE_BENCH_DIR'] ?? file.corpusDir
-  return { ...file, corpusDir, ...overrides }
+  return { ...file, corpusDir: process.env['TREADLE_BENCH_DIR'] ?? file.corpusDir }
 }
 
 export function samplesFor(config: BenchConfig, items: number): number {

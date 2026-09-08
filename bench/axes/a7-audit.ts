@@ -7,7 +7,7 @@
 // against its own event chain.
 //
 // The chain is read from `.work/events/*.jsonl`, which is the store's committed artefact and
-// what a person auditing this workspace would open. There is no history verb, so the surface
+// what a person auditing this workspace would open. The surface
 // half of the answer is `explain` naming the one event that produced the current state; the
 // log half is the replay that has to agree with it. An item counts as explained only when
 // both hold, which is why the two are scored together rather than separately.
@@ -62,7 +62,7 @@ function argsFor(item: Tracked, to: WorkItemState): readonly string[] {
   return base
 }
 
-export type AuditRow = {
+type AuditRow = {
   readonly item: string
   readonly type: string
   readonly state: string

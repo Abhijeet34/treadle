@@ -31,10 +31,6 @@ export class Diagnostics {
     this.#options = options
   }
 
-  get level(): Level {
-    return this.#options.level
-  }
-
   /** One resolved fact a caller asked for with `-v`: a path, a source, a guard verdict. */
   note(key: string, value: string): void {
     if (this.#options.level >= 1) this.#options.write(`v ${key} ${value}`)

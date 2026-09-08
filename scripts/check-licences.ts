@@ -44,12 +44,12 @@ const PURPOSE: Readonly<Record<string, string>> = {
   '@commitlint/cli': 'the Conventional Commits check CI runs over a pull request',
   '@commitlint/config-conventional': 'the rule set that check uses',
   '@types/node': "type declarations for the runtime, which is the only API treadle's code calls",
-  esbuild: "DR1's bundler: one entry file, at most 500 KB",
+  esbuild: "DR1's bundler: one entry file, weighed against bench/budgets.json's bundle budget",
   'gpt-tokenizer': 'the second tokenizer the rig reports, so no single vocabulary decides a budget',
   typescript: 'type checking; Node strips the types at run time and never compiles them',
 }
 
-export type Installed = { readonly name: string; readonly version: string; readonly licence: string }
+type Installed = { readonly name: string; readonly version: string; readonly licence: string }
 
 /** Every package in the installed tree, including transitive ones and nested trees. */
 export function installed(dir: string, scope = ''): Installed[] {

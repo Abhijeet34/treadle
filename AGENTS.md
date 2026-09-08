@@ -26,125 +26,74 @@ preceded it.
 
 ## Build and test
 
-`npm run check` is the gate: `tsc --noEmit`, then `node --test`, then `npm run build`. There
-is no build step in development. Node runs the TypeScript directly by stripping types, which is
-why `tsconfig.json` sets `erasableSyntaxOnly` and the code uses `const` objects and union types
-rather than enums, and why every relative import carries its `.ts` extension.
+`npm run check` is the gate: `tsc --noEmit`, then `node --test`, then `npm run build`.
+There is no build step in development.
+Node runs the TypeScript directly by stripping types, which is why `tsconfig.json` sets
+`erasableSyntaxOnly`, the code uses `const` objects and union types rather than enums, and
+every relative import carries its `.ts` extension.
 
-Two entry points, and only one of them ships. `bin/treadle.js` is a one-line shim over
-`src/cli/entry.ts` and runs from source, which is what the README and the process-spawning
-tests use. `npm run build` bundles that same entry file to `dist/treadle.js` with esbuild, and
-that bundle is what `bin` points at and `files` ships: no source reaches the tarball. Change
-the entry file, not one of the two.
+Two entry points, and only one of them ships.
+`bin/treadle.js` is a one-line shim over `src/cli/entry.ts` and runs from source, which is what
+the README and the process-spawning tests use.
+`npm run build` bundles that same entry file to `dist/treadle.js` and writes `schemas/` beside
+it; those two are what `bin` points at and `files` ships, and neither is committed.
+Change the entry file, not one of the two.
 
-`bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way. `scripts/build.ts`
-reads that line rather than spelling a second copy, and `scripts/shebang.ts`'s
-`portabilityProblem` refuses an `env` option or a node flag on it: both need `env -S`, which
-BusyBox does not have, and the day the line carried `-S node --stack-size=3072` the installed
-tool answered `env: unrecognized option: S` and exited 1 on `node:24-alpine`. The cost is one
-platform limit rather than a crash protection: on macOS an argv-plus-environment block over
-about 955 KB kills the process inside Node's own bootstrap, which no code here can catch. That
-limit is removable by a `#!/bin/sh` launcher, and that trade was measured and declined on
-2026-09-08: on `windows-2025` the sh launcher stops the tool starting in every native Windows
-shell, and both PowerShells report exit 0 while doing so.
+`bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way.
+`scripts/shebang.ts` refuses an `env` option or a node flag on it, and
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
-measurements and the trade; `docs/architecture/adr/0009-release-and-supply-chain.md` carries
-the release design, and `docs/RELEASING.md` how a release happens and how to roll one back.
+measurements and the trade behind that.
+Nothing is published: `docs/RELEASING.md` carries the three interlocks, the signed-tag rule and
+how a release happens, and `scripts/apply-repo-settings.sh` is the only thing that applies the
+checked-in rulesets under `.github/`.
+Do not tag, release or publish without the captain saying so.
 
-Nothing is published. Three interlocks hold that, each sufficient alone: `"private": true`,
-the `NPM_PUBLISH_ENABLED` repository variable, and the `npm-publish` environment. A release
-also needs a signed annotated `v<semver>` tag that a person pushes, because release-please
-creates lightweight unsigned tags and `scripts/release-preflight.ts` refuses one. Do not tag,
-release or publish without the captain saying so.
+`package.json` declares `engines.node` at the product's floor of 24.15.
+This machine may be below it; the domain core is pure and runs anyway, so an `EBADENGINE`
+warning from `npm install` here is expected and is not a defect to fix.
+`node:sqlite` also works unflagged below the floor and prints one `ExperimentalWarning` per
+process; that line in test output is expected too.
 
-Branch protection, the tag rules and the Actions policy are checked in under
-`.github/rulesets/` and `.github/settings/`, and `scripts/apply-repo-settings.sh` is the only
-thing that applies them: never configure one by hand on the forge, because a hand-made
-ruleset beside the file is the drift the files exist to prevent. The script applies every
-setting it can and names the ones it could not, together, at the end. Not every rule GitHub
-documents is available here, and `docs/RELEASING.md` carries which and the measurement behind
-it, so read that before adding a rule to one of those files. The one setting there that
-reads like a mistake is not one: `can_approve_pull_request_reviews` is `true` because
-GitHub couples creating and approving into a single switch and release-please needs the
-creating half, and "Why Actions may create pull requests" in that doc carries why a
-stored token is the worse answer.
-
-`package.json` declares `engines.node` at the product's floor of 24.15. This machine may be
-below it; the domain core is pure and runs anyway, so an `EBADENGINE` warning from
-`npm install` here is expected and is not a defect to fix. `node:sqlite` also works unflagged
-below the floor and prints one `ExperimentalWarning` per process; that line in test output is
-expected too.
-
-`npm run bench` is the measurement rig and `npm run bench:gate` is the same run with a
-non-zero exit on a regression. A full four-scale run takes about five and a half minutes and
-writes about 430 MB of corpora under `TREADLE_BENCH_DIR`, so pass `--scales 100,1000` while
-iterating. Two runs at once are safe without setting anything: each measures its own clone of
-a shared cache entry, described under "Two runs at once" in `bench/README.md`, which also has
-the flags. `bench/bench.config.json` has the parameters, `docs/BENCHMARKS.md` the last
-measured run and ADR-0008 the method. Two things about it are worth knowing before reading a
-figure: a value that could not be taken is the string `NOT MEASURED: <reason>` and never a
-zero, and the gate reads the median rather than the p95 because the p95 moved 68.9% between
-two identical runs on one machine. This machine is shared and never idle, so every figure
-carries the load either side of it; judge a number against its load column and against the
-ten-run series in the report, not on its own.
+`npm run bench` is the measurement rig and `npm run bench:gate` is the same run with a non-zero
+exit on a regression.
+A full four-scale run takes about five and a half minutes and writes about 430 MB of corpora
+under `TREADLE_BENCH_DIR`, so pass `--scales 100,1000` while iterating.
+Two runs at once are safe without setting anything; `bench/README.md` has the flags and
+`bench/bench.config.json` the parameters, `docs/BENCHMARKS.md` the method and what each figure
+meant, and ADR-0008 the design.
+Two things are worth knowing before reading a figure: a value that could not be taken is the
+string `NOT MEASURED: <reason>` and never a zero, and this machine is shared and never idle, so
+judge a number against the load recorded beside it rather than on its own.
+Every budget the gate weighs is armed; a budget nobody has met is a finding, and a finding
+belongs in `docs/BENCHMARKS.md` rather than in a row that prints red and stops nothing.
 
 The corpus carries what the product stores, and adding a shape to it is how a cost stops
-hiding. It had no relation edge and no impediment until 2026-09-06, so three
-superlinear paths went unpriced until then: `relationGraphFrom` scanned its accumulated edges
-per edge and every command paid it through `readWorkspace`, `findRelationCycle` ran a walk per
-edge, and `rank` in `insight.ts` asked the whole relation list twice per ready item. All three
-are linear now, and the shape is held by a test rather than a wall time:
-`test/services/next-scale.test.ts` counts passes over the relation list the way
-`test/services/doctor-scale.test.ts` counts passes over the log, so a per-item scan fails at
-60 items. Adding an operation to `READ_OPS` in `bench/axes/a4-latency.ts` widens what the
-peak-RSS read budget prices, which is deliberate and is how `doctor` at 1,021 MiB became
-visible; it held 500,000 decoded events beside 50,000 whole records to look at each once, and
-ADR-0021 records the streaming reads that replaced that. One ceiling the generator found
-rather than the other way round is in `docs/BENCHMARKS.md`: `packageFacts` weighed whatever
-`dist/treadle.js` was on disk until it learned to refuse one older than the sources.
-
+hiding: it had no relation edge until 2026-09-06, and three superlinear paths went unpriced
+until it did.
 An axis that asserts an absence is the one that goes stale, because nothing fails when a
-capability closes it, and nothing fails when one is removed either. A2 published "there is no
-sprint entity in this tree" for a release after that stopped being true and "there is no history
-verb" for months, and five of its questions now carry prose again because ADR-0029 removed the
-sprint and the board. So a question with a command to aim at is aimed at it, including when the
-expected answer is a refusal, and A12 names every command in the inventory it never drove.
-
+capability closes it and nothing fails when one is removed, so a question with a command to aim
+at is aimed at it, including when the expected answer is a refusal.
 Six of the twelve comparison axes score behaviour rather than time and share one harness,
-`bench/axes/surface.ts`, which builds a workspace by running `init` and `file` and drives
-`src/cli/main.ts`'s own `run` with argv, the cwd, the environment and both streams passed in.
-A new behaviour claim about the surface belongs there rather than in a new driver, and each
-axis cross-checks one of its reads against the shipped `bin/treadle.js` so the in-process
-shortcut stays honest. Two axes stay `NOT MEASURED` on purpose: A9 has no metrics layer to
-score and A11 no adapter generator, and neither is closed by writing more harness.
+`bench/axes/surface.ts`, which drives `src/cli/main.ts`'s own `run` with argv, the cwd, the
+environment and both streams passed in; a new behaviour claim about the surface belongs there
+rather than in a new driver.
+Two axes stay `NOT MEASURED` on purpose: A9 has no metrics layer to score and A11 no adapter
+generator, and neither is closed by writing more harness.
 
-Most of the suite's wall time is real processes and generated input. `test/store/lock.test.ts`
-and `test/reliability/kill.test.ts` spawn 73 child processes between them through
-`test/store/fixtures/writer.ts`, because DR4's guarantees are about separate processes and an
-in-process race would prove nothing, and `test/cli/index-contention.test.ts` spawns the
-published entry point against an index another process holds through
-`test/store/fixtures/index-holder.ts`; the fuzzer runs 500,000 mutated inputs per run. Run the
-suite with a generous `--test-timeout`.
-
-These process-spawning files exist because one class of defect is invisible from in-process
-tests. Driving the store API from one process serialises writers on the advisory lock and
-never contends on the index, which opens before the lock is taken; what that hides is a
-command dying with a raw stack trace and losing its write. When a concurrency bug is reported,
-reach for N processes each running the command surface, not N promises against one store.
-
-The lock's heartbeat is a timer on the writer's own event loop, so any synchronous stretch
-under the lock longer than the 5 s stale window forfeits it, and a busy machine stretches the
-same work: `apply` yields once per record for that reason, held by
-`test/store/bulk-heartbeat.test.ts`. Every command writes one record and held the lock under
-a second at a 1-minute load of 165, while a 2,144-record transaction held it 10.3 s without
-a beat at 134 before the yield. Measure a change here with a poller on `.lock`'s mtime while
-the command runs under CPU spinners, and report the load beside every figure.
+Most of the suite's wall time is real processes and generated input.
+`test/store/lock.test.ts` and `test/reliability/kill.test.ts` spawn 73 child processes between
+them, `test/cli/index-contention.test.ts` spawns the published entry point against an index
+another process holds, and the fuzzer runs 500,000 mutated inputs per run, so run the suite with
+a generous `--test-timeout`.
+Driving the store API from one process serialises writers on the advisory lock and never
+contends on the index, which is exactly what hides a command dying with a raw stack trace and
+losing its write: when a concurrency bug is reported, reach for N processes each running the
+command surface, not N promises against one store.
 
 Two more gates sit beside `npm run check`, and neither is in it because both cost minutes.
 `npm run coverage` runs the suite under Node's own coverage and holds it to the table in
-`scripts/coverage.ts`: 90 percent lines and 85 percent branches overall, 95 and 90 on the
-parser, the state machine, the escaper, path resolution and the lock. `npm run flake` runs
-the whole suite 20 times and fails on any failure or on the test count moving between runs.
+`scripts/coverage.ts`; `npm run flake` runs the whole suite 20 times and fails on any failure or
+on the test count moving between runs.
 `docs/VERIFICATION.md` carries every claim with the measurement behind it, and
 `TREADLE_FUZZ_INPUTS=<n>` raises the fuzzer for a soak.
 
@@ -236,188 +185,43 @@ asserted the other path's name did not exist.
 
 ## Rules that are tests rather than conventions
 
-Before hand-checking any of these, run the suite: it already checks them.
+Do not hand-check any of these: run `npm run check`, which already does.
+Each row names the file that holds the rule, and that file's header carries the rationale, the
+defect that produced it and what it costs to break; a second copy of that argument here is a
+copy that has to move whenever the test does.
 
-- `src/domain` may import nothing but `src/domain`, and may not touch the filesystem, the
-  clock, a random source, the process or the console (`test/architecture/layering.test.ts`).
-- `tsconfig.json` sets `noUnusedLocals` and `noUnusedParameters`, so an unused local, import
-  or parameter fails `npm run typecheck` and cannot land. What tsc cannot see is an export
-  nothing imports, which is therefore the only shape dead code takes here:
-  `test/architecture/exported-surface.test.ts` refuses a value under `src/` that no other
-  file in the tree names, which is what two hand sweeps each missed part of. A barrel line in
-  `src/domain/index.ts` or `src/adapters/store/index.ts` does not count as a reader, because
-  it names a symbol and reads nothing, and eleven values sat behind one; a mention in a
-  tracked document does count, because docs/DOMAIN.md publishing a name is a deliberate claim
-  about it. It holds values and not types, so a type export still needs the reading below.
-  Nothing is published
-  (`"private": true`) and only `dist/treadle.js` ships, so no external consumer keeps one
-  alive; a test-only caller does not either, with one exception that has already cost a
-  sweep. A test that uses a symbol as an independent oracle for the production path is a
-  consumer, not a caller to be discounted: `scoreOf` in
-  `src/application/services/insight.ts` is reachable from no `src` file, and
-  `test/services/next-scale.test.ts` scores every ready item with it to prove that `rank`'s
-  indexed scores are the same list. Delete it and the property that ADR-0021's index is
-  correct has nothing left holding it. Read what the test does with the symbol before
-  deciding, because a missing wire and dead code look identical to a grep.
-- A command's operands are bounded by the usage lines it declares in `src/cli/inventory.ts`,
-  not by a list anyone maintains. `<id>` and `<other>` in a usage line are what make
-  `src/cli/operands.ts` refuse a delimiter in that position before any service reads it, so a
-  new command with `<id>` in its usage is guarded when it is written. A placeholder of its own
-  is guarded by nothing, so classify it in `ENTITY_OPERANDS` and add a line to
-  `test/cli/operand-guard.test.ts` in the same change. Adding a command means writing its
-  usage before its dispatch arm.
-- Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
-  `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
-  filesystem. `test/security/f1-f7-no-execution.test.ts` and
-  `test/security/f11-adapter-write-safety.test.ts` hold this as an architecture rule over
-  source text and the command inventory; `test/security/f1-no-execution-at-runtime.test.ts`
-  holds the same claim for F1 at runtime, tripping every entry point Node has for running a
-  program or a string against every command in the inventory. Findings closed by absence
-  rather than by a guard have the test as the whole of the control; the walker all three
-  tree-wide source-text rules share (this one, F11's, and layering's above) is
-  `test/helpers/src-scan.ts`.
-- Every tracked `.ts`, `.js`, `.sh` and `.yml` file carries `SPDX-License-Identifier:
-  Apache-2.0` near the top (`test/architecture/license-header.test.ts`).
-- No tracked file at the repository root is one a single agent harness loads by itself
-  (`test/architecture/harness-instruction-files.test.ts`). The list of names is closed and in
-  that file; ADR-0019 says why that list rather than a broader one, and why the rule needs no
-  CI job of its own: `tests kept` already refuses a branch that drops the test's titles.
-- Zero runtime dependencies. The same test fails if `dependencies` gains an entry.
-- No npm lifecycle script, ever. `.npmrc`'s `ignore-scripts=true` and the release workflow's
-  own `npm pack --ignore-scripts` mean a `prepack`, `prepare` or `postinstall` would never
-  run, so `test/architecture/supply-chain.test.ts` refuses one in the manifest by name. A gate
-  that has to happen before a tarball exists goes in `scripts/release-preflight.ts`, which the
-  workflow runs between the build and the pack; `docs/RELEASING.md` carries that reasoning.
-- `.npmrc` keeps `ignore-scripts=true`, the lockfile stays committed, every workflow installs
-  the tree with `npm ci`, `bin`/`files`/`bench/package-facts.ts` all name `dist/treadle.js`,
-  and every third-party action in every workflow is pinned to a 40-character commit SHA
-  (`test/architecture/supply-chain.test.ts`). That file is threat-model finding F13's
-  enforcement; `npm run licences` is the other half and refuses a licence off the allowlist.
-- `@types/node`'s major matches `engines.node`'s floor, in the same file.
-  Its major says which Node the code may call, so a major ahead of the floor lets `tsc` accept
-  an API that is absent there and only a test that happens to run the line would catch it.
-  Raise `engines.node` first and the bump follows; `.github/dependabot.yml` ignores the major
-  until then.
-- `DECLARED_FLOOR` in `src/cli/runtime.ts` is the floor a user reads, because `checkRuntime`
-  prints it to anyone below the hard floor, and the same file asserts it against
-  `engines.node`. The floor is named in five places now: `package.json`, `.nvmrc`,
-  `ci.yml`, `@types/node`'s major and that constant. Raising it means editing all five, and
-  the suite names whichever one is left behind.
-- A pull request may not remove a test the merge base has. `scripts/check-tests-kept.ts`
-  compares test titles at `merge-base(origin/main, HEAD)` against the branch head, counts a
-  rename and a `.skip` as removals, and takes one `Removes-test: <exact title>` commit trailer
-  per deliberate removal. `.github/rulesets/main.json` requires the `tests kept` context by
-  name beside `checks`, because a branch that deleted the job from `ci.yml` would leave
-  `checks` green with the guard gone, so renaming that job means editing the ruleset in the
-  same change. ADR-0013 argues it and `test/architecture/tests-kept.test.ts` holds it. When a
-  resolution or a revert is what a change needs, do not resolve a conflict by taking one side
-  whole: that is the move this rule exists to catch.
-- Every commit is signed off (`git commit -s`) and follows Conventional Commits; CI runs
-  `scripts/check-dco.sh` and commitlint over a pull request's commits. The trailer's name must
-  match the author's name; the address may differ only for a GitHub App author, which is why a
-  Dependabot bump passes while a trailer naming anyone else does not.
-  `test/architecture/dco.test.ts` drives that script over real commits in a throwaway repository,
-  so change the rule there and not by loosening the comparison.
-- `schemas/*.json` are generated from the `ResultShape` each service declares. Change a
-  shape, run `npm run schemas`, and commit both; the suite fails otherwise. A new command is
-  a shape, a line in `src/application/shapes.ts` and in `src/cli/inventory.ts`, an entry in
-  `COMMAND_OPTIONS` in `src/cli/parse.ts`, a branch in `dispatch`, and an invocation in the
-  two tables in `test/security/no-egress.test.ts` and
-  `test/security/f1-no-execution-at-runtime.test.ts`, which assert they exercise every
-  command the inventory names. Four documents move with it and each has a test:
-  `README.md`'s "runs N commands" sentence and its implemented-commands Status row,
-  `docs/VERIFICATION.md`'s egress row, which spells the command count, and
-  `test/render/human.snapshot.txt`, refreshed with `TREADLE_SNAPSHOT=update node --test
-  test/render/human-layout.test.ts` rather than by hand. Adding `remove` failed all four
-  before it passed.
-- A rule id is a string literal, and the table that documents it is enforced against the
-  code by scan. `test/architecture/documented-numbers.test.ts` reads every `'<G|T|R|P|I|V><n>'`
-  literal in `src/domain` and `src/application` and requires exactly that set in
-  `docs/DOMAIN.md`'s "Rule ids" table, in both directions; the `H` ids are held the same way
-  against `docs/architecture/adr/README.md`. So a new refusal either reuses an id whose
-  published sentence is already true of it or adds a row in the same commit.
-- No prose a dependency wrote reaches an output surface. `node:util`'s `parseArgs` was the
-  one source of it: its `cause` explained a `--` convention this tool does not document and
-  its three-line message rendered `cause` as a counted block rather than a marked scalar.
-  `src/cli/parse.ts` re-derives every flag fault from the option table `help <command>`
-  prints, and the suite in `test/cli/found-by-use.test.ts` asserts the parser's own byte
-  sequences are absent. A dependency that formats a message is a message to rewrite.
-- The parser's option table and the help page's flag matrix are one set, not two.
-  `GLOBAL_OPTIONS` in `src/cli/parse.ts` decides what is accepted and `GLOBAL_FLAGS` in
-  `src/cli/inventory.ts` decides what `help <command>` prints, and the two drifted apart
-  four times: `--contract`, `--ascii`, `--no-color` and `--log-values` were all accepted and
-  named by no page, and `--contract` is the line grammar an agent needs before it can parse
-  anything else. `test/cli/found-by-use.test.ts` now holds both directions, so a flag added
-  to one table and not the other fails rather than shipping findable only by guessing.
-- Every remedy a gate rule emits is a command line, and `test/domain/gate-remedies.test.ts`
-  holds that: each `GateCheck` kind declares the command that performs its remedy, or a
-  reason it has none. A remedy that reads as advice is the defect that left a bug filed
-  without `expected` permanently unadvanceable.
-- Every line the tool prints for the reader to run, a `fix`, a `page`, a `whole` or a `need`
-  cell, runs as printed from the state that printed it, and `test/cli/runnable-lines.test.ts`
-  holds that by running each one: it builds workspaces in the states that make the tool emit,
-  fills the placeholders from one table, and runs every collected line on a fresh copy of its
-  state. A remedy names the next move from where the item stands, never the destination:
-  `transition <blocker> done` was refused from four of the five states a blocker can be in,
-  and `nextTowardDone` in `src/domain/state-machine.ts` is what a rule names instead. A new
-  emit site needs a provocation in that file that reaches it; a placeholder the table does not
-  know fails by name. The check is a test rather than a CI job because the property is one of
-  the tree alone, so it runs under `npm test`, `coverage` and `flake` and fails on the
-  developer's machine before a push; `tests kept` is a CI job because its comparison needs
-  main's history, which a test of the tree cannot see.
-- A number a document states about this tree is held to the tree by
-  `test/architecture/documented-numbers.test.ts`: the README's command list against the
-  inventory, its type count against `WORK_ITEM_TYPES`, its backlog figures against `.work`,
-  the `H` table in `docs/architecture/adr/README.md` and the finding count README.md and this
-  file spell against what `doctor` raises, the threat model's total and closed counts against
-  the register in `test/security/findings.test.ts`, the axis total and the measured split
-  against what `bench/` emits, the rendering count against `RENDERINGS`, the seam count
-  against the table in `docs/ARCHITECTURE.md`, the decision-record index against the files in
-  its own directory, `docs/DOMAIN.md`'s state, parent-pair, relation and gate tables against
-  the closed sets `src/domain` declares, the Node
-  floor against `engines.node`, and the bundle budget against `bench/budgets.json`. When one
-  of those moves, the fix is the sentence, not the assertion. A measurement does not go in
-  that file: a wall time, a test count, a byte count of the tree or a coverage decimal moves on a commit
-  that changed nothing about the claim, and those live in `docs/VERIFICATION.md` with the
-  date and the load they were taken at. A record a later record overtakes is marked with an
-  `**Overtaken in part by:**` line in its own header rather than rewritten.
-- No renderer reads anything but the result object. `test/render/conformance.test.ts` renders
-  each golden object twice, once from a `structuredClone` and once after moving the process's
-  cwd and environment, and asserts the bytes do not move.
-- No emitted value may carry a byte the line grammar treats as a delimiter, and a block may
-  carry one free-text column, which renders last. Both fail loudly rather than corrupting a
-  row; findings F2 and F3.
-- A shape declares its scalars, lists and text first and its blocks after them, and the
-  service builds its result object in that same order, because `json` renders the object's
-  own keys while `agent` and `human` walk the shape. `test/render/conformance.test.ts` holds
-  both halves; ADR-0005 says why.
-- In the human rendering a block closes the group it is in, so a scalar after a table is
-  separated by a blank line; the rule is ADR-0005 and `test/render/human-layout.test.ts`
-  holds it. That suite pins the bytes of every golden object at 60, 80 and 200 cells, so a
-  deliberate layout change is `TREADLE_SNAPSHOT=update node --test test/render/human-layout.test.ts`
-  and then reviewing the diff.
+| Rule | Held by |
+|---|---|
+| `src/domain` imports only `src/domain` and touches no filesystem, clock, random source, process or console | `test/architecture/layering.test.ts` |
+| No value exported under `src/` without a reader elsewhere in the tree; a barrel line is not a reader, a document that names it is, and a test using it as an independent oracle is | `test/architecture/exported-surface.test.ts` |
+| A command's operands are bounded by the usage lines in `src/cli/inventory.ts`, and a new placeholder is classified in `ENTITY_OPERANDS` | `test/cli/operand-guard.test.ts` |
+| Nothing under `src` starts a process, evaluates a string or reads a `hooks` setting, and only the store's five modules and `src/adapters/workspace.ts` touch the filesystem | `test/security/f1-f7-no-execution.test.ts`, `test/security/f11-adapter-write-safety.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
+| Every tracked `.ts`, `.js`, `.sh` and `.yml` carries its SPDX identifier | `test/architecture/license-header.test.ts` |
+| No root file is one a single harness loads by itself; the list of names is closed | `test/architecture/harness-instruction-files.test.ts`, ADR-0019 |
+| Zero runtime dependencies, no npm lifecycle script, a committed lockfile, `npm ci` everywhere, every action pinned to a 40-character SHA | `test/architecture/supply-chain.test.ts` |
+| `@types/node`'s major matches `engines.node`'s floor, and `DECLARED_FLOOR` in `src/cli/runtime.ts` names the same number as the other four places that carry it | `test/architecture/supply-chain.test.ts` |
+| A pull request may not remove a test the merge base has, without a `Removes-test: <exact title>` trailer | `scripts/check-tests-kept.ts`, `test/architecture/tests-kept.test.ts`, ADR-0013 |
+| Every commit is signed off and follows Conventional Commits, with the trailer's name matching the author's | `test/architecture/dco.test.ts` |
+| A new command is a shape, an inventory line, a `COMMAND_OPTIONS` entry, a `dispatch` arm and a row in both security tables | `test/cli/inventory.test.ts`, `test/security/no-egress.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
+| Every rule id a literal in `src/domain` or `src/application` spells has a published row, in both directions | `test/architecture/documented-numbers.test.ts` |
+| No prose a dependency wrote reaches an output surface, and the parser's option table and the help page's flag matrix are one set | `test/cli/found-by-use.test.ts` |
+| Every gate rule declares the command that remedies it, or the reason it has none | `test/domain/gate-remedies.test.ts` |
+| Every line the tool prints for the reader to run, runs as printed from the state that printed it | `test/cli/runnable-lines.test.ts` |
+| Every number a document states about this tree is held to the tree; a measurement is not one of those and lives in `docs/VERIFICATION.md` with its date and load | `test/architecture/documented-numbers.test.ts` |
+| No renderer reads anything but the result object, a shape declares scalars before blocks, and a block closes its group in the human rendering | `test/render/conformance.test.ts`, `test/render/human-layout.test.ts`, ADR-0005 |
+| No emitted value carries a delimiter byte, and a block carries at most one free-text column, rendered last | findings F2 and F3, `test/render/conformance.test.ts` |
+| No path at or below the workspace root is followed as a symbolic link; a link is refusal `S15` | `test/store/symlink.test.ts`, ADR-0002 |
+| A lock holder that stalls past the 5 second heartbeat window has lost its lock, and the store asks the handle at every commit point; the refusal is `LOCK_LOST`/`S16` | `test/store/lock.test.ts` |
+| A line the store holds and does not serve is a finding at its line, never a silent drop | `test/store/record-boundary.test.ts`, `docs/architecture/adr/README.md`'s `H` table |
 
-## Three properties the second adversarial pass added, and where each lives
+Two of these are worth reading before you touch them, because a grep cannot tell them from
+dead code. `scoreOf` in `src/application/services/insight.ts` is reachable from no `src` file
+and is the independent oracle `test/services/next-scale.test.ts` proves `rank`'s index against.
+A remedy names the next move from where an item stands, never the destination, which is why
+`nextTowardDone` in `src/domain/state-machine.ts` exists.
 
-No path at or below the workspace root is followed as a symbolic link: the store `lstat`s its
-layout and every shard and event file before reading or writing, and a link is refusal `S15`.
-A workspace is a committed directory and git materialises a link on checkout, so this is the
-containment claim `init` prints, held against a clone. `test/store/symlink.test.ts` is the
-property; ADR-0002 carries the decision.
-
-A lock holder that stalls past the 5 second heartbeat window has lost its lock, whether or not
-a waiter took it, and the store asks the handle at the commit point of every file it writes.
-A paused writer (`Ctrl-Z`, `SIGSTOP`, a laptop lid) resuming into its critical section was
-measured overwriting the reclaimer's write. The refusal is `LOCK_LOST`/`S16`;
-`test/store/lock.test.ts` reproduces the pause with a real process, and `apply` warms the
-index before taking the lock so a cold rebuild is never the stall.
-
-The event log holds the record files' property: a line the store holds and does not serve is
-a finding at its line, never a silent drop. A repeated event id is `S14`, an instant that
-names no real date is `S1`, and `doctor` reports a state the record holds against the last
-event that recorded it (`H20`) and an event dated before its item was filed (`H23`). An event
-naming an item the store does not hold is not a finding, because a record removed by hand is
-a legitimate edit and the event reaches no read surface.
+A layout change is `TREADLE_SNAPSHOT=update node --test test/render/human-layout.test.ts` and
+then reviewing the diff, never a hand edit of `test/render/human.snapshot.txt`.
 
 ## Where a relation lives, and what is derived from it
 
@@ -580,7 +384,7 @@ Compare paths through `node:path` and never against a literal `/`, and never bui
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
 Where the invariant can be expressed in what Windows does have, express it: `deleteIndex` in `test/helpers/store-fixtures.ts` removes the index between two opens rather than under a live handle, because Windows will not unlink a file another handle holds.
 That last rule is a production rule too: close a `DatabaseSync` on every path out of the function that opened it, including the throwing ones, or the store cannot rebuild its own cache on Windows.
-The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md`, the shipped schemas and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
+The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF, but no longer the schemas, which this branch untracked; without it 30 tests fail there and every shard reads as an `H16`.
 
 Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:
 `npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;

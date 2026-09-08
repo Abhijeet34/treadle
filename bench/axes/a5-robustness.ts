@@ -27,7 +27,7 @@ import type { AxisResult } from './axis.ts'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const AUDIT = path.join(HERE, '..', 'children', 'audit.ts')
 
-export type Outcome =
+type Outcome =
   | 'absorbed'
   | 'edit removed the record'
   | 'refusal names the record'
@@ -42,7 +42,7 @@ type Audit = {
   readonly findingsRefused: boolean
 }
 
-export type Case = {
+type Case = {
   readonly label: string
   readonly file: string
   readonly line: number

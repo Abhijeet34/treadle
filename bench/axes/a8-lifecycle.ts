@@ -52,7 +52,7 @@ function argsFor(id: string, to: WorkItemState): readonly string[] {
   return to === 'cancelled' ? [...base, '--resolution', 'wont_do'] : base
 }
 
-export type PairRow = {
+type PairRow = {
   readonly from: WorkItemState
   readonly to: WorkItemState
   readonly type: string

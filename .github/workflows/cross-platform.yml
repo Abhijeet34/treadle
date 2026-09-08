@@ -12,6 +12,9 @@
 # And what only the `installed` job below can find: every job here runs the suite from a
 # checkout, so none of them ever starts the shipped bundle through its own shebang.
 #
+# CodeQL rides the same weekly cadence, for a different reason: it found nothing in 227 runs on
+# a zero-dependency tree, so it is worth a scan a week and not 63 seconds of every push.
+#
 # No `concurrency` block at all: cancelling a scheduled or release run discards the only
 # record of its own result, and AGENTS.md forbids cancel-in-progress on either.
 
@@ -99,6 +102,34 @@ jobs:
             exit 1
           fi
           echo "${{ matrix.os }} - ran $ran tests" >> "$GITHUB_STEP_SUMMARY"
+
+  # Moved here from ci.yml on 2026-09-08. It cost 63 seconds of every pull request and every
+  # push and reported zero findings in 227 CI runs over a tree with zero runtime dependencies,
+  # so a weekly pass is the cadence its yield supports. Skipped on the release path: release.yml
+  # calls this workflow for platform evidence, and a called workflow gets the caller's token,
+  # which does not carry `security-events: write`.
+  codeql:
+    name: codeql
+    if: github.event_name != 'workflow_call'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # build-mode: none, because there is nothing to observe being compiled. Node strips the
+      # types at run time and the esbuild bundle is a concatenation of the same files CodeQL
+      # already reads, so a tracing build would give it the source twice.
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: /language:javascript-typescript
 
   # The tool as a user installs it, on the two userlands the shebang has to satisfy. The three
   # matrix jobs above all run the suite from a checkout, so none of them ever executes the

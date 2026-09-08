@@ -7,7 +7,7 @@
 // operations reports the same shape as one that ran a thousand, and only the count separates
 // them.
 
-export type AxisVerdict = 'MET' | 'MISSED' | 'PARTIAL' | 'NOT MEASURED'
+type AxisVerdict = 'MET' | 'MISSED' | 'PARTIAL' | 'NOT MEASURED'
 
 export type AxisResult = {
   readonly axis: string

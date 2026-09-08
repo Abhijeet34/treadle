@@ -12,7 +12,7 @@ import { spawnSync } from 'node:child_process'
 
 import { peakLoad, sampleLoad, type LoadSample } from './load.ts'
 
-export type Percentile = {
+type Percentile = {
   readonly ms: number
   /** 1-based index into the sorted samples that this percentile selected. */
   readonly rank: number
@@ -45,14 +45,14 @@ export function realStderr(text: string, limit = 400): string {
     .slice(0, limit)
 }
 
-export type ChildReport = {
+type ChildReport = {
   readonly inProcessMs?: number
   readonly maxRssKb?: number
   readonly ops?: number
   readonly detail?: Record<string, unknown>
 }
 
-export type Sample = {
+type Sample = {
   readonly wallMs: number
   readonly status: number | null
   readonly report?: ChildReport
@@ -118,7 +118,7 @@ function shift(source: Stats, by: number): { readonly stats: Stats; readonly cla
   }
 }
 
-export type LaunchOptions = {
+type LaunchOptions = {
   readonly samples: number
   readonly env?: NodeJS.ProcessEnv
   readonly cwd?: string
@@ -153,7 +153,7 @@ export function launchOnce(command: string, args: readonly string[], options: La
   }
 }
 
-export type MeasureOptions = LaunchOptions & {
+type MeasureOptions = LaunchOptions & {
   readonly label: string
   /** Median of the harness floor, subtracted to give the program's own cost. */
   readonly floorMedianMs?: number
