@@ -2,7 +2,8 @@
 
 **Status:** Accepted
 **Date:** 2026-09-09
-**Implements:** the keep-list truth audit and the type-vocabulary decision, decided by the captain on 2026-09-09
+**Implements:** the keep-list truth audit and the type-vocabulary decision
+**Decided by:** firstmate on 2026-09-08, under the captain's instruction to think critically and act, and to build no bulk. The captain's own approval covered folding `chore` into `task`; keeping `story` and `task` as two types was firstmate's call on the evidence.
 
 ## Context
 
