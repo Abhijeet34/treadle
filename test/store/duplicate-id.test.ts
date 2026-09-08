@@ -10,7 +10,7 @@ import { readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 /** Appends a second record carrying an id the shard already holds, as a hand edit would. */
 async function duplicate(root: string, shard: string, id: string, title: string): Promise<void> {
@@ -82,7 +82,7 @@ describe('an id that names more than one record in one file', () => {
       await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
       await duplicate(workspace.root, 'items/2026-09.md', 'item-one', 'A first task, the copy')
 
-      const listed = await workspace.store.list()
+      const listed = await allItems(workspace.store)
       assert.ok(listed.ok)
       assert.equal(
         listed.value.some((item) => item.id === 'item-one'), false,

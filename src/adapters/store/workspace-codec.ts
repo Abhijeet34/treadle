@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The workspace record to a value and back, over the one record grammar every file in the
-// store shares. It is the sprint codec's shape over the configuration dictionary: the
+// store shares. It is the item codec's shape over the configuration dictionary: the
 // grammar knows lines, and this file knows which keys are single-line, that the two gates
 // are H2 sections, and the order a rendered workspace record takes.
 //
@@ -32,7 +32,7 @@ const CREATED_AT = 'created_at'
 /**
  * The workspace record's compare-and-set token, absent on every workspace written before
  * `config set` existed. Absent reads as zero and the first write puts `version: 1` on the
- * record, which is the same token an item and a sprint carry and the same refusal (`S10`)
+ * record, which is the same token an item carries and the same refusal (`S10`)
  * when two writers race.
  */
 const VERSION = 'version'
@@ -59,10 +59,10 @@ export type WorkspaceRecord = {
 
 /**
  * The workspace record as it is stored. A key this build knows and cannot read is a refusal
- * naming the key: a `point_scale` of "banana" cannot be defaulted quietly, because the
+ * naming the key: an `aging_days` of "banana" cannot be defaulted quietly, because the
  * estimate check would then accept a set the file does not name. A key it does not know is
  * carried forward untouched, which is the same forward-compatibility rule the item and
- * sprint codecs keep, and `config set` is where the key set is closed.
+ * item codec keeps, and `config set` is where the key set is closed.
  */
 export function decodeWorkspace(record: ParsedRecord): StoreResult<WorkspaceRecord> {
   let config = defaultConfig()

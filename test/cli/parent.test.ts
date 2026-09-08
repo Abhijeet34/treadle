@@ -148,16 +148,6 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     assert.equal(await held(), before)
   })
 
-  it('a sprint id in the parent slot is answered as a sprint, the way every other command answers it', async () => {
-    await must(['sprint', 'open', 'Sprint one', '--id', 'sprint-one', '--end', '2030-01-31'])
-    const run = await cli(['file', 'task', 'Under a sprint', '--parent', 'sprint-one'])
-    assert.equal(run.code, 5, run.err)
-    const data = dataOf(run)
-    assert.equal(data['rule'], 'I5')
-    assert.equal(data['cause'], 'sprint-one is a sprint here, not an item, and file takes an item id')
-    assert.deepEqual(data['fix'], ['treadle sprints sprint-one', 'treadle backlog --sprint sprint-one'])
-  })
-
   // `--set parent_id=` won over `--parent` in silence, and the same held for every named flag
   // against its `--set` spelling.
   it('refuses one field set twice with two values on one file line, and takes it once with one', async () => {
@@ -176,14 +166,14 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     assert.ok((dataOf(same)['set'] as string[]).includes('parent_id - -> epic-one'))
   })
 
-  // `sprint open --id` refuses a taken sprint id as `I5`; `file --id` left a taken item id to
-  // the store, which answered `CONFLICT S10` and sent the caller to re-read and retry a line
-  // that can never land.
-  it('refuses file --id naming an item that exists as the same I5 sprint open gives a taken sprint id', async () => {
+  // `file --id` left a taken item id to the store, which answered `CONFLICT S10` and sent the
+  // caller to re-read and retry a line that can never land. `V9` is the id namespace's own
+  // rule: an id names one thing.
+  it('refuses file --id naming an item that exists with V9 rather than the store CONFLICT', async () => {
     const run = await cli(['file', 'task', 'Again', '--id', 'draft-task'])
     assert.equal(run.code, 2, `exit 4 is the store's CONFLICT: ${run.err}`)
     const data = dataOf(run)
-    assert.equal(data['rule'], 'I5')
+    assert.equal(data['rule'], 'V9')
     assert.equal(data['cause'], 'draft-task is already an item here, and an id names one thing')
     assert.deepEqual(data['fix'], ['treadle show draft-task', 'treadle file task "<title>" --id <slug>'])
   })

@@ -13,7 +13,7 @@ import path from 'node:path'
 import { describe, it } from 'node:test'
 
 import { IndexCache, parseEventLine } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
 
 const LOG = 'events/2026-09.jsonl'
 
@@ -148,7 +148,7 @@ describe('a clash finding goes with the file it clashed against', () => {
       const findings = await workspace.store.findings()
       assert.ok(findings.ok)
       assert.deepEqual(findings.value.filter((finding) => finding.rule === 'S3'), [], 'the S3 outlived the duplicate shard')
-      const served = await workspace.store.list()
+      const served = await allItems(workspace.store)
       assert.ok(served.ok)
       assert.equal(served.value.length, 1)
     } finally {

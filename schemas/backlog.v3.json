@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "next.v1.json",
-  "title": "next/1",
-  "description": "Rank what to pick up, and print the components and weights that produced the order.",
+  "$id": "backlog.v3.json",
+  "title": "backlog/3",
+  "description": "List the items that match a filter, in one stated order.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "next/1"
+      "const": "backlog/3"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "next"
+      "const": "backlog"
     },
     "workspace": {
       "type": "string"
@@ -60,13 +60,25 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "weights": {
+        "filter": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sort": {
           "type": [
             "string",
             "null"
           ]
         },
         "none": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "narrowest": {
           "type": [
             "string",
             "null"
@@ -102,7 +114,7 @@
             "null"
           ]
         },
-        "next": {
+        "items": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -158,17 +170,27 @@
               "name": "id"
             },
             {
-              "name": "pts"
+              "name": "type"
             },
             {
-              "name": "score"
+              "name": "state"
             },
             {
-              "name": "parts"
+              "name": "pri"
+            },
+            {
+              "name": "assignee",
+              "trust": "data"
             },
             {
               "name": "title",
               "trust": "data"
+            },
+            {
+              "name": "sev"
+            },
+            {
+              "name": "labels"
             }
           ]
         }

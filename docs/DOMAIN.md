@@ -33,14 +33,12 @@ The set is closed.
 |---|---|
 | `G1` | The ready gate passes |
 | `G2` | The item is not blocked |
-| `G3` | The target column's work-in-progress limit is not exceeded |
-| `G4` | The item is in the active sprint, or on the board |
+| `G3` | The target state's work-in-progress limit is not exceeded |
 | `G5` | The type's review step decides whether `submit` or `finish` is the legal exit from `in_progress`; `story`, `bug` and `epic` have one |
 | `G6` | The done gate passes |
 | `G7` | Nothing active is blocked by this one |
 | `G8` | An epic reaches `done` only once every child is done or cancelled |
 | `T1` | No transition exists on this edge |
-| `T2` | The target is not a state |
 | `T3` | `on_hold` restores only the state it was held from |
 | `T4` | A transition or an override that records a reason was given none |
 | `T5` | An override names a guard the edge does not evaluate, or one that cannot be overridden |
@@ -51,16 +49,11 @@ The set is closed.
 | `R3` | The relation traversal hit its depth ceiling |
 | `R4` | An item already duplicates another, and a duplicate has one original |
 | `R5` | A `blocks` edge out of a done or cancelled item would block nothing |
-| `R6` | A record would be removed while another record still names it: a closed sprint's frozen member list, a stored relation edge, or a child's parent |
+| `R6` | A record would be removed while another record still names it: a stored relation edge or a child's parent |
 | `P1` | The parent and child types are not an allowed pair |
 | `P2` | The parent edge would close a cycle, or the stored hierarchy already contains one |
 | `P3` | The hierarchy traversal hit its depth ceiling |
 | `P4` | The id is not an item in this workspace |
-| `I1` | A sprint date is not a calendar day written `YYYY-MM-DD`, or the end is before the start |
-| `I2` | The sprint is closed, and a closed sprint's committed set is a record; a reopen that would drop a carried item since committed onward, and a `sprint set` that would edit the record its tally was counted over, are refused under the same rule |
-| `I3` | The item is committed to another open sprint; an item is in one sprint |
-| `I4` | The item cannot enter a sprint: it is done or cancelled, or its ready gate fails |
-| `I5` | The id is not a sprint in this workspace, is already taken by a record of the kind being created, names a sprint where an item was wanted, names an item where a sprint was wanted, or names an event where a transaction was wanted |
 | `V1` | A field key does not match the record grammar |
 | `V2` | A field key names a JavaScript prototype slot |
 | `V3` | A field key appears twice in one record |
@@ -69,6 +62,7 @@ The set is closed.
 | `V6` | A gate rule reads a field the scoped type does not have |
 | `V7` | A gate uses one rule id twice |
 | `V8` | A configuration value is not one its key accepts |
+| `V9` | An id names one thing, and this one already names another record or another kind of thing |
 
 `G8` is this implementation's number for a rule the domain model states without numbering: "an epic cannot reach done while any child is not done or cancelled".
 The model's second epic rule, that an epic enters `in_progress` when its first child starts, is an effect rather than a guard and belongs to the application layer.
@@ -83,7 +77,7 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `story` | none | `acceptance_criteria` |
 | `task` | none | none |
 | `bug` | `severity`, `repro_steps`, `found_in` | `severity`, `repro_steps`, `expected`, `actual`, `found_in`, `fix_confirmed` |
-| `spike` | `question`, `timebox_hours` | `question`, `timebox_hours`, `findings` |
+| `spike` | `question` | `question`, `findings` |
 | `chore` | none | none |
 | `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
 
@@ -100,14 +94,13 @@ Two of the common fields are conditional rather than free.
 A field `set` writes is cleared by an empty value: `set <id> parent_id=` removes the parent, and `set <id> parent_id= assignee=` is one write and one event, with each side recorded as `(unset)` in `history`.
 The empty value is the clearing syntax because no field in the dictionary accepts it, so it can never collide with a stored value the way a sentinel such as `-` would on a prose field, and because `labels=` already read as an empty list.
 `title` and the fields the type requires at creation refuse it as `V4`, naming the write that fills them.
-A field another command owns is cleared by that command: `sprint uncommit` clears `sprint_id`, and a transition off `on_hold` clears the three hold fields.
+A field another command owns is cleared by that command: a transition off `on_hold` clears the three hold fields.
 `file` reads an empty value as the field left unset, so `--set assignee=` files without one and `--set severity=` on a bug is the same `V4` as leaving it off.
 `help set` carries the rule as its last example.
 
 `requiredAtCreation(type)` returns the first column and `fieldsOf(type)` returns the common set plus the second.
-`validateWorkItem(item, { now, pointScale })` checks both, plus every field's own validation from the field dictionary.
+`validateWorkItem(item, { now })` checks both, plus every field's own validation from the field dictionary.
 `now` is an argument because a hold expiry has to be in the future and this layer does not read a clock.
-`pointScale` is workspace configuration and defaults to `1, 2, 3, 5, 8, 13`.
 `storedProse` is set by the store and by nothing else: `description` was narrowed from 100,000 characters to `MAX_DESCRIPTION` after files existed, and applying a write bound on the load path would make a record an earlier version wrote unreadable, which [STABILITY.md](STABILITY.md) says the file format never does.
 On that path the store's S5 section ceiling is the bound and a stored value over `MAX_DESCRIPTION` is doctor finding `H18`.
 
@@ -150,7 +143,7 @@ It is derived from the relation graph and shown beside the state, never in place
 `TRANSITION_TABLE` holds twenty-three edges: the twenty-two the model draws, and `release`.
 
 `release` runs from `in_progress` back to `ready`, requires a reason, and evaluates no guard.
-It is the exit an attempt that ended without the work being done had nowhere to record: a hold leaves `next`, which ranks `ready` only, and a cancel leaves the board.
+It is the exit an attempt that ended without the work being done had nowhere to record: a hold leaves `next`, which ranks `ready` only, and a cancel leaves the queue.
 The item returns to the queue and the event carries `outcome`, one of `failed` or `yielded`.
 
 Two edges record a value from a closed set, and `T6` is the one rule over both.
@@ -170,7 +163,7 @@ It restores the state the item was held from, so an `on_hold` item's only non-te
 The model names `hold_reason` and `hold_until` and does not name a field to keep the held-from state in, so `held_from` is this implementation's storage of the rule.
 
 G2, G3 and G7 yield to an explicit override that carries a reason.
-G1, G4, G5, G6 and G8 never do: the answer there is to fix the item.
+G1, G5, G6 and G8 never do: the answer there is to fix the item.
 
 ## Hierarchy
 
@@ -199,33 +192,6 @@ The clock is an argument, as everywhere in this layer.
 `healthFindings(items, now)` returns `H17` for every overdue item assigned to nobody, in id order, each naming the rule, the record and the instant it saw.
 A due date nobody owns is a date nothing acts on, which is the whole reason the field is worth its bytes.
 
-## Sprints
-
-A sprint is a period with a committed set, and not a work item: it is `open` or `closed`, and nothing else about it moves.
-`Sprint` carries `id`, `title`, `state`, `filed_at` (the instant it was opened), `version`, `start` and `end` as calendar days, and on a closed sprint `closed_at`, `carried`, the ids of the members still open at that instant, `finished`, the ids of the rest, and the tally the close froze over the two together: `done`, `done_points`, `cancelled` and `points`.
-`membersOf(sprint)` is that union, which is what `sprints <id>` prints as `members` and what every frozen number is counted over.
-`finished` is stored as a `## Finished` section rather than a field, because a field value is bounded at 8 KiB and it grows with the whole sprint.
-`goal` is optional and bounded at `MAX_GOAL`, which is `MAX_REASON`.
-`validateSprint` checks the dictionary; `isCalendarDate` refuses a date the calendar does not have, so `2026-02-30` is `I1` rather than the second of March.
-
-The committed set is not a field.
-An item carries `sprint_id`, so what is committed to an OPEN sprint is what points at it.
-A closed sprint's set is `carried` plus `finished`, because it is no longer derivable: reviving or reopening a member that was terminal at close and committing it onward is two legal moves, and each used to take that member out of a set four frozen numbers were still counted against.
-`carryOver(items)` is one of the two lists a close records: every committed item whose state is not terminal, in id order, so a cancelled item is in `finished` and is not carried.
-A reopen clears every frozen field, so once a carried item has been committed onward the reopen is refused with `I2`: the item would leave the record and the re-close would count a smaller sprint than the one a team already read.
-A sprint an older build closed carries no `points`, and everything about it reads live, which is what it always did.
-[ADR-0023](architecture/adr/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) carries the argument.
-
-`dayOfSprint(sprint, now)` reads the UTC date of the instant against `start` and `end`, both inclusive: `day` is 1 on the start date and `days` is the length, and neither is clamped.
-`sprintDay(sprint, now)` is what a read surface prints from that pair: `3/14` inside the window, and outside it the distance from the boundary as one token, `ended+967d/14` or `starts+14d/12`.
-It is one token because `status` prints it in a row cell that is not the last one and the row grammar splits on spaces, and it is a distance because `day 981/14` is arithmetic no reader can act on ([ADR-0016](architecture/adr/0016-sprints.md), STR-8).
-`evaluateCommit(context)` decides whether one item enters one sprint and returns `already`, `allowed` or `refused` with `I2`, `I3` or `I4` and the remedies.
-A `draft` item whose fields are complete enters a sprint, and that is the decision rather than an omission: planning a sprint with work nobody has refined yet is ordinary, and `file --sprint` files in `draft` by construction, so refusing it would make that flag refuse every item it can file.
-What the tool owed the reader instead is the list, because `next` ranks `ready` only.
-`notGroomed(items)` in `src/application/services/context.ts` derives it, and five surfaces name those ids rather than leaving them inside a tally: `sprint commit` and `file --sprint` say it at the moment of committing, `sprints <id>` and `status` carry a `not_ready` line, and `board` has listed them in its `draft` column since ADR-0018.
-The ready gate is the item's own definition of "can be picked up", and a sprint is where work is picked up, so the same verdict decides both.
-[architecture/adr/0016-sprints.md](architecture/adr/0016-sprints.md) carries every judgement call.
-
 ## Relations
 
 Six kinds, each with a defined inverse, and `relation add` writes three of them: `blocks`, `duplicates` and `relates_to`.
@@ -250,7 +216,7 @@ Writing an edge twice is idempotent: the second call returns `added: false` and 
 
 A successful `addRelation` also returns `read`, the ids whose outgoing edges the cycle check consulted.
 The writer hands those to the store as the transaction's read set, and the store refuses the write with `S10` if any of them moved between the read and the lock, so two commands that each passed the check against the other's absence cannot close a cycle between them.
-The guards and gate rules that read a neighbour carry the same read set: `guardReads` in `src/application/services/context.ts` names every item on a `blocks` edge with the item, every child and the original it duplicates, at the version the decision read, and `transition` and `sprint commit` hand it to the store.
+The guards and gate rules that read a neighbour carry the same read set: `guardReads` in `src/application/services/context.ts` names every item on a `blocks` edge with the item, every child and the original it duplicates, at the version the decision read, and `transition` hands it to the store.
 Without it a start decided against a done blocker landed after that blocker was reopened, and an accept landed after a done child was.
 
 An edge is stored once, as a `relations` entry on its source record, and `relationGraphFrom(items)` is the load path that reads every record's entries into one graph.
@@ -280,7 +246,6 @@ Default ready gate:
 | `DOR2` | all | The fields the type requires at creation are present |
 | `DOR3` | all | Nothing active is blocking the item |
 | `DOR4` | story | The story has at least one acceptance criterion |
-| `DOR5` | story | The story is estimated in points |
 | `DOR6` | bug | The bug records what was expected |
 | `DOR7` | bug | The bug records what actually happened |
 | `DOR8` | epic | The epic has at least one child story |
@@ -307,7 +272,7 @@ Together they are the anti-attestation pair: the item was accepted by someone ot
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
-The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
+The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
 A workspace gate composes those; there is no custom predicate, because a gate is loaded from a text file and a text file cannot carry one.
 
 ## Workspace configuration
@@ -318,12 +283,9 @@ The key set is closed and every key is optional; the absence of a key is the com
 | Key | What reads it | Default |
 |---|---|---|
 | `review_step` | guard `G5`, `DOD3` and `DOD7` | `story, bug, epic` |
-| `point_scale` | `validateWorkItem`, at write time only | `1, 2, 3, 5, 8, 13` |
-| `next_weights` | `next`'s ranking | `pri=10, age=1, dep=5, spr=8, asg=8, due=4, sev=6` |
-| `wip_limits` | guard `G3`, and doctor `H04` | `-`, meaning no column is limited |
+| `next_weights` | `next`'s ranking | `pri=10, age=1, dep=5, asg=8, due=4, sev=6` |
+| `wip_limits` | guard `G3`, and doctor `H04` | `-`, meaning no state is limited |
 | `aging_days` | doctor `H03` | `0`, meaning no threshold |
-| `cycle_time_excludes_hold` | the metrics layer, which is not built | `false` |
-| `start_requires_sprint` | guard `G4` | `false` |
 | `ready_gate` | guards `G1` and `G6`, and `explain` | the default ready gate above |
 | `done_gate` | the same | the default done gate above |
 

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "init.v1.json",
-  "title": "init/1",
+  "$id": "init.v2.json",
+  "title": "init/2",
   "description": "Create a workspace here, and say what it created and what it did not.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "init/1"
+      "const": "init/2"
     },
     "ok": {
       "type": "boolean"
@@ -97,12 +97,6 @@
           }
         },
         "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
           "type": [
             "integer",
             "null"

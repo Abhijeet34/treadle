@@ -13,6 +13,11 @@ The appendix at the end of this file is `bench/results/bench.md` from run `2026-
 Two later four-scale runs are in "The axis table re-derived at 50,000 items" and a fourth, taken after sprints, impediments, relations and boards landed, is in "The axis table re-derived after the four capabilities landed"; every paragraph that says "the appended run" means the one in the appendix and not those.
 [ADR-0008](architecture/adr/0008-the-measurement-rig.md) holds the method and what it departs from in DR8.
 
+Every run recorded below was taken against a tree that carried the sprint, the board, the retrospective and story points, all of which [ADR-0029](architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removed on 2026-09-08.
+The figures are not re-derived here, because a measurement is a fact about the run that produced it and rewriting one would make this file a fiction rather than a record.
+What a re-run scores differently is named where it is known: five of A2's 25 questions were answered or part-answered by a sprint or a board and now carry prose, A12 drives fewer verbs because the inventory is shorter, and `board` has left `READ_OPS` so the peak-RSS read budget is weighed over one operation fewer.
+Read a paragraph below against the tree it names.
+
 **One set of figures below is older than the appendix and is marked where it appears.**
 The ten-run series in "Targets missed" was taken on 2026-09-04, before [#4](https://github.com/Abhijeet34/treadle/pull/4) and [#7](https://github.com/Abhijeet34/treadle/pull/7) landed, and none of it was re-taken.
 It is kept because it is the only evidence this repository has of how far a figure on this machine drifts between runs, and a single run cannot replace it.
@@ -524,6 +529,8 @@ That row is the store-loading floor's median above `node -e`'s median, both take
 It is 86.3 ms at a 1-minute load of 3.35 and 245.5 ms at 6.35, on the same code, which is the strongest single argument in this file for why the timing budgets are not armed anywhere.
 
 ## The axis table re-derived after the four capabilities landed
+
+Three of the four capabilities this section measures were removed by ADR-0029 two days later; the section is kept as the record of what they cost while they were here.
 
 Sprints, impediments, relations and boards all shipped on 2026-09-06, so the table above was re-derived against the finished set rather than against any one of them.
 The run is `2026-09-06T12-51-17-231Z`, 572 s of wall time, four corpora regenerated in the run, 990 timed cold samples, 51 budgets: 32 pass, 0 fail, 3 open miss, 16 pending.

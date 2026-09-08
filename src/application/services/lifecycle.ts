@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-// The transition use case, and the two anti-ambiguity modes that ride on it.
+// The transition use case, and the anti-ambiguity mode that rides on it.
 //
 // A dry run holds an overlay store rather than a flag: every guard runs, the record goes
 // through encode, render, parse and decode exactly as a real write does, and nothing
-// touches a file. A preview evaluates no guard at all and says so on its last line, so the
-// cheap "am I pointing at the right thing" check can never be mistaken for a guard check.
+// touches a file.
 
 import {
   ATTEMPT_OUTCOMES,
   OVERRIDABLE_GUARDS,
-  TRANSITION_TABLE,
   evaluateTransition,
   isTerminal,
   overrideCommand,
@@ -35,12 +33,12 @@ import { storeRefusal } from './refusal.ts'
 
 export const TRANSITION_SHAPE: ResultShape = {
   command: 'transition',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Move one item to a target state, with every guard on that edge evaluated.',
   properties: [
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'item', type: 'string' },
@@ -134,21 +132,6 @@ export async function transition(
   const asked = request.target === 'resume' ? item.held_from : request.target
   const context = transitionContextFor(view.value, item, asked)
 
-  if (mode === 'preview') {
-    return okResult(TRANSITION_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        preview: 1,
-        item: item.id,
-        store: view.value.identity.path ?? workspace,
-        state: item.state,
-        will_evaluate: guardsOnEdge(item, request.target).join(' ') || '-',
-        will_write: 'item.transition',
-        note: 'guards not evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
-
   const outcome = evaluateTransition(context, {
     target: request.target,
     ...(request.reason === undefined ? {} : { reason: request.reason }),
@@ -189,7 +172,7 @@ export async function transition(
   // that has one: the store validates a record with a structural instant so an expired hold
   // already on disk stays readable, which is right on load and wrong on the write that sets
   // it. Without this call `--until` in the past was accepted and stored.
-  const live = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
+  const live = validateWorkItem(after, { now })
   if (!live.ok) {
     return errorResult({
       code: 'VALIDATION', command: 'transition', workspace, effect: 'mutate',
@@ -239,23 +222,11 @@ export async function transition(
 }
 
 /**
- * The guards a preview says it *would* evaluate. Read off the transition table rather than
- * from an evaluation, which is the whole point of the mode: it resolves the target and the
- * store and evaluates nothing.
- */
-function guardsOnEdge(item: WorkItem, target: WorkItemState | 'resume'): readonly GuardId[] {
-  const to = target === 'resume' ? item.held_from : target
-  const spec = TRANSITION_TABLE.find((edge) => edge.from === item.state && edge.to === to)
-  if (spec === undefined) return []
-  return item.type === 'epic' && to === 'done' ? [...spec.guards, 'G8'] : spec.guards
-}
-
-/**
  * The caller's own line, completed, when the refusal is about what the line left off: T4 is a
  * reason missing and T6 a closed-set value missing. `explain` and `show` were the only fixes
- * on both, and neither adds the flag the refusal asked for; the dry-run and preview clash
- * already answers with the caller's line corrected, and this is that shape for the two rules
- * whose remedy is one more flag. Any other rule adds nothing here.
+ * on both, and neither adds the flag the refusal asked for; this is the shape that answers
+ * with the caller's line corrected, for the two rules whose remedy is one more flag. Any
+ * other rule adds nothing here.
  */
 function completedLine(item: WorkItem, request: TransitionRequestInput, rule: string): readonly string[] {
   if (rule !== 'T4' && rule !== 'T6') return []

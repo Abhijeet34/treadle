@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** section 2 of the capability contract for the four absent features
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the sprint, so "it may belong to a sprint" below is a decision about a field that no longer exists; the impediment as a type is unchanged
 
 ## Context
 

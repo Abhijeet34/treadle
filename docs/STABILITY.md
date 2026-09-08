@@ -80,7 +80,7 @@ Breaking, and therefore never done:
 
 Breaking, and allowed with a minor bump plus release notes:
 
-- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is still read as it stands, and a mutation to it is refused as `SCHEMA_OLDER` (`S9`) at exit `6`, because writing it would rewrite the whole file as a side effect of a one-record change. The command that would rewrite it is `migrate`, which the README's Status table records as specified and not implemented, so the refusal names no rewrite: it says that no command here rewrites the file yet, and its fix line is `treadle version`. A fix line naming a command the tool does not carry would not run as printed, which `test/cli/runnable-lines.test.ts` refuses.
+- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is still read as it stands, and a mutation to it is refused as `SCHEMA_OLDER` (`S9`) at exit `6`, because writing it would rewrite the whole file as a side effect of a one-record change. The command that would rewrite it is `migrate`, which the README's Status table records as Declined until a schema 2 exists, so the refusal names no rewrite: it says that no command here rewrites the file yet, and its fix line is `treadle version`. A fix line naming a command the tool does not carry would not run as printed, which `test/cli/runnable-lines.test.ts` refuses.
 
 Not breaking:
 

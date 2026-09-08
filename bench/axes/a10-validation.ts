@@ -44,12 +44,12 @@ const RULES: readonly Rule[] = [
   {
     n: 4, rule: 'a spike without a question', source: '2.1, spike row, invalid at creation',
     id: 'a10-spike-no-question',
-    argv: ['file', 'spike', 'A spike with no question', '--set', 'timebox_hours=4'],
+    argv: ['file', 'spike', 'A spike with no question'],
   },
   {
-    n: 5, rule: 'a spike without a timebox', source: '2.1, spike row, invalid at creation',
-    id: 'a10-spike-no-timebox',
-    argv: ['file', 'spike', 'A spike with no timebox', '--set', 'question=which ranker'],
+    n: 5, rule: 'an impediment with no proposed resolution', source: '2.1, impediment row, invalid at creation',
+    id: 'a10-imped-no-resolution',
+    argv: ['file', 'impediment', 'An impediment naming nothing that would clear it', '--set', 'severity=S2'],
   },
   {
     n: 6, rule: 'a type outside the closed set of six', source: '2.14, common field type',
@@ -67,9 +67,9 @@ const RULES: readonly Rule[] = [
     argv: ['file', 'task', 'A task at priority nine', '--priority', '9'],
   },
   {
-    n: 9, rule: 'points off the workspace scale', source: '2.14, common field points',
-    id: 'a10-points-scale',
-    argv: ['file', 'task', 'A task estimated at four points', '--points', '4'],
+    n: 9, rule: 'an assignee carrying a control character', source: '2.14, common field assignee',
+    id: 'a10-assignee-control',
+    argv: ['file', 'task', 'A task assigned to a name with a control character', '--assignee', 'da\u0007na'],
   },
   {
     n: 10, rule: 'a label that is not a slug', source: '2.14, common field labels',

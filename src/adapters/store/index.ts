@@ -34,13 +34,9 @@ export {
   type Section,
 } from './grammar.ts'
 
-export { IndexCache, type Fingerprint, type IndexedCeremony, type IndexedItem } from './index-cache.ts'
+export { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts'
 
 export { decodeItem, encodeItem } from './item-codec.ts'
-
-export { decodeSprint, encodeSprint, type EncodedSprint } from './sprint-codec.ts'
-
-export { decodeCeremony, encodeCeremony, type EncodedCeremony } from './ceremony-codec.ts'
 
 export * from './limits.ts'
 
@@ -61,7 +57,6 @@ export {
   WORKSPACE_FILE,
   createWorkspace,
   openWorkspace,
-  resolveWorkspace,
   rowOf,
   type ShardedStoreOptions,
 } from './sharded-store.ts'

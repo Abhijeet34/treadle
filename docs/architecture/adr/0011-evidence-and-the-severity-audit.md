@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** sections 3.4 and 4.5 of the `treadle-board-outcomes-retention-b3` audit
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `--preview` from the flag matrix; severity, the audit and the evidence pointer stand
 
 ## Context
 

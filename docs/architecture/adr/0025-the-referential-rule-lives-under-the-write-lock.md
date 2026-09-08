@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** limit two of the platform-parity scout report, which reproduced three interleavings against `52616bc`
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the closed-sprint referrer and `H26`, leaving `S17` with the parent and the relation edge
 
 ## Context
 

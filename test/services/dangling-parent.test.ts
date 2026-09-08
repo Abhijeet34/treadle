@@ -6,7 +6,7 @@
 // git merge, an older build, a crash between two writes. `doctor` reported clean over one,
 // which is worse than the dangling reference itself, because the tool's own health check was
 // silent about a record every read then answered from as if the parent were there. `H24`
-// covers a relation's target and `H26` a `sprint_id`; `H30` is the same rule for a parent.
+// covers a relation's target; `H30` is the same rule for a parent.
 //
 // The quarantine case is here for the reason round five's is: a record the store holds and
 // refuses to serve still exists, so a child pointing at it is not dangling.
@@ -100,7 +100,7 @@ describe('a child of a quarantined parent', () => {
     assert.equal((await cli(['file', 'task', 'A child task', '--id', 'child-task', '--parent', 'parent-story'])).code, 0)
     // A value no write path produces, on the parent, so the store holds the record and
     // refuses to serve it.
-    await edit(shardOf(root), (text) => text.replace(/^type: story$/m, 'type: story\npoints: -3'))
+    await edit(shardOf(root), (text) => text.replace(/^type: story$/m, 'type: story\npriority: -3'))
   })
   after(async () => { await rm(root, { recursive: true, force: true }) })
 

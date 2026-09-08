@@ -101,7 +101,7 @@ describe('no command returns an oversized argument to the caller', () => {
       ['show', HUGE], ['history', HUGE], ['explain', HUGE], ['set', HUGE, 'points=3'],
       ['mark', HUGE, '--priority', '1', '--reason', 'why'],
       ['transition', HUGE, 'ready'], ['relation', 'add', HUGE, 'blocks', 'sso-saml'],
-      ['evidence', 'add', HUGE, 'run', '1'], ['sprint', 'commit', HUGE, 'sso-saml'],
+      ['evidence', 'add', HUGE, 'run', '1'], ['relation', 'add', HUGE, 'blocks', 'sso-saml'],
       ['file', 'task', 'A title', '--id', HUGE],
     ]) {
       const run = await runCli(argv, { cwd: demo.root, env: { TREADLE_ACTOR: 'dana' } })

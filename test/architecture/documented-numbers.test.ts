@@ -13,7 +13,7 @@
 // changed nothing about the claim; docs/VERIFICATION.md carries those with their dates.
 
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
@@ -129,7 +129,7 @@ describe('the domain rule table names every rule id the domain raises, and no ot
   // The ids a refusal prints are the closed set docs/DOMAIN.md publishes under "Rule ids".
   // Nothing held the two together: a rule added to the code and not the table, or kept in
   // the table after its code went, read as documentation either way.
-  // `I5` is raised by the services, which is where a sprint id meets an item id, so the
+  // `V9` is raised by the services, which is where two record namespaces meet, so the
   // application layer is scanned with the domain; `C`, `H` and `S` ids belong to other tables.
   const DOMAIN_PREFIXES = /^(G|T|R|P|I|V)\d+$/
   const raised = new Set<string>()
@@ -466,6 +466,66 @@ describe('docs/DOMAIN.md counts the closed sets the domain declares', () => {
         `docs/DOMAIN.md's default ${name} gate table names different rules or scopes than src/domain/gates.ts evaluates`)
     })
   }
+})
+
+describe("the README's Status table points at something this tree holds", () => {
+  // The State column had "Specified, not implemented" and "Partly implemented" on nine rows,
+  // and neither said who owned the gap: a row could sit there for a release naming work
+  // nobody had queued and nobody had declined. The vocabulary is four words now, each
+  // carrying a pointer, and this is what makes the pointer real rather than decorative.
+  // A Shipped row names a record or a commit and is not held here, because a commit hash is
+  // not a file and the record link is already held by the ADR index test above.
+  const section = README.slice(README.indexOf('| Area | State |'), README.indexOf('\nEvery row'))
+  const rows = [...section.matchAll(/^\| (.+?) \| (Shipped|Queued|Declined|Removed|Blocked)\b(.*)\|$/gm)]
+    .map((match) => ({ area: match[1] as string, state: match[2] as string, rest: match[3] as string }))
+
+  /** Every item id under `.work/items`, with the state its record carries. */
+  const stateOf = new Map<string, string>()
+  {
+    const items = path.join(ROOT, '.work', 'items')
+    let id: string | undefined
+    for (const file of readdirSync(items)) {
+      for (const line of readFileSync(path.join(items, file), 'utf8').split('\n')) {
+        const heading = /^# ([a-z0-9][a-z0-9-]*): /.exec(line)
+        if (heading !== null) { id = heading[1] as string; continue }
+        const state = /^state: ([a-z_]+)$/.exec(line)
+        if (state !== null && id !== undefined) stateOf.set(id, state[1] as string)
+      }
+    }
+  }
+
+  it('has rows to check, and every State is one of the four words plus Blocked', () => {
+    assert.ok(rows.length >= 10, `only ${rows.length} Status rows parsed; the table or its State column has changed shape`)
+    const bare = section.split('\n').filter((line) => line.startsWith('| ') && !line.startsWith('| Area') && !line.startsWith('|---'))
+    assert.equal(rows.length, bare.length,
+      `${bare.length - rows.length} Status rows carry a State that is not one of Shipped, Queued, Declined, Removed or Blocked`)
+  })
+
+  it('names, on every Queued row, an item .work holds in ready or draft', () => {
+    const queued = rows.filter((row) => row.state === 'Queued')
+    assert.ok(queued.length > 0, 'no Status row is Queued, so this assertion proves nothing')
+    for (const row of queued) {
+      const named = /`([a-z0-9][a-z0-9-]*)`/.exec(row.rest)?.[1]
+      assert.ok(named !== undefined, `the Queued row "${row.area}" backticks no .work item id`)
+      const state = stateOf.get(named)
+      assert.ok(state !== undefined, `the Queued row "${row.area}" names ${named}, which .work does not hold`)
+      assert.ok(['ready', 'draft'].includes(state),
+        `the Queued row "${row.area}" names ${named}, which .work holds in ${state}; a queued gap is one somebody can pick up`)
+    }
+  })
+
+  it('names, on every Declined and Removed row, a record file that exists', () => {
+    const decided = rows.filter((row) => row.state === 'Declined' || row.state === 'Removed')
+    assert.ok(decided.length > 0, 'no Status row is Declined or Removed, so this assertion proves nothing')
+    for (const row of decided) {
+      const links = [...row.rest.matchAll(/\]\((docs\/architecture\/adr\/[^)]+)\)/g)].map((match) => match[1] as string)
+      assert.ok(links.length > 0, `the ${row.state} row "${row.area}" links no decision record`)
+      for (const link of links) {
+        assert.ok(existsSync(path.join(ROOT, link)),
+          `the ${row.state} row "${row.area}" links ${link}, which is not a file in this tree`)
+      }
+    }
+  })
 })
 
 describe('the README never prints a suite figure without the run it came from', () => {

@@ -28,11 +28,9 @@ import {
   MAX_DESCRIPTION,
   findRelationCycle,
   relationGraphFrom,
-  membersOf,
   summaryOf,
   type Instant,
   type ItemId,
-  type Sprint,
   type RelationGraph,
   type WorkItem,
   type WorkItemState,
@@ -110,7 +108,7 @@ const NONE: readonly DoctorFinding[] = []
  */
 type Audited = {
   readonly item: WorkItemSummary
-  /** H26 and H18, in that order. */
+  /** H18. */
   readonly before: readonly DoctorFinding[]
   /** H21. */
   readonly after: readonly DoctorFinding[]
@@ -140,7 +138,6 @@ type Audited = {
 export type AuditContext = {
   readonly config: WorkspaceConfig
   readonly now: Instant
-  readonly sprints: readonly Sprint[]
 }
 
 const DAY_MS = 86_400_000
@@ -152,45 +149,24 @@ const DAY_MS = 86_400_000
  */
 export class WorkspaceAudit {
   readonly #context: AuditContext
-  readonly #sprintIds: ReadonlySet<string>
   readonly #heldItems: ReadonlySet<string>
-  readonly #heldSprints: ReadonlySet<string>
   readonly #entries: Audited[] = []
   readonly #byId = new Map<ItemId, Audited>()
 
   /**
-   * `sprintIds` and the item ids the records supply are the SERVED set. The two held sets are
-   * what the store holds and refused to serve, which it already reported as an S-row of its
-   * own: an id in one exists, so a neighbour pointing at it is not dangling. Testing served
-   * membership alone made every neighbour of one damaged record lie, and H26's remedy then
-   * told the reader to open a second sprint with the same id, which is an S3 waiting to
-   * happen. A record that is neither served nor held is genuinely absent, and the two held
-   * sets stay apart so a quarantined item never answers for a `sprint_id`.
+   * The item ids the records supply are the SERVED set. `heldItems` is what the store holds
+   * and refused to serve, which it already reported as an S-row of its own: an id in it
+   * exists, so a neighbour pointing at it is not dangling. Testing served membership alone
+   * made every neighbour of one damaged record lie. A record that is neither served nor held
+   * is genuinely absent.
    */
-  constructor(
-    context: AuditContext,
-    heldItems: ReadonlySet<string> = new Set(),
-    heldSprints: ReadonlySet<string> = new Set(),
-  ) {
+  constructor(context: AuditContext, heldItems: ReadonlySet<string> = new Set()) {
     this.#context = context
-    this.#sprintIds = new Set(context.sprints.map((sprint) => sprint.id))
     this.#heldItems = heldItems
-    this.#heldSprints = heldSprints
   }
 
   record(item: WorkItem): void {
     const before: DoctorFinding[] = []
-    // No write path points an item at a sprint that is not a record: `file --sprint` and
-    // `sprint commit` both resolve the id first. A value written before sprints were records,
-    // or by hand, is reported rather than refused, because the item still serves.
-    if (item.sprint_id !== undefined && !this.#sprintIds.has(item.sprint_id) && !this.#heldSprints.has(item.sprint_id)) {
-      before.push({
-        rule: 'H26',
-        id: item.id,
-        where: 'sprint_id',
-        detail: `sprint_id is ${item.sprint_id} and no sprint record carries that id; open one with --id ${item.sprint_id}, or commit the item to a sprint that exists`,
-      })
-    }
     if (item.description !== undefined && item.description.length > MAX_DESCRIPTION) {
       before.push({
         rule: 'H18',
@@ -320,30 +296,26 @@ export class WorkspaceAudit {
   }
 
   /**
-   * `H04`: a column holding more than its configured limit. It is scoped exactly as `G3`
-   * scopes its count, to the one open sprint or to the workspace, so the finding and the
-   * guard cannot disagree about which items are in the column. `G3` refuses the move that
-   * would put a column over, and this reports the ones already there: a limit lowered under
+   * `H04`: a state holding more than its configured limit. It is scoped exactly as `G3`
+   * scopes its count, over the whole workspace, so the finding and the guard cannot disagree
+   * about which items are in it. `G3` refuses the move that would put a state over its
+   * limit, and this reports the ones already there: a limit lowered under
    * work in flight and an override are both routes no guard could have refused, which is the
    * write-time-guard and load-time-finding pair the rest of this file already keeps.
    */
   #columnsOverLimit(): readonly DoctorFinding[] {
     const limits = this.#context.config.wip_limits
     if (limits.size === 0) return NONE
-    const open = this.#context.sprints.filter((sprint) => sprint.state === 'open')
-    const sprint = open.length === 1 ? open[0] : undefined
     const findings: DoctorFinding[] = []
     for (const [state, limit] of limits) {
       if (limit === 0) continue
-      const used = this.#entries.filter((entry) =>
-        entry.item.state === state && (sprint === undefined || entry.item.sprint_id === sprint.id)).length
+      const used = this.#entries.filter((entry) => entry.item.state === state).length
       if (used <= limit) continue
-      const scope = sprint === undefined ? 'this workspace' : sprint.id
       findings.push({
         rule: 'H04',
         id: '-',
         where: state as WorkItemState,
-        detail: `the ${state} column of ${scope} holds ${used} items against a wip_limits of ${limit}, which G3 refuses to add to and an override or a lowered limit produces; treadle board --state ${state}`,
+        detail: `the ${state} column of this workspace holds ${used} items against a wip_limits of ${limit}, which G3 refuses to add to and an override or a lowered limit produces; treadle backlog --state ${state}`,
       })
     }
     return findings
@@ -368,9 +340,9 @@ export function auditItem(
  * A `parent_id` naming a record the store does not hold (H30). The store refuses to write
  * one, so this reports what reached the files by the routes D1 permits: a hand edit, a git
  * merge, a build older than that rule. It is the same test `H24` runs for a relation's
- * target and `H26` for a `sprint_id`, against the same held-or-served set, and it was the
- * one neighbour of the three with no finding at all - `doctor` exited 0 over a record whose
- * parent had gone, while `show` went on printing the parent as though it were there.
+ * target, against the same held-or-served set, and it was the neighbour of the two with no
+ * finding at all - `doctor` exited 0 over a record whose parent had gone, while `show` went
+ * on printing the parent as though it were there.
  */
 export function auditParentOf(
   known: ReadonlySet<ItemId>, item: Pick<WorkItemSummary, 'id' | 'parent_id'>,
@@ -429,53 +401,6 @@ export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | '
 }
 
 /**
- * What one closed sprint's own record says about a set the store can be asked for. Both rules
- * reach `sprints` output as facts and neither has a write path that produces it.
- *
- * `H28`: a `carried` or `finished` id no record holds. `sprints sp1` printed
- * `carried beta-task,ghost-task` and counted the ghost in `committed`, so the sprint reads as
- * one item larger than the workspace can show.
- *
- * `H29`: a frozen tally larger than the set it is counted over. A hand-edited `done: 99` over
- * four members printed `99/4`, and a close writes each of these numbers off the set it froze,
- * so no write path produces one over it.
- */
-function auditSprint(sprint: Sprint, known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
-  const findings: DoctorFinding[] = []
-  for (const field of ['carried', 'finished'] as const) {
-    for (const id of sprint[field] ?? []) {
-      if (known.has(id)) continue
-      findings.push({
-        rule: 'H28',
-        id: sprint.id,
-        where: field,
-        detail: `${field} names ${id} and no record here carries that id; the sprint counts it in its committed set and nothing can show it`,
-      })
-    }
-  }
-  const over = (where: string, detail: string): void => { findings.push({ rule: 'H29', id: sprint.id, where, detail }) }
-  // The set the close recorded; a sprint an older build closed recorded none, and there is
-  // then nothing on the record to count these against.
-  const size = membersOf(sprint)?.length
-  if (size !== undefined) {
-    for (const field of ['done', 'cancelled'] as const) {
-      const value = sprint[field]
-      if (value === undefined || value <= size) continue
-      over(field, `${field} is ${value} over a committed set of ${size}; a close writes this number off the set it froze, so no write path produces one above it`)
-    }
-    const { done, cancelled } = sprint
-    if (done !== undefined && cancelled !== undefined && done + cancelled > size) {
-      over('done', `done ${done} and cancelled ${cancelled} are ${done + cancelled} outcomes over a committed set of ${size}; an item has one outcome`)
-    }
-  }
-  const { points, done_points: donePoints } = sprint
-  if (points !== undefined && donePoints !== undefined && donePoints > points) {
-    over('done_points', `done_points is ${donePoints} over a committed total of ${points}; the done items are part of the set the total counts`)
-  }
-  return findings
-}
-
-/**
  * A `blocks` cycle the files carry (H25). `relation add` refuses one at write time (R2) and
  * cannot see one a hand edit or a merge put in; every item on it is blocked by itself.
  */
@@ -497,18 +422,10 @@ export async function doctor(store: Store, clock: Clock): Promise<ResultObject> 
 
   const stored = await store.findings()
   if (!stored.ok) return storeRefusal('doctor', 'read', stored.error, workspace)
-  const sprints = await store.sprints()
-  if (!sprints.ok) return storeRefusal('doctor', 'read', sprints.error, workspace)
   // A record the store holds and refused to serve still exists, and the S-row above names it.
-  // Its id is not free and nothing that points at it is dangling. The two kinds are kept
-  // apart: a quarantined ITEM must not answer for a `sprint_id`, which is what would turn a
-  // true `H26` into silence.
-  const held = (kind: 'item' | 'sprint'): ReadonlySet<string> =>
-    new Set(stored.value.flatMap((finding) => (finding.id !== undefined && finding.kind === kind ? [finding.id] : [])))
-  const audit = new WorkspaceAudit(
-    { config: identity.value.config, now: clock.now(), sprints: sprints.value },
-    held('item'), held('sprint'),
-  )
+  // Its id is not free and nothing that points at it is dangling.
+  const held = new Set(stored.value.flatMap((finding) => (finding.id === undefined ? [] : [finding.id])))
+  const audit = new WorkspaceAudit({ config: identity.value.config, now: clock.now() }, held)
   // The audit reads every field of every record against its events, so this is the one
   // command that decodes the whole store; it holds one record and one event at a time.
   const records = await store.eachItem({}, (item) => audit.record(item))
@@ -516,8 +433,7 @@ export async function doctor(store: Store, clock: Clock): Promise<ResultObject> 
   const events = await store.eachEvent({}, (event) => audit.event(event))
   if (!events.ok) return storeRefusal('doctor', 'read', events.error, workspace)
 
-  const known = audit.known()
-  const audited = [...audit.findings(), ...sprints.value.flatMap((sprint) => auditSprint(sprint, known))]
+  const audited = audit.findings()
   const rows: DoctorFinding[] = [
     ...stored.value.map((finding): DoctorFinding => ({
       rule: finding.rule,

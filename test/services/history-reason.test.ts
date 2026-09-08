@@ -23,6 +23,7 @@ import { fixedClock } from '../../src/adapters/clock.ts'
 import { sequentialIds } from '../../src/adapters/ids.ts'
 import { targetFor } from '../../src/adapters/target.ts'
 import { makeEvent } from '../../src/application/services/mutation.ts'
+import { allItems } from '../helpers/store-fixtures.ts'
 
 const REASON = 'revenue path, the checkout funnel depends on it'
 
@@ -33,7 +34,7 @@ describe('a reason the log records is a reason a reading returns', () => {
   before(async () => {
     demo = await aDemoWorkspace()
     const clock = fixedClock('2026-09-07T10:00:00Z')
-    const items = await demo.store.list({})
+    const items = await allItems(demo.store)
     assert.ok(items.ok && items.value.length > 0, 'the demo workspace holds no item to mark')
     id = (items.value[0] as { id: string }).id
     const marked = await markItem(targetFor(demo.store, 'apply'), clock, sequentialIds(900), {
@@ -95,7 +96,7 @@ describe('a reason a hand edit made unprintable is marked, never printed', () =>
 
   before(async () => {
     demo = await aDemoWorkspace()
-    const items = await demo.store.list({})
+    const items = await allItems(demo.store)
     assert.ok(items.ok && items.value.length > 0)
     id = (items.value[0] as { id: string }).id
     const events = unprintable.map(([, value], at) => makeEvent({

@@ -12,12 +12,14 @@
 // The reference scored 4 full, 6 partial, 15 none on this same list.
 //
 // Every `none` here is a claim that the product cannot do something, and a claim like that
-// goes stale the moment a capability lands. Questions 7, 8, 20 and 21 asserted there was no
-// sprint, no impediment and no board in this tree for as long as that was true and for one
-// release after it was not, and 14 and 15 asserted there was no history verb from #21
-// onward. So an absence is put to the tool rather than remembered: a question with a command
-// to aim at is aimed at it, including when the expected answer is a refusal, and only a
-// question the inventory can offer nothing for carries its verdict in prose.
+// goes stale the moment a capability lands or leaves. Questions 7, 8, 20 and 21 asserted
+// there was no sprint, no impediment and no board in this tree for as long as that was true
+// and for one release after it was not, and 14 and 15 asserted there was no history verb
+// from #21 onward. So an absence is put to the tool rather than remembered: a question with
+// a command to aim at is aimed at it, including when the expected answer is a refusal, and
+// only a question the inventory can offer nothing for carries its verdict in prose. Four
+// questions carry prose again after the purpose ADR removed sprints, estimation and the
+// board, and each says what was removed rather than that it never existed.
 
 import { crossCheck, openSurface, resultOf, type CrossCheck, type Invocation, type Surface } from './surface.ts'
 import type { AxisResult } from './axis.ts'
@@ -50,11 +52,6 @@ const scalar = (answer: Answer, key: string): string =>
   (typeof answer.data[key] === 'string' ? answer.data[key] as string
     : typeof answer.data[key] === 'number' ? String(answer.data[key]) : '')
 
-/** Every row of every board column, which is where the board's own answers live. */
-const boardRows = (answer: Answer): readonly Record<string, unknown>[] =>
-  ['draft', 'ready', 'in_progress', 'in_review', 'on_hold']
-    .flatMap((state) => block(answer, state) as readonly Record<string, unknown>[])
-
 const listed = (key: string): Predicate => (answer) => answer.exit === 0 && block(answer, key).length > 0
 const present = (key: string): Predicate => (answer) => answer.exit === 0 && answer.data[key] !== undefined
 const never: Predicate = () => false
@@ -70,12 +67,8 @@ const QUESTIONS: readonly Question[] = [
   },
   {
     n: 2, question: 'what is blocked and by what',
-    argv: ['board', '--all'],
     fullNeeds: 'a list of the blocked items across the workspace, each with its blockers',
-    full: (answer) => answer.exit === 0 && present('blocked')(answer)
-      && boardRows(answer).some((row) => typeof row['blocked'] === 'string' && row['blocked'] !== '-'),
-    partial: (answer) => boardRows(answer).length > 0,
-    note: 'the board carries a blocked column naming the active blockers of every live item, counts them in its blocked scalar and sorts a blocked row to the top of its column; the rows arrive grouped by state rather than as one flat list, and no filter reduces the board to the blocked ones alone',
+    note: 'the board carried this and was removed as a projection that computed nothing the records do not say; explain answers it one item at a time, and the blocked column and --blocked filter on backlog are queued rather than shipped, so no single command lists the blocked set today'
   },
   {
     n: 3, question: 'why is X blocked',
@@ -112,27 +105,18 @@ const QUESTIONS: readonly Question[] = [
   },
   {
     n: 7, question: 'what is the sprint goal',
-    argv: ['sprints', 'a2-sprint-31'],
     fullNeeds: 'the goal of the active sprint',
-    full: (answer) => present('goal')(answer) && scalar(answer, 'state') === 'open',
-    note: 'the one-sprint read prints the goal whole, beside the dates and the tally; the bare sprints listing has no goal column, so a caller who does not know the id pays a call to learn it',
+    note: 'there is no sprint: the record kind was removed as a time box that records no interaction, decision or task, so the question has no subject in this tool rather than an unanswered one'
   },
   {
     n: 8, question: 'committed versus capacity',
-    argv: ['sprints', 'a2-sprint-31'],
     fullNeeds: 'the committed points of the active sprint against its capacity',
-    full: (answer) => present('capacity')(answer),
-    partial: (answer) => present('committed')(answer) && present('pts')(answer),
-    note: 'the committed half is exact, as a count of items and a done-over-committed points ratio; a sprint stores no capacity, so there is nothing to weigh the commitment against and ADR-0016 left the field out rather than guessing one',
+    note: 'neither half exists: the sprint and the point scale were both removed, so there is no committed set to count and no estimate to count it in'
   },
   {
     n: 9, question: 'velocity over the last three sprints',
-    argv: ['sprints'],
     fullNeeds: 'a velocity figure per sprint with the formula that produced it',
-    full: never,
-    partial: (answer) => block(answer, 'sprints').some((row) =>
-      typeof (row as { pts?: unknown }).pts === 'string'),
-    note: 'the listing carries done-over-committed points for every sprint in one call, which is the numerator of a velocity and the whole of the input; no verb divides it by anything or names a formula, and that is the same absence axis A9 is NOT MEASURED for',
+    note: 'a velocity is a tally over a time box divided by a number nothing enforces, and both inputs were removed; the event log still holds every transition with its instant, so the arithmetic is a reader\'s to do outside the tool'
   },
   {
     n: 10, question: 'cycle time of X',
@@ -141,7 +125,7 @@ const QUESTIONS: readonly Question[] = [
     full: never,
     partial: (answer) => block(answer, 'events').filter((row) =>
       (row as { op?: unknown }).op === 'item.transition').length >= 2,
-    note: 'history puts every state change of one item in one call, each with its instant, so both ends of a cycle time are behind a command rather than in the committed log; no verb subtracts them, and sprints prints a day-of-sprint but nothing per item',
+    note: 'history puts every state change of one item in one call, each with its instant, so both ends of a cycle time are behind a command rather than in the committed log; no verb subtracts them',
   },
   {
     n: 11, question: 'what is aging',
@@ -217,23 +201,27 @@ const QUESTIONS: readonly Question[] = [
   },
   {
     n: 20, question: 'open impediments and their age',
-    argv: ['board', '--all', '--type', 'impediment'],
+    argv: ['backlog', '--type', 'impediment'],
     fullNeeds: 'the open impediments with the days each has stood',
-    full: (answer) => boardRows(answer).some((row) => typeof row['age'] === 'string' || typeof row['age'] === 'number'),
-    partial: (answer) => boardRows(answer).length > 0,
-    note: 'an impediment is a work-item type, so the board filtered to it is every open one in a single call, each with its severity, and a terminal one is out of the columns by construction; no read prints how long one has stood, and the age of a ready item exists only as a scored component inside next',
+    full: (answer) => (block(answer, 'items') as readonly Record<string, unknown>[])
+      .some((row) => row['age'] !== undefined),
+    partial: listed('items'),
+    note: 'an impediment is a work-item type, so one filter on the list verb is every one of them in a single call with its severity; no read prints how long one has stood, and the age of a ready item exists only as a scored component inside next',
   },
   {
     n: 21, question: 'is any column over its limit',
-    fullNeeds: 'each board column against its work-in-progress limit',
-    note: 'the board is real now and prints its five columns with a count on each, so the left half of the question is answered; nothing stores a work-in-progress limit for a column, which is why ADR-0018 leaves guard G3 disarmed rather than evaluating it against no limit',
+    argv: ['doctor'],
+    fullNeeds: 'each state against its work-in-progress limit, with the ones over it named',
+    full: never,
+    partial: (answer) => answer.data['checked'] !== undefined,
+    note: 'the limit is real: config wip_limits arms guard G3, and doctor reports finding H04 for a state already over its limit; no command prints every state against its limit whether or not it is over, so a workspace inside its limits gets silence rather than a table, and this seeded one sets no limit at all',
   },
   {
     n: 22, question: 'what will this command do',
     argv: ['transition', 'a2-story', 'in_progress', '--dry-run'],
     fullNeeds: 'the fields the command would change and the exit status it would return, without changing anything',
     full: (answer) => present('dry_run')(answer) && present('would_exit')(answer),
-    note: 'every mutation takes --dry-run, which runs every guard against a store that cannot write, and --preview, which names the store and the guards without evaluating one',
+    note: 'every mutation takes --dry-run, which runs every guard against a store that cannot write and reports the field diff and the exit status the real run would return',
   },
   {
     n: 23, question: 'why did X not appear in ready',
@@ -349,23 +337,23 @@ async function seed(surface: Surface): Promise<void> {
   }
 
   await must(['file', 'epic', 'A2 the epic', '--id', 'a2-epic', '--set', 'outcome=enterprise tenants can sign in'])
-  await must(['file', 'story', 'A2 the story', '--id', 'a2-story', '--points', '5', '--priority', '1',
+  await must(['file', 'story', 'A2 the story', '--id', 'a2-story', '--priority', '1',
     '--assignee', 'dana', '--set', 'acceptance_criteria=it signs in|it signs out'])
-  await must(['file', 'story', 'A2 the child story', '--id', 'a2-child', '--points', '3', '--priority', '2',
+  await must(['file', 'story', 'A2 the child story', '--id', 'a2-child', '--priority', '2',
     '--parent', 'a2-epic', '--set', 'acceptance_criteria=the child is done'])
-  await must(['file', 'task', 'A2 the task in progress', '--id', 'a2-doing', '--points', '2', '--priority', '2', '--assignee', 'kim'])
-  await must(['file', 'task', 'A2 the finished task', '--id', 'a2-done', '--points', '1', '--priority', '3'])
+  await must(['file', 'task', 'A2 the task in progress', '--id', 'a2-doing', '--priority', '2', '--assignee', 'kim'])
+  await must(['file', 'task', 'A2 the finished task', '--id', 'a2-done', '--priority', '3'])
   await must(['file', 'bug', 'A2 the defect', '--id', 'a2-bug', '--priority', '1',
     '--set', 'severity=S1', '--set', 'found_in=production', '--set', 'repro_steps=sign in twice'])
-  await must(['file', 'task', 'A2 the duplicate', '--id', 'a2-dupe', '--points', '1', '--priority', '4'])
-  await must(['file', 'task', 'A2 the overdue task', '--id', 'a2-overdue', '--points', '2', '--priority', '2',
+  await must(['file', 'task', 'A2 the duplicate', '--id', 'a2-dupe', '--priority', '4'])
+  await must(['file', 'task', 'A2 the overdue task', '--id', 'a2-overdue', '--priority', '2',
     '--set', 'due=2026-01-05T09:00:00Z'])
-  await must(['file', 'task', 'A2 the ready task', '--id', 'a2-ready', '--points', '3', '--priority', '3'])
+  await must(['file', 'task', 'A2 the ready task', '--id', 'a2-ready', '--priority', '3'])
   await must(['file', 'impediment', 'A2 the expired staging certificate', '--id', 'a2-imped',
     '--set', 'severity=S1', '--set', 'proposed_resolution=platform renews the certificate'])
 
   // The impediment blocks the bug rather than the story, because a blocker fails DOR3 and
-  // the story has to reach `ready` for the sprint to commit it.
+  // question 1 needs a ready story to list.
   await must(['relation', 'add', 'a2-imped', 'blocks', 'a2-bug'])
   await must(['relation', 'add', 'a2-dupe', 'duplicates', 'a2-ready'])
 
@@ -374,19 +362,8 @@ async function seed(surface: Surface): Promise<void> {
   await must(['transition', 'a2-doing', 'ready'])
   await must(['transition', 'a2-doing', 'in_progress'])
   await must(['transition', 'a2-done', 'ready'])
-
-  // Two sprints, one closed over a finished item and one open, so the listing a velocity
-  // question is put to has more than one row and the open one is unambiguous for the board.
-  await must(['sprint', 'open', 'A2 sprint 30', '--id', 'a2-sprint-30',
-    '--start', '2026-08-17', '--end', '2026-08-28', '--goal', 'land the sign-in flow'])
-  await must(['sprint', 'commit', 'a2-sprint-30', 'a2-done'])
   await must(['transition', 'a2-done', 'in_progress'])
   await must(['transition', 'a2-done', 'done'])
-  await must(['sprint', 'close', 'a2-sprint-30'])
-
-  await must(['sprint', 'open', 'A2 sprint 31', '--id', 'a2-sprint-31',
-    '--start', '2026-08-31', '--end', '2026-09-11', '--goal', 'ship the token refresh'])
-  await must(['sprint', 'commit', 'a2-sprint-31', 'a2-story', 'a2-ready'])
 
   await must(['transition', 'a2-dupe', 'cancelled', '--resolution', 'duplicate', '--reason', 'a2-ready already covers it'])
 }

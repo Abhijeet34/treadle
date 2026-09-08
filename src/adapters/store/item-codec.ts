@@ -36,20 +36,30 @@ const STORED = { now: STRUCTURAL_NOW, storedProse: true } as const
 /** The single-line fields, in the order 2.14 lists them. Unknown keys render after these. */
 const FIELD_ORDER = [
   'type', 'state', 'filed_at', 'version',
-  'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
+  'priority', 'parent_id',
+  'assignee', 'reporter', 'reviewer', 'labels',
   'hold_reason', 'hold_until', 'held_from', 'resolution', 'due',
-  'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
+  'severity', 'found_in', 'fix_confirmed',
 ] as const
 
 /**
- * A field this tool renamed, and the key it is read as now. This is the whole migration for
- * the epic-only `target_date` becoming the common `due` (report 3.3): a stored record is
- * read under the new key and the next write to it renders the new key, so no file is
- * rewritten to change a name. A retired key is never carried into `extra`, which is what
- * would otherwise leave one record saying the same date twice under two names.
+ * A field this tool retired, and the key it is read as now. A string is a rename: the whole
+ * migration for the epic-only `target_date` becoming the common `due` (report 3.3), where a
+ * stored record is read under the new key and the next write to it renders the new key, so no
+ * file is rewritten to change a name. `null` is a pure removal, for a field ADR-0029 dropped
+ * with no successor: it is read as nothing and disappears on the next ordinary write the same
+ * way, with no user action, no cleanup command and no file rewritten. Either case is never
+ * carried into `extra`, which is what would otherwise leave a rename saying the same date
+ * twice under two names, or a removed field riding every record as clutter forever.
  */
-const RETIRED_FIELDS: ReadonlyMap<string, string> = new Map([['target_date', 'due']])
+const RETIRED_FIELDS: ReadonlyMap<string, string | null> = new Map([
+  ['target_date', 'due'],
+  ['sprint_id', null],
+  ['points', null],
+  ['hours_estimate', null],
+  ['timebox_hours', null],
+  ['component', null],
+])
 
 /** The H2 sections DR3 rule 4 names, in render order. */
 const SECTION_FIELD: readonly (readonly [string, string])[] = [
@@ -68,7 +78,7 @@ const SECTION_FIELD: readonly (readonly [string, string])[] = [
 
 const SECTION_BY_NAME = new Map(SECTION_FIELD)
 
-const INT_FIELDS = ['version', 'priority', 'points', 'hours_estimate', 'timebox_hours'] as const
+const INT_FIELDS = ['version', 'priority'] as const
 const TICKED = /^- \[([ x])\] (.+)$/
 /**
  * One evidence pointer per line. Bounded and linear like every other pattern here: the ref
@@ -154,9 +164,9 @@ export function decodeItem(record: ParsedRecord): StoreResult<WorkItem> {
 
   for (const key of record.fields.keys()) {
     const value = record.fields.get(key) as string
-    const renamed = RETIRED_FIELDS.get(key)
-    if (renamed !== undefined) {
-      if (!record.fields.has(renamed)) draft[renamed] = value
+    if (RETIRED_FIELDS.has(key)) {
+      const renamed = RETIRED_FIELDS.get(key)
+      if (renamed !== null && renamed !== undefined && !record.fields.has(renamed)) draft[renamed] = value
       continue
     }
     if (!isKnownField(key) || key === 'extra' || key === 'id' || key === 'title') {

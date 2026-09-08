@@ -51,10 +51,6 @@ function viewOf(all: readonly WorkItemSummary[]): { view: WorkspaceView; passes:
     byId: new Map(all.map((item) => [item.id, item])),
     hierarchy: hierarchyFrom(all),
     relations: { relations },
-    sprints: [],
-    sprintById: new Map(),
-    ceremonies: [],
-    ceremonyById: new Map(),
   }
   return { view, passes: () => passes }
 }

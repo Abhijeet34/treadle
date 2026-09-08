@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-// Three interleavings that leave a record naming an id the store no longer holds.
+// The interleavings that leave a record naming an id the store no longer holds.
 //
 // `remove`'s guards are about a neighbour that does not exist yet, so no read set can name
-// one: an edge, a child's parent or a closed sprint's member written between the guard's
-// read and the store's write is not seen, and the removal completes over it. Two of the
-// three are the reverse order, a parent written at a record the removal already decided
-// against, and `doctor` reported nothing about either.
+// one: an edge or a child's parent written between the guard's read and the store's write is
+// not seen, and the removal completes over it. The reverse order is a parent written at a
+// record the removal already decided against, and `doctor` reported nothing about either.
 //
 // The rule that closes them is the store's, not this layer's: `S17` runs inside the lock
 // `apply` already holds, after the read set and before any shard is rewritten, so the check
@@ -22,10 +21,8 @@ import { describe, it, beforeEach, afterEach } from 'node:test'
 
 import { readWorkspace } from '../../src/application/services/context.ts'
 import { setFields } from '../../src/application/services/editing.ts'
-import { transition } from '../../src/application/services/lifecycle.ts'
 import { relate } from '../../src/application/services/relation.ts'
 import { removeItem } from '../../src/application/services/removal.ts'
-import { closeSprint, commitItems, openSprint } from '../../src/application/services/sprints.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
 import { sequentialIds } from '../../src/adapters/ids.ts'
 import { openWorkspace } from '../../src/adapters/store/index.ts'
@@ -163,116 +160,6 @@ describe('the referential rule under the orders that attack it', () => {
   afterEach(async () => { await second.close(); await demo.dispose() })
 
   const apply = (store: Store, seed: number) => [targetFor(store, 'apply'), fixedClock(NOW), sequentialIds(seed)] as const
-
-  /** One sprint holding one done item, which is the state a close freezes into a record. */
-  async function aSprintHolding(id: string): Promise<void> {
-    const [target, clock, ids] = apply(demo.store, 600)
-    const opened = await openSprint(target, clock, ids, { title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', actor: ACTOR })
-    assert.equal(opened.ok, true, String(opened.data['cause']))
-    const committed = await commitItems(target, clock, ids, { sprint: 'sprint-31', items: [id], actor: ACTOR })
-    assert.equal(committed.ok, true, String(committed.data['cause']))
-    for (const to of ['in_progress', 'done'] as const) {
-      const moved = await transition(target, clock, ids, { id, target: to, actor: ACTOR })
-      assert.equal(moved.ok, true, String(moved.data['cause']))
-    }
-  }
-
-  it('refuses a removal that a sprint close froze a member set around', async () => {
-    await aSprintHolding('avatar-crop')
-    const first = gated(demo.store)
-    // An open sprint's committed set is derived, so this removal is legal when it is decided.
-    const early = removeItem(...apply(first.store, 700), { id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR })
-    await first.reached
-    const closed = await closeSprint(...apply(second, 800), { sprint: 'sprint-31', actor: ACTOR })
-    assert.equal(closed.ok, true, String(closed.data['cause']))
-    first.release()
-    const refused = await early
-
-    assert.equal(refused.ok, false, 'the close wrote a frozen member set naming this record')
-    assert.equal(refused.data['rule'], 'S17')
-    assert.equal(refused.data['cause'],
-      'sprint-31 is closed and counts avatar-crop in its committed set, written after this removal was decided; retry so the decision reads what is there now')
-  })
-
-  it('allows a removal that a sprint commit lands under, because an open set is derived', async () => {
-    await aSprintHolding('avatar-crop')
-    const first = gated(demo.store)
-    const early = removeItem(...apply(first.store, 700), { id: 'webhook-retry', reason: 'filed twice', confirmed: true, actor: ACTOR })
-    await first.reached
-    const committed = await commitItems(...apply(second, 800), { sprint: 'sprint-31', items: ['webhook-retry'], actor: ACTOR })
-    assert.equal(committed.ok, true, String(committed.data['cause']))
-    first.release()
-    const removed = await early
-
-    // The record it was committed to still exists and its membership is recomputed from what
-    // points at it, so nothing is left naming a record that is not there.
-    assert.equal(removed.ok, false, 'the commit bumped the version this removal was decided against')
-    assert.equal(removed.data['rule'], 'S10', String(removed.data['cause']))
-    const again = await removeItem(...apply(second, 900), { id: 'webhook-retry', reason: 'filed twice', confirmed: true, actor: ACTOR })
-    assert.equal(again.ok, true, String(again.data['cause']))
-  })
-
-  /** A retrospective naming one chore, written straight through the store as T4b's command will. */
-  async function aRetroNaming(store: Store, action: string): Promise<void> {
-    const written = await store.apply({
-      txn: 'txn-retro', writes: [], events: [],
-      ceremonies: [{
-        ceremony: {
-          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded',
-          filed_at: '2026-09-18T16:00:00Z', version: 1, actions: [action],
-        },
-      }],
-    })
-    assert.equal(written.ok, true, written.ok ? '' : written.error.message)
-  }
-
-  // ADR-0028's fourth referrer, in both halves. `R6` is the service's guard, decided against
-  // a read taken before the lock, and it fires with the friendlier cause when the record was
-  // already there; `S17` is the store's, decided inside the lock, and it is what catches the
-  // retrospective written after the removal had passed every guard.
-  it('refuses a removal of a chore a retrospective already names, with R6 before the lock', async () => {
-    await aRetroNaming(demo.store, 'avatar-crop')
-    const refused = await removeItem(...apply(demo.store, 700), {
-      id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR,
-    })
-    assert.equal(refused.ok, false, 'a retrospective names this chore in its action list')
-    assert.equal(refused.code, 'GUARD_REFUSED')
-    assert.equal(refused.data['rule'], 'R6')
-    assert.equal(refused.data['cause'],
-      'retro-sprint-31 names avatar-crop in its action list, and a retrospective\'s actions are the record of what it produced')
-    const view = await readWorkspace(second)
-    assert.equal(view.ok && view.value.byId.has('avatar-crop'), true, 'the refused removal left the record where it was')
-  })
-
-  it('refuses the removal a retrospective was written under, with S17 inside the lock', async () => {
-    const first = gated(demo.store)
-    // Nothing names the chore when this removal is decided, so `R6` passes and the guard the
-    // refusal has to come from is the store's own.
-    const early = removeItem(...apply(first.store, 700), {
-      id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR,
-    })
-    await first.reached
-    await aRetroNaming(second, 'avatar-crop')
-    first.release()
-    const refused = await early
-
-    assert.equal(refused.ok, false, 'a retrospective was written naming the record this removal decided against')
-    assert.equal(refused.code, 'CONFLICT')
-    assert.equal(refused.data['rule'], 'S17')
-    assert.equal(refused.data['entity'], 'avatar-crop')
-    assert.equal(refused.data['cause'],
-      'retro-sprint-31 names avatar-crop in its action list, written after this removal was decided; retry so the decision reads what is there now')
-
-    const view = await readWorkspace(second)
-    assert.equal(view.ok, true)
-    if (!view.ok) return
-    assert.equal(view.value.byId.has('avatar-crop'), true, 'the refused removal left the record where it was')
-    for (const ceremony of view.value.ceremonies) {
-      for (const action of ceremony.actions ?? []) {
-        assert.equal(view.value.byId.has(action), true, `${ceremony.id} names ${action}, which is no record`)
-      }
-    }
-  })
 
   it('lets one of two simultaneous removals of one record land, and refuses the other', async () => {
     const first = gated(demo.store)

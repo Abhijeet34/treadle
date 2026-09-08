@@ -33,15 +33,9 @@ const BUDGET: Readonly<Record<string, number>> = {
   // is the defect this product has now shipped four times. The budget owner reconciles it
   // with A.3 and with the copy of this table in bench/axes/a3-output.ts.
   history: 630,
-  // Derived the same way: the golden board over the whole 25-item workspace is 1,461 B and
-  // the one scoped to the open sprint 357 B, each given the 75 percent fill. The unscoped
-  // figure is five capped columns, so it is about 1.5 backlogs of the same rows.
-  board: 1950,
-  'board-sprint': 480,
   transition: 230,
   'transition-already': 110,
   'transition-dry-run': 250,
-  'transition-preview': 250,
   'not-found': 160,
   'guard-refused': 270,
 }

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "evidence.v1.json",
-  "title": "evidence/1",
-  "description": "Append one bounded pointer at an artefact a third party can open.",
+  "$id": "transition.v2.json",
+  "title": "transition/2",
+  "description": "Move one item to a target state, with every guard on that edge evaluated.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "evidence/1"
+      "const": "transition/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "evidence"
+      "const": "transition"
     },
     "workspace": {
       "type": "string"
@@ -60,48 +60,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "item": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "v": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "kind": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "ref": {
-          "type": [
-            "string",
-            "null"
-          ],
-          "x-trust": "data"
-        },
-        "label": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "entries": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
           "type": [
             "integer",
             "null"
@@ -113,7 +72,68 @@
             "null"
           ]
         },
+        "already": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "item": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "store": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "since": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "v": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "set": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "x-trust": "data"
+        },
+        "guards": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "will_evaluate": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "will_write": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "events": {
           "type": [
             "string",
             "null"

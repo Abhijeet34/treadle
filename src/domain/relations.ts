@@ -75,10 +75,6 @@ export type RelationView = {
   readonly direction: 'outgoing' | 'incoming'
 }
 
-export function emptyRelationGraph(): RelationGraph {
-  return { relations: [] }
-}
-
 /**
  * The graph a set of records carries. This is the load path, so it refuses nothing: a
  * hand-edited cycle is `findRelationCycle`'s to report and an edge to a missing record is
@@ -318,12 +314,4 @@ export function blockersOf(
       return state !== undefined && !isTerminal(state)
     })
     .map((r) => r.source)
-}
-
-export function isBlocked(
-  graph: RelationGraph,
-  stateOf: (id: ItemId) => WorkItemState | undefined,
-  id: ItemId,
-): boolean {
-  return blockersOf(graph, stateOf, id).length > 0
 }

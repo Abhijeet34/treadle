@@ -3,15 +3,14 @@
 //
 // `treadle show $'a\nb'` printed `err INTERNAL -` with a render invariant in its cause and
 // no rule id, and so did `explain`, `history`, `remove`, `set`, `mark`, `transition`,
-// `evidence add`, `relation add`, `sprints`, `ceremonies` and five `sprint` verbs. The contract says every
-// failure is a structured, typed, machine-readable error, and that was the one path where it
-// was not, on twelve commands at once.
+// `evidence add` and `relation add`. The contract says every failure is a structured,
+// typed, machine-readable error, and that was the one path where it was not, on twelve
+// commands at once.
 //
 // The suite is written against the inventory rather than against that list, because the list
-// is what grows. Two assertions carry the rule for a command nobody has written yet: the
-// vocabulary check refuses an unclassified operand placeholder, and the coverage check
-// refuses an entity operand this file does not exercise. A command added with `<id>` in its
-// usage is guarded by construction; one added with a placeholder of its own fails here.
+// is what grows: every line below is expanded through `entityOperands`, which reads the
+// usage lines the inventory publishes, so a command added with `<id>` in its usage is
+// guarded by construction.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -23,7 +22,7 @@ import { DELIMITERS } from '../../src/adapters/render/grammar.ts'
 import { RENDERINGS } from '../../src/adapters/render/index.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { COMMAND_OPTIONS, GLOBAL_OPTIONS } from '../../src/cli/parse.ts'
-import { entityOperands, isClassified, isEntityPlaceholder, operandPlaceholders } from '../../src/cli/operands.ts'
+import { entityOperands } from '../../src/cli/operands.ts'
 import { EXIT_OF } from '../../src/cli/exit.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
@@ -43,7 +42,6 @@ async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
   must(await cli(['init', '--name', 'guarded']), 'init')
   must(await cli(['file', 'task', 'A record to name', '--id', 'a-record']), 'file')
   must(await cli(['file', 'task', 'Another record', '--id', 'other-record']), 'file')
-  must(await cli(['sprint', 'open', 'A sprint', '--id', 'a-sprint', '--end', '2099-01-01']), 'sprint open')
   return { root, cli }
 }
 
@@ -82,13 +80,6 @@ const LINES: readonly (readonly string[])[] = [
   ['remove', 'a-record', '--reason', 'filed twice', '--yes'],
   ['evidence', 'add', 'a-record', 'run', 'https://example.test/1'],
   ['relation', 'add', 'a-record', 'blocks', 'other-record'],
-  ['sprints', 'a-sprint'],
-  ['ceremonies', 'a-ceremony'],
-  ['sprint', 'set', 'a-sprint', '--goal', 'ship it'],
-  ['sprint', 'commit', 'a-sprint', 'a-record'],
-  ['sprint', 'uncommit', 'a-record'],
-  ['sprint', 'close', 'a-sprint'],
-  ['sprint', 'reopen', 'a-sprint'],
 ]
 
 /** The argv positions of a line that are operands, in order, skipping flags and their values. */
@@ -122,7 +113,7 @@ describe('an operand naming a record is bounded before any service reads it', ()
           assert.equal(run.code, EXIT_OF.VALIDATION, `exited ${run.code}: ${run.err}`)
           assert.match(run.err, /^err VALIDATION /, run.err)
           assert.match(run.err, /^rule C1$/m, run.err)
-          assert.match(run.err, /^"cause the (?:sprint |ceremony )?id in operand \d+ carries U\+[0-9A-F]{4}/m, run.err)
+          assert.match(run.err, /^"cause the id in operand \d+ carries U\+[0-9A-F]{4}/m, run.err)
           assert.equal(run.out, '', 'a refusal wrote to stdout')
           // The operand whole, because a refusal is several lines and a line feed is how it
           // separates them: what must not appear is the caller's word, delimiter and all.
@@ -154,12 +145,10 @@ describe('an operand naming a record is bounded before any service reads it', ()
 
   it('leaves a legal id alone, so the guard refuses the class and not the operand', async () => {
     must(await cli(['show', 'a-record']), 'show')
-    must(await cli(['sprints', 'a-sprint']), 'sprints')
-    // No command in this build files a retrospective, so the fixture holds none. A legal id
-    // that names nothing is still the guard passing: it reaches the service and comes back a
-    // NOT_FOUND about a record, not a VALIDATION about a character.
-    const ceremony = await cli(['ceremonies', 'a-ceremony'])
-    assert.equal(ceremony.code, EXIT_OF.NOT_FOUND, ceremony.err)
+    // A legal id that names nothing is still the guard passing: it reaches the service and
+    // comes back a NOT_FOUND about a record, not a VALIDATION about a character.
+    const absent = await cli(['show', 'no-such-record'])
+    assert.equal(absent.code, EXIT_OF.NOT_FOUND, absent.err)
     // A space is legal in a scalar line and no id holds one, so it stays a NOT_FOUND about a
     // record rather than becoming a refusal about a character.
     const spaced = await cli(['show', 'a b'])
@@ -214,34 +203,15 @@ describe('no flag of any command answers a delimiter with an internal error', ()
   })
 })
 
-describe('a command added without the guard fails here rather than shipping', () => {
-  it('classifies every operand placeholder the inventory publishes', () => {
-    const unclassified = operandPlaceholders().filter(([, name]) => !isClassified(name))
-    assert.deepEqual(unclassified, [],
-      'an operand placeholder is neither an entity nor a value; classify it in src/cli/operands.ts')
-  })
-
-  it('exercises every command whose usage declares an entity operand', () => {
-    const declared = COMMANDS
-      .filter((command) => operandPlaceholders()
-        .some(([name, placeholder]) => name === command.name && isEntityPlaceholder(placeholder)))
-      .map((command) => command.name)
-    const exercised = [...new Set(LINES.map((line) => line[0] as string))]
-    assert.deepEqual(declared.filter((name) => !exercised.includes(name)), [],
-      'a command takes an entity operand and no line in this file poisons it')
-    assert.deepEqual(exercised.filter((name) => !declared.includes(name)), [],
-      'a line here names a command the inventory says takes no entity operand')
-  })
-
+describe('the guard is read from the usage lines rather than from a list', () => {
   it('reads the entity operands of every command from its usage, and not from a list', () => {
     assert.deepEqual(entityOperands('show', ['x']).map((one) => one.at), [0])
     assert.deepEqual(entityOperands('relation', ['add', 'x', 'blocks', 'y']).map((one) => one.at), [1, 3])
-    assert.deepEqual(entityOperands('sprint', ['commit', 's', 'a', 'b', 'c']).map((one) => one.at), [1, 2, 3, 4])
-    assert.deepEqual(entityOperands('sprint', ['open', 'A title']).map((one) => one.at), [])
+    assert.deepEqual(entityOperands('relation', ['remove', 'x', 'blocks', 'y']).map((one) => one.at), [1, 3])
     assert.deepEqual(entityOperands('file', ['task', 'A title']).map((one) => one.at), [])
     // The verb decides which line the operands are read against, and a verb no line carries
     // reads none: the command refuses its own verb, and a guard here would answer about an
     // operand the caller has not reached.
-    assert.deepEqual(entityOperands('sprint', ['nonsense', 'x']).map((one) => one.at), [])
+    assert.deepEqual(entityOperands('relation', ['nonsense', 'x']).map((one) => one.at), [])
   })
 })

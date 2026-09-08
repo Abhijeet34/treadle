@@ -21,7 +21,7 @@ const RECORDS = 1200
 const ITEMS = 800
 
 const FIELD_KEYS = [
-  'type', 'state', 'filed_at', 'version', 'priority', 'assignee', 'sprint_id',
+  'type', 'state', 'filed_at', 'version', 'priority', 'assignee', 'reporter',
   'a_newer_tool_wrote_this', 'unknown_key', 'x9', 'zz_top',
 ]
 const SECTION_NAMES = ['Description', 'Outcome', 'Findings', 'A Newer Section', 'Notes']

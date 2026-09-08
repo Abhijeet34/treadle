@@ -12,10 +12,8 @@ import {
   RELATION_KINDS,
   addRelation,
   blockersOf,
-  emptyRelationGraph,
   findRelationCycle,
   inverseOf,
-  isBlocked,
   linkableKindOf,
   relationGraphFrom,
   relationsOf,
@@ -28,7 +26,7 @@ import { NOW, errorOf, item, unwrap } from '../helpers/fixtures.ts'
 function graphOf(...edges: readonly (readonly [string, RelationKind, string])[]): RelationGraph {
   return edges.reduce(
     (g, [source, kind, target]) => unwrap(addRelation(g, { kind, source, target }, live)).graph,
-    emptyRelationGraph(),
+    { relations: [] } as RelationGraph,
   )
 }
 
@@ -67,13 +65,13 @@ describe('the relation kinds', () => {
 describe('writing a relation', () => {
   it('refuses a self relation for every kind', () => {
     for (const kind of RELATION_KINDS) {
-      const error = errorOf(addRelation(emptyRelationGraph(), { kind, source: 'a-1', target: 'a-1' }, live))
+      const error = errorOf(addRelation({ relations: [] }, { kind, source: 'a-1', target: 'a-1' }, live))
       assert.equal(error.rule, 'R1', `${kind} self relation must be refused`)
     }
   })
 
   it('is idempotent: writing the same edge twice adds nothing the second time', () => {
-    const first = unwrap(addRelation(emptyRelationGraph(), { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
+    const first = unwrap(addRelation({ relations: [] }, { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
     assert.equal(first.added, true)
     const second = unwrap(addRelation(first.graph, { kind: 'blocks', source: 'a-1', target: 'b-1' }, live))
     assert.equal(second.added, false)
@@ -317,7 +315,6 @@ describe('the derived blocked flag', () => {
       'audit-log': 'draft',
     })
     assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), ['auth-refresh'])
-    assert.equal(isBlocked(graph, stateOf, 'sso-saml'), true)
   })
 
   it('treats a blocker the caller cannot find as inactive, so a record removed by hand holds nothing forever', () => {
@@ -332,7 +329,6 @@ describe('the derived blocked flag', () => {
       'sso-saml': 'ready',
     })
     assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), [])
-    assert.equal(isBlocked(graph, stateOf, 'sso-saml'), false)
   })
 
   // The rule read from the other end. "Blocked" means the work cannot proceed, and finished
@@ -342,7 +338,6 @@ describe('the derived blocked flag', () => {
     for (const own of ['done', 'cancelled'] as const) {
       const stateOf = states({ 'auth-refresh': 'in_progress', 'legacy-oauth': 'ready', 'sso-saml': own })
       assert.deepEqual(blockersOf(graph, stateOf, 'sso-saml'), [], `a ${own} item has no active blockers`)
-      assert.equal(isBlocked(graph, stateOf, 'sso-saml'), false)
     }
   })
 

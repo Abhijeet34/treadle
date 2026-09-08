@@ -11,9 +11,9 @@ export default {
     'body-max-line-length': [0],
     // A `Removes-test:` trailer has to name the title exactly as the source declared it
     // (ADR-0013), and this project's test titles are sentences. The 100-character default
-    // made the two rules contradict each other: the only conforming declaration of
-    // "sums the points of non-cancelled descendants and excludes cancelled ones from both
-    // sides" is 102 characters long.
+    // made the two rules contradict each other: a title such as "file --parent on a type
+    // nothing may parent offers the line that files it alone, not an id that was never
+    // filed" is 110 characters, and its declaration is longer still.
     'footer-max-line-length': [0],
   },
 }

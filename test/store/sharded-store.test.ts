@@ -16,7 +16,7 @@ import {
   renderRecord,
   rowOf,
 } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
 import { storeConformance } from './conformance.ts'
 import { POSIX_MODES } from '../helpers/platform.ts'
 
@@ -109,7 +109,7 @@ describe('the sharded store on disk', () => {
       const bad = '# Renamed Heading: broken\n\ntype: task\n\n'
       await writeFile(path.join(workspace.root, 'items/2026-09.md'), `${renderHeader(1)}${good}${bad}${good.replace('item-one', 'item-two')}`)
 
-      const all = await workspace.store.list()
+      const all = await allItems(workspace.store)
       assert.deepEqual(all.ok ? all.value.map((i) => i.id) : [], ['item-one', 'item-two'])
 
       const findings = await workspace.store.findings()

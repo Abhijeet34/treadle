@@ -11,7 +11,7 @@
 //
 // `effect` is `mutate` for both forms, because one word covers a read and a write and the
 // envelope has to be able to carry a transaction id (R4). The bare read answers `changed 0`
-// with `txn` null, which is the envelope `sprint set` gives when nothing moved. Declaring
+// with `txn` null, which is the envelope every mutation gives when nothing moved. Declaring
 // the read effect instead would have been the dangerous direction to be wrong in.
 
 import {
@@ -32,18 +32,18 @@ import { storeRefusal } from './refusal.ts'
 
 export const CONFIG_SHAPE: ResultShape = {
   command: 'config',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Read every configuration key with the value in force and its source, or set one.',
   properties: [
     { kind: 'scalar', key: 'key', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'string' },
     // Every entry ends in a value the caller wrote, so the line carries the untrusted-content
-    // marker rather than reading as the tool's own speech (F12), as `sprint set` does.
+    // marker rather than reading as the tool's own speech (F12).
     { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
@@ -151,16 +151,6 @@ export async function setConfig(
     v: `${version} -> ${version + 1}`,
     set: [`${key} ${echoed(was)} -> ${echoed(now)}`],
   }
-  if (mode === 'preview') {
-    return okResult(CONFIG_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        key, preview: 1, store: view.value.identity.path ?? workspace,
-        note: 'nothing evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
-
   const txn = ids.txn()
   const eventId = ids.event()
   // Both sides verbatim, which is what makes the change reversible from the log and what

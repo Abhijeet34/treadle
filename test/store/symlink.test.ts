@@ -12,7 +12,7 @@ import path from 'node:path'
 import { describe, it } from 'node:test'
 
 import { ShardedStore, openWorkspace } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 /** Every path the store creates below its root, plus the one shard and one log a write makes. */
 const LINKED = ['workspace.md', 'items', 'events', '.index', 'items/2026-09.md', 'events/2026-09.jsonl'] as const
@@ -61,7 +61,7 @@ describe('no path at or below the workspace root is followed as a symbolic link'
 
         const store = new ShardedStore(workspace.root)
         try {
-          const read = await store.list()
+          const read = await allItems(store)
           assert.ok(!read.ok, `${relative} as a link was read through`)
           assert.equal(read.error.rule, 'S15')
           assert.match(read.error.message, new RegExp(`^${relative.replaceAll('.', '\\.')} is a symbolic link to `))

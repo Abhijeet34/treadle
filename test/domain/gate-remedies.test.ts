@@ -38,7 +38,6 @@ const PERFORMED_BY: Readonly<Record<string, string>> = {
   list_all_ticked: 'set',
   field_is_true: 'set',
   type_required_fields: 'set',
-  estimate_set: 'set',
   no_active_blocker: 'transition',
   parent_present: 'set',
   child_present: 'file',
@@ -163,10 +162,14 @@ describe('every remedy a gate can emit names a command that exists', () => {
     })
   }
 
-  // Imported here rather than at the top of the file, so a tree with no field editor at all
-  // fails this one assertion by name instead of failing to load and reporting nothing.
+  // The dictionary is read here rather than at the top of the file, so a tree with no field
+  // editor at all fails this one assertion by name instead of failing to load and reporting
+  // nothing. `set` writes every field of the dictionary the writer table does not claim,
+  // which is the same rule `writerOf` decides one field at a time.
   it('names, in every assignment it writes, a field that set will accept', async () => {
-    const { SETTABLE_FIELDS } = await import('../../src/application/services/editing.ts')
+    const { WORK_ITEM_TYPES, fieldsOf, writerOf } = await import('../../src/domain/index.ts')
+    const SETTABLE_FIELDS = [...new Set(WORK_ITEM_TYPES.flatMap((type) => fieldsOf(type)))]
+      .filter((field) => writerOf(field).kind === 'set')
     const sets = remedies.filter((entry) => entry.remedy.includes('='))
     assert.ok(sets.length >= 6, `only ${sets.length} remedies carry an assignment`)
     for (const { rule, remedy } of sets) {

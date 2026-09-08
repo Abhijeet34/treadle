@@ -27,7 +27,7 @@ import {
   renderHeader,
   scanEventFile,
 } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 describe('a file bigger than its ceiling is a named refusal, not an out-of-memory crash', () => {
   it(`refuses a record shard over ${MAX_FILE_BYTES} bytes and keeps every other shard`, async () => {
@@ -42,7 +42,7 @@ describe('a file bigger than its ceiling is a named refusal, not an out-of-memor
       await writeFile(hostile, renderHeader(1))
       await truncate(hostile, MAX_FILE_BYTES + 1)
 
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.deepEqual(items.ok ? items.value.map((i) => i.id) : [], ['item-one'])
       const findings = await workspace.store.findings()
       assert.ok(findings.ok)
@@ -160,7 +160,7 @@ describe('a hierarchy a hand edit made cyclic is reported, never recursed into',
       assert.ok(cycle, 'expected an S12 finding')
       assert.match(cycle.reason, /item-one -> |item-two -> |item-tri -> /)
 
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.equal(items.ok && items.value.length, 3)
     } finally {
       await workspace.dispose()

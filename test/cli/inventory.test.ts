@@ -56,7 +56,7 @@ describe('the command-by-flag matrix', () => {
     assert.equal(verdictFor(backlog!, '--limit'), 'S')
     assert.equal(verdictFor(show!, '--dry-run'), 'A', 'a read already writes nothing')
     assert.equal(verdictFor(show!, '--width'), 'S', 'the human rendering lays every answer out at this width')
-    assert.equal(verdictFor(show!, '--color'), 'A', 'no rendering emits colour, so there is none to switch')
+    assert.equal(verdictFor(show!, '--actor'), 'A', 'a read records no event, so no actor is attributed')
     assert.equal(verdictFor(show!, '--version'), 'N', '--version is a program-level flag')
   })
 

@@ -4,10 +4,10 @@
 //
 // TWO SCOPES, NEVER BOTH. An id is every change to one record across every command; `--txn`
 // is every change one command made across every record. An intersection of the two is a
-// third question nobody asked and the line is refused, exactly as `board --all --sprint`
-// is. The transaction-scoped read is what spends the id a mutation hands back on its own
-// envelope: `sprint commit s a b c` answers `ok sprint <ws> tj0vksb 3`, and until this flag
-// the only reading of that 3 was one item at a time or the JSONL by hand.
+// third question nobody asked and the line is refused. The transaction-scoped read is what
+// spends the id a mutation hands back on its own envelope: a `changed 3` says a command
+// touched three records, and until this flag the only reading of that 3 was one item at a
+// time or the JSONL by hand.
 //
 // Every write already appended an event carrying an actor, and until this command nothing
 // printed one, so the audit trail the tool kept was unanswerable through the tool.
@@ -44,7 +44,7 @@
 // because a row carries exactly one space-bearing field and that is the actor, so it is a
 // block of its own keyed on `at` and `op`, which the table above prints.
 
-import { MAX_REASON, isConfigKey, isKnownField, isSafeText, isSprintField, type ItemId } from '../../domain/index.ts'
+import { MAX_REASON, isConfigKey, isKnownField, isSafeText, type ItemId } from '../../domain/index.ts'
 import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 import { readWorkspace } from './context.ts'
@@ -75,7 +75,7 @@ export const HISTORY_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'events',
-      // `what` projects stored values: an assignee, a reviewer, a component, an evidence
+      // `what` projects stored values: an assignee, a reviewer, a label, an evidence
       // pointer. Every one of them is written by a caller, and the cell is arity-1 because
       // `side` and `cell` refuse a value carrying whitespace, so it takes the marker
       // without taking the free-text column's placement.
@@ -184,9 +184,8 @@ const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
 
 /**
  * Fields whose value is a comma-joined list of ids. A list over `MAX_VALUE` prints its count
- * rather than `(?)`: a four-id carry-over is 41 characters, and `(?)` said a value existed and
- * nothing else where `(list:4)` says how many, which is the part a reader of a close can act
- * on. `sprints <id>` prints the list itself.
+ * rather than `(?)`: a four-id list is 41 characters, and `(?)` said a value existed and
+ * nothing else where `(list:4)` says how many, which is the part a reader can act on.
  *
  * The bound is the size and not the kind, which it was for one day: `set x labels=frontend,
  * backend` renders 16 characters, well under the bound, and printed `labels=(list:2)`, hiding
@@ -194,7 +193,7 @@ const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
  * prints verbatim, and a reader splitting the cell on commas tells a continuation from a pair
  * by the `=` a pair always carries.
  */
-const LISTED = new Set<string>(['carried', 'finished', 'labels'])
+const LISTED = new Set<string>(['labels'])
 
 /**
  * The two configuration keys whose value is a list of gate rules, each ending in a sentence.
@@ -255,13 +254,12 @@ function movedBy(event: StoreEvent): readonly string[] {
   const source = after ?? before
   if (source === undefined) return []
   const keys = Object.keys(source)
-  // A sprint event names sprint fields and a workspace event names configuration keys; an
-  // item event names neither, so one filter serves all three.
-  const known = keys.filter((key) => isKnownField(key) || isSprintField(key) || isConfigKey(key))
+  // An item event names record fields and a workspace event names configuration keys, so
+  // one filter serves both.
+  const known = keys.filter((key) => isKnownField(key) || isConfigKey(key))
   // A pair that was not set before and is not set after moved nothing, and a log of moves is
-  // what this cell is: a sprint close over a sprint that finished nothing carried
-  // `finished=(unset)->(unset)` beside the six pairs that did move. A creation has no before at
-  // all and prints whole.
+  // what this cell is: an event carrying `reviewer=(unset)->(unset)` beside the pairs that
+  // did move says nothing. A creation has no before at all and prints whole.
   //
   // The test is `(unset)` on both sides and never "the two sides render the same", which was
   // the first shape of this filter and hid a real edit: prose is recorded as its length, so a
@@ -281,9 +279,8 @@ function movedBy(event: StoreEvent): readonly string[] {
  *
  * `named` leads the cell with `entity=<id>` under the transaction-scoped read, where the
  * record is the one fact that tells two rows of the same op apart and is on no column of
- * its own: the three `item.commit` rows of one `sprint commit` each render
- * `sprint_id=(unset)->sprint-31` and nothing else. It leads rather than trails because the
- * bound below drops the tail, and the row's own identity is not what a reader can spare.
+ * its own. It leads rather than trails because the bound below drops the tail, and the row's
+ * own identity is not what a reader can spare.
  * The entity-scoped read never carries it: there it is the `item` scalar, constant per row.
  */
 function whatOf(event: StoreEvent, named: boolean): string {
@@ -343,7 +340,7 @@ export type HistoryRequest = {
  * An id that named no transaction, told apart by one streaming pass over the log. Only this
  * path pays for the pass, and it buys the distinction that makes the refusal worth reading:
  * a caller who reached for an event id gets the transaction that wrote it rather than a
- * dead end, which is `notFound`'s "is a sprint here, not an item" over the log's two ids.
+ * dead end, which is `notFound`'s shape over the log's two kinds of id.
  *
  * An empty answer and a wrong id must not look the same, so neither ends as `~events 0 0`.
  */
@@ -359,7 +356,7 @@ async function noTransaction(
   if (!scanned.ok) return storeRefusal('history', 'read', scanned.error, workspace)
   if (named !== undefined) {
     return errorResult({
-      code: 'NOT_FOUND', command: 'history', workspace, effect: 'read', rule: 'I5', entity: txn,
+      code: 'NOT_FOUND', command: 'history', workspace, effect: 'read', rule: 'V9', entity: txn,
       cause: `${txn} is an event here, not a transaction, and --txn takes the transaction a write recorded under`,
       fix: [invocation('history', [], [['txn', named.txn]]), invocation('history', [named.entity], [])],
     })
@@ -381,9 +378,8 @@ export async function history(
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
   const scope = request.scope
-  /** An id names an item, a sprint or a ceremony; the log is keyed by entity and the rows read the same. */
-  const carried = (entity: string): boolean =>
-    view.value.byId.has(entity) || view.value.sprintById.has(entity) || view.value.ceremonyById.has(entity)
+  /** An id names an item, and the log is keyed by entity, so the rows read the same. */
+  const carried = (entity: string): boolean => view.value.byId.has(entity)
 
   const events = await store.events(
     scope.kind === 'txn' ? { txn: scope.txn } : { entity: scope.id })

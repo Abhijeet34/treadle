@@ -9,8 +9,6 @@
 
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
-import { BOARD_SHAPE } from '../application/services/board.ts'
-import { CEREMONIES_SHAPE } from '../application/services/ceremonies.ts'
 import { CONFIG_SHAPE } from '../application/services/config.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
 import { SET_SHAPE } from '../application/services/editing.ts'
@@ -21,7 +19,6 @@ import { HELP_SHAPE, VERSION_SHAPE } from '../application/services/meta.ts'
 import { RELATION_SHAPE } from '../application/services/relation.ts'
 import { REMOVE_SHAPE } from '../application/services/removal.ts'
 import { TRANSITION_SHAPE } from '../application/services/lifecycle.ts'
-import { SPRINT_SHAPE, SPRINTS_SHAPE } from '../application/services/sprints.ts'
 import { INIT_SHAPE } from '../application/services/workspace.ts'
 
 /** What a command produces, which decides whether a column selector can mean anything. */
@@ -37,11 +34,6 @@ export type Command = {
   readonly omits: boolean
   /** A query result, so a partial answer is a short one rather than a wrong one. */
   readonly pageable: boolean
-  /**
-   * `--limit` caps every list this command prints and no cursor resumes one: a board has
-   * five columns and no single order to resume from, so it takes the cap without the cursor.
-   */
-  readonly capped?: true
   readonly confirm: Confirmation
   /** True when the command needs no workspace, which decides `--workspace`. */
   readonly standalone: boolean
@@ -70,8 +62,8 @@ export const COMMANDS: readonly Command[] = [
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
     usage: [
-      'treadle file <type> <title> [--id <slug>] [--points <n>] [--priority <1-5>] [--assignee <name>]',
-      'treadle file <type> <title> [--desc <text>] [--label <name>] [--sprint <id>] [--parent <id>]',
+      'treadle file <type> <title> [--id <slug>] [--priority <1-5>] [--assignee <name>]',
+      'treadle file <type> <title> [--desc <text>] [--label <name>] [--parent <id>]',
       'treadle file <type> <title> [--set <field>=<value>]',
     ],
     examples: [
@@ -96,7 +88,7 @@ export const COMMANDS: readonly Command[] = [
     columns: true,
     usage: [
       'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
-      'treadle backlog [--sprint <id>] [--priority <1-5>] [--label <slug>] [--title <words>]',
+      'treadle backlog [--priority <1-5>] [--label <slug>] [--title <words>]',
       'treadle backlog [--fields <list>] [--limit <n>] [--cursor <id>]',
     ],
     examples: [
@@ -105,23 +97,6 @@ export const COMMANDS: readonly Command[] = [
       ['treadle backlog --label ux --label ui --state ready --fields +labels', 'every clause has to hold, --label included, so this is ready work carrying both labels, with the whole list as a column'],
       ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
       ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
-      ['treadle backlog --sprint sprint-30', 'the items whose sprint_id is that sprint now, which for a closed one is not the set its close recorded'],
-    ],
-  },
-  {
-    name: 'board', shape: BOARD_SHAPE, effect: 'read', record: 'list',
-    omits: true, pageable: false, capped: true, confirm: 'none', standalone: false,
-    columns: true,
-    usage: [
-      'treadle board [--sprint <id> | --all] [--limit <n>] [--fields <list>]',
-      'treadle board [--state <s>] [--type <t>] [--assignee <a>] [--priority <1-5>] [--resolution <r>]',
-      'treadle board [--label <slug>] [--title <words>]',
-    ],
-    examples: [
-      ['treadle board', 'the open sprint, one section per live state, blocked work first in each'],
-      ['treadle board --all', 'the whole workspace while a sprint is open'],
-      ['treadle board --sprint sprint-30', 'where a closed sprint left the work that still points at it'],
-      ['treadle board --type bug --limit 3', 'every filter backlog takes, and at most three rows per column'],
     ],
   },
   {
@@ -140,7 +115,6 @@ export const COMMANDS: readonly Command[] = [
       ['treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
       ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
-      ['treadle transition sso-saml in_progress --preview', 'which store and which guards, evaluating none of them'],
     ],
   },
   {
@@ -200,50 +174,10 @@ export const COMMANDS: readonly Command[] = [
     ],
   },
   {
-    name: 'sprint', shape: SPRINT_SHAPE, effect: 'mutate', record: 'record',
-    omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
-    usage: [
-      'treadle sprint open <title> --end <date> [--start <date>] [--id <slug>] [--goal <text>]',
-      'treadle sprint set <sprint> [--title <text>] [--goal <text>] [--start <date>] [--end <date>]',
-      'treadle sprint commit <sprint> <id> [<id> ...]',
-      'treadle sprint uncommit <id> [<id> ...]',
-      'treadle sprint close <sprint>',
-      'treadle sprint reopen <sprint>',
-    ],
-    examples: [
-      ['treadle sprint open "Sprint 31" --start 2026-09-07 --end 2026-09-18 --goal "Ship the token refresh"', 'open a two-week sprint; dates are calendar days, read in UTC'],
-      ['treadle sprint commit sprint-31 auth-refresh sso-saml', 'commit two items; refused if either sits in another open sprint or fails its ready gate'],
-      ['treadle sprint set sprint-31 --goal "Ship the token refresh"', 'change an open sprint\'s title, goal or dates; --goal= clears the goal, and a closed sprint is a record that reopen is the way back into'],
-      ['treadle sprint close sprint-31', 'close it; the items still open are recorded on the sprint as carried'],
-    ],
-  },
-  {
-    name: 'sprints', shape: SPRINTS_SHAPE, effect: 'read', record: 'list',
-    omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
-    usage: ['treadle sprints [<sprint>]'],
-    examples: [
-      ['treadle sprints', 'every sprint with its dates and how much of its committed set is done'],
-      ['treadle sprints sprint-31', 'one sprint: its dates, goal, tally, and what carried over when it closed'],
-    ],
-  },
-  {
-    name: 'ceremonies', shape: CEREMONIES_SHAPE, effect: 'read', record: 'list',
-    omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
-    usage: ['treadle ceremonies [<ceremony>]'],
-    examples: [
-      ['treadle ceremonies', 'every retrospective, oldest first, with the sprint it looked back over and how many chores it produced'],
-      ['treadle ceremonies retro-sprint-31', 'one retrospective: what went well, what went badly, and the chores it named'],
-    ],
-  },
-  {
     // `effect` is `mutate` for both forms because one word covers a read and a write, and a
     // command that can write may not under-declare it (R6). The bare read answers with
-    // `changed 0` and no transaction, which is the envelope `sprint set` gives when nothing
-    // moved; the interface specification's rule that a command word is always one or the
-    // other is departed from here and in ADR-0026, which says why.
+    // `changed 0` and no transaction; the interface specification's rule that a command word
+    // is always one or the other is departed from here and in ADR-0026, which says why.
     name: 'config', shape: CONFIG_SHAPE, effect: 'mutate', record: 'list',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
@@ -334,7 +268,7 @@ export type Verdict = 'S' | 'A' | 'N' | 'X'
 
 export const GLOBAL_FLAGS = [
   '--help', '--version', '--contract', '--out', '--quiet', '--verbose', '--log-values',
-  '--color', '--ascii', '--workspace', '--dry-run', '--preview', '--yes', '--no-input',
+  '--ascii', '--workspace', '--dry-run', '--yes',
   '--actor', '--width', '--fields', '--limit', '--cursor', '--explain-absence',
 ] as const
 export type GlobalFlag = (typeof GLOBAL_FLAGS)[number]
@@ -355,11 +289,6 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     // this is the opt-in that puts the values themselves on stderr, where a CI job and an
     // agent transcript keep them; a caller cannot weigh that disclosure against an unnamed flag.
     case '--log-values': return 'S'
-    // No rendering emits colour at all, by decision rather than by omission (the human
-    // renderer's own header says why), so this is ignored everywhere. It stays `A` and not
-    // `X` under the rule above: it only changes presentation, and its absence changes no
-    // answer. What was wrong was the reason help gave, not the letter.
-    case '--color': return 'A'
     // `--ascii` reaches the human rendering's truncation mark and nothing else, so it is
     // supported rather than ignored: the answer is the same, the bytes are not.
     case '--ascii': return 'S'
@@ -368,16 +297,12 @@ export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
     // `A` here while `emit` passed it to the renderer on every call, which told a caller the
     // one knob the rendering has does nothing.
     case '--width': return 'S'
-    // Only a command that can prompt has anything to suppress. `init` is the one with a
-    // confirmation class today; interface B.5's severe class lands with `undo`.
-    case '--no-input': return command.confirm === 'none' ? 'A' : 'S'
     case '--workspace': return command.standalone ? 'N' : 'S'
     case '--dry-run': return command.effect === 'mutate' ? 'S' : 'A'
-    case '--preview': return command.effect === 'mutate' ? 'S' : 'A'
     case '--yes': return command.confirm === 'none' ? 'A' : 'S'
     case '--actor': return command.effect === 'mutate' ? 'S' : 'A'
     case '--fields': return command.columns ? 'S' : 'X'
-    case '--limit': return command.pageable || command.capped === true ? 'S' : 'X'
+    case '--limit': return command.pageable ? 'S' : 'X'
     // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
     // the tool prints itself in every `page` line, and `treadle version --cursor x` was
     // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.

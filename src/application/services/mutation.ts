@@ -4,15 +4,15 @@
 //
 // A mutation reports what changed rather than what was asked (A.5), so the diff is computed
 // against the stored item and a field that was already correct produces no line and does not
-// count. `dry-run` and `preview` are modes rather than flags read here: the caller hands in
-// an overlay store for a dry run, so a guard that would refuse the real write refuses this
-// one, and nothing in this file knows which store it holds.
+// count. `dry-run` is a mode rather than a flag read here: the caller hands in an overlay
+// store for a dry run, so a guard that would refuse the real write refuses this one, and
+// nothing in this file knows which store it holds.
 
 import { isSafeText, type WorkItem } from '../../domain/index.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
 
-/** `apply` writes, `dry-run` evaluates every guard and writes nothing, `preview` evaluates nothing. */
-export type Mode = 'apply' | 'dry-run' | 'preview'
+/** `apply` writes; `dry-run` evaluates every guard and writes nothing. */
+export type Mode = 'apply' | 'dry-run'
 
 /**
  * A store and the mode it is in, paired. A mutating use case takes one of these rather than
@@ -89,13 +89,13 @@ export function makeEvent(input: EventInput): StoreEvent {
  * The fields a mutation event records before and after. It is `file`'s `REPORTED` set less
  * its six free-text fields: an event line is read by a machine and diffed by a person, and a
  * 5,000-character repro step in it duplicates the record it was copied from. Everything a
- * caller can be held to - the marker fields, the estimate, the ownership, the date - is
- * here, which is what makes a hand edit of severity or priority detectable against the log.
+ * caller can be held to - the marker fields, the ownership, the date - is here, which is
+ * what makes a hand edit of severity or priority detectable against the log.
  */
 export const AUDITED_FIELDS = [
-  'type', 'state', 'filed_at', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
-  'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
+  'type', 'state', 'filed_at', 'priority', 'parent_id',
+  'assignee', 'reporter', 'reviewer', 'labels', 'due',
+  'severity', 'found_in', 'fix_confirmed',
 ] as const
 
 /** The change list as an event's `before` or `after` object, keyed by field. */

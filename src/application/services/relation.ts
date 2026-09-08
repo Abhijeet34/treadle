@@ -37,7 +37,8 @@ import { storeRefusal } from './refusal.ts'
 
 export const RELATION_SHAPE: ResultShape = {
   command: 'relation',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Link two items with a typed edge, or remove one; the inverse is derived, never stored.',
   properties: [
@@ -47,7 +48,6 @@ export const RELATION_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'other', type: 'string' },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
@@ -157,7 +157,7 @@ export async function relate(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(written, { now, pointScale: view.value.config.point_scale })
+  const valid = validateWorkItem(written, { now })
   if (!valid.ok) {
     return errorResult({
       code: 'VALIDATION', command: 'relation', workspace, effect: 'mutate',
@@ -166,16 +166,6 @@ export async function relate(
   }
 
   const before = view.value.byId.get(written.id) as WorkItemSummary
-  if (mode === 'preview') {
-    return okResult(RELATION_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        item: written.id, kind: edge.kind, other: edge.target, preview: 1,
-        store: view.value.identity.path ?? workspace, note: 'nothing evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
-
   const txn = ids.txn()
   const eventId = ids.event()
   const snapshot = { kind: edge.kind, other: edge.target }

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// G1 and G4: a line that says one thing twice was answered once, in silence.
+// The operand guard's repeated-input gaps: a line that says one thing twice was answered
+// once, in silence.
 //
 // `backlog --state draft --state ready` listed the ready work and printed `filter state
 // ready`; nothing said `draft` had been read and dropped. `backlog --fields id,id` printed
@@ -41,11 +42,10 @@ async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
   return { root, cli }
 }
 
-/** Every single-valued flag of the two filtering commands, which is where G1 was measured. */
+/** Every single-valued flag of the one filtering command, which is where G1 was measured. */
 const SINGLE: readonly (readonly [string, string, string])[] = [
   ['state', 'draft', 'ready'],
   ['type', 'story', 'task'],
-  ['sprint', 'sprint-one', 'sprint-two'],
   ['assignee', 'kim', 'sam'],
   ['priority', '1', '2'],
   ['resolution', 'done', 'duplicate'],
@@ -59,8 +59,8 @@ describe('a single-valued flag written twice is refused rather than resolved', (
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
   for (const [name, first, second] of SINGLE) {
-    it(`refuses --${name} twice on backlog and on board`, async () => {
-      for (const command of ['backlog', 'board']) {
+    it(`refuses --${name} twice on backlog`, async () => {
+      for (const command of ['backlog']) {
         const run = await cli([command, `--${name}`, first, `--${name}`, second])
         assert.equal(run.code, EXIT_OF.VALIDATION, `${command} --${name}: ${run.err}`)
         assert.match(run.err, new RegExp(`^"cause --${name} takes one value and this line writes it more than once`, 'm'), run.err)
@@ -128,7 +128,7 @@ describe('a column named twice is refused, as a flag written twice is', () => {
   before(async () => { ({ root, cli } = await aWorkspace()) })
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
-  for (const command of ['backlog', 'board']) {
+  for (const command of ['backlog']) {
     it(`refuses a repeated column on ${command}, and offers the line without it`, async () => {
       const run = await cli([command, '--fields', 'id,type,id'])
       assert.equal(run.code, EXIT_OF.VALIDATION, run.err)
@@ -151,9 +151,9 @@ describe('a column named twice is refused, as a flag written twice is', () => {
     assert.match(run.err, /^"cause nope is not a column of this list/m, run.err)
   })
 
-  it('leaves a list with no repeat alone, on both commands and through the + selector', async () => {
+  it('leaves a list with no repeat alone, and the same through the + selector', async () => {
     must(await cli(['backlog', '--fields', 'id,type,title']), 'backlog --fields')
     must(await cli(['backlog', '--fields', '+labels']), 'backlog --fields +labels')
-    must(await cli(['board', '--fields', 'id,pts,title']), 'board --fields')
+    must(await cli(['backlog', '--fields', 'id,pri,title']), 'backlog --fields id,pri,title')
   })
 })

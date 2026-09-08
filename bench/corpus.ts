@@ -16,17 +16,14 @@ import { fileURLToPath } from 'node:url'
 import { random } from '../test/helpers/store-fixtures.ts'
 import {
   BUG_SEVERITIES,
-  DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
-  isTerminal,
   type ItemId,
-  type Sprint,
   type StoredRelation,
   type WorkItem,
   type WorkItemState,
   type WorkItemType,
 } from '../src/domain/index.ts'
-import { MAX_FIELD_VALUE_BYTES, ShardedStore, createWorkspace } from '../src/adapters/store/index.ts'
+import { ShardedStore, createWorkspace } from '../src/adapters/store/index.ts'
 import type { StoreEvent } from '../src/application/ports/store.ts'
 
 /**
@@ -55,9 +52,7 @@ export type CorpusSpec = {
   /**
    * Edges per hundred items, and impediments per hundred. A corpus with none of either
    * priced nothing that reads the relation graph, and every command reads it: `readWorkspace`
-   * builds the graph on every invocation. One sprint record per month is not a knob, because
-   * the item generator already points every item at `sprint-<0..23>` and a pointer with no
-   * record behind it is doctor finding H26 fifty thousand times over.
+   * builds the graph on every invocation.
    */
   readonly relationsPerHundredItems: number
   readonly impedimentsPerHundredItems: number
@@ -74,15 +69,6 @@ export type Corpus = {
   readonly largestMonthItems: number
   readonly largestMonthBytes: number
   readonly readyMatches: number
-  readonly sprintsWritten: number
-  readonly openSprint: string
-  /**
-   * What a close would have recorded against what the store accepted. `carried` is one
-   * field line bounded at MAX_FIELD_VALUE_BYTES, so a sprint past a few hundred open items
-   * cannot record its own carry-over; `fitting` below measures the line rather than
-   * estimating it, and docs/BENCHMARKS.md carries the figure that measurement produced.
-   */
-  readonly carryOver: { readonly largestWanted: number; readonly largestStored: number; readonly sprintsTruncated: number }
   readonly impediments: number
   readonly relations: { readonly total: number; readonly blocks: number; readonly duplicates: number; readonly relates_to: number }
   /** The longest `blocks` chain the generator laid down, which is what the cycle check walks. */
@@ -116,8 +102,8 @@ function monthRange(lastMonth: string, count: number): readonly string[] {
 }
 
 const WORDS = [
-  'index', 'shard', 'lock', 'render', 'parse', 'migrate', 'gate', 'sprint', 'burndown',
-  'cadence', 'retro', 'standup', 'backlog', 'impediment', 'cursor', 'schema', 'event',
+  'index', 'shard', 'lock', 'render', 'parse', 'migrate', 'gate', 'quarantine', 'journal',
+  'cadence', 'handover', 'review', 'backlog', 'impediment', 'cursor', 'schema', 'event',
   'conflict', 'quarantine', 'freshness', 'overlay', 'transition', 'estimate', 'velocity',
 ]
 
@@ -146,9 +132,7 @@ function itemAt(
     version: 1,
     description: sentence(next, 12 + Math.floor(next() * 20)),
     priority: 1 + Math.floor(next() * 5),
-    points: DEFAULT_POINT_SCALE[Math.floor(next() * DEFAULT_POINT_SCALE.length)],
     assignee: `person-${Math.floor(next() * 12)}`,
-    sprint_id: `sprint-${Math.floor(next() * 24)}`,
     labels: [`area-${Math.floor(next() * 8)}`],
   }
   // Parents point at epics generated before this item, so the hierarchy is a forest and the
@@ -176,10 +160,7 @@ function itemAt(
     base['repro_steps'] = sentence(next, 14)
     base['found_in'] = FOUND_IN_STAGES[Math.floor(next() * FOUND_IN_STAGES.length)]
   }
-  if (type === 'spike') {
-    base['question'] = sentence(next, 8)
-    base['timebox_hours'] = 1 + Math.floor(next() * 40)
-  }
+  if (type === 'spike') base['question'] = sentence(next, 8)
   return base as unknown as WorkItem
 }
 
@@ -202,7 +183,6 @@ function asImpediment(item: WorkItem): WorkItem {
     description: item.description,
     priority: item.priority,
     assignee: item.assignee,
-    sprint_id: item.sprint_id,
     labels: item.labels,
     severity: item.severity ?? 'S2',
     proposed_resolution: `platform clears ${item.id}`,
@@ -212,65 +192,6 @@ function asImpediment(item: WorkItem): WorkItem {
     base['held_from'] = item.held_from
   }
   return base as unknown as WorkItem
-}
-
-/**
- * One sprint per month, so every `sprint_id` the item generator wrote resolves to a record.
- * Exactly one is open, because `board` with no scope refuses two open sprints by design
- * (C1), and the default board is the path a caller takes.
- */
-function sprintsFor(months: readonly string[], items: readonly WorkItem[]): readonly Sprint[] {
-  const lastDay = (month: string): string => {
-    const [year, m] = month.split('-').map(Number) as [number, number]
-    return `${month}-${String(new Date(Date.UTC(year, m, 0)).getUTCDate()).padStart(2, '0')}`
-  }
-  const openIndex = months.length - 1
-  const members = new Map<string, ItemId[]>()
-  for (const item of items) {
-    if (item.sprint_id === undefined || isTerminal(item.state)) continue
-    const held = members.get(item.sprint_id)
-    if (held === undefined) members.set(item.sprint_id, [item.id])
-    else held.push(item.id)
-  }
-  return months.map((month, index): Sprint => {
-    const id = `sprint-${index}`
-    const closed = index !== openIndex
-    // Two limits the store found here rather than the other way round. An empty list is an
-    // absent field, so a sprint whose members all finished writes no `carried` line at all.
-    // And `carried` is a single-line field, bounded at MAX_FIELD_VALUE_BYTES, so a sprint
-    // past a few hundred open items cannot record its own carry-over. The corpus writes what
-    // fits and the corpora table prints wanted against stored, so the ceiling is a measured
-    // figure rather than one this comment asserts.
-    const carried = fitting(members.get(id) ?? [])
-    return {
-      id,
-      title: `Sprint over ${month}`,
-      state: closed ? 'closed' : 'open',
-      filed_at: `${month}-01T00:00:00Z`,
-      version: 1,
-      start: `${month}-01`,
-      end: lastDay(month),
-      goal: `land the work filed in ${month}`,
-      // A close records the items still open as carried, and that list is the half of a
-      // committed set the store holds rather than derives, so the corpus writes it.
-      ...(closed ? { closed_at: `${lastDay(month)}T23:59:59Z`, ...(carried.length === 0 ? {} : { carried }) } : {}),
-    }
-  })
-}
-
-/**
- * As many ids as the store will accept on one field line. The length is taken off the joined
- * value with the separator the sprint codec writes, rather than estimated from the id length:
- * an estimate that assumed a one-byte separator put 8,996 bytes on a line with an 8,192 byte
- * ceiling and the store refused the whole corpus.
- */
-function fitting(ids: readonly ItemId[]): readonly ItemId[] {
-  const kept: ItemId[] = []
-  for (const id of ids) {
-    if (Buffer.byteLength([...kept, id].join(', '), 'utf8') > MAX_FIELD_VALUE_BYTES) break
-    kept.push(id)
-  }
-  return kept
 }
 
 /**
@@ -405,8 +326,8 @@ function manifestOf(spec: CorpusSpec): string {
 /**
  * Everything that decides a corpus's bytes: the spec, and the source of everything that
  * writes it or draws from it - this file, the store it writes through, the domain constants
- * `itemAt` and `asImpediment` read directly (`BUG_SEVERITIES`, `DEFAULT_POINT_SCALE`,
- * `FOUND_IN_STAGES`, `isTerminal`), and the `mulberry32` generator that drives every roll. A
+ * `itemAt` and `asImpediment` read directly (`BUG_SEVERITIES`, `FOUND_IN_STAGES`), and the
+ * `mulberry32` generator that drives every roll. A
  * cache entry is named by this, so a corpus generated by an older generator, against an older
  * store grammar, or off a changed domain constant or RNG can never be found at the path a
  * newer run looks up. That is what makes reuse safe without a validation pass over hundreds of
@@ -513,13 +434,14 @@ async function readBackWith(
   store: ShardedStore,
   spec: CorpusSpec, root: string, generated: Generated | undefined, reused: boolean, cloneMs: number | undefined,
 ): Promise<Corpus> {
-  const all = await store.list({})
+  const items: WorkItem[] = []
+  const all = await store.eachItem({}, (item) => items.push(item))
   if (!all.ok) throw new Error(`corpus readback: ${all.error.message}`)
   // A corpus short of its spec is the failure this rig must never absorb: the figures it
   // produces look ordinary and measure something else. The readback happens either way, so
   // comparing two counts costs nothing, and a stop here is the outcome a reader notices.
-  if (all.value.length !== spec.items) {
-    throw new Error(`corpus at ${root}: store holds ${all.value.length} items, spec says ${spec.items}`)
+  if (items.length !== spec.items) {
+    throw new Error(`corpus at ${root}: store holds ${items.length} items, spec says ${spec.items}`)
   }
   // The events are counted off the log files for the same reason: `eventsWritten` was the
   // spec's arithmetic, so a cache entry missing an events file was cloned, reported whole
@@ -529,13 +451,12 @@ async function readBackWith(
   if (eventsWritten !== eventsWanted) {
     throw new Error(`corpus at ${root}: the log holds ${eventsWritten} events, spec says ${eventsWanted}`)
   }
-  const ready = await store.list({ state: 'ready' })
+  const readyRows: WorkItem[] = []
+  const ready = await store.eachItem({ state: 'ready' }, (item) => readyRows.push(item))
   if (!ready.ok) throw new Error(`corpus readback: ${ready.error.message}`)
-  const sprints = await store.sprints()
-  if (!sprints.ok) throw new Error(`corpus readback: ${sprints.error.message}`)
 
   const perMonth = new Map<string, number>()
-  for (const item of all.value) {
+  for (const item of items) {
     const month = item.filed_at.slice(0, 7)
     perMonth.set(month, (perMonth.get(month) ?? 0) + 1)
   }
@@ -545,25 +466,20 @@ async function readBackWith(
 
   // Two probe ids from the largest shard: a read of the biggest file is the worst case a
   // read has, and the transition probe must be an item a create never collides with.
-  const inLargest = all.value.filter((i) => i.filed_at.slice(0, 7) === largestMonth).map((i) => i.id).sort()
+  const inLargest = items.filter((i) => i.filed_at.slice(0, 7) === largestMonth).map((i) => i.id).sort()
 
   return {
     spec,
     root,
-    itemsInStore: all.value.length,
+    itemsInStore: items.length,
     eventsWritten,
     months,
     largestMonth,
     largestMonthItems: perMonth.get(largestMonth) ?? 0,
     largestMonthBytes: largestBytes,
-    readyMatches: ready.value.length,
-    // Read back from the store rather than taken from the generator, for the reason every
-    // other count here is: a reused corpus never ran the generator at all.
-    sprintsWritten: sprints.value.length,
-    carryOver: carryOverOf(all.value, sprints.value),
-    openSprint: sprints.value.find((sprint) => sprint.state === 'open')?.id ?? 'NOT MEASURED: no open sprint',
-    impediments: all.value.filter((item) => item.type === 'impediment').length,
-    relations: relationTally(all.value),
+    readyMatches: readyRows.length,
+    impediments: items.filter((item) => item.type === 'impediment').length,
+    relations: relationTally(items),
     longestBlocksChain: generated?.chain ?? 8,
     probeIds: {
       get: inLargest[Math.floor(inLargest.length / 2)] as string,
@@ -580,31 +496,7 @@ async function readBackWith(
   }
 }
 
-/**
- * The carry-over each closed sprint would record against the length the store served back,
- * both read off the store so a reused corpus reports the same figures as a fresh one.
- */
-function carryOverOf(items: readonly WorkItem[], sprints: readonly Sprint[]): Corpus['carryOver'] {
-  const open = new Map<string, number>()
-  for (const item of items) {
-    if (item.sprint_id === undefined || isTerminal(item.state)) continue
-    open.set(item.sprint_id, (open.get(item.sprint_id) ?? 0) + 1)
-  }
-  let largestWanted = 0
-  let largestStored = 0
-  let sprintsTruncated = 0
-  for (const sprint of sprints) {
-    if (sprint.state !== 'closed') continue
-    const wanted = open.get(sprint.id) ?? 0
-    const stored = sprint.carried?.length ?? 0
-    largestWanted = Math.max(largestWanted, wanted)
-    largestStored = Math.max(largestStored, stored)
-    if (stored < wanted) sprintsTruncated += 1
-  }
-  return { largestWanted, largestStored, sprintsTruncated }
-}
-
-/** The edges the store actually holds, counted off the records rather than off the plan. */
+/** The stored edges by kind, which is what the corpora table reports the graph as. */
 function relationTally(items: readonly WorkItem[]): Corpus['relations'] {
   const tally = { total: 0, blocks: 0, duplicates: 0, relates_to: 0 }
   for (const item of items) {
@@ -620,7 +512,6 @@ function relationTally(items: readonly WorkItem[]): Corpus['relations'] {
 
 export type Generated = {
   readonly ms: number
-  readonly sprints: readonly Sprint[]
   readonly impediments: number
   readonly relations: { readonly total: number; readonly blocks: number; readonly duplicates: number; readonly relates_to: number }
   readonly chain: number
@@ -628,8 +519,8 @@ export type Generated = {
 
 /**
  * One transaction per month shard, so a shard is written once rather than per record. The
- * items are built whole before any of them is written, because relations and carry-over are
- * both statements about the set and neither can be decided one record at a time.
+ * items are built whole before any of them is written, because the relation graph is a
+ * statement about the set and cannot be decided one record at a time.
  */
 async function generate(root: string, spec: CorpusSpec): Promise<Generated> {
   const store = new ShardedStore(root)
@@ -690,23 +581,19 @@ async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Gene
     byMonth.set(month, bucket)
   }
 
-  const sprints = sprintsFor(months, items)
   const sorted = [...byMonth.keys()].sort()
   for (const month of sorted) {
     const bucket = byMonth.get(month)!
     const applied = await store.apply({
       txn: `txn-corpus-${month}`,
       writes: bucket.writes,
-      // The sprint file is one file, so every sprint record goes in with the first shard
-      // rather than being rewritten once per month.
-      ...(month === sorted[0] ? { sprints: sprints.map((sprint) => ({ sprint })) } : {}),
       events: bucket.events,
     })
     if (!applied.ok) throw new Error(`corpus ${month}: ${applied.error.code} ${applied.error.message}`)
   }
 
   const elapsed = performance.now() - started
-  return { ms: elapsed, sprints, impediments: impedimentIndexes.length, relations: tally, chain }
+  return { ms: elapsed, impediments: impedimentIndexes.length, relations: tally, chain }
 }
 
 /** Deletes the derived index so the next open pays DR8's first-index-build budget. */

@@ -5,7 +5,7 @@
 // what lets a later implementation coordinate differently without a contract change.
 
 import type { DomainErrorCode } from '../../domain/index.ts'
-import type { Ceremony, Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType, WorkspaceConfig } from '../../domain/index.ts'
+import type { Instant, ItemId, WorkItem, WorkItemState, WorkItemSummary, WorkItemType, WorkspaceConfig } from '../../domain/index.ts'
 
 /**
  * The domain's three codes plus the five a store can produce on its own. Widening a
@@ -75,7 +75,6 @@ export type StoreEvent = {
 export type ItemQuery = {
   readonly state?: WorkItemState
   readonly type?: WorkItemType
-  readonly sprint?: string
   readonly limit?: number
 }
 
@@ -130,25 +129,9 @@ export type ItemRemoval = {
   readonly ifVersion: number
 }
 
-/** One sprint write, under the same compare-and-set rule as an item's. */
-export type SprintWrite = {
-  readonly sprint: Sprint
-  readonly ifVersion?: number
-}
-
-/** One ceremony write, under the same compare-and-set rule as an item's. */
-export type CeremonyWrite = {
-  readonly ceremony: Ceremony
-  readonly ifVersion?: number
-}
-
 export type StoreTransaction = {
   readonly txn: string
   readonly writes: readonly ItemWrite[]
-  /** Sprint records, which live in one file beside the shards and land in the same journal. */
-  readonly sprints?: readonly SprintWrite[]
-  /** Ceremony records, month-sharded as items are and landing in the same journal. */
-  readonly ceremonies?: readonly CeremonyWrite[]
   /** Records that leave the store in this transaction; see `ItemRemoval`. */
   readonly removes?: readonly ItemRemoval[]
   /** Records the decision depended on, refused as `S10` if one moved; see `ItemRead`. */
@@ -172,15 +155,8 @@ export type Finding = {
   readonly line: number
   readonly rule: string
   readonly reason: string
+  /** The record the finding is about, absent on a finding about a file rather than a record. */
   readonly id?: string
-  /**
-   * Which record kind the finding's `id` names, when it names one. A quarantined record still
-   * exists, so a neighbour pointing at its id is not dangling; the kind is what keeps that
-   * from being read too broadly, since an item and a sprint may not share an id but a reader
-   * of one flat set cannot tell which of the two a quarantined id was. The store derives it
-   * from the file it was reading, and a finding about a file rather than a record has none.
-   */
-  readonly kind?: 'item' | 'sprint' | 'ceremony'
 }
 
 /**
@@ -222,7 +198,7 @@ export type StoreIdentity = {
   /**
    * How many field keys the workspace record carries that this build has no meaning for. A
    * newer writer's key is kept verbatim (DR3) and counted rather than printed, which is the
-   * decision the item and sprint dictionaries already made for `extra`: printing one invites
+   * decision the item dictionary already made for `extra`: printing one invites
    * a caller to act on a value nothing here can validate, and printing nothing at all made a
    * mistyped configuration key indistinguishable from one nobody wrote.
    */
@@ -231,8 +207,8 @@ export type StoreIdentity = {
 
 /**
  * The workspace record this transaction writes, under the same compare-and-set rule an item
- * and a sprint are under. There is one such record per store, so this is a single value
- * rather than a list, and `ifVersion` is the version the decision was made against.
+ * is under. There is one such record per store, so this is a single value rather than a
+ * list, and `ifVersion` is the version the decision was made against.
  */
 export type WorkspaceWrite = {
   readonly config: WorkspaceConfig
@@ -243,29 +219,20 @@ export interface Store {
   /** The one printed identity every command resolves before it runs (2.17 rule 4). */
   identity(): Promise<StoreResult<StoreIdentity>>
   get(id: ItemId): Promise<StoreResult<WorkItem | undefined>>
-  list(query?: ItemQuery): Promise<StoreResult<readonly WorkItem[]>>
   /**
-   * The same items as `list` in the same order, as the fields a scan over the whole set
-   * reads. The prose and the lists of one record are `get`'s to serve. Every field is the
-   * record's own as `list` would serve it, never a cached approximation of it.
+   * Every item the query selects, in the store's own order, as the fields a scan over the
+   * whole set reads. The prose and the lists of one record are `get`'s to serve. Every field
+   * is the record's own, never a cached approximation of it.
    */
   summaries(query?: ItemQuery): Promise<StoreResult<readonly WorkItemSummary[]>>
   /**
-   * `list` without the array: `visit` sees each item `list` would return, in its order, and
-   * the count comes back. The read is refused where `list` refuses it, and an item visited
-   * before the refusal is the caller's to discard. `doctor` is the reader: it audits every
-   * field of every record and held all of them at once, 484 MiB of the 1,442 it allocated
-   * at 50,000 items, to look at each one once.
+   * The same read as `summaries` over whole records and without the array: `visit` sees each
+   * item in the same order, and the count comes back. An item visited before a refusal is
+   * the caller's to discard. `doctor` is the reader: it audits every field of every record
+   * and held all of them at once, 484 MiB of the 1,442 it allocated at 50,000 items, to look
+   * at each one once.
    */
   eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>>
-  /** Every sprint the store holds, in the order they were opened. There are few, so no query. */
-  sprints(): Promise<StoreResult<readonly Sprint[]>>
-  /**
-   * Every ceremony record the store holds, oldest first. A retrospective is filed once a
-   * sprint, so the whole set is read as `sprints` is rather than queried; the layout is
-   * month-sharded because DR2 drew it that way and a shard is what a reviewer reads in a diff.
-   */
-  ceremonies(): Promise<StoreResult<readonly Ceremony[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
   /** `events` without the array, under the same contract as `eachItem`; 865 MiB of the same call. */
   eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>>

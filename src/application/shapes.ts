@@ -5,8 +5,6 @@
 
 import { ERROR_SHAPE, type ResultShape } from './result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from './services/items.ts'
-import { BOARD_SHAPE } from './services/board.ts'
-import { CEREMONIES_SHAPE } from './services/ceremonies.ts'
 import { CONFIG_SHAPE } from './services/config.ts'
 import { DOCTOR_SHAPE } from './services/doctor.ts'
 import { HISTORY_SHAPE } from './services/history.ts'
@@ -17,13 +15,10 @@ import { EXPLAIN_SHAPE, NEXT_SHAPE, STATUS_SHAPE } from './services/insight.ts'
 import { RELATION_SHAPE } from './services/relation.ts'
 import { REMOVE_SHAPE } from './services/removal.ts'
 import { HELP_SHAPE, VERSION_SHAPE } from './services/meta.ts'
-import { SPRINT_SHAPE, SPRINTS_SHAPE } from './services/sprints.ts'
 import { INIT_SHAPE } from './services/workspace.ts'
 
 export const SHAPES: readonly ResultShape[] = [
   BACKLOG_SHAPE,
-  BOARD_SHAPE,
-  CEREMONIES_SHAPE,
   CONFIG_SHAPE,
   DOCTOR_SHAPE,
   ERROR_SHAPE,
@@ -39,8 +34,6 @@ export const SHAPES: readonly ResultShape[] = [
   REMOVE_SHAPE,
   SET_SHAPE,
   SHOW_SHAPE,
-  SPRINT_SHAPE,
-  SPRINTS_SHAPE,
   STATUS_SHAPE,
   TRANSITION_SHAPE,
   VERSION_SHAPE,

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "relation.v1.json",
-  "title": "relation/1",
+  "$id": "relation.v2.json",
+  "title": "relation/2",
   "description": "Link two items with a typed edge, or remove one; the inverse is derived, never stored.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "relation/1"
+      "const": "relation/2"
     },
     "ok": {
       "type": "boolean"
@@ -91,12 +91,6 @@
           ]
         },
         "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
           "type": [
             "integer",
             "null"

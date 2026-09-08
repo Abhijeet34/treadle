@@ -36,7 +36,6 @@ const A3: readonly { readonly name: string; readonly budget: number; readonly re
   { name: 'transition', budget: 230 },
   { name: 'transition-already', budget: 110 },
   { name: 'transition-dry-run', budget: 250 },
-  { name: 'transition-preview', budget: 250 },
   { name: 'not-found', budget: 160 },
   { name: 'guard-refused', budget: 270 },
 ]

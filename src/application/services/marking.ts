@@ -36,7 +36,8 @@ import { storeRefusal } from './refusal.ts'
 
 export const MARK_SHAPE: ResultShape = {
   command: 'mark',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Set the severity or the priority of one item, with the reason and both values in the log.',
   properties: [
@@ -47,7 +48,6 @@ export const MARK_SHAPE: ResultShape = {
     { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
@@ -57,7 +57,8 @@ export const MARK_SHAPE: ResultShape = {
 
 export const EVIDENCE_SHAPE: ResultShape = {
   command: 'evidence',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Append one bounded pointer at an artefact a third party can open.',
   properties: [
@@ -70,7 +71,6 @@ export const EVIDENCE_SHAPE: ResultShape = {
     { kind: 'text', key: 'label' },
     { kind: 'scalar', key: 'entries', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
@@ -147,23 +147,13 @@ export async function markItem(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
+  const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal('mark', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
       [`treadle show ${item.id}`])
   }
 
   const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)
-  if (mode === 'preview') {
-    return okResult(MARK_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        preview: 1, item: item.id, store: view.value.identity.path ?? workspace,
-        set, note: 'nothing evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
-
   const txn = ids.txn()
   const eventId = ids.event()
   const applied = await store.apply({
@@ -235,7 +225,7 @@ export async function addEvidence(
   const after = { ...item, evidence: [...existing, pointer] } as WorkItem
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
+  const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal('evidence', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
       ['treadle help evidence'])
@@ -248,16 +238,6 @@ export async function addEvidence(
     entries: `${after.evidence?.length ?? 0}/${MAX_EVIDENCE_ENTRIES}`,
   }
   if (pointer.label !== undefined) data['label'] = pointer.label
-
-  if (mode === 'preview') {
-    return okResult(EVIDENCE_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        preview: 1, item: item.id, store: view.value.identity.path ?? workspace,
-        note: 'nothing evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
 
   const txn = ids.txn()
   const eventId = ids.event()

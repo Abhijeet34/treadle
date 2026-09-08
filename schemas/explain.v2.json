@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "show.v1.json",
-  "title": "show/1",
-  "description": "Print the stored fields of one item.",
+  "$id": "explain.v2.json",
+  "title": "explain/2",
+  "description": "Say why one item is where it is, and what each legal next move needs.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "show/1"
+      "const": "explain/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "show"
+      "const": "explain"
     },
     "workspace": {
       "type": "string"
@@ -78,31 +78,23 @@
             "null"
           ]
         },
-        "filed": {
+        "since": {
           "type": [
             "string",
             "null"
           ]
         },
-        "v": {
+        "from_event": {
           "type": [
-            "integer",
+            "string",
             "null"
           ]
         },
-        "pts": {
-          "type": [
-            "integer",
-            "null"
-          ]
+        "reason": {
+          "type": "string",
+          "x-trust": "data"
         },
-        "pri": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "sprint": {
+        "blocked": {
           "type": [
             "string",
             "null"
@@ -114,41 +106,11 @@
             "null"
           ]
         },
-        "ac": {
+        "blocks": {
           "type": [
             "string",
             "null"
           ]
-        },
-        "due": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "overdue": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "resolution": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "assignee": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "title": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "desc": {
-          "type": "string",
-          "x-trust": "data"
         },
         "sev": {
           "type": [
@@ -156,99 +118,147 @@
             "null"
           ]
         },
-        "hrs": {
-          "type": [
-            "integer",
-            "null"
-          ]
+        "by": {
+          "type": "string",
+          "x-trust": "data"
         },
-        "labels": {
+        "rules": {
           "type": [
             "string",
             "null"
           ]
         },
-        "found": {
-          "type": [
-            "string",
-            "null"
+        "gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  },
+                  "data": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "gate"
+            },
+            {
+              "name": "rule"
+            },
+            {
+              "name": "verdict"
+            },
+            {
+              "name": "need",
+              "trust": "data"
+            }
           ]
         },
-        "fixed": {
-          "type": [
-            "boolean",
-            "null"
+        "moves": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "columns",
+            "shown",
+            "total",
+            "rows"
+          ],
+          "properties": {
+            "columns": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "const": true
+                  },
+                  "data": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "shown": {
+              "type": "integer"
+            },
+            "total": {
+              "type": "integer"
+            },
+            "rows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": [
+                    "string",
+                    "number",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "x-columns": [
+            {
+              "name": "to"
+            },
+            {
+              "name": "guards"
+            },
+            {
+              "name": "records"
+            }
           ]
-        },
-        "timebox": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "hold_until": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "held_from": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "extra": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "reporter": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "reviewer": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "component": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "hold": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "outcome": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "question": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "repro": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "expected": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "actual": {
-          "type": "string",
-          "x-trust": "data"
         },
         "findings": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "proposed_resolution": {
-          "type": "string",
-          "x-trust": "data"
-        },
-        "evidence": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -301,139 +311,11 @@
           },
           "x-columns": [
             {
-              "name": "kind"
+              "name": "rule"
             },
             {
-              "name": "ref",
+              "name": "detail",
               "trust": "data"
-            },
-            {
-              "name": "label",
-              "trust": "data"
-            }
-          ]
-        },
-        "criteria": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "columns",
-            "shown",
-            "total",
-            "rows"
-          ],
-          "properties": {
-            "columns": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "const": true
-                  },
-                  "data": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            "shown": {
-              "type": "integer"
-            },
-            "total": {
-              "type": "integer"
-            },
-            "rows": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": [
-                    "string",
-                    "number",
-                    "null"
-                  ]
-                }
-              }
-            }
-          },
-          "x-columns": [
-            {
-              "name": "n"
-            },
-            {
-              "name": "tick"
-            },
-            {
-              "name": "text",
-              "trust": "data"
-            }
-          ]
-        },
-        "relations": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "columns",
-            "shown",
-            "total",
-            "rows"
-          ],
-          "properties": {
-            "columns": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "const": true
-                  },
-                  "data": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            "shown": {
-              "type": "integer"
-            },
-            "total": {
-              "type": "integer"
-            },
-            "rows": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": [
-                    "string",
-                    "number",
-                    "null"
-                  ]
-                }
-              }
-            }
-          },
-          "x-columns": [
-            {
-              "name": "kind"
-            },
-            {
-              "name": "other"
             }
           ]
         }

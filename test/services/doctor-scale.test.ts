@@ -77,8 +77,8 @@ function countingLog(events: readonly StoreEvent[]): { log: readonly StoreEvent[
   return { log, passes: () => passes }
 }
 
-/** No sprints, no configured threshold: the scale fixture measures the passes, not the policy. */
-const NO_POLICY: AuditContext = { config: defaultConfig(), now: '2026-09-08T09:00:00Z', sprints: [] }
+/** No configured threshold: the scale fixture measures the passes, not the policy. */
+const NO_POLICY: AuditContext = { config: defaultConfig(), now: '2026-09-08T09:00:00Z' }
 
 function auditWorkspace(items: readonly WorkItem[], events: readonly StoreEvent[]): readonly string[] {
   const audit = new WorkspaceAudit(NO_POLICY)
@@ -113,18 +113,15 @@ describe('doctor audits a workspace in one pass over the log', () => {
       const base = workspace.store
       const written = await base.apply({ txn: 't1', writes: items.map((item) => ({ item })), events: [...events] })
       assert.ok(written.ok, written.ok ? '' : written.error.message)
-      const calls = { list: 0, events: 0, eachItem: 0, eachEvent: 0 }
+      const calls = { summaries: 0, events: 0, eachItem: 0, eachEvent: 0 }
       const counting: Store = {
         ...base,
         identity: () => base.identity(),
         get: (id) => base.get(id),
-        summaries: (query) => base.summaries(query),
-        sprints: () => base.sprints(),
-        ceremonies: () => base.ceremonies(),
         findings: () => base.findings(),
         apply: (transaction) => base.apply(transaction),
         close: () => base.close(),
-        list: (query) => { calls.list += 1; return base.list(query) },
+        summaries: (query) => { calls.summaries += 1; return base.summaries(query) },
         events: (query) => { calls.events += 1; return base.events(query) },
         eachItem: (query, visit) => { calls.eachItem += 1; return base.eachItem(query, visit) },
         eachEvent: (query, visit) => { calls.eachEvent += 1; return base.eachEvent(query, visit) },
@@ -132,7 +129,7 @@ describe('doctor audits a workspace in one pass over the log', () => {
       const result = await doctor(counting, fixedClock('2026-09-08T09:00:00Z'))
       assert.equal(result.data['checked'], ITEMS)
       assert.equal((result.data['findings'] as { total: number }).total, ITEMS * 2, 'H20 and H19 once per item')
-      assert.deepEqual(calls, { list: 0, events: 0, eachItem: 1, eachEvent: 1 })
+      assert.deepEqual(calls, { summaries: 0, events: 0, eachItem: 1, eachEvent: 1 })
     } finally {
       await workspace.dispose()
     }

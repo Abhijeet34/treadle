@@ -32,7 +32,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 
 | Seam | What it does | First implementation | Second implementation |
 |---|---|---|---|
-| Store (built) | Reads records and events by id, state, sprint and time range, and the sprint and ceremony records whole; applies a transaction of item, sprint and ceremony writes under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing. `--preview` resolves the target and evaluates none, so it takes no overlay |
+| Store (built) | Reads records by id, state and type and events by entity, transaction and time range; applies a transaction of item writes and removals under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing |
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
@@ -64,7 +64,7 @@ That is why the domain core validates on load rather than only on write: a hand 
 
 ## The decision records
 
-[architecture/adr/](architecture/adr/README.md) carries one record per decision that a later change has to argue with: the storage layout, the record grammar and its migration path, concurrency and durability, the output and exit-code contract, the store seam, and every decision since, through relations, sprints, impediments, the board and the two performance reshapes.
+[architecture/adr/](architecture/adr/README.md) carries one record per decision that a later change has to argue with: the storage layout, the record grammar and its migration path, concurrency and durability, the output and exit-code contract, the store seam, and every decision since, through relations, impediments, the two performance reshapes, and [ADR-0029](architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removed the sprint, the board, the retrospective and the estimate against the tool's statement of purpose.
 Each names where it departs from the design that preceded it, and a record a later one overtook says so in its header rather than being rewritten.
 
 ## Extension

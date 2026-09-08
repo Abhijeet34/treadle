@@ -16,15 +16,12 @@ import { readConfig, setConfig } from '../application/services/config.ts'
 import { doctor } from '../application/services/doctor.ts'
 import { setFields } from '../application/services/editing.ts'
 import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, invocation, showItem, type Filter } from '../application/services/items.ts'
-import { DEFAULT_BOARD_COLUMNS, board } from '../application/services/board.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
 import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { removeItem } from '../application/services/removal.ts'
 import { transition } from '../application/services/lifecycle.ts'
-import { SPRINT_SET_FIELDS, closeSprint, commitItems, openSprint, reopenSprint, setSprint, sprints, uncommitItems, type SprintSetField } from '../application/services/sprints.ts'
-import { ceremonies } from '../application/services/ceremonies.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
@@ -83,9 +80,7 @@ function actorOf(env: Environment, flags: Readonly<Record<string, unknown>>): Ac
 }
 
 function modeOf(flags: Readonly<Record<string, unknown>>): Mode {
-  if (flags['preview'] === true) return 'preview'
-  if (flags['dry-run'] === true) return 'dry-run'
-  return 'apply'
+  return flags['dry-run'] === true ? 'dry-run' : 'apply'
 }
 
 function levelOf(flags: Readonly<Record<string, unknown>>): Level {
@@ -175,10 +170,10 @@ function flagValueRefusal(
       )
     }
   }
-  // The two rules below are about a filter's value rather than any flag's, so they are asked
-  // of the two commands that filter and of nothing else: on `file` and `sprint set` the same
-  // flag names a field, and the field dictionary already refuses it with a better sentence.
-  if (command !== 'backlog' && command !== 'board') return undefined
+  // The rule below is about a filter's value rather than any flag's, so it is asked of the
+  // one command that filters and of nothing else: on `file` the same flag names a field, and
+  // the field dictionary already refuses it with a better sentence.
+  if (command !== 'backlog') return undefined
 
   // A filter value comes back in the `filter`, `narrowest` and `page` lines, and the agent
   // rendering treats a newline as a record delimiter, so a value carrying one threw a render
@@ -189,7 +184,7 @@ function flagValueRefusal(
     for (const value of valuesOf(flags, name)) {
       // The length bound above reads a string flag, so a repeatable one is bounded here
       // instead of there, for the reason that bound's own comment gives. The safe-line half
-      // of this loop moved into it, because it now covers every flag rather than these eight.
+      // of this loop moved into it, because it now covers every flag rather than these seven.
       if (value.length <= MAX_LINE) continue
       return validation(
         command,
@@ -250,8 +245,8 @@ function setFieldsOf(
   const fields: Record<string, string> = {}
   const spelled = new Map<string, string>()
   const direct: readonly (readonly [string, string])[] = [
-    ['points', 'points'], ['priority', 'priority'], ['assignee', 'assignee'],
-    ['desc', 'description'], ['sprint', 'sprint_id'], ['parent', 'parent_id'],
+    ['priority', 'priority'], ['assignee', 'assignee'],
+    ['desc', 'description'], ['parent', 'parent_id'],
   ]
   for (const [name, field] of direct) {
     const value = flag(flags, name)
@@ -495,17 +490,6 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     })
   }
 
-  if (command === 'board') {
-    const absence = flag(flags, 'explain-absence')
-    return board(store, systemClock, {
-      filters: filtersOf(flags, input.filterOrder),
-      columns: fieldsOf(flags, DEFAULT_BOARD_COLUMNS),
-      limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),
-      all: flags['all'] === true,
-      ...(absence === undefined ? {} : { explainAbsence: absence }),
-    })
-  }
-
   if (command === 'doctor') return doctor(store, systemClock)
 
   if (command === 'config') {
@@ -548,8 +532,8 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === 'history') {
     const txn = flag(flags, 'txn')
     // The two scopes are one question each and their intersection is a third nobody asked,
-    // so the line is refused rather than answered, as `board --all --sprint` is. Both
-    // readings are printed as the lines that give them, which is what the caller runs next.
+    // so the line is refused rather than answered. Both readings are printed as the lines
+    // that give them, which is what the caller runs next.
     if (id !== undefined && txn !== undefined) {
       return validation(
         'history',
@@ -650,51 +634,6 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     return removeItem(target, systemClock, randomIds, {
       id, ...(reason === undefined ? {} : { reason }), confirmed: flags['yes'] === true, actor,
     })
-  }
-
-  if (command === 'sprints') return sprints(store, systemClock, operands[0])
-
-  if (command === 'ceremonies') return ceremonies(store, operands[0])
-
-  if (command === 'sprint') {
-    // Five verbs, each named: the read is `sprints`, so nothing here is reached by omission.
-    const [verb, first, ...rest] = operands
-    if (verb === 'open') {
-      if (first === undefined) return validation('sprint', 'sprint open needs a title in quotes', ['treadle help sprint'])
-      const end = flag(flags, 'end')
-      if (end === undefined) return validation('sprint', 'sprint open needs --end <date>, the last day of the sprint', ['treadle help sprint'])
-      const chosen = flag(flags, 'id')
-      const start = flag(flags, 'start')
-      const goal = flag(flags, 'goal')
-      return openSprint(target, systemClock, randomIds, {
-        title: first, end, actor,
-        ...(chosen === undefined ? {} : { id: chosen }),
-        ...(start === undefined ? {} : { start }),
-        ...(goal === undefined ? {} : { goal }),
-      })
-    }
-    if (verb === 'set') {
-      if (first === undefined) return validation('sprint', 'sprint set needs the id of one sprint', ['treadle sprints'])
-      const fields: Partial<Record<SprintSetField, string>> = {}
-      for (const field of SPRINT_SET_FIELDS) {
-        const value = flag(flags, field)
-        if (value !== undefined) fields[field] = value
-      }
-      return setSprint(target, systemClock, randomIds, { sprint: first, fields, actor })
-    }
-    if (verb === 'commit') {
-      if (first === undefined) return validation('sprint', 'sprint commit needs a sprint id and then one or more item ids', ['treadle help sprint'])
-      return commitItems(target, systemClock, randomIds, { sprint: first, items: rest, actor })
-    }
-    if (verb === 'uncommit') return uncommitItems(target, systemClock, randomIds, { items: first === undefined ? [] : [first, ...rest], actor })
-    if (verb === 'close' || verb === 'reopen') {
-      if (first === undefined) return validation('sprint', `sprint ${verb} needs the id of one sprint`, ['treadle sprints'])
-      const request = { sprint: first, actor }
-      return verb === 'close'
-        ? closeSprint(target, systemClock, randomIds, request)
-        : reopenSprint(target, systemClock, randomIds, request)
-    }
-    return validation('sprint', `sprint takes one of open, set, commit, uncommit, close, reopen, not ${verb ?? 'nothing'}`, ['treadle help sprint'])
   }
 
   if (command === 'transition') {

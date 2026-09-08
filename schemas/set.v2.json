@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "remove.v1.json",
-  "title": "remove/1",
-  "description": "Take one mis-filed item out of the records, keeping every event it earned in the log.",
+  "$id": "set.v2.json",
+  "title": "set/2",
+  "description": "Write one or more stored fields of an item that is already filed.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "remove/1"
+      "const": "set/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "remove"
+      "const": "set"
     },
     "workspace": {
       "type": "string"
@@ -66,27 +66,11 @@
             "null"
           ]
         },
-        "type": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "state": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "v": {
           "type": [
-            "integer",
+            "string",
             "null"
           ]
-        },
-        "title": {
-          "type": "string",
-          "x-trust": "data"
         },
         "set": {
           "type": "array",
@@ -95,13 +79,13 @@
           },
           "x-trust": "data"
         },
-        "dry_run": {
+        "already": {
           "type": [
-            "integer",
+            "string",
             "null"
           ]
         },
-        "preview": {
+        "dry_run": {
           "type": [
             "integer",
             "null"

@@ -10,10 +10,10 @@
 //
 // The guards below are all one rule read two ways: a removal is refused exactly where it
 // would leave another record naming something the store no longer holds, because that is the
-// shape `doctor` raises as `H24`, `H26`, `H28` and `H30`, and a write that manufactures a
-// finding is a write the tool should not perform. An item's own state gates nothing, because
-// no state makes another record depend on it; what does is a closed sprint that counted it,
-// an edge pointing at it, or a child parented to it.
+// shape `doctor` raises as `H24` and `H30`, and a write that manufactures a finding is a
+// write the tool should not perform. An item's own state gates nothing, because no state
+// makes another record depend on it; what does is an edge pointing at it or a child parented
+// to it.
 //
 // These guards decide against a read taken before the store's lock, so they cannot see a
 // neighbour written after it. That half of the rule is the store's, as `S17` inside the lock
@@ -30,7 +30,8 @@ import { storeRefusal } from './refusal.ts'
 
 export const REMOVE_SHAPE: ResultShape = {
   command: 'remove',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Take one mis-filed item out of the records, keeping every event it earned in the log.',
   properties: [
@@ -43,7 +44,6 @@ export const REMOVE_SHAPE: ResultShape = {
     // untrusted-content marker rather than reading as the tool's own speech.
     { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
@@ -67,32 +67,11 @@ function refusal(workspace: string, rule: string, entity: string, cause: string,
 type Reference = { readonly cause: string; readonly fix: readonly string[] }
 
 /**
- * The first record that would be left naming this item, or `undefined`. The four kinds are
- * the four ways one record can hold another's id: a closed sprint's committed set, a stored
- * relation edge, a child's parent, and a retrospective's action list.
- *
- * A closed sprint is read two ways because two eras of record exist. This build's close
- * writes `carried` and `finished`, so a member is named by one of them; a sprint an older
- * build closed wrote neither for its finished members, and `committedTo` recomputes that
- * sprint's set from what still points at it, so `sprint_id` is the membership there. Reading
- * only the frozen list let a member of a legacy closed sprint be removed, which shrinks a
- * count a team already read; reading only `sprint_id` misses every carried member, which is
- * `H28`. Both are read.
- *
- * An open sprint is deliberately not among them. Its committed set is what points at it,
- * recomputed on every read, so a member leaving takes nothing with it.
+ * The first record that would be left naming this item, or `undefined`. The two kinds are
+ * the two ways one record can hold another's id: a stored relation edge and a child's parent.
  */
 function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
   const { id } = item
-  for (const sprint of view.sprints) {
-    if (sprint.state !== 'closed') continue
-    const recorded = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
-    if (!recorded.includes(id) && item.sprint_id !== sprint.id) continue
-    return {
-      cause: `${id} is a member of ${sprint.id}, which is closed, and a closed sprint's committed set is a record that its tally was counted over`,
-      fix: [`treadle sprints ${sprint.id}`],
-    }
-  }
   const edge = view.relations.relations.find((relation) => relation.target === id)
   if (edge !== undefined) {
     return {
@@ -107,37 +86,17 @@ function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
       fix: [`treadle set ${child} parent_id=`, `treadle backlog --fields id,type,state,title`],
     }
   }
-  // A retrospective's action list is the one place the retro-to-chore link is stored, so a
-  // chore taken out from under it leaves the record unable to say what it produced. There is
-  // no fix line that edits the list, because no command edits a filed retrospective: the
-  // record is the answer, and `transition <id> cancelled` is what stops the work instead.
-  const ceremony = view.ceremonies.find((held) => (held.actions ?? []).includes(id))
-  if (ceremony !== undefined) {
-    return {
-      cause: `${ceremony.id} names ${id} in its action list, and a retrospective's actions are the record of what it produced`,
-      fix: [`treadle ceremonies ${ceremony.id}`, `treadle transition ${id} cancelled`],
-    }
-  }
   return undefined
 }
 
 /**
- * What the removal changes that the caller did not name. Neither is a reason to refuse:
- * an open sprint's set is derived, and an item stops blocking whatever it blocked, which is
- * the same thing cancelling it would have done. Both are said out loud, because a silent
- * change to a sprint a team is running or to another item's blocked state is the class of
- * quiet answer this tool refuses everywhere else.
+ * What the removal changes that the caller did not name. It is not a reason to refuse: an
+ * item stops blocking whatever it blocked, which is the same thing cancelling it would have
+ * done. It is said out loud, because a silent change to another item's blocked state is the
+ * class of quiet answer this tool refuses everywhere else.
  */
 function consequence(view: WorkspaceView, item: WorkItem): string | undefined {
   const parts: string[] = []
-  const sprint = item.sprint_id === undefined ? undefined : view.sprintById.get(item.sprint_id)
-  // The state is read rather than assumed. `namedBy` refuses a member of a closed sprint
-  // before this runs, so the sentence below is only ever true; asserting "is open" of
-  // whatever the id resolved to is how it would stop being true after the next change.
-  if (sprint !== undefined && sprint.state === 'open') {
-    const remaining = view.items.filter((other) => other.sprint_id === sprint.id && other.id !== item.id).length
-    parts.push(`${sprint.id} is open and now holds ${remaining} ${remaining === 1 ? 'item' : 'items'}`)
-  }
   const freed = view.relations.relations
     .filter((relation) => relation.kind === 'blocks' && relation.source === item.id)
     .map((relation) => relation.target)
@@ -197,13 +156,6 @@ export async function removeItem(
   }
   const said = consequence(view.value, item)
   if (said !== undefined) data['note'] = said
-  if (mode === 'preview') {
-    return okResult(REMOVE_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: { ...data, preview: 1, store: view.value.identity.path ?? workspace, note: 'nothing evaluated; use --dry-run for the outcome' },
-    })
-  }
-
   const now = clock.now()
   const txn = ids.txn()
   const eventId = ids.event()

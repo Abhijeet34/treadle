@@ -17,7 +17,7 @@ import { mkdir, mkdtemp, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
-import { resolveWorkspace } from '../../src/adapters/store/index.ts'
+import { resolveStore } from '../../src/adapters/workspace.ts'
 import type { Corpus } from '../corpus.ts'
 import { dataOf, openSurface, resultOf, type Invocation } from './surface.ts'
 import type { AxisResult } from './axis.ts'
@@ -138,7 +138,7 @@ export async function runA6(corpus: Corpus): Promise<{
       target: '0 of 3; every write prints the store identity',
       verdict: met ? 'MET' : 'MISSED',
       observed: met
-        ? `0 mis-targets in ${implicit.length} writes with no explicit target, across all three scenarios; ${explicit.length} explicit --workspace write landed where it was pointed; ${seam.length} of ${seam.length} seam resolutions correct; no command invented a store; every write that landed printed the workspace identity in its envelope, while the filesystem path is printed by status, doctor and --preview but not by an applied write`
+        ? `0 mis-targets in ${implicit.length} writes with no explicit target, across all three scenarios; ${explicit.length} explicit --workspace write landed where it was pointed; ${seam.length} of ${seam.length} seam resolutions correct; no command invented a store; every write that landed printed the workspace identity in its envelope, while the filesystem path is printed by status and doctor but not by an applied write`
         : `${misTargets.length} of ${rows.length} writes mis-targeted, ${invented.length} invented a store, ${silent.length} printed no identity, ${seamWrong} of ${seam.length} seam resolutions wrong`,
       operations: driven + seam.length,
       samples: rows.length,
@@ -196,7 +196,7 @@ async function seamRows(corpus: Corpus): Promise<readonly SeamRow[]> {
   ]
   const rows: SeamRow[] = []
   for (const scenario of scenarios) {
-    const resolved = await resolveWorkspace(scenario.from)
+    const resolved = await resolveStore(scenario.from)
     rows.push({
       scenario: scenario.name,
       resolved: resolved ?? null,

@@ -17,7 +17,7 @@ import { describe, it } from 'node:test'
 
 import { findUnsafeCharacter, isSafeText } from '../../src/domain/index.ts'
 import { parseRecordSource, renderRecord } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 /** The design's own rule, as the audit implemented it, so the gap is visible in the table. */
 const OLD_RULE = /[\u202A-\u202E]/
@@ -100,7 +100,7 @@ describe('the class is enforced at the store boundary, in both directions', () =
       const edited = (await readFile(shard, 'utf8')).replace('state: draft', 'state: dr\u202Eaft')
       await writeFile(shard, edited)
 
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.deepEqual(items.ok ? items.value.map((i) => i.id) : [], [])
       const findings = await workspace.store.findings()
       assert.ok(findings.ok)
@@ -122,7 +122,7 @@ describe('the class is enforced at the store boundary, in both directions', () =
       assert.match(refused.ok ? '' : refused.error.message, /U\+2069 POP DIRECTIONAL ISOLATE/)
 
       const shard = path.join(workspace.root, 'items/2026-09.md')
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.deepEqual(items.ok ? items.value.map((i) => i.id) : [], [])
       await assert.rejects(readFile(shard, 'utf8'))
     } finally {

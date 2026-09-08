@@ -11,7 +11,8 @@ import { describe, it } from 'node:test'
 
 import { defaultConfig, withConfigKey } from '../../src/domain/index.ts'
 import { makeEvent } from '../../src/application/services/mutation.ts'
-import { openWorkspace, resolveWorkspace } from '../../src/adapters/store/index.ts'
+import { openWorkspace } from '../../src/adapters/store/index.ts'
+import { resolveStore } from '../../src/adapters/workspace.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 describe('resolving the store', () => {
@@ -20,8 +21,8 @@ describe('resolving the store', () => {
     try {
       const deep = path.join(workspace.root, 'items', 'nested', 'deeper')
       await mkdir(deep, { recursive: true })
-      assert.equal(await resolveWorkspace(deep), workspace.root)
-      assert.equal(await resolveWorkspace(workspace.root), workspace.root)
+      assert.equal(await resolveStore(deep), workspace.root)
+      assert.equal(await resolveStore(workspace.root), workspace.root)
     } finally {
       await workspace.dispose()
     }
@@ -29,7 +30,7 @@ describe('resolving the store', () => {
 
   it('returns nothing outside a workspace rather than inventing one', async () => {
     const empty = await mkdtemp(path.join(tmpdir(), 'treadle-nowhere-'))
-    const found = await resolveWorkspace(empty)
+    const found = await resolveStore(empty)
     assert.equal(found === empty, false, 'a directory with no workspace.md is not a workspace')
   })
 

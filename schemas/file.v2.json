@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "file.v1.json",
-  "title": "file/1",
+  "$id": "file.v2.json",
+  "title": "file/2",
   "description": "File one work item of a type, and report the fields it was created with.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "file/1"
+      "const": "file/2"
     },
     "ok": {
       "type": "boolean"
@@ -101,12 +101,6 @@
             "null"
           ]
         },
-        "preview": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "would_exit": {
           "type": [
             "integer",
@@ -120,12 +114,6 @@
           ]
         },
         "note": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "not_ready": {
           "type": [
             "string",
             "null"

@@ -117,13 +117,11 @@ describe('the defects found by using the tool', () => {
       const noteOf = (flag: string): string =>
         help.out.split('\n').find((line) => line.startsWith(`${flag} `)) ?? ''
 
-      // Both were `A ... it only changes presentation, and here there is nothing to present`,
-      // on a command that presents. `--width` is read by the human rendering, so it is `S`;
-      // `--color` is read by no rendering, which is the reason its note now gives.
+      // `--yes` was `A ... it only changes presentation, and here there is nothing to
+      // present`, on a command that presents. `--width` is read by the human rendering, so
+      // it is `S`, and the note says which knob it turns.
       assert.match(noteOf('--width'), /^--width S .*display cells/)
-      assert.match(noteOf('--color'), /^--color A .*no rendering emits colour/)
-      assert.doesNotMatch(noteOf('--color'), /nothing to present/)
-      for (const flag of ['--yes', '--no-input']) {
+      for (const flag of ['--yes']) {
         assert.match(noteOf(flag), new RegExp(`^${flag} A `), `${flag} is still accepted and ignored here`)
         assert.doesNotMatch(noteOf(flag), /presentation/, `${flag} has nothing to do with presentation`)
         assert.match(noteOf(flag), /confirm/, `${flag} is ignored because there is no confirmation`)
@@ -460,12 +458,13 @@ describe('an aggregate says what it aggregates, and a heading with no value prin
 
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
 
-  it('names the completed-points counter for the points it sums, not for the items', async () => {
+  // The finding this suite recorded was `done` as a key beside a row whose STATE cell reads
+  // `done`, which a reader took for a count of finished items. The key was renamed to
+  // `done_points` and then removed with estimation in ADR-0029; what stands is the rule, so
+  // this asserts that no bare `done` count is back on the surface.
+  it('prints no bare done count, which a reader takes for a count of finished items', async () => {
     const listed = await cli(['backlog'])
     assert.equal(listed.code, 0, listed.err)
-    assert.match(listed.out, /^done_points \d+$/m)
-    // `done` was the key, and beside a row whose STATE cell reads `done` it was read as a
-    // count of finished items. No key on this surface may be read that way again.
     assert.doesNotMatch(listed.out, /^done \d+$/m)
   })
 
@@ -675,7 +674,7 @@ describe('what the tool says about itself', () => {
 
   it('declares a NOT_FOUND from a mutating command a mutation, not a read', async () => {
     // `notFound` hard-coded `effect: 'read'`, so every NOT_FOUND from `transition`, `set`,
-    // `mark`, `evidence`, `relation` and `sprint` said it was a read. R6 makes the effect a
+    // `mark`, `evidence` and `relation` said it was a read. R6 makes the effect a
     // declaration rather than an inference, and an agent deciding whether a failed call may
     // have written anything reads this one field.
     const lines: readonly (readonly [string, readonly string[]])[] = [
@@ -684,7 +683,6 @@ describe('what the tool says about itself', () => {
       ['mark', ['mark', 'nope', '--priority', '2', '--reason', 'a reason for the change']],
       ['evidence', ['evidence', 'add', 'nope', 'run', '8813']],
       ['relation', ['relation', 'add', 'nope', 'blocks', 'sso-saml']],
-      ['sprint', ['sprint', 'commit', 'sprint-31', 'nope']],
     ]
     for (const [command, argv] of lines) {
       const refused = await cli([...argv, '--out', 'json'])
@@ -734,19 +732,21 @@ describe('help names every flag the parser accepts', () => {
     assert.match(help.out, /^--out S .*human, agent, json/m)
   })
 
-  it('refuses --no-color by name, rather than accepting a second spelling of nothing', async () => {
-    // No renderer has ever read a colour flag. `--color` is the one documented knob and is
-    // declared `A` for exactly that reason; `--no-color` was a second spelling of the same
-    // nothing that no help page named, so it is gone rather than documented.
-    const refused = await cli(['status', '--no-color'])
-    assert.equal(refused.code, 2)
-    assert.match(refused.err, /--no-color is not a flag of status/)
-    assert.match(refused.err, /^fix treadle help status$/m)
+  it('refuses a colour flag by name, rather than accepting a spelling of nothing', async () => {
+    // No renderer has ever read a colour flag. `--color` was accepted and ignored and
+    // `--no-color` was a second spelling of the same nothing; ADR-0029 removed both rather
+    // than documenting a knob that turns nothing.
+    for (const flag of ['--no-color', '--color']) {
+      const refused = await cli(['status', flag])
+      assert.equal(refused.code, 2, refused.out)
+      assert.match(refused.err, new RegExp(`${flag} is not a flag of status`))
+      assert.match(refused.err, /^fix treadle help status$/m)
+    }
   })
 
   it('has a usage line for each command flag, so a caller finds one by asking', async () => {
-    // `file` accepted --id, --desc, --assignee, --label, --sprint and --parent, and `backlog`
-    // accepted --sprint and --priority, none of which appeared in any help output. A caller's
+    // `file` accepted --id, --desc, --assignee, --label and --parent, and `backlog` accepted
+    // --priority, none of which appeared in any help output. A caller's
     // only way to those eight was the refusal it got for guessing wrong.
     const missing: string[] = []
     for (const [command, options] of Object.entries(COMMAND_OPTIONS)) {

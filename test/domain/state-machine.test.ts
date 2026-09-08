@@ -64,7 +64,7 @@ describe('the transition table matches the model diagram', () => {
       ['groom', 'ungroom', 'start', 'submit', 'finish', 'rework', 'accept', 'reopen',
         'hold', 'resume', 'cancel', 'release', 'revive'],
     )
-    assert.deepEqual([...GUARD_IDS], ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'])
+    assert.deepEqual([...GUARD_IDS], ['G1', 'G2', 'G3', 'G5', 'G6', 'G7', 'G8'])
   })
 
   it('draws 23 edges once the three resume edges this fixture cannot reach are added back', () => {
@@ -189,9 +189,15 @@ describe('resume', () => {
     assert.equal(refusal(outcome).error.rule, 'T3')
   })
 
-  it('is refused when the held-from state is missing, rather than guessing one', () => {
-    const broken = item('task', { state: 'on_hold', hold_reason: 'vendor' })
-    assert.equal(refusal(evaluateTransition(context(broken), { target: 'resume' })).error.rule, 'T3')
+  // An on_hold record with no `held_from` cannot reach this evaluator: `V4` requires the
+  // field on every on_hold record and the store quarantines one without it, so ADR-0029
+  // removed the branch that used to guess. What is asserted instead is that the field the
+  // evaluator does read is the one it restores.
+  it('restores the state the record says it was held from, and no other', () => {
+    const held = item('task', { state: 'on_hold', hold_reason: 'vendor', held_from: 'in_progress' })
+    const outcome = evaluateTransition(context(held), { target: 'resume' })
+    assert.equal(outcome.outcome, 'allowed')
+    assert.equal(outcome.outcome === 'allowed' ? outcome.to : '-', 'in_progress')
   })
 })
 
@@ -256,15 +262,9 @@ describe('T6, the closed-set value two edges record', () => {
   })
 })
 
-describe('an unknown target', () => {
-  it('is a validation error, not a guard refusal', () => {
-    const { error } = refusal(
-      evaluateTransition(context(item('task')), { target: 'blocked' as WorkItemState }),
-    )
-    assert.equal(error.code, 'VALIDATION')
-    assert.equal(error.rule, 'T2')
-  })
-})
+// `T2` refused a target that is not a state and was removed with ADR-0029, because
+// `src/cli/main.ts` refuses one with `C1` before this evaluator runs and no other caller
+// exists. `test/cli/contract.test.ts` holds that refusal from the surface a caller reaches.
 
 describe('reasons', () => {
   for (const name of REASON_REQUIRED) {
@@ -356,22 +356,6 @@ describe('guards', () => {
     ))
   })
 
-  it('G4 refuses start for an item that is in no sprint and on no board', () => {
-    const outcome = evaluateTransition(
-      context(subject('ready'), { iterationMember: false }),
-      { target: 'in_progress' },
-    )
-    assert.equal(refusal(outcome).error.rule, 'G4')
-  })
-
-  it('G4 cannot be overridden', () => {
-    const outcome = evaluateTransition(
-      context(subject('ready'), { iterationMember: false }),
-      { target: 'in_progress', overrides: ['G4'], reason: 'why' },
-    )
-    assert.equal(refusal(outcome).error.rule, 'T5')
-  })
-
   it('G5 makes submit the only exit from in_progress when the type has a review step', () => {
     const withReview = context(subject('in_progress'), { reviewStep: true })
     allowance(evaluateTransition(withReview, { target: 'in_review' }))
@@ -432,13 +416,12 @@ describe('guards', () => {
     const outcome = refusal(evaluateTransition(
       context(subject('ready'), {
         blockers: [neighbour('a')],
-        iterationMember: false,
         column: { name: 'in_progress', used: 5, limit: 5 },
       }),
       { target: 'in_progress' },
     ))
-    assert.deepEqual(outcome.guards.map((g) => g.guard), ['G2', 'G3', 'G4'])
-    assert.equal(outcome.guards.filter((g) => !g.pass).length, 3)
+    assert.deepEqual(outcome.guards.map((g) => g.guard), ['G2', 'G3'])
+    assert.equal(outcome.guards.filter((g) => !g.pass).length, 2)
     // The error names the first failing guard; the body carries the rest.
     assert.equal(outcome.error.rule, 'G2')
     assert.deepEqual(outcome.error.entities, ['task-1'])

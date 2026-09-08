@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "config.v1.json",
-  "title": "config/1",
-  "description": "Read every configuration key with the value in force and its source, or set one.",
+  "$id": "next.v2.json",
+  "title": "next/2",
+  "description": "Rank what to pick up, and print the components and weights that produced the order.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "config/1"
+      "const": "next/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,13 +36,13 @@
       ]
     },
     "command": {
-      "const": "config"
+      "const": "next"
     },
     "workspace": {
       "type": "string"
     },
     "effect": {
-      "const": "mutate"
+      "const": "read"
     },
     "txn": {
       "type": [
@@ -60,46 +60,27 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "key": {
+        "weights": {
           "type": [
             "string",
             "null"
           ]
         },
-        "v": {
+        "none": {
           "type": [
             "string",
             "null"
           ]
         },
-        "set": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
-          "x-trust": "data"
-        },
-        "already": {
+        "absent": {
           "type": [
             "string",
             "null"
           ]
         },
-        "dry_run": {
+        "clause": {
           "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "would_exit": {
-          "type": [
-            "integer",
+            "string",
             "null"
           ]
         },
@@ -109,25 +90,19 @@
             "null"
           ]
         },
-        "event": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "note": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "extra": {
+        "more": {
           "type": [
             "integer",
             "null"
           ]
         },
-        "config": {
+        "page": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "next": {
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -180,13 +155,16 @@
           },
           "x-columns": [
             {
-              "name": "key"
+              "name": "id"
             },
             {
-              "name": "source"
+              "name": "score"
             },
             {
-              "name": "value",
+              "name": "parts"
+            },
+            {
+              "name": "title",
               "trust": "data"
             }
           ]

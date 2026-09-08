@@ -15,13 +15,10 @@ import type { ResultObject } from '../../src/application/result.ts'
 import type { Store } from '../../src/application/ports/store.ts'
 import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
-import { ceremonies } from '../../src/application/services/ceremonies.ts'
-import { DEFAULT_BOARD_COLUMNS, board } from '../../src/application/services/board.ts'
 import { history } from '../../src/application/services/history.ts'
 import { readConfig, setConfig } from '../../src/application/services/config.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
 import { relate } from '../../src/application/services/relation.ts'
-import { closeSprint, commitItems, openSprint, sprints } from '../../src/application/services/sprints.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import type { Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -47,30 +44,30 @@ const CRITERIA = 'acceptance_criteria'
 
 /** Ids are short on purpose: every byte figure in the budget table shifts with them. */
 export const SEEDS: readonly Seed[] = [
-  { id: 'auth-refresh', type: 'story', title: 'Refresh the access token on a 401', filed: '2026-08-20T09:00:00Z', to: ['ready', 'in_progress'], fields: { points: '5', priority: '2', assignee: 'dana', [CRITERIA]: 'a 401 refreshes once|the retry carries the new token', description: 'The client currently drops the session when the access token expires, and the user is signed out in the middle of a task they had already started.' } },
-  { id: 'sso-saml', type: 'story', title: 'SAML login for enterprise tenants', filed: '2026-08-21T09:00:00Z', to: ['ready', 'in_progress'], fields: { points: '8', priority: '1', assignee: 'kim', [CRITERIA]: 'metadata upload works|a signed assertion logs in' } },
-  { id: 'rate-limit', type: 'story', title: 'Return 429 with a retry-after header', filed: '2026-08-22T09:00:00Z', to: ['ready', 'in_progress', 'in_review'], fields: { points: '3', priority: '2', assignee: 'ravi', [CRITERIA]: 'a burst gets 429|the header names the wait' } },
-  { id: 'csv-export', type: 'story', title: 'Export a filtered list to CSV', filed: '2026-08-23T09:00:00Z', to: ['ready'], fields: { points: '5', priority: '3', [CRITERIA]: 'the header row is present' } },
-  { id: 'flaky-e2e', type: 'bug', title: 'Checkout suite fails, one run in five', filed: '2026-08-24T09:00:00Z', to: ['ready'], fields: { points: '2', priority: '2', severity: 'S2', found_in: 'test', repro_steps: 'run the checkout suite five times', expected: 'five passes', actual: 'one failure' } },
-  { id: 'dep-bump', type: 'chore', title: 'Move the toolchain to the current release', filed: '2026-08-25T09:00:00Z', to: ['ready'], fields: { points: '1', priority: '4' } },
-  { id: 'search-rank', type: 'spike', title: 'Which ranker do we adopt', filed: '2026-08-26T09:00:00Z', fields: { priority: '3', question: 'which ranker', timebox_hours: '8' } },
-  { id: 'audit-log', type: 'story', title: 'Record who changed what and when', filed: '2026-08-27T09:00:00Z', fields: { points: '8', priority: '2' } },
-  { id: 'onboard-copy', type: 'task', title: 'Rewrite the first-run text', filed: '2026-08-28T09:00:00Z', to: ['ready', 'on_hold'], fields: { points: '2', priority: '5', assignee: 'kim' } },
-  { id: 'login-cta', type: 'task', title: 'Move the sign-in call to action above the fold', filed: '2026-08-29T09:00:00Z', to: ['ready', 'in_progress', 'done'], fields: { points: '3', priority: '3', assignee: 'dana' } },
-  { id: 'log-redact', type: 'task', title: 'Redact tokens from request logs', filed: '2026-08-30T09:00:00Z', to: ['ready', 'in_progress'], fields: { points: '3', priority: '1', assignee: 'ravi' } },
-  { id: 'avatar-crop', type: 'task', title: 'Crop an uploaded avatar to a square', filed: '2026-08-31T09:00:00Z', to: ['ready'], fields: { points: '2', priority: '4' } },
-  { id: 'webhook-retry', type: 'task', title: 'Retry a failed webhook three times', filed: '2026-09-01T09:00:00Z', to: ['ready'], fields: { points: '3', priority: '3' } },
-  { id: 'gdpr-export', type: 'story', title: 'Export everything we hold on one account', filed: '2026-09-01T10:00:00Z', to: ['ready'], fields: { points: '5', priority: '2', assignee: 'dana', [CRITERIA]: 'the archive is complete' } },
-  { id: 'legacy-oauth', type: 'chore', title: 'Remove OAuth 1 support', filed: '2026-09-01T11:00:00Z', to: ['cancelled'], fields: { points: '5', priority: '5' } },
-  { id: 'stale-cache', type: 'bug', title: 'Profile cache serves a deleted avatar', filed: '2026-09-02T09:00:00Z', fields: { points: '2', priority: '2', severity: 'S3', found_in: 'production', repro_steps: 'delete an avatar and reload' } },
-  { id: 'metrics-p95', type: 'task', title: 'Publish p95 latency per route', filed: '2026-09-02T10:00:00Z', fields: { points: '3', priority: '4' } },
-  { id: 'docs-quickstart', type: 'chore', title: 'Write the quickstart page', filed: '2026-09-02T11:00:00Z', fields: { points: '2', priority: '5' } },
-  { id: 'sess-timeout', type: 'bug', title: 'Session survives a password change', filed: '2026-09-03T09:00:00Z', fields: { points: '3', priority: '1', severity: 'S1', found_in: 'production', repro_steps: 'change the password in a second browser' } },
-  { id: 'i18n-dates', type: 'task', title: 'Format dates in the viewer locale', filed: '2026-09-03T10:00:00Z', fields: { points: '2', priority: '4' } },
-  { id: 'bulk-import', type: 'story', title: 'Import a list of accounts from CSV', filed: '2026-09-03T11:00:00Z', fields: { points: '8', priority: '3' } },
-  { id: 'perm-audit', type: 'spike', title: 'Do we need row level permissions', filed: '2026-09-03T12:00:00Z', fields: { priority: '3', question: 'row level permissions', timebox_hours: '4' } },
-  { id: 'queue-drain', type: 'task', title: 'Drain the dead letter queue on deploy', filed: '2026-09-04T08:00:00Z', fields: { points: '3', priority: '2' } },
-  { id: 'theme-dark', type: 'story', title: 'Ship a dark theme', filed: '2026-09-04T08:30:00Z', fields: { points: '5', priority: '5' } },
+  { id: 'auth-refresh', type: 'story', title: 'Refresh the access token on a 401', filed: '2026-08-20T09:00:00Z', to: ['ready', 'in_progress'], fields: { priority: '2', assignee: 'dana', [CRITERIA]: 'a 401 refreshes once|the retry carries the new token', description: 'The client currently drops the session when the access token expires, and the user is signed out in the middle of a task they had already started.' } },
+  { id: 'sso-saml', type: 'story', title: 'SAML login for enterprise tenants', filed: '2026-08-21T09:00:00Z', to: ['ready', 'in_progress'], fields: { priority: '1', assignee: 'kim', [CRITERIA]: 'metadata upload works|a signed assertion logs in' } },
+  { id: 'rate-limit', type: 'story', title: 'Return 429 with a retry-after header', filed: '2026-08-22T09:00:00Z', to: ['ready', 'in_progress', 'in_review'], fields: { priority: '2', assignee: 'ravi', [CRITERIA]: 'a burst gets 429|the header names the wait' } },
+  { id: 'csv-export', type: 'story', title: 'Export a filtered list to CSV', filed: '2026-08-23T09:00:00Z', to: ['ready'], fields: { priority: '3', [CRITERIA]: 'the header row is present' } },
+  { id: 'flaky-e2e', type: 'bug', title: 'Checkout suite fails, one run in five', filed: '2026-08-24T09:00:00Z', to: ['ready'], fields: { priority: '2', severity: 'S2', found_in: 'test', repro_steps: 'run the checkout suite five times', expected: 'five passes', actual: 'one failure' } },
+  { id: 'dep-bump', type: 'chore', title: 'Move the toolchain to the current release', filed: '2026-08-25T09:00:00Z', to: ['ready'], fields: { priority: '4' } },
+  { id: 'search-rank', type: 'spike', title: 'Which ranker do we adopt', filed: '2026-08-26T09:00:00Z', fields: { priority: '3', question: 'which ranker' } },
+  { id: 'audit-log', type: 'story', title: 'Record who changed what and when', filed: '2026-08-27T09:00:00Z', fields: { priority: '2' } },
+  { id: 'onboard-copy', type: 'task', title: 'Rewrite the first-run text', filed: '2026-08-28T09:00:00Z', to: ['ready', 'on_hold'], fields: { priority: '5', assignee: 'kim' } },
+  { id: 'login-cta', type: 'task', title: 'Move the sign-in call to action above the fold', filed: '2026-08-29T09:00:00Z', to: ['ready', 'in_progress', 'done'], fields: { priority: '3', assignee: 'dana' } },
+  { id: 'log-redact', type: 'task', title: 'Redact tokens from request logs', filed: '2026-08-30T09:00:00Z', to: ['ready', 'in_progress'], fields: { priority: '1', assignee: 'ravi' } },
+  { id: 'avatar-crop', type: 'task', title: 'Crop an uploaded avatar to a square', filed: '2026-08-31T09:00:00Z', to: ['ready'], fields: { priority: '4' } },
+  { id: 'webhook-retry', type: 'task', title: 'Retry a failed webhook three times', filed: '2026-09-01T09:00:00Z', to: ['ready'], fields: { priority: '3' } },
+  { id: 'gdpr-export', type: 'story', title: 'Export everything we hold on one account', filed: '2026-09-01T10:00:00Z', to: ['ready'], fields: { priority: '2', assignee: 'dana', [CRITERIA]: 'the archive is complete' } },
+  { id: 'legacy-oauth', type: 'chore', title: 'Remove OAuth 1 support', filed: '2026-09-01T11:00:00Z', to: ['cancelled'], fields: { priority: '5' } },
+  { id: 'stale-cache', type: 'bug', title: 'Profile cache serves a deleted avatar', filed: '2026-09-02T09:00:00Z', fields: { priority: '2', severity: 'S3', found_in: 'production', repro_steps: 'delete an avatar and reload' } },
+  { id: 'metrics-p95', type: 'task', title: 'Publish p95 latency per route', filed: '2026-09-02T10:00:00Z', fields: { priority: '4' } },
+  { id: 'docs-quickstart', type: 'chore', title: 'Write the quickstart page', filed: '2026-09-02T11:00:00Z', fields: { priority: '5' } },
+  { id: 'sess-timeout', type: 'bug', title: 'Session survives a password change', filed: '2026-09-03T09:00:00Z', fields: { priority: '1', severity: 'S1', found_in: 'production', repro_steps: 'change the password in a second browser' } },
+  { id: 'i18n-dates', type: 'task', title: 'Format dates in the viewer locale', filed: '2026-09-03T10:00:00Z', fields: { priority: '4' } },
+  { id: 'bulk-import', type: 'story', title: 'Import a list of accounts from CSV', filed: '2026-09-03T11:00:00Z', fields: { priority: '3' } },
+  { id: 'perm-audit', type: 'spike', title: 'Do we need row level permissions', filed: '2026-09-03T12:00:00Z', fields: { priority: '3', question: 'row level permissions' } },
+  { id: 'queue-drain', type: 'task', title: 'Drain the dead letter queue on deploy', filed: '2026-09-04T08:00:00Z', fields: { priority: '2' } },
+  { id: 'theme-dark', type: 'story', title: 'Ship a dark theme', filed: '2026-09-04T08:30:00Z', fields: { priority: '5' } },
 ]
 
 export type Demo = {
@@ -122,8 +119,8 @@ export async function aDemoWorkspace(): Promise<Demo> {
  * `mkdtemp` root: the A.3 byte budget counts the `store` line, and the human-layout snapshot
  * lays that line out against the terminal width. A macOS `/var/folders/bl/vzjcvbz.../T` root
  * is 44 characters where a Linux `/tmp` one is 4, which on macos-15 in run 34110894767 put
- * `transition-preview` at 266 B against its 250 B budget and wrapped the snapshot's `store`
- * scalar onto a second line. Neither is a fact about this tool.
+ * an artefact over its A.3 byte budget and wrapped the snapshot's `store` scalar onto a
+ * second line. Neither is a fact about this tool.
  */
 const GOLDEN_ROOT = '/w/platform/.work'
 
@@ -148,15 +145,15 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     const golden = new Map<string, ResultObject>()
     golden.set('status', await status(demo.store, clock))
     golden.set('backlog', await backlog(demo.store, {
-      filters: [], columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9,
+      filters: [], columns: ['id', 'type', 'state', 'title'], limit: 9,
     }))
     golden.set('backlog-empty', await backlog(demo.store, {
       filters: [{ field: 'state', value: 'ready' }, { field: 'assignee', value: 'kim' }],
-      columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9,
+      columns: ['id', 'type', 'state', 'title'], limit: 9,
     }))
     golden.set('backlog-absence', await backlog(demo.store, {
       filters: [{ field: 'state', value: 'ready' }],
-      columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'sso-saml',
+      columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'sso-saml',
     }))
     golden.set('show', await showItem(demo.store, clock, 'auth-refresh'))
     // The `ac` projection, which is the one read surface that prints a story's criteria: the
@@ -171,9 +168,6 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('transition-dry-run', await transition(targetFor(demo.store, 'dry-run'), clock, ids, {
       id: 'csv-export', target: 'in_progress', actor: ACTOR,
     }))
-    golden.set('transition-preview', await transition(targetFor(demo.store, 'preview'), clock, ids, {
-      id: 'csv-export', target: 'in_progress', actor: ACTOR,
-    }))
     golden.set('transition', await transition(targetFor(demo.store, 'apply'), clock, ids, {
       id: 'csv-export', target: 'in_progress', actor: ACTOR,
     }))
@@ -185,7 +179,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     }))
     golden.set('file', await fileItem(targetFor(demo.store, 'apply'), clock, ids, {
       type: 'task', title: 'Add a health endpoint', id: 'health-endpoint',
-      fields: { points: '1', priority: '4' }, actor: ACTOR,
+      fields: { priority: '4' }, actor: ACTOR,
     }))
     // A second status, taken last so it moves none of the figures above. The workspace has
     // no missed date until this item exists, so without it the `overdue` scalar and the
@@ -200,7 +194,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('status-not-yet-overdue', await status(demo.store, fixedClock('2026-08-27T09:00:00Z')))
     // Taken last, on the item `file` above created, so it moves none of the figures over it.
     golden.set('set', await setFields(targetFor(demo.store, 'apply'), clock, ids, {
-      id: 'health-endpoint', assignments: ['assignee=kim', 'component=platform'], actor: ACTOR,
+      id: 'health-endpoint', assignments: ['assignee=kim', 'reviewer=dana'], actor: ACTOR,
     }))
     // Taken last, between two draft items, so neither `next` nor any figure above moves: the
     // `explain` over the blocked end is the line that was `blocked no` on every item before.
@@ -209,41 +203,13 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     }))
     golden.set('explain-blocked', await explain(demo.store, clock, 'theme-dark'))
     golden.set('show-relations', await showItem(demo.store, clock, 'queue-drain'))
-    // Over the whole workspace, since nothing is open yet: the blocked draft sorts first in
-    // its column, which is the one line a board carries that a backlog does not.
-    golden.set('board', await board(demo.store, clock, {
-      filters: [], columns: [...DEFAULT_BOARD_COLUMNS], limit: 9, all: false,
-    }))
-    // A sprint, opened after every figure above so none of them gains the block `status`
-    // prints for an open sprint: opened, two items committed, one finished, then closed with
-    // the other recorded as carried. `sprints` is read once open and once closed.
-    golden.set('sprint-open', await openSprint(targetFor(demo.store, 'apply'), clock, ids, {
-      title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
-    }))
-    golden.set('sprint-commit', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
-      sprint: 'sprint-31', items: ['webhook-retry', 'avatar-crop'], actor: ACTOR,
-    }))
-    // The transaction-scoped read, over the one transaction here that wrote more than one
-    // event: the commit above put two items in the sprint under a single id, which is the
-    // case the flag exists for. A read moves no figure below it.
+    // The transaction-scoped read, over the transaction the `relation` write above returned.
+    // Every command in this build writes one event per transaction, so this block carries one
+    // row; the multi-row case is the store's to produce and lives in
+    // test/services/history-transaction.test.ts, which builds one through `apply` directly.
     golden.set('history-txn', await history(demo.store, {
-      scope: { kind: 'txn', txn: (golden.get('sprint-commit') as ResultObject).txn as string }, limit: 9,
+      scope: { kind: 'txn', txn: (golden.get('relation') as ResultObject).txn as string }, limit: 9,
     }))
-    golden.set('sprint-refused', await commitItems(targetFor(demo.store, 'apply'), clock, ids, {
-      sprint: 'sprint-31', items: ['theme-dark'], actor: ACTOR,
-    }))
-    golden.set('status-sprint', await status(demo.store, fixedClock('2026-09-09T09:30:00Z')))
-    // The same board with no flags now scopes itself to the one open sprint and says so.
-    golden.set('board-sprint', await board(demo.store, fixedClock('2026-09-09T09:30:00Z'), {
-      filters: [], columns: [...DEFAULT_BOARD_COLUMNS], limit: 9, all: false,
-    }))
-    golden.set('sprints-open', await sprints(demo.store, fixedClock('2026-09-09T09:30:00Z'), 'sprint-31'))
-    for (const target of ['in_progress', 'done'] as const) {
-      await transition(targetFor(demo.store, 'apply'), clock, ids, { id: 'webhook-retry', target, actor: ACTOR })
-    }
-    golden.set('sprint-close', await closeSprint(targetFor(demo.store, 'apply'), clock, ids, { sprint: 'sprint-31', actor: ACTOR }))
-    golden.set('sprints', await sprints(demo.store, clock))
-    golden.set('sprints-closed', await sprints(demo.store, clock, 'sprint-31'))
     // Last of all, because a configured key changes what every read above evaluates: the
     // write moves `wip_limits` off its default, and the read that follows it is the one
     // artefact carrying a `source` column with both of its words in it.
@@ -251,27 +217,6 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       key: 'wip_limits', value: 'in_progress=5, in_review=2', actor: ACTOR,
     }))
     golden.set('config', await readConfig(demo.store))
-    // The third record kind, written straight through the store because no command in this
-    // build files one: `ceremony retro` is T4b's, and a shape no golden object carries
-    // reaches neither the render conformance suite nor the human snapshot.
-    await fileItem(targetFor(demo.store, 'apply'), clock, ids, {
-      type: 'chore', title: 'Split the carried stories', id: 'split-carried', fields: {}, actor: ACTOR,
-    })
-    const retro = await demo.store.apply({
-      txn: 'txn-retro', writes: [], events: [],
-      ceremonies: [{
-        ceremony: {
-          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded',
-          filed_at: '2026-09-18T16:00:00Z', version: 1, sprint_id: 'sprint-31',
-          actions: ['split-carried'],
-          well: 'The token refresh shipped without a hotfix.',
-          badly: 'Two stories carried for the third sprint running.',
-        },
-      }],
-    })
-    if (!retro.ok) throw new Error(retro.error.message)
-    golden.set('ceremonies', await ceremonies(demo.store))
-    golden.set('ceremonies-one', await ceremonies(demo.store, 'retro-sprint-31'))
     return new Map([...golden].map(([name, result]) => [name, atGoldenRoot(result, demo.root)]))
   } finally {
     await demo.dispose()

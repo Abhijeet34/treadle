@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** T1 of the remaining-surface plan, under the captain decision `remaining-unbuilt-scope`
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the `point_scale`, `cycle_time_excludes_hold` and `start_requires_sprint` keys; the closed key set, the two gate sections and the compare-and-set still stand
 
 ## Context
 

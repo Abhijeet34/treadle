@@ -4,6 +4,7 @@
 **Date:** 2026-09-05
 **Implements:** DR2 of the system design record, under decision D1
 **Overtaken in part by:** [ADR-0016](0016-sprints.md) writes `sprints.md`, and [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) settles that `impediments.md` is never written
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `sprints.md` and leaves `ceremonies/` unwritten again, so the month-sharded items and the log are the whole layout
 
 ## Context
 

@@ -40,7 +40,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
-import { CONFIG_KEYS, SPRINT_FIELDS, WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type Sprint, type WorkItem } from '../../src/domain/index.ts'
+import { CONFIG_KEYS, WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type WorkItem } from '../../src/domain/index.ts'
 import { EVENT_KEYS } from '../../src/adapters/store/event-log.ts'
 import { SHAPES } from '../../src/application/shapes.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
@@ -52,7 +52,6 @@ import { explain } from '../../src/application/services/insight.ts'
 import { fileItem } from '../../src/application/services/items.ts'
 import { addEvidence, markItem } from '../../src/application/services/marking.ts'
 import { relate } from '../../src/application/services/relation.ts'
-import { closeSprint, commitItems, openSprint, sprints } from '../../src/application/services/sprints.ts'
 import { transition } from '../../src/application/services/lifecycle.ts'
 import { makeEvent, type Actor } from '../../src/application/services/mutation.ts'
 import { fixedClock } from '../../src/adapters/clock.ts'
@@ -79,15 +78,11 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   version: readable('show:v'),
   description: readable('show:desc', 'cut at 64 cells, whole under `show <id> --field desc`'),
   priority: readable('show:pri'),
-  points: readable('show:pts'),
-  hours_estimate: readable('show:hrs'),
   parent_id: readable('show:parent'),
   assignee: readable('show:assignee'),
   reporter: readable('show:reporter'),
   reviewer: readable('show:reviewer'),
-  component: readable('show:component'),
   labels: readable('show:labels'),
-  sprint_id: readable('show:sprint'),
   due: readable('show:due'),
   evidence: readable('show:evidence'),
   relations: readable('show:relations', 'the stored edges under their own kind, and the edges other records store against this one under the inverse kind'),
@@ -105,7 +100,6 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   found_in: readable('show:found'),
   fix_confirmed: readable('show:fixed'),
   question: readable('show:question'),
-  timebox_hours: readable('show:timebox'),
   findings: readable('show:findings'),
   proposed_resolution: readable('show:proposed_resolution', 'cut at 64 cells, whole under `show <id> --field proposed_resolution`, and a G2 refusal on work the impediment blocks names that command'),
 }
@@ -116,7 +110,7 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   at: readable('history:at'),
   actor: readable('history:by'),
   actor_kind: readable('history:kind'),
-  entity_kind: hidden('`item` and `sprint` are the two values written, and no command in this build writes both under one transaction, so the kind is the same on every row of either scope: a column of it would restate what the caller typed under `history <id>` and one op prefix under `history --txn`.'),
+  entity_kind: hidden('`item` and `workspace` are the two values written, and no command in this build writes both under one transaction, so the kind is the same on every row of either scope: a column of it would restate what the caller typed under `history <id>` and one op prefix under `history --txn`.'),
   entity: readable('history:what', 'as `entity=<id>`, and under `history --txn` alone: there the rows span records and the record is the only thing telling two rows of one op apart, where under `history <id>` every row is the id the caller named and the column would restate the `item` line above it'),
   op: readable('history:op'),
   before: hidden('the values a change moved away from. `history` names the fields a change moved and `show` prints what they are now, so a `before` column would put a per-row copy of the old record inside a list whose budget is per row. The one question the old value answers alone is whether the record still agrees with the log, and `doctor` H20 asks it against the record rather than printing it.'),
@@ -128,39 +122,16 @@ const EVENT_FIELDS: Readonly<Record<string, Decision>> = {
   txn: readable('history:transaction', 'as the scope of the read rather than as a column: `history --txn <txn>` is asked for one transaction and every row it prints belongs to it, so a column would restate the scalar above it. The mutation\'s own envelope is where a caller gets the id, and this is what spends it (R4).'),
 }
 
-/** Every field of the sprint dictionary, and the surface that prints it. */
-const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
-  id: readable('sprints:sprint'),
-  title: readable('sprints:title'),
-  state: readable('sprints:state'),
-  filed_at: readable('sprints:filed'),
-  version: readable('sprints:v'),
-  start: readable('sprints:start'),
-  end: readable('sprints:end'),
-  closed_at: readable('sprints:closed'),
-  carried: readable('sprints:carried', 'the ids joined by commas, which is the form `explain` already gives a list of ids'),
-  done: readable('sprints:done', 'the count the close froze, which is what a closed sprint reports instead of a live count over a set its carry-over has left'),
-  done_points: readable('sprints:pts', 'the numerator of the points figure, printed done over committed as the live tally is'),
-  cancelled: readable('sprints:cancelled', 'the count the close froze beside `done`, so an item cancelled after the close is not counted under two outcomes'),
-  finished: readable('sprints:members', 'the members that were finished at the close; `carried` is the rest, and `members` prints the two as the one set every frozen number is counted over'),
-  points: readable('sprints:pts', 'the denominator of the points figure, frozen with `done_points` so a closed sprint does not read five done points out of a live total of three'),
-  goal: readable('sprints:goal'),
-  extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
-}
-
 /**
  * Every key of the workspace's configuration dictionary, and the surface that prints it.
- * `config` prints all nine as rows of one block, each with the value in force and whether
+ * `config` prints all six as rows of one block, each with the value in force and whether
  * this workspace set it, which is the surface the sweep below checks the shape declares.
  */
 const CONFIG_KEY_DECISIONS: Readonly<Record<string, Decision>> = {
   review_step: readable('config:value'),
-  point_scale: readable('config:value'),
   next_weights: readable('config:value'),
   wip_limits: readable('config:value'),
   aging_days: readable('config:value'),
-  cycle_time_excludes_hold: readable('config:value'),
-  start_requires_sprint: readable('config:value'),
   ready_gate: readable('config:value', 'the rules as the file writes them, joined by | on one row; `explain` prints each rule of the gate in force with its verdict'),
   done_gate: readable('config:value', 'the same, and `explain` is where a rule is read against one item'),
 }
@@ -295,8 +266,8 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   await file('story', 'Refresh the access token on a 401', 'every-story', {
     description: 'the client drops the session when the token expires',
     acceptance_criteria: 'a 401 refreshes once|the retry carries the new token',
-    points: '5', priority: '2', hours_estimate: '6', parent_id: 'every-epic',
-    assignee: 'kim', reporter: 'ravi', reviewer: 'dana', component: 'payments',
+    priority: '2', parent_id: 'every-epic',
+    assignee: 'kim', reporter: 'ravi', reviewer: 'dana',
     labels: 'revenue,regression', due: '2026-09-30T09:00:00Z',
   })
   await file('bug', 'Checkout drops paid orders', 'every-bug', {
@@ -305,10 +276,10 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
     expected: 'both orders are listed', actual: 'one order is listed and the other is charged',
   })
   await file('spike', 'Which payment retry strategy', 'every-spike', {
-    question: 'do we retry on the gateway or in the queue', timebox_hours: '8',
+    question: 'do we retry on the gateway or in the queue',
     findings: 'the gateway retries twice already',
   })
-  await file('task', 'Rotate the payment signing key', 'every-held', { points: '2' })
+  await file('task', 'Rotate the payment signing key', 'every-held', { priority: '3' })
   const linked = await relate(apply, clock, ids, {
     verb: 'add', id: 'every-held', kind: 'blocks', other: 'every-story', actor: ACTOR,
   })
@@ -320,20 +291,6 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   await file('impediment', 'Staging certificate expired', 'every-raised', {
     severity: 'S1', proposed_resolution: 'the platform team renews it from the vault',
   })
-
-  // A sprint carrying every field of its own dictionary: opened with a goal, given the spike
-  // (the story is blocked above, and a blocked item fails the ready gate a commit reads), and
-  // closed with the spike still open so the carry-over and the frozen tally are recorded.
-  // Committed before the impediment is raised against it, because a blocked item fails that
-  // same ready gate.
-  const sprintOpened = await openSprint(apply, clock, ids, {
-    title: 'Sprint 31', id: 'sprint-31', start: '2026-09-07', end: '2026-09-18', goal: 'Ship the token refresh', actor: ACTOR,
-  })
-  if (!sprintOpened.ok) throw new Error(String(sprintOpened.data['cause']))
-  const committed = await commitItems(apply, clock, ids, { sprint: 'sprint-31', items: ['every-spike'], actor: ACTOR })
-  if (!committed.ok) throw new Error(String(committed.data['cause']))
-  const closed = await closeSprint(apply, clock, ids, { sprint: 'sprint-31', actor: ACTOR })
-  if (!closed.ok) throw new Error(String(closed.data['cause']))
 
   const raised = await relate(apply, clock, ids, {
     verb: 'add', id: 'every-raised', kind: 'blocks', other: 'every-spike', actor: ACTOR,
@@ -387,10 +344,6 @@ describe('every persisted field carries a visibility decision', () => {
     )
   })
 
-  it('has one decision per field of the sprint dictionary, and none for a field it has not got', () => {
-    assert.deepEqual(Object.keys(SPRINT_FIELD_DECISIONS).sort(), [...SPRINT_FIELDS].sort())
-  })
-
   it('has one decision per key of the configuration dictionary, and none for a key it has not got', () => {
     assert.deepEqual(Object.keys(CONFIG_KEY_DECISIONS).sort(), [...CONFIG_KEYS].sort())
   })
@@ -404,7 +357,7 @@ describe('every persisted field carries a visibility decision', () => {
   })
 
   it('names, for every readable decision, a key its command declares', () => {
-    for (const [scope, table] of [['item', ITEM_FIELDS], ['sprint', SPRINT_FIELD_DECISIONS], ['event', EVENT_FIELDS], ['config', CONFIG_KEY_DECISIONS]] as const) {
+    for (const [scope, table] of [['item', ITEM_FIELDS], ['event', EVENT_FIELDS], ['config', CONFIG_KEY_DECISIONS]] as const) {
       for (const [field, decision] of Object.entries(table)) {
         if (decision.kind !== 'readable') continue
         const [command, key] = decision.at.split(':')
@@ -509,31 +462,6 @@ describe('a real record and a real log print what the decisions claim', () => {
     }
   })
 
-  it('prints every key and the stored content of every field of the one sprint record', async (t) => {
-    const stored = await rig.store.sprints()
-    assert.ok(stored.ok && stored.value.length === 1, 'the fixture holds one sprint')
-    const sprint = (stored as { value: readonly Sprint[] }).value[0] as unknown as Record<string, unknown>
-    const carried = sprint['carried']
-    assert.deepEqual(carried, ['every-spike'], 'the close recorded the open spike as carried')
-    const printed = agentRenderer.render(await sprints(rig.store, fixedClock(NOW), 'sprint-31'))
-    const keys = printedKeys(printed)
-    let checked = 0
-    for (const [field, decision] of Object.entries(SPRINT_FIELD_DECISIONS)) {
-      if (decision.kind !== 'readable') continue
-      const key = decision.at.split(':')[1] as string
-      if (sprint[field] === undefined) continue
-      assert.ok(keys.has(key), `${field} claims ${decision.at} and the sprint record printed no ${key}`)
-      if (field in CONTENT_HELD_BACK) continue
-      for (const atom of contentOf(sprint[field])) {
-        assert.ok(printed.includes(atom), `sprint-31: ${field} holds ${JSON.stringify(atom)} and sprints printed no such content`)
-        checked += 1
-      }
-    }
-    t.diagnostic(`${checked} stored sprint values checked for content`)
-  })
-
-  // The assertion the four tests above cannot make. Each of them is satisfied by a key, and
-  // `ac 0/1` is a key over content no command would print.
   it('prints the stored content of every readable field, and not merely its name', async (t) => {
     const clock = fixedClock(NOW)
     let checked = 0
@@ -565,7 +493,7 @@ describe('a real record and a real log print what the decisions claim', () => {
   // command would print a mark's reason, which is the defect the tests above cannot see.
   it('prints the stored content of every readable event field, and not merely its name', async (t) => {
     let checked = 0
-    for (const entity of ['every-bug', 'every-story', 'every-held', 'sprint-31'] as const) {
+    for (const entity of ['every-bug', 'every-story', 'every-held'] as const) {
       const log = await rig.store.events({ entity })
       assert.ok(log.ok, `the log for ${entity} is unreadable`)
       assert.ok(log.value.length > 0, `${entity} has no recorded event, so this sweep is vacuous`)

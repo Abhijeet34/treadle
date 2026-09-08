@@ -66,19 +66,19 @@ describe('F3: a column appended after a space-bearing one cannot corrupt the spl
   it('places the one free-text column last whatever order it was asked for', async () => {
     const result = await backlog(demo.store, {
       filters: [{ field: 'state', value: 'ready' }], limit: 9,
-      columns: ['id', 'title', 'state', 'pts'],
+      columns: ['id', 'title', 'state', 'pri'],
     })
     assert.equal(result.ok, true)
     const rendered = agentRenderer.render(result as ResultObject)
     const header = rendered.split('\n').find((line) => line.startsWith('#')) as string
-    assert.equal(header, '#id state pts "title', `the free-text column is not last: ${header}`)
+    assert.equal(header, '#id state pri "title', `the free-text column is not last: ${header}`)
 
     const rows = parseRows(rendered)
     assert.ok(rows.length >= 3, `only ${rows.length} rows to check`)
     for (const row of rows) {
       assert.match(row['id'] as string, /^[a-z0-9-]+$/, 'an id absorbed part of a title')
       assert.match(row['state'] as string, /^[a-z_]+$/)
-      assert.match(row['pts'] as string, /^(\d+|-)$/)
+      assert.match(row['pri'] as string, /^(\d+|-)$/)
       assert.ok((row['title'] as string).includes(' '), 'the title kept its spaces')
     }
   })

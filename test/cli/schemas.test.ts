@@ -62,7 +62,7 @@ describe('every golden result object validates against its shipped schema', () =
   })
 
   it('catches a result object that does not match its schema, so the validator is not a no-op', () => {
-    const schema = JSON.parse(readFileSync(path.join(SCHEMAS, 'show.v1.json'), 'utf8')) as Record<string, unknown>
+    const schema = JSON.parse(readFileSync(path.join(SCHEMAS, 'show.v2.json'), 'utf8')) as Record<string, unknown>
     const broken = { ...(golden.get('show') as ResultObject), code: 'NOT_A_CODE' }
     assert.ok(validate(schema, broken).length > 0, 'an invalid code must be reported')
   })
