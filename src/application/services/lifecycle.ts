@@ -130,7 +130,10 @@ export async function transition(
   // move goes INTO; `resume` resolves to the state the hold was taken from, which is the
   // same resolution the transition table makes.
   const asked = request.target === 'resume' ? item.held_from : request.target
-  const context = transitionContextFor(view.value, item, asked)
+  // The actor decides `DOD3` beside the record's own `reviewer`, so it reaches the gate
+  // rather than only the event: the gate read the field alone, and an assignee who wrote any
+  // name into it accepted their own work with `guards G6 pass`.
+  const context = transitionContextFor(view.value, item, asked, request.actor.id)
 
   const outcome = evaluateTransition(context, {
     target: request.target,

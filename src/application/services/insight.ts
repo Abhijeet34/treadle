@@ -315,7 +315,12 @@ function enteredAt(events: readonly StoreEvent[], state: string): Entry | undefi
   return undefined
 }
 
-export async function explain(store: Store, clock: Clock, id: ItemId): Promise<ResultObject> {
+/**
+ * `actor` is who is asking, and it is an argument because `DOD3` reads it: an `explain` that
+ * evaluated the done gate without it printed `rules 8/8 pass` over a move `transition` then
+ * refused, which is the explain-versus-transition disagreement this command exists to end.
+ */
+export async function explain(store: Store, clock: Clock, id: ItemId, actor?: string): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('explain', 'read', view.error, undefined)
   const workspace = view.value.identity.id
@@ -325,8 +330,8 @@ export async function explain(store: Store, clock: Clock, id: ItemId): Promise<R
   if (item === undefined) return notFound('explain', 'read', workspace, view.value, id)
 
   const blockers = activeBlockers(view.value, id)
-  const ready = readyVerdict(view.value, item)
-  const done = doneVerdict(view.value, item)
+  const ready = readyVerdict(view.value, item, actor)
+  const done = doneVerdict(view.value, item, actor)
   const failing = [
     ...ready.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'ready', rule })),
     ...done.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'done', rule })),

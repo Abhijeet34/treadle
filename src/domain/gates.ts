@@ -59,6 +59,14 @@ export type GateContext = {
    * must not hold the copy at draft forever on a record nobody can move.
    */
   readonly duplicateOf?: GateItem
+  /**
+   * DOD3: who is asking. The reviewer field says who was named and this says who is moving
+   * the item, and the rule needs both: naming a reviewer is a field a caller writes, so an
+   * assignee who writes any name into it passed a gate that reads only that field. Absent
+   * means the caller supplied no actor, which no command surface does; the rule then reads
+   * the field alone, exactly as it did before, rather than failing over a fact it was not told.
+   */
+  readonly actor?: string
 }
 
 export const DEFAULT_READY_GATE: Gate = {
@@ -91,10 +99,12 @@ export const DEFAULT_DONE_GATE: Gate = {
   rules: [
     { id: 'DOD1', scope: 'all', sentence: 'Every child is done or cancelled.', check: { kind: 'no_open_child' } },
     { id: 'DOD2', scope: 'all', sentence: 'No impediment is still open against the item.', check: { kind: 'no_open_impediment' } },
-    // The sentence says "is named" and not "accepted it" because the check reads `reviewer`
-    // against `assignee` and never the actor of `accept`; a rule's sentence is printed by
-    // `config` and `explain`, so it may not promise more than the code decides.
-    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
+    // The sentence promises exactly what the check decides, which is why it names both the
+    // reviewer and the caller: the rule read `reviewer` against `assignee` and never the
+    // actor, so an assignee wrote any name into the field and then accepted their own work
+    // at exit 0. A rule's sentence is printed by `config` and `explain`, so widening the
+    // check widens the sentence in the same edit.
+    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
     { id: 'DOD4', scope: 'story', sentence: 'Every acceptance criterion is ticked.', check: { kind: 'list_all_ticked', field: 'acceptance_criteria' } },
     { id: 'DOD5', scope: 'spike', sentence: 'The spike records its findings.', check: { kind: 'field_present', field: 'findings' } },
     { id: 'DOD6', scope: 'bug', sentence: 'The fix is confirmed.', check: { kind: 'field_is_true', field: 'fix_confirmed' } },
@@ -228,12 +238,25 @@ function run(check: GateCheck, context: GateContext): Outcome {
           `treadle transition ${item.id} cancelled --resolution duplicate --reason "<why>"`,
         )
     }
+    // Two facts, one rule, because they are one promise: the work was reviewed by somebody
+    // other than the person who did it. The field half is a name on the record and the actor
+    // half is who is running the move, and a gate that reads only the first is a gate an
+    // assignee clears alone - measured, an assignee named a reviewer who never touched the
+    // item and took it to done with `guards G6 pass`. The actor half is skipped when the
+    // caller supplied none, so a gate evaluated with no actor decides exactly what it did.
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
       const reviewer = writeCommand('reviewer', item.id, '<name>')
       if (item.reviewer === undefined) return no('no reviewer is recorded', reviewer)
-      return item.reviewer === item.assignee
-        ? no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
+      if (item.reviewer === item.assignee) return no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
+      // Reassigning is the remedy rather than "ask someone else to run it", because a remedy
+      // is a command line the caller can run from where the item stands, and no command
+      // makes the caller a different person.
+      return context.actor !== undefined && context.actor === item.assignee
+        ? no(
+          `${context.actor} is the assignee, and the assignee does not accept their own work`,
+          writeCommand('assignee', item.id, '<name>'),
+        )
         : PASS
     }
     // Scoped by the review step rather than by three per-type rules, the same way DOD3 is:
