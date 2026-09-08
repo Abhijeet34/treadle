@@ -165,7 +165,7 @@ describe('the release pull request carries its own parked state', () => {
     assert.match(statuses(result)[0] as string, /state=failure/)
   })
 
-  it('ignores a pull request that is not release-please’s', async () => {
+  it('ignores a pull request that is not release-please's', async () => {
     const result = await drive({ pulls: '' })
 
     assert.equal(result.code, 0)

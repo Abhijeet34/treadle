@@ -153,10 +153,23 @@ Knowing to make that call is the part that was missing until 2026-09-09.
 A parked run attaches no check to the pull request, so the pull request page reports nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
 Forty-six runs had concluded `action_required` by then.
 
-`.github/workflows/release.yml`'s `parked-checks` job is what says so now.
-It runs on the same push to `main` that updated the pull request, asks the API which runs on the pull request's current head commit are at `action_required`, and fails the Release run with the approve command for each one written into the step summary.
-It reports and never approves: read-only permissions, the run's own token, no stored credential, and the click stays where ADR-0009 put it.
-Keying it on the head commit rather than the branch is what makes it self-clearing, because a run parked on a commit the pull request has moved past stays `action_required` for the life of the repository.
+`.github/workflows/release.yml`'s `parked-checks` job is what says so now, on the pull request rather than on the trunk.
+It runs after `release-pr` on the same push to `main`, asks the API which runs on the pull request's current head commit are at `action_required`, and posts a `release checks approved` commit status on that head: red while they are parked, green once they are not.
+`gh pr checks 69` reads commit statuses, so the surface that answered nothing now answers.
+The approve command for each parked run goes into the Release run's step summary, and the status links there.
+The job reports and never approves: `statuses: write` over two reads, the run's own token, no stored credential, and the click stays where ADR-0009 put it.
+
+It does not fail the Release run, and that is the point.
+Parking is this design rather than a fault, so the condition is true on every push to `main`, and as a gate it failed runs `34277320540`, `34281238907` and `34288199967` - every Release run from the one that introduced it.
+A red that never clears is a red nobody reads, and it makes every other red on `main` look like this one.
+`release checks approved` is required by no rule in `.github/rulesets/main.json`, so it carries the state without gating on it.
+
+Keying it on the head commit rather than the branch is what keeps it honest, because a run parked on a commit the pull request has moved past stays `action_required` for the life of the repository.
+`needs: release-pr` is there because the job read the pull request one second into run `34288199967` and answered about the head commit release-please replaced two minutes later.
+GitHub then created the runs on that new head two seconds after `release-pr` finished, so a head sha carrying no runs at all is read again rather than called clear.
+
+One thing the status cannot do is refresh itself.
+It describes the head commit as of the last push to `main`, so between approving the runs and the next push it is behind, and merging the pull request is what ends that window.
 
 A gate nobody can see holding is indistinguishable from a gate that failed.
 
