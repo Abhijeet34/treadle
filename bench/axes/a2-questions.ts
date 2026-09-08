@@ -194,10 +194,12 @@ const QUESTIONS: readonly Question[] = [
   },
   {
     n: 19, question: 'which bug did story X cause',
-    argv: ['relation', 'add', 'a2-bug', 'caused-by', 'a2-story'],
-    fullNeeds: 'the bugs whose caused-by edge names X',
-    full: never,
-    note: 'caused_by is one of the six kinds the domain declares, loads and derives an inverse for, and relation add writes three of them: ADR-0015 exposes a kind on a second argued caller rather than by default, so the command refuses this one by name and no edge exists to read back',
+    argv: ['show', 'a2-story'],
+    fullNeeds: 'the bugs whose caused-by edge names X, named against X',
+    full: (answer) => block(answer, 'relations').some((row) =>
+      (row as { kind?: unknown }).kind === 'causes' && typeof (row as { other?: unknown }).other === 'string'),
+    partial: listed('relations'),
+    note: 'the expected answer changed here because the capability changed: commit a85b8e5 gave caused_by and discovered_from a writer, having found that three of the six declared kinds could be written only with a text editor and then bound the removal rule R6 with no command able to unbind them. Before it, relation add refused caused_by by name and this scored none by construction; the edge is now stored once on the bug and the read derives causes on the story, the same shape question 18 measures for duplicates',
   },
   {
     n: 20, question: 'open impediments and their age',
@@ -356,6 +358,10 @@ async function seed(surface: Surface): Promise<void> {
   // question 1 needs a ready story to list.
   await must(['relation', 'add', 'a2-imped', 'blocks', 'a2-bug'])
   await must(['relation', 'add', 'a2-dupe', 'duplicates', 'a2-ready'])
+  // Question 19 reads this edge back off the story. `caused_by` gained a writer in a85b8e5,
+  // so the corpus can carry the fact the question asks about; before that no command could
+  // write one and the question scored `none` by construction.
+  await must(['relation', 'add', 'a2-bug', 'caused-by', 'a2-story'])
 
   await must(['transition', 'a2-story', 'ready'])
   await must(['transition', 'a2-ready', 'ready'])
