@@ -232,9 +232,12 @@ const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
  * test name and a report name have no such shape, so those five keep the ref bounds alone.
  * Bounded and non-backtracking, like every other pattern here (threat model F8).
  */
-const URL_REF = /^https?:\/\/\S{1,190}$/
-const PR_NUMBER = /^#?\d{1,12}$/
-const PR_REPO = /^[A-Za-z0-9._-]{1,64}\/[A-Za-z0-9._-]{1,64}#\d{1,12}$/
+// The scheme is matched case-insensitively because RFC 3986 defines it that way, and
+// `HTTPS://example.test/x` is a URL a refusal has no business calling one. A pr number starts
+// at 1: no forge issues #0, so a zero is a placeholder or an off-by-one rather than a pointer.
+const URL_REF = /^https?:\/\/\S{1,190}$/i
+const PR_NUMBER = /^#?[1-9]\d{0,11}$/
+const PR_REPO = /^[A-Za-z0-9._-]{1,64}\/[A-Za-z0-9._-]{1,64}#[1-9]\d{0,11}$/
 
 const EVIDENCE_REF_FORM: Readonly<Record<string, { readonly ok: (ref: string) => boolean; readonly form: string }>> = {
   url: { ok: (ref) => URL_REF.test(ref), form: 'a URL beginning http:// or https://' },

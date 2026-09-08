@@ -33,6 +33,9 @@ export type Actor = {
 /** The bound the three identity fields of the dictionary already carry. */
 const MAX_ACTOR = 200
 
+/** What a refusal will echo of a wrong actor kind. The two right answers are six characters. */
+const MAX_ACTOR_KIND_ECHO = 40
+
 /**
  * Why an actor cannot be recorded, or `undefined`. The value comes from a flag or from the
  * environment and is written verbatim into a committed event log, so it is held to the same
@@ -60,7 +63,13 @@ export function actorRefusal(actor: Actor): string | undefined {
  */
 export function actorKindRefusal(kind: string | undefined): string | undefined {
   if (kind === undefined || kind === 'human' || kind === 'agent') return undefined
-  return `TREADLE_ACTOR_KIND is ${kind}, and an actor kind is human or agent`
+  // The token is named because that is what makes a refusal actionable, and it is bounded and
+  // held to the line class first: it comes from the environment, so it is as unbounded and as
+  // unsafe as an actor's own name, which this file has always checked before printing it back.
+  const named = kind.length <= MAX_ACTOR_KIND_ECHO && isSafeText(kind, 'line')
+    ? `"${kind}"`
+    : `${kind.length} characters`
+  return `TREADLE_ACTOR_KIND is ${named}, and an actor kind is human or agent`
 }
 
 export type EventInput = {

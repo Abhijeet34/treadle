@@ -30,8 +30,17 @@ describe('the actor kind a mutation records', () => {
     assert.equal(actorKindRefusal(undefined), undefined)
     assert.equal(actorKindRefusal('human'), undefined)
     assert.equal(actorKindRefusal('agent'), undefined)
-    assert.equal(actorKindRefusal('robot'), 'TREADLE_ACTOR_KIND is robot, and an actor kind is human or agent')
-    assert.equal(actorKindRefusal('AGENT'), 'TREADLE_ACTOR_KIND is AGENT, and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('robot'), 'TREADLE_ACTOR_KIND is "robot", and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('AGENT'), 'TREADLE_ACTOR_KIND is "AGENT", and an actor kind is human or agent')
+  })
+
+  // The value comes from the environment, so it is as unbounded and as unsafe as an actor's
+  // own name: a refusal that echoed it whole would print megabytes, and one that echoed a
+  // newline would forge a line of the tool's own grammar (F2).
+  it('names the token only where it is bounded and safe to print back', () => {
+    assert.equal(actorKindRefusal('x'.repeat(5000)), 'TREADLE_ACTOR_KIND is 5000 characters, and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('age\nnt'), 'TREADLE_ACTOR_KIND is 6 characters, and an actor kind is human or agent')
+    assert.equal(actorKindRefusal(''), 'TREADLE_ACTOR_KIND is "", and an actor kind is human or agent')
   })
 
   it('refuses a mutation whose kind is neither word, naming the token and the export', async () => {
@@ -40,7 +49,7 @@ describe('the actor kind a mutation records', () => {
         cwd: root, env: { TREADLE_ACTOR: 'kim', TREADLE_ACTOR_KIND: kind },
       })
       assert.equal(run.code, 2, `${kind}: ${run.out}${run.err}`)
-      assert.match(run.err, new RegExp(`^"cause TREADLE_ACTOR_KIND is ${kind}, and an actor kind is human or agent$`, 'm'))
+      assert.match(run.err, new RegExp(`^"cause TREADLE_ACTOR_KIND is "${kind}", and an actor kind is human or agent$`, 'm'))
       assert.match(run.err, /^fix export TREADLE_ACTOR_KIND=agent$/m)
     }
   })
