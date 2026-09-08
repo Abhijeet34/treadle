@@ -15,6 +15,7 @@
 
 import { parseArgs, type ParseArgsConfig } from 'node:util'
 
+import { findUnsafeCharacter } from '../domain/index.ts'
 import { GLOBAL_FLAGS, commandNamed, verdictFor, type GlobalFlag } from './inventory.ts'
 
 type OptionConfig = NonNullable<ParseArgsConfig['options']>
@@ -224,9 +225,18 @@ function flagFault(
       // them to a flag list that could not hold one. `--` is what carries it through, and
       // the value is then refused by the key's own rule, which is the answer they asked for.
       if (NEGATIVE_NUMBER.test(token.source)) {
+        // Naming the whole argv entry is what makes this refusal true, and an argv entry is
+        // the caller's own bytes: `-1<CR>evil` reached the agent rendering's delimiter
+        // invariant and came back `err INTERNAL` at exit 1 with no rule id. So the entry is
+        // echoed only when it is a single safe line, and otherwise the character is named by
+        // code point and no byte of it reaches the stream, which is what `operandRefusal`
+        // does for the same class one file over.
+        const found = findUnsafeCharacter(token.source, 'line')
         return {
           ok: false,
-          cause: `${token.source} was read as a flag of ${scope}, and an operand beginning with a dash is written after --`,
+          cause: found === undefined
+            ? `${token.source} was read as a flag of ${scope}, and an operand beginning with a dash is written after --`
+            : `an operand of ${scope} beginning with a dash carries ${found.label} at character ${found.at + 1}, and no value of a record holds one; a value beginning with a dash is written after --`,
           fix,
         }
       }

@@ -20,6 +20,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it, before, after } from 'node:test'
 
+import { RENDERINGS } from '../../src/adapters/render/index.ts'
 import { EXIT_OF } from '../../src/cli/exit.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { operandLimit } from '../../src/cli/operands.ts'
@@ -278,6 +279,29 @@ describe('a value this line cannot mean is refused wherever the line writes it',
     const decimal = await cli(['config', 'set', 'aging_days', '-0.5'])
     assert.equal(decimal.code, EXIT_OF.VALIDATION, decimal.err)
     assert.match(decimal.err, /^"cause -0\.5 was read as a flag of config, and an operand beginning with a dash is written after --$/m, decimal.err)
+  })
+
+  it('names the character rather than echoing a dash-led operand that carries one', async () => {
+    // Naming the whole argv token is what makes this refusal true, and an argv token is a
+    // caller's own bytes: `-1<CR>evil` reached the agent rendering's delimiter invariant and
+    // came back `err INTERNAL` at exit 1 with no rule id, which is the one thing the contract
+    // says never happens and exactly the class the operand guard closes one file over. The
+    // token is echoed only when it is a single safe line; otherwise the character is named by
+    // code point and no byte of it reaches the stream.
+    for (const [what, token] of [
+      ['a carriage return', '-1\revil'],
+      ['a line feed', '-1\nevil'],
+      ['a right-to-left override', '-1\u202eevil'],
+    ] as const) {
+      for (const rendering of RENDERINGS) {
+        const run = await cli(['config', 'set', 'aging_days', token, '--out', rendering])
+        assert.equal(run.code, EXIT_OF.VALIDATION, `${what} in ${rendering} exited ${run.code}: ${run.err}`)
+        assert.equal(run.out, '', `${what} in ${rendering} wrote to stdout`)
+        assert.equal(run.err.includes('INTERNAL'), false, `${what} in ${rendering} is untyped: ${run.err}`)
+        assert.equal(run.err.includes(token), false, `${what} in ${rendering} echoed the operand`)
+        assert.match(run.err, /U\+[0-9A-F]{4}/, run.err)
+      }
+    }
   })
 
   it('still names the flag, not the dash-led value, when a flag needing a value is written first', async () => {
