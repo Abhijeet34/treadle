@@ -9,7 +9,7 @@
 import assert from 'node:assert/strict'
 import { execFile } from 'node:child_process'
 import { spawn } from 'node:child_process'
-import { readFile, readdir, stat, utimes, writeFile } from 'node:fs/promises'
+import { readFile, readdir, stat, unlink, utimes, writeFile } from 'node:fs/promises'
 import { hostname } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -348,6 +348,76 @@ describe('a holder that stalls past the heartbeat window has lost its lock', () 
       const outcomes = output.split('\n').filter((l) => l.startsWith('{')).map((l) => JSON.parse(l) as { ok: boolean; code?: string; rule?: string })
       const refused = outcomes.filter((o) => !o.ok)
       assert.ok(refused.every((o) => (o.code === 'LOCK_LOST' && o.rule === 'S16') || (o.code === 'CONFLICT' && o.rule === 'S10')), JSON.stringify(refused))
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+describe('a holder that never lets go', () => {
+  it('is refused by name at the per-holder bound instead of waited on forever', async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      // Alive and heartbeating, so neither of the two rules that end a wait applies: the
+      // holder is not gone and its token is never stale. Before the bound, the second
+      // caller here never returned - measured through the CLI, a second command sat silent
+      // past 20 seconds and printed nothing at all.
+      const held = await acquireLock(file)
+      assert.ok(held.ok)
+
+      const started = Date.now()
+      const second = await acquireLock(file, { holderTimeoutMs: 600 })
+      const waited = Date.now() - started
+
+      assert.equal(second.ok, false, 'the wait ended with the lock, which the holder never released')
+      assert.equal(second.ok ? '' : second.error.code, 'LOCK_TIMEOUT')
+      assert.equal(second.ok ? '' : second.error.rule, 'S11')
+      assert.match(second.ok ? '' : second.error.message, new RegExp(`held by pid ${process.pid} on `))
+      assert.match(second.ok ? '' : second.error.message, /has not changed hands in \d+ ms, past the 600 ms/)
+      assert.ok(waited >= 600, `refused after ${waited} ms, before the bound`)
+      assert.ok(waited < 5_000, `refused after ${waited} ms, which is the stale window rather than the bound`)
+      await held.value.release()
+      t.diagnostic(`a holder that never let go was refused after ${waited} ms, naming pid ${process.pid}`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('waits out a lock that keeps changing hands, however long the whole wait is', async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      const file = path.join(workspace.root, '.lock')
+      const BOUND = 300
+      const TURNOVER = 100
+      const TURNS = 9
+      // The reference's failing case, which is why the bound is per holder and not over the
+      // whole wait: the file is never free, every 100 ms a different holder takes it, and the
+      // waiter is still owed the lock after 900 ms - three times a total budget of 300 ms.
+      let turn = 0
+      const handover = setInterval(() => {
+        turn += 1
+        void writeFile(file, JSON.stringify({
+          pid: process.pid, host: hostname(), since: new Date().toISOString(), nonce: `turn-${turn}`,
+        })).catch(() => undefined)
+      }, TURNOVER)
+      await writeFile(file, JSON.stringify({
+        pid: process.pid, host: hostname(), since: new Date().toISOString(), nonce: 'turn-0',
+      }))
+
+      const started = Date.now()
+      const waiter = acquireLock(file, { holderTimeoutMs: BOUND })
+      await delay(TURNS * TURNOVER)
+      clearInterval(handover)
+      await unlink(file).catch(() => undefined)
+
+      const got = await waiter
+      const waited = Date.now() - started
+      assert.ok(got.ok, got.ok ? '' : `a moving lock was refused: ${got.error.message}`)
+      assert.ok(waited >= TURNS * TURNOVER, `waited ${waited} ms, so the handovers did not happen`)
+      assert.ok(turn >= TURNS - 1, `${turn} handovers, so the lock did not keep moving`)
+      await got.value.release()
+      t.diagnostic(`${turn} handovers over ${waited} ms, ${Math.round(waited / BOUND)}x a total budget of ${BOUND} ms, refused none of it`)
     } finally {
       await workspace.dispose()
     }
