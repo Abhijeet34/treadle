@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Axis A12: every verb on both its success and its failure path.
 //
-// `test/cli/schemas.test.ts` validates golden result objects against the shipped schemas.
+// `test/cli/schemas.test.ts` validates golden result objects against the generated schemas.
 // What it does not do is drive the verb: the reference's defect (prior-art E9) was that the
 // machine-readable flag existed on mutations only, that reads refused it with exit 2, and
 // that errors were written to stdout. All three are properties of an invocation, so each verb
@@ -9,18 +9,18 @@
 // which stream stayed empty, what the exit status was, and whether the object validates
 // against the schema this repository ships for it.
 
-import { readFileSync } from 'node:fs'
 import { mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
+import { generated } from '../../scripts/generate-schemas.ts'
 import { RESULT_CODES } from '../../src/application/result.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { validate } from '../../test/helpers/json-schema.ts'
 import { crossCheck, openSurface, type CrossCheck, type Invocation } from './surface.ts'
 import type { AxisResult } from './axis.ts'
 
-const SCHEMAS = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..', 'schemas')
+/** The schemas `npm run build` writes, read from their generator so this axis needs no build. */
+const SCHEMAS = generated()
 
 const CODES = new Set<string>(RESULT_CODES)
 
@@ -116,9 +116,8 @@ export async function runA12(): Promise<{ readonly axis: AxisResult; readonly ro
   const held = rows.filter((row) => row.holds)
   const verbs = new Set(rows.map((row) => row.verb))
   // A command the table forgot is invisible in a pass rate over the rows the table has, and
-  // it stays invisible for as long as nobody adds it: `set`, `relation` and `history`
-  // shipped and no axis called one of them. So the gap is named,
-  // rather than folded into a verdict that was already MISSED for a different reason.
+  // it stays invisible for as long as nobody adds it. So the gap is named, rather than folded
+  // into a verdict that was already MISSED for a different reason.
   const unreached = COMMANDS.map((command) => command.name).filter((name) => !verbs.has(name))
   const met = held.length === rows.length && unreached.length === 0
 
@@ -166,9 +165,10 @@ function score(verb: string, which: 'success' | 'failure', call: Invocation): Co
   const [name, version] = schema.split('/')
   let failures: readonly string[] = ['no result object was written to the expected stream']
   if (name !== undefined && version !== undefined && parsed !== undefined) {
-    const file = path.join(SCHEMAS, `${name}.v${version}.json`)
-    const document = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
-    failures = validate(document, parsed).map((entry) => `${entry.path} ${entry.reason}`)
+    const body = SCHEMAS.get(`${name}.v${version}.json`)
+    failures = body === undefined
+      ? [`no shape generates ${name}.v${version}.json`]
+      : validate(JSON.parse(body) as Record<string, unknown>, parsed).map((entry) => `${entry.path} ${entry.reason}`)
   }
 
   const validates = failures.length === 0

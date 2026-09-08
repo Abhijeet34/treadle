@@ -318,8 +318,8 @@ Before hand-checking any of these, run the suite: it already checks them.
   Dependabot bump passes while a trailer naming anyone else does not.
   `test/architecture/dco.test.ts` drives that script over real commits in a throwaway repository,
   so change the rule there and not by loosening the comparison.
-- `schemas/*.json` are generated from the `ResultShape` each service declares. Change a
-  shape, run `npm run schemas`, and commit both; the suite fails otherwise. A new command is
+- `schemas/*.json` are generated from the `ResultShape` each service declares and are not
+  committed; `npm run build` writes them beside `dist/`. A new command is
   a shape, a line in `src/application/shapes.ts` and in `src/cli/inventory.ts`, an entry in
   `COMMAND_OPTIONS` in `src/cli/parse.ts`, a branch in `dispatch`, and an invocation in the
   two tables in `test/security/no-egress.test.ts` and

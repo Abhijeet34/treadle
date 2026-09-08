@@ -3,8 +3,7 @@
 # Windows clone under Git for Windows' installer default, core.autocrlf=true, checks
 # `.work/items/*.md` out as CRLF: measured on the 2026-09-07 cross-platform run, every shard
 # then read as an `H16` finding, `documented-numbers.test.ts` counted 0 records under
-# `.work/items`, the twenty shipped schemas compared unequal to what `npm run schemas`
-# generates, and the human-layout snapshot differed by a trailing `\r` on every line.
+# `.work/items`, and the human-layout snapshot differed by a trailing `\r` on every line.
 #
 # `eol=lf` rather than `text=auto` alone, because `text=auto` normalises what is committed and
 # still lets the checkout follow `core.autocrlf`. This is the checkout half.

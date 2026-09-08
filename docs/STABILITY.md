@@ -68,7 +68,7 @@ Not breaking:
 - Adding a field at the end of a schema's property order.
 - Adding a new result object for a new command.
 
-A change to a schema's shape bumps that schema's version, and CI diffs the shipped schemas against the previous release so this cannot happen by accident.
+A change to a schema's shape bumps that schema's version, and `test/cli/schemas.test.ts` validates every golden result object against the schema its shape generates, so a shape change that breaks the object it describes fails the suite; nothing diffs against a release, because none has shipped.
 
 ### The file format
 
