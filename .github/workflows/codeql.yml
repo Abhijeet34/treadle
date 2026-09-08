@@ -1,0 +1,51 @@
+# SPDX-License-Identifier: Apache-2.0
+# CodeQL, weekly, in a workflow of its own.
+#
+# It lived in ci.yml until 2026-09-08, where it cost 63 seconds of every pull request and every
+# push and reported zero findings in 227 CI runs over a tree with zero runtime dependencies, so
+# a weekly pass is the cadence its yield supports.
+#
+# PR #66 moved it into cross-platform.yml to get that cadence, and that is the one place it
+# could not go. release.yml calls cross-platform.yml with `uses:` on the signed tag, a called
+# workflow may not request a permission its caller does not hold, and GitHub validates that
+# request before any `if` is evaluated - so the job's own `if: github.event_name !=
+# 'workflow_call'` guard stopped nothing and every Release run on main failed at startup with
+# "The nested job 'codeql' is requesting 'security-events: write', but is only allowed
+# 'security-events: none'." A job that needs a scope no caller can grant belongs in a workflow
+# nobody calls, which is this one. test/release/called-workflow-permissions.test.ts is the gate.
+#
+# No `concurrency` block, for the same reason as its siblings: cancelling a scheduled run
+# discards the only record of its own result.
+
+name: CodeQL
+
+on:
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  codeql:
+    name: codeql
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # build-mode: none, because there is nothing to observe being compiled. Node strips the
+      # types at run time and the esbuild bundle is a concatenation of the same files CodeQL
+      # already reads, so a tracing build would give it the source twice.
+      - uses: github/codeql-action/init@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          languages: javascript-typescript
+          build-mode: none
+
+      - uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          category: /language:javascript-typescript
