@@ -119,7 +119,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | `doctor`: fourteen findings over records, the event log, the relation graph, the parent hierarchy, the sprint records, impediments and the workspace's configured thresholds; the rest wait on entities that do not exist yet | Partly implemented |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
 | Boards, as a projection: `board` groups by state and scopes to the open sprint; guards `G3` and `G4` read the limits and the membership rule the workspace record carries, and are disarmed until it does | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md), [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
-| Ceremonies, metrics, export, completions | Specified, not implemented |
+| Metrics, export, completions | Specified, not implemented |
 | Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Implemented; inside budget, enforced by the build in CI |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
