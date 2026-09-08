@@ -10,7 +10,7 @@
 // afterwards. Fixed clocks here rather than a sleep, because H23 compares instants.
 
 import assert from 'node:assert/strict'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
@@ -92,6 +92,64 @@ describe('a record removed and filed again under its own id', () => {
     assert.equal(h23.length, 1, JSON.stringify(h23))
     assert.match(h23[0]?.['detail'] as string,
       /is dated 2026-09-09T09:30:00Z, before the item was filed at 2026-09-09T10:00:00Z/)
+  })
+})
+
+// The boundary is the removal's instant and not the position the scan reached it at, because
+// the store orders the log by file name first and by `at` only within one file: a hand-written
+// line filed under another month is read where the file puts it. Dropping the findings at the
+// moment the removal was reached therefore cleared a line dated AFTER the removal whenever a
+// forger filed it under an earlier month - `doctor` reported clean at exit 0 while `history`
+// served a transition to `done` that no actor had authorised.
+describe('a forged event filed under an earlier month than the removal', () => {
+  let parent: string
+  let root: string
+  let store: Store
+  const ids = sequentialIds()
+
+  before(async () => {
+    parent = await mkdtemp(path.join(tmpdir(), 'treadle-cross-month-'))
+    root = path.join(parent, 'platform', '.work')
+    await initWorkspace(fixedClock(FILED), ids, { at: root, name: 'platform', actor: ACTOR })
+    const opened = await openWorkspace(root)
+    assert.ok(opened.ok, opened.ok ? '' : opened.error.message)
+    store = opened.value
+    const apply = targetFor(store, 'apply')
+    const must = (result: { ok: boolean; data: Record<string, unknown> }, what: string) => {
+      assert.equal(result.ok, true, `${what}: ${String(result.data['cause'])}`)
+    }
+    must(await fileItem(apply, fixedClock(FILED), ids, {
+      type: 'task', title: 'The thing', id: 'thing', fields: {}, actor: ACTOR,
+    }), 'file the original')
+    must(await removeItem(apply, fixedClock(REMOVED), ids, {
+      id: 'thing', reason: 'refiling under a corrected type', confirmed: true, actor: ACTOR,
+    }), 'remove')
+    must(await fileItem(apply, fixedClock(REFILED), ids, {
+      type: 'task', title: 'The thing', id: 'thing', fields: {}, actor: ACTOR,
+    }), 'refile')
+
+    // Dated between the removal and the refile, so it claims to be a change to the record the
+    // store holds now, and written into the month file before the one its own `at` names.
+    const forged = {
+      id: 'eforged', at: BETWEEN, actor: 'mallory', actor_kind: 'human',
+      entity_kind: 'item', entity: 'thing', op: 'item.transition',
+      after: { state: 'done' }, txn: 'tforged', cmd: 'transition',
+    }
+    await writeFile(path.join(root, 'events', '2026-08.jsonl'), `${JSON.stringify(forged)}\n`, 'utf8')
+  })
+
+  after(async () => {
+    await store.close()
+    await rm(parent, { recursive: true, force: true })
+  })
+
+  it('is named by H23, because the boundary is the removal instant and not the scan position', async () => {
+    const audit = await doctor(store, fixedClock(REFILED))
+    const h23 = (audit.data['findings'] as Rows).rows.filter((row) => row['rule'] === 'H23')
+    assert.equal(h23.length, 1, JSON.stringify((audit.data['findings'] as Rows).rows))
+    assert.match(h23[0]?.['detail'] as string,
+      /^event eforged is dated 2026-09-09T09:30:00Z, before the item was filed at 2026-09-09T10:00:00Z/)
+    assert.equal(audit.code, 'INTEGRITY', JSON.stringify(audit.data))
   })
 })
 

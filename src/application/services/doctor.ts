@@ -121,8 +121,23 @@ type Audited = {
    * evidence of an edit, so no finding is raised on it.
    */
   logged?: Map<string, string>
-  /** H23 and H19, in log order. */
-  fromLog?: DoctorFinding[]
+  /**
+   * H23 and H19, in log order. An H23 carries the instant its decision is made against,
+   * because a removal seen later in the scan is what settles it and the scan order is not
+   * the instant order; see `removedAt`.
+   */
+  fromLog?: { readonly finding: DoctorFinding; readonly at?: Instant }[]
+  /**
+   * The latest `item.remove` this id has, which is where the record the store holds now
+   * begins. It cannot be decided from scan position: the store orders the log by file name
+   * and then by `at` within one file, so a hand-written line filed under another month is
+   * read where the file puts it (`sharded-store.ts`, `#eachLogEvent`). Dropping H23 findings
+   * at the moment the removal was reached therefore cleared a line dated AFTER the removal
+   * whenever a forger had filed it under an earlier month, which is the one edit H23 exists
+   * to catch. The boundary is the instant, and it is compared once per finding rather than
+   * held per event.
+   */
+  removedAt?: Instant
   /**
    * The instant the item entered the state it is in now, folded forward over every event
    * whose `after` names that state. It is `H03`'s input and the log is the only place it is:
@@ -211,36 +226,40 @@ export class WorkspaceAudit {
     }
     if (Date.parse(event.at) < Date.parse(item.filed_at)) {
       (entry.fromLog ??= []).push({
-        rule: 'H23',
-        id: item.id,
-        where: cell(event.id),
-        detail: `event ${event.id} is dated ${event.at}, before the item was filed at ${item.filed_at}; no write path records a change to an item that does not exist yet`,
+        at: event.at,
+        finding: {
+          rule: 'H23',
+          id: item.id,
+          where: cell(event.id),
+          detail: `event ${event.id} is dated ${event.at}, before the item was filed at ${item.filed_at}; no write path records a change to an item that does not exist yet`,
+        },
       })
     }
     // A removal ends one record's life, and the log keeps its events under the id (ADR-0024).
-    // Everything dated before it therefore belongs to the record that left, not to the one
-    // the store holds now, and comparing those with a later `filed_at` faulted the whole
-    // trail: the one migration the tool offers for a field no command writes - `remove` then
-    // `file` under the same id, which is how a type is changed - left `doctor` at exit 7 for
-    // ever, because the log is append-only and nothing could clear the findings.
+    // Everything dated up to it therefore belongs to the record that left, not to the one the
+    // store holds now, and comparing those with a later `filed_at` faulted the whole trail:
+    // the one migration the tool offers for a field no command writes - `remove` then `file`
+    // under the same id, which is how a type is changed - left `doctor` at exit 7 for ever,
+    // because the log is append-only and nothing could clear the findings.
     //
-    // The store hands the log over sorted by instant, so a line backdated past the removal
-    // is indistinguishable from a genuine event of the record that left, and the audit says
-    // nothing about either rather than faulting both. What it still decides is every event
-    // dated after the removal, which is where the record the store holds now begins. The
-    // findings are dropped here rather than skipped above so the removal's own event goes
-    // with them, and nothing extra is held per event.
-    if (event.op === 'item.remove' && entry.fromLog !== undefined) {
-      entry.fromLog = entry.fromLog.filter((finding) => finding.rule !== 'H23')
+    // A line dated at or before the removal cannot be told from a genuine event of the record
+    // that left, so the audit says nothing about either rather than faulting both; every event
+    // dated after it is still decided. The latest removal wins, because an id may be removed
+    // and refiled more than once. `#ofItem` applies the boundary, since the removal can be
+    // reached after the events it settles.
+    if (event.op === 'item.remove' && (entry.removedAt === undefined || event.at > entry.removedAt)) {
+      entry.removedAt = event.at
     }
     if (event.op !== 'item.mark') return
     if (item.assignee === undefined || event.actor !== item.assignee) return
     const changed = typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
     ;(entry.fromLog ??= []).push({
-      rule: 'H19',
-      id: item.id,
-      where: cell(event.id),
-      detail: `${event.actor} changed ${changed} on an item they are assigned; the audit says who and a reader decides`,
+      finding: {
+        rule: 'H19',
+        id: item.id,
+        where: cell(event.id),
+        detail: `${event.actor} changed ${changed} on an item they are assigned; the audit says who and a reader decides`,
+      },
     })
   }
 
@@ -260,7 +279,12 @@ export class WorkspaceAudit {
         detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
       })
     }
-    findings.push(...this.#aging(entry), ...(entry.fromLog ?? NONE), ...entry.after)
+    // The removal boundary is applied here rather than in `event`, because the removal can be
+    // reached after the events it settles: the store orders the log by file name first.
+    const fromLog = (entry.fromLog ?? [])
+      .filter((held) => held.at === undefined || entry.removedAt === undefined || held.at > entry.removedAt)
+      .map((held) => held.finding)
+    findings.push(...this.#aging(entry), ...fromLog, ...entry.after)
     return findings
   }
 
