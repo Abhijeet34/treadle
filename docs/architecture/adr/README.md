@@ -17,6 +17,7 @@ ADR-0025 carries the next free number because it answers a scout report's measur
 ADR-0026 carries the next free number because workspace configuration is the fifth of the absent capabilities the sprint, the impediment and the board were three of, and it fills the Policy seam DR6 named.
 ADR-0027 carries the next free number for ADR-0009's reason: it moves a number DR8 set, and the argument for moving it is the thing worth reading.
 ADR-0028 carries the next free number because the retrospective is the sixth of the absent capabilities, and because its own draft claimed ADR-0026, which workspace configuration took while it was queued.
+ADR-0029 carries the next free number because it answers the tool's statement of purpose rather than any one design record, and it is the first record here that supersedes rather than overtakes: five of the records above it designed a surface it removes whole.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -48,6 +49,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md) | Workspace configuration is a closed set of optional fields and two gate sections on `workspace.md`, a configured gate replaces the default whole through the one evaluator, a configuration this build cannot read hides content, and the record is written under the same compare-and-set as every other |
 | [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
 | [ADR-0028](0028-a-retrospective-is-a-record-of-its-own-kind.md) | The retrospective is the one ceremony that gets a record, a kind of its own in `ceremonies/YYYY-MM.md` with no lifecycle and no family around it, its actions named once on the record and held there by `S17`'s fourth referrer |
+| [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) | The sprint, the board, the retrospective and the estimate are removed because none of them records an interaction, a decision or a task; a record written before the cut keeps its retired fields through `extra` and reads unchanged |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -56,6 +58,8 @@ A record is never rewritten when a later one overtakes part of it, because the a
 What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands.
 ADR-0002, ADR-0003, ADR-0004 and ADR-0006 carry that line today, each having reasoned from the absence of an entity, a command or a layer that has since been built, and ADR-0005's own hook-code bullet was the first to be marked this way.
 A record with no such line has not been overtaken, which is the claim the line exists to make checkable.
+A `**Superseded by:**` line is the stronger form of the same mark, for a record whose whole subject a later one removed rather than reshaped: the argument still reads and the surface it argued for is not in the tree.
+ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028 carry that line, all five naming ADR-0029.
 
 ## The store's rule ids
 
@@ -81,7 +85,7 @@ The set is closed.
 | `S14` | Two events in the store share an id |
 | `S15` | A path inside the store is a symbolic link, which the store never follows |
 | `S16` | The lock was lost while held: the holder stalled past the heartbeat window and another writer reclaimed it |
-| `S17` | A removal would leave a record naming the removed id: a child's parent, a stored relation edge, a closed sprint's committed set, or a retrospective's action list |
+| `S17` | A removal would leave a record naming the removed id: a child's parent or a stored relation edge |
 
 ## The doctor's finding ids
 
@@ -93,11 +97,11 @@ They are raised in three places, because each id needs a different thing beside 
 The rest come from `doctor` and from `explain`, the only reads that have the event log and
 the done gate. ADR-0010 argues `H17` and ADR-0011 `H18` to `H21`; `H23` is the log's own
 half of `H20`, added when a hand-written event line was found answering `explain`. ADR-0015
-argues `H24` and `H25`, which need the whole relation graph beside the record, and `H26`
-came with ADR-0016, for a `sprint_id` written before sprints were records. ADR-0017 argues
-`H27`, which needs only the impediment's own record, and ADR-0022 narrows it to an
+argues `H24` and `H25`, which need the whole relation graph beside the record. ADR-0017
+argues `H27`, which needs only the impediment's own record, and ADR-0022 narrowed it to an
 impediment past `draft`, because `file` lands one in `draft` and the finding used to fire
 between the two commands the tool prescribes.
+ADR-0029 removes `H26`, `H28` and `H29` with the sprint they reported on.
 ADR-0025 argues `H30`, the parent's half of `H24`: the store refuses to write a `parent_id`
 naming a record it does not hold, and this reports the ones a hand edit, a git merge or an
 older build left behind, which nothing reported at all.
@@ -105,7 +109,7 @@ older build left behind, which nothing reported at all.
 | Id | Raised by | Finding |
 |---|---|---|
 | `H03` | `doctor` | An item has been `in_progress` for longer than the workspace's `aging_days`, which is a threshold a team set rather than a fault in the files |
-| `H04` | `doctor` | A column holds more items than the workspace's `wip_limits` allows, which `G3` refuses to add to and an override or a lowered limit produces |
+| `H04` | `doctor` | A state holds more items than the workspace's `wip_limits` allows, which `G3` refuses to add to and an override or a lowered limit produces |
 | `H14` | the store, on load | A configured gate names a rule this build cannot load, which `config set` refuses with `V6` or `V7` before the write |
 | `H16` | the store, on load | A file arrived with CRLF line endings, which DR3 rule 6 named |
 | `H17` | `status` | An overdue item is assigned to nobody |
@@ -116,10 +120,7 @@ older build left behind, which nothing reported at all.
 | `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
 | `H24` | `doctor`, `explain` | A stored relation names an item the store does not hold, so it counts for nothing on any read |
 | `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
-| `H26` | `doctor`, `explain` | An item's `sprint_id` names no sprint record, which no write path produces since ADR-0016 |
 | `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
-| `H28` | `doctor` | A closed sprint's `members` or `carried` list names an id no record here carries, so the sprint counts a member nothing can show |
-| `H29` | `doctor` | A closed sprint's frozen tally is larger than the set it was counted over, which no close writes |
 | `H30` | `doctor`, `explain` | A record's `parent_id` names an item the store does not hold, so the record reads as a child of nothing |
 
 ## The CLI's rule ids

@@ -11,7 +11,7 @@ import { readFile, stat, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { aWorkspace, anEvent, anItem, deleteIndex } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anEvent, anItem, deleteIndex } from '../helpers/store-fixtures.ts'
 import { renderEvent } from '../../src/adapters/store/index.ts'
 import type { Store, StoreEvent } from '../../src/application/ports/store.ts'
 
@@ -36,7 +36,7 @@ function openHandlesOn(file: string): number {
 }
 
 async function snapshot(store: Store): Promise<string> {
-  const items = await store.list()
+  const items = await allItems(store)
   const events = await store.events()
   const findings = await store.findings()
   assert.ok(items.ok && events.ok && findings.ok)
@@ -87,7 +87,7 @@ describe('the index is a cache and deleting it is always harmless', () => {
       await writeFile(file, 'not a database, not even close')
 
       const before = openHandlesOn(file)
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.ok(items.ok, items.ok ? '' : items.error.message)
       assert.equal(openHandlesOn(file) - before, 1, 'the rebuilt index is one handle, not two')
     } finally {

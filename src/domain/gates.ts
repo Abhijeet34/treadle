@@ -24,7 +24,6 @@ export type GateCheck =
   | { readonly kind: 'list_all_ticked'; readonly field: string }
   | { readonly kind: 'field_is_true'; readonly field: string }
   | { readonly kind: 'type_required_fields' }
-  | { readonly kind: 'estimate_set' }
   | { readonly kind: 'no_active_blocker' }
   | { readonly kind: 'parent_present' }
   | { readonly kind: 'child_present'; readonly childType?: WorkItemType }
@@ -47,7 +46,6 @@ export type Gate = {
   readonly rules: readonly GateRule[]
 }
 
-
 export type GateContext = {
   readonly item: WorkItem
   /** Active blockers, derived from the relation graph by the caller; DOD2 reads the impediments among them. */
@@ -69,8 +67,10 @@ export const DEFAULT_READY_GATE: Gate = {
     { id: 'DOR1', scope: 'all', sentence: 'The item has a title.', check: { kind: 'field_present', field: 'title' } },
     { id: 'DOR2', scope: 'all', sentence: 'The fields the type requires at creation are present.', check: { kind: 'type_required_fields' } },
     { id: 'DOR3', scope: 'all', sentence: 'Nothing active is blocking the item.', check: { kind: 'no_active_blocker' } },
+    // DOR5 was "the story is estimated in points" and went with estimation. The id is not
+    // reused and the rest are not renumbered, for the reason DOR9 below records: a rule id
+    // is a name a past refusal printed.
     { id: 'DOR4', scope: 'story', sentence: 'The story has at least one acceptance criterion.', check: { kind: 'field_non_empty_list', field: 'acceptance_criteria' } },
-    { id: 'DOR5', scope: 'story', sentence: 'The story is estimated in points.', check: { kind: 'estimate_set' } },
     { id: 'DOR6', scope: 'bug', sentence: 'The bug records what was expected.', check: { kind: 'field_present', field: 'expected' } },
     { id: 'DOR7', scope: 'bug', sentence: 'The bug records what actually happened.', check: { kind: 'field_present', field: 'actual' } },
     { id: 'DOR8', scope: 'epic', sentence: 'The epic has at least one child story.', check: { kind: 'child_present', childType: 'story' } },
@@ -159,10 +159,6 @@ function run(check: GateCheck, context: GateContext): Outcome {
         ? no(reason, `treadle set ${item.id} ${missing.map((f) => `${f}=${placeholderOf(f)}`).join(' ')}`)
         : no(reason, writeCommand(first, item.id, placeholderOf(first)))
     }
-    case 'estimate_set':
-      return typeof item.points === 'number'
-        ? PASS
-        : no('points are not set', writeCommand('points', item.id, '<n>'))
     case 'no_active_blocker': {
       const first = context.blockers[0]
       return first === undefined

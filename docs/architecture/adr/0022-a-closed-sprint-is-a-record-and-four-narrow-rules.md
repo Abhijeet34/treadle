@@ -4,6 +4,7 @@
 **Date:** 2026-09-06
 **Implements:** rows 3, 11, 12, 13 and 16 of the full audit
 **Overtaken in part by:** [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md), which freezes the whole member set and `points` with the rest of the tally, so the bullet below that keeps `committed`, `cancelled` and `points` derived no longer holds; the freeze this record argued for, and everything else it decided, stands
+**Superseded by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
 
 ## Context
 

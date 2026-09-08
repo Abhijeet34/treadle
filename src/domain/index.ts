@@ -17,7 +17,6 @@ export {
 export {
   ATTEMPT_OUTCOMES,
   BUG_SEVERITIES,
-  DEFAULT_POINT_SCALE,
   EVIDENCE_KINDS,
   FOUND_IN_STAGES,
   GUARD_IDS,
@@ -156,42 +155,14 @@ export {
 } from './hierarchy.ts'
 
 export {
-  CEREMONY_FIELDS,
-  validateCeremony,
-  type Ceremony,
-  type CeremonyState,
-} from './ceremony.ts'
-
-export {
-  MAX_GOAL,
-  SPRINT_FIELDS,
-  carryOver,
-  membersOf,
-  dateOf,
-  dayOfSprint,
-  sprintDay,
-  evaluateCommit,
-  isCalendarDate,
-  isSprintField,
-  validateSprint,
-  type CalendarDate,
-  type CommitContext,
-  type CommitOutcome,
-  type Sprint,
-  type SprintState,
-} from './sprint.ts'
-
-export {
   MAX_RELATION_DEPTH,
   LINKABLE_KINDS,
   addRelation,
   blockersOf,
-  emptyRelationGraph,
   findRelationCycle,
   linkableKindOf,
   relationGraphFrom,
   inverseOf,
-  isBlocked,
   isSymmetric,
   relationsOf,
   removeRelation,

@@ -3,11 +3,10 @@
 // one parse and one render per key so the file, the command line, the event log and the
 // `config` reading all spell a value the same way.
 //
-// Six things in this tree waited on this file by name, and each is a value that was a
-// constant with a comment saying so: the review step G5 reads, the point scale
-// `validateWorkItem` takes, `next`'s weights, G3's column limits, G4's boolean, and the
-// second implementation of the Policy seam, which is a gate loaded from data and run
-// through the one evaluator the built-in gates run through.
+// Four things in this tree waited on this file by name, and each is a value that was a
+// constant with a comment saying so: the review step G5 reads, `next`'s weights, G3's
+// column limits, and the second implementation of the Policy seam, which is a gate loaded
+// from data and run through the one evaluator the built-in gates run through.
 //
 // Every key is optional. Absence is the default below, which is why a workspace that has
 // never been configured behaves exactly as it did before this file existed, and why
@@ -16,7 +15,7 @@
 import { fail, ok, type Result } from './errors.ts'
 import { isSafeText } from './text.ts'
 import { DEFAULT_DONE_GATE, DEFAULT_READY_GATE, validateGate, type Gate, type GateCheck, type GateRule } from './gates.ts'
-import { DEFAULT_POINT_SCALE, WORK_ITEM_STATES, WORK_ITEM_TYPES, type WorkItemState, type WorkItemType } from './types.ts'
+import { WORK_ITEM_STATES, WORK_ITEM_TYPES, type WorkItemState, type WorkItemType } from './types.ts'
 
 /**
  * The closed set, in the order `config` prints it and the codec writes it. `ready_gate` and
@@ -26,12 +25,9 @@ import { DEFAULT_POINT_SCALE, WORK_ITEM_STATES, WORK_ITEM_TYPES, type WorkItemSt
  */
 export const CONFIG_KEYS = [
   'review_step',
-  'point_scale',
   'next_weights',
   'wip_limits',
   'aging_days',
-  'cycle_time_excludes_hold',
-  'start_requires_sprint',
   'ready_gate',
   'done_gate',
 ] as const
@@ -53,7 +49,7 @@ export function isGateKey(key: ConfigKey): key is 'ready_gate' | 'done_gate' {
 }
 
 /** The components of `next`'s score, which are the keys `next_weights` may name. */
-export const WEIGHT_NAMES = ['pri', 'age', 'dep', 'spr', 'asg', 'due', 'sev'] as const
+export const WEIGHT_NAMES = ['pri', 'age', 'dep', 'asg', 'due', 'sev'] as const
 export type WeightName = (typeof WEIGHT_NAMES)[number]
 export type Weights = Readonly<Record<WeightName, number>>
 
@@ -68,20 +64,16 @@ export type Weights = Readonly<Record<WeightName, number>>
  * They live here rather than beside `next` because a configured workspace overrides them
  * and one table is what stops the default and the override disagreeing.
  */
-export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, spr: 8, asg: 8, due: 4, sev: 6 }
+export const DEFAULT_WEIGHTS: Weights = { pri: 10, age: 1, dep: 5, asg: 8, due: 4, sev: 6 }
 
 export type WorkspaceConfig = {
   /** G5's input: the types whose work passes through `in_review`. */
   readonly review_step: readonly WorkItemType[]
-  readonly point_scale: readonly number[]
   readonly next_weights: Weights
   /** G3's input, per target state. A state absent here is unlimited, as a limit of zero is. */
   readonly wip_limits: ReadonlyMap<WorkItemState, number>
   /** Doctor `H03`'s threshold in days. Zero disarms it, as a zero column limit disarms G3. */
   readonly aging_days: number
-  readonly cycle_time_excludes_hold: boolean
-  /** G4's input: with it false the guard passes, which is what ADR-0018 left it doing. */
-  readonly start_requires_sprint: boolean
   readonly ready_gate: Gate
   readonly done_gate: Gate
   /** The keys this workspace's own file set, which is what `config` reports as `file`. */
@@ -98,12 +90,9 @@ const NO_KEYS: ReadonlySet<ConfigKey> = new Set()
 export function defaultConfig(): WorkspaceConfig {
   return {
     review_step: ['story', 'bug', 'epic'],
-    point_scale: DEFAULT_POINT_SCALE,
     next_weights: DEFAULT_WEIGHTS,
     wip_limits: new Map(),
     aging_days: 0,
-    cycle_time_excludes_hold: false,
-    start_requires_sprint: false,
     ready_gate: DEFAULT_READY_GATE,
     done_gate: DEFAULT_DONE_GATE,
     from: NO_KEYS,
@@ -193,7 +182,7 @@ function gateRule(key: ConfigKey, line: string): Result<GateRule> {
  */
 const FIELD_CHECKS = ['field_present', 'field_non_empty_list', 'list_all_ticked', 'field_is_true'] as const
 const BARE_CHECKS = [
-  'type_required_fields', 'estimate_set', 'no_active_blocker', 'parent_present',
+  'type_required_fields', 'no_active_blocker', 'parent_present',
   'no_open_child', 'no_open_impediment', 'blocks_something', 'not_a_duplicate',
   'reviewer_distinct_from_assignee', 'evidence_present',
 ] as const
@@ -250,17 +239,6 @@ export function parseConfigValue(key: ConfigKey, text: string): Result<unknown> 
       if (new Set(types).size !== types.length) return refuse('V8', 'review_step names a type twice', key)
       return ok(types as readonly WorkItemType[])
     }
-    case 'point_scale': {
-      const words = text.split(',').map((word) => word.trim())
-      const scale: number[] = []
-      for (const word of words) {
-        if (!WHOLE.test(word)) return refuse('V8', `point_scale entry "${word}" is not a whole number`, key)
-        scale.push(Number(word))
-      }
-      if (scale.length === 0) return refuse('V8', 'point_scale is empty, and an estimate has to be one of its values', key)
-      if (new Set(scale).size !== scale.length) return refuse('V8', 'point_scale carries a value twice', key)
-      return ok(scale as readonly number[])
-    }
     case 'next_weights': {
       const parsed = pairs(key, text)
       if (!parsed.ok) return parsed
@@ -289,12 +267,6 @@ export function parseConfigValue(key: ConfigKey, text: string): Result<unknown> 
     case 'aging_days':
       if (!WHOLE.test(text.trim())) return refuse('V8', `aging_days is "${text}" and it is a whole number of days, zero meaning no threshold`, key)
       return ok(Number(text.trim()))
-    case 'cycle_time_excludes_hold':
-    case 'start_requires_sprint': {
-      const word = text.trim()
-      if (word !== 'true' && word !== 'false') return refuse('V8', `${key} is "${text}" and it is true or false`, key)
-      return ok(word === 'true')
-    }
     case 'ready_gate':
     case 'done_gate': {
       const lines = text.split(/[|\n]/).map((line) => line.trim()).filter((line) => line.length > 0)
@@ -322,12 +294,9 @@ export function parseConfigValue(key: ConfigKey, text: string): Result<unknown> 
 export function configLine(key: ConfigKey, config: WorkspaceConfig): string {
   switch (key) {
     case 'review_step': return config.review_step.length === 0 ? EMPTY : config.review_step.join(', ')
-    case 'point_scale': return config.point_scale.join(', ')
     case 'next_weights': return WEIGHT_NAMES.map((name) => `${name}=${config.next_weights[name]}`).join(', ')
     case 'wip_limits': return config.wip_limits.size === 0 ? EMPTY : [...config.wip_limits].map(([state, limit]) => `${state}=${limit}`).join(', ')
     case 'aging_days': return String(config.aging_days)
-    case 'cycle_time_excludes_hold': return String(config.cycle_time_excludes_hold)
-    case 'start_requires_sprint': return String(config.start_requires_sprint)
     case 'ready_gate': return renderGateRules(config.ready_gate).join('|')
     case 'done_gate': return renderGateRules(config.done_gate).join('|')
   }

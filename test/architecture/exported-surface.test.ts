@@ -28,7 +28,7 @@
 // `MAX_EVIDENCE_REF` and `nextTowardDone` are exported for that and nothing else. No other
 // document counts, and a decision record least of all: an ADR names the symbols it argued
 // about at the time it was written and goes on naming them after they are gone, so counting
-// one would have let `auditSprint`, `gateContextFor` and `BOARD_COLUMNS` through on the
+// one would have let `gateContextFor` through on the
 // strength of ADR-0023, ADR-0022 and ADR-0018 respectively.
 //
 // Only `src/` is held. Nine values under `test/`, `bench/` and `scripts/` are in the same
@@ -67,7 +67,7 @@ const EVERYWHERE = ['src', 'test', 'bench', 'scripts'].flatMap(
   // This file names the symbols it was written against, and a word match cannot tell a
   // comment from a call: leaving it in the reference set would exempt every example above
   // from the rule the examples exist to explain. Measured: with it in, re-exporting
-  // `auditSprint` passed.
+  // `gateContextFor` passed.
   .filter((file) => file !== fileURLToPath(import.meta.url))
 
 /** `export const X`, `export function X`, `export async function X`, `export class X`. */

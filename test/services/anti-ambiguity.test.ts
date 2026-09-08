@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The four primitives from the domain model's 2.12, which are the product's differentiator
-// rather than polish: a dry run that shows the exact diff, a preview that resolves the
+// rather than polish: a dry run that shows the exact diff, an absence that names the
 // target without evaluating a guard, an explanation of an absence, and a ranking that prints
 // the components and weights that produced it.
 
@@ -64,34 +64,6 @@ describe('--dry-run evaluates every guard and writes nothing', () => {
   })
 })
 
-describe('--preview resolves the target and evaluates nothing', () => {
-  let demo: Demo
-
-  before(async () => { demo = await aDemoWorkspace() })
-  after(async () => { await demo.dispose() })
-
-  it('names the store, the target and the guards it would evaluate', async () => {
-    const result = await transition(targetFor(demo.store, 'preview'), CLOCK, sequentialIds(500), {
-      id: 'csv-export', target: 'in_progress', actor: ACTOR,
-    })
-    assert.equal(result.data['preview'], 1)
-    assert.equal(result.data['item'], 'csv-export')
-    // Joined through `node:path`, so the separator asserted is this platform's own.
-    assert.ok(String(result.data['store']).endsWith(path.join('platform', '.work')), String(result.data['store']))
-    assert.equal(result.data['will_evaluate'], 'G2 G3 G4')
-    assert.equal(result.data['will_write'], 'item.transition')
-  })
-
-  it('says on its last line that no guard ran, so it cannot be read as a guard check', async () => {
-    const result = await transition(targetFor(demo.store, 'preview'), CLOCK, sequentialIds(501), {
-      id: 'sso-saml', target: 'done', actor: ACTOR,
-    })
-    assert.equal(result.ok, true, 'preview evaluates nothing, so a guard cannot refuse it')
-    assert.equal(result.data['note'], 'guards not evaluated; use --dry-run for the outcome')
-    assert.equal(result.data['guards'], undefined)
-  })
-})
-
 describe('an empty result and an absence are answered rather than left silent', () => {
   let demo: Demo
 
@@ -101,7 +73,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   it('says how many were searched, how many matched, and which clause was narrowest', async () => {
     const result = await backlog(demo.store, {
       filters: [{ field: 'state', value: 'ready' }, { field: 'assignee', value: 'kim' }],
-      columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9,
+      columns: ['id', 'type', 'state', 'title'], limit: 9,
     })
     assert.equal(result.data['none'], 'searched 24 matched 0')
     assert.equal(result.data['narrowest'], 'assignee kim 2', 'kim owns two items, none of them ready')
@@ -110,7 +82,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   it('names the first clause that excluded an id the caller expected', async () => {
     const result = await backlog(demo.store, {
       filters: [{ field: 'state', value: 'ready' }],
-      columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'sso-saml',
+      columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'sso-saml',
     })
     assert.equal(result.data['absent'], 'sso-saml')
     assert.equal(result.data['clause'], 'state want ready got in_progress')
@@ -118,7 +90,7 @@ describe('an empty result and an absence are answered rather than left silent', 
 
   it('names the store it searched when the id is nowhere in it', async () => {
     const result = await backlog(demo.store, {
-      filters: [], columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9, explainAbsence: 'no-such-item',
+      filters: [], columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'no-such-item',
     })
     assert.equal(result.data['absent'], 'no-such-item')
     assert.ok(String(result.data['store']).endsWith(path.join('platform', '.work')), String(result.data['store']))
@@ -144,12 +116,12 @@ describe('next ranks deterministically and prints the weights it used (R11)', ()
     assert.deepEqual(a, b)
   })
 
-  it('carries the seven components of each row, and the weights that multiplied them', async () => {
+  it('carries the six components of each row, and the weights that multiplied them', async () => {
     const result = await next(demo.store, CLOCK, { limit: 3 })
-    assert.equal(result.data['weights'], 'pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6')
+    assert.equal(result.data['weights'], 'pri 10 age 1 dep 5 asg 0 due 4 sev 6')
     const block = result.data['next'] as { rows: readonly Record<string, unknown>[] }
     for (const row of block.rows) {
-      assert.match(String(row['parts']), /^p\d+\/a\d+\/d\d+\/s[01]\/m[01]\/u\d+\/v[0-4]$/)
+      assert.match(String(row['parts']), /^p\d+\/a\d+\/d\d+\/m[01]\/u\d+\/v[0-4]$/)
     }
   })
 

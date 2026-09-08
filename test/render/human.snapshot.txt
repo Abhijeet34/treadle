@@ -2,7 +2,6 @@
 status  acme-platform
   store  /w/platform/.work
   items  24
-  points  83
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record
@@ -19,16 +18,15 @@ states  7 of 7
   ready        6
 
 next  3 of 3
-  ID           PTS  SCORE  TITLE
-  flaky-e2e    2    69     Checkout suite fails, one run …
-  csv-export   5    42     Export a filtered list to CSV
-  gdpr-export  5    42     Export everything we hold on o…
+  ID           SCORE  TITLE
+  flaky-e2e    69     Checkout suite fails, one run in fi…
+  csv-export   42     Export a filtered list to CSV
+  gdpr-export  42     Export everything we hold on one ac…
 
 ### status @ 80
 status  acme-platform
   store  /w/platform/.work
   items  24
-  points  83
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record against the event log
@@ -44,16 +42,15 @@ states  7 of 7
   ready        6
 
 next  3 of 3
-  ID           PTS  SCORE  TITLE
-  flaky-e2e    2    69     Checkout suite fails, one run in five
-  csv-export   5    42     Export a filtered list to CSV
-  gdpr-export  5    42     Export everything we hold on one account
+  ID           SCORE  TITLE
+  flaky-e2e    69     Checkout suite fails, one run in five
+  csv-export   42     Export a filtered list to CSV
+  gdpr-export  42     Export everything we hold on one account
 
 ### status @ 200
 status  acme-platform
   store  /w/platform/.work
   items  24
-  points  83
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record against the event log
@@ -69,71 +66,65 @@ states  7 of 7
   ready        6
 
 next  3 of 3
-  ID           PTS  SCORE  TITLE
-  flaky-e2e    2    69     Checkout suite fails, one run in five
-  csv-export   5    42     Export a filtered list to CSV
-  gdpr-export  5    42     Export everything we hold on one account
+  ID           SCORE  TITLE
+  flaky-e2e    69     Checkout suite fails, one run in five
+  csv-export   42     Export a filtered list to CSV
+  gdpr-export  42     Export everything we hold on one account
 
 ### backlog @ 60
 backlog  acme-platform
   sort  priority,filed,id
-  points  39
-  done_points  0
   more  15
-  page  treadle backlog --fields id,type,state,pts,title
+  page  treadle backlog --fields id,type,state,title
     --cursor queue-drain
 
 items  9 of 24
-  ID            TYPE   STATE        PTS  TITLE
-  sso-saml      story  in_progress  8    SAML login for e…
-  log-redact    task   in_progress  3    Redact tokens fr…
-  sess-timeout  bug    draft        3    Session survives…
-  auth-refresh  story  in_progress  5    Refresh the acce…
-  rate-limit    story  in_review    3    Return 429 with …
-  flaky-e2e     bug    ready        2    Checkout suite f…
-  audit-log     story  draft        8    Record who chang…
-  gdpr-export   story  ready        5    Export everythin…
-  stale-cache   bug    draft        2    Profile cache se…
+  ID            TYPE   STATE        TITLE
+  sso-saml      story  in_progress  SAML login for enterp…
+  log-redact    task   in_progress  Redact tokens from re…
+  sess-timeout  bug    draft        Session survives a pa…
+  auth-refresh  story  in_progress  Refresh the access to…
+  rate-limit    story  in_review    Return 429 with a ret…
+  flaky-e2e     bug    ready        Checkout suite fails,…
+  audit-log     story  draft        Record who changed wh…
+  gdpr-export   story  ready        Export everything we …
+  stale-cache   bug    draft        Profile cache serves …
 
 ### backlog @ 80
 backlog  acme-platform
   sort  priority,filed,id
-  points  39
-  done_points  0
   more  15
-  page  treadle backlog --fields id,type,state,pts,title --cursor queue-drain
+  page  treadle backlog --fields id,type,state,title --cursor queue-drain
 
 items  9 of 24
-  ID            TYPE   STATE        PTS  TITLE
-  sso-saml      story  in_progress  8    SAML login for enterprise tenants
-  log-redact    task   in_progress  3    Redact tokens from request logs
-  sess-timeout  bug    draft        3    Session survives a password change
-  auth-refresh  story  in_progress  5    Refresh the access token on a 401
-  rate-limit    story  in_review    3    Return 429 with a retry-after header
-  flaky-e2e     bug    ready        2    Checkout suite fails, one run in five
-  audit-log     story  draft        8    Record who changed what and when
-  gdpr-export   story  ready        5    Export everything we hold on one acc…
-  stale-cache   bug    draft        2    Profile cache serves a deleted avatar
+  ID            TYPE   STATE        TITLE
+  sso-saml      story  in_progress  SAML login for enterprise tenants
+  log-redact    task   in_progress  Redact tokens from request logs
+  sess-timeout  bug    draft        Session survives a password change
+  auth-refresh  story  in_progress  Refresh the access token on a 401
+  rate-limit    story  in_review    Return 429 with a retry-after header
+  flaky-e2e     bug    ready        Checkout suite fails, one run in five
+  audit-log     story  draft        Record who changed what and when
+  gdpr-export   story  ready        Export everything we hold on one account
+  stale-cache   bug    draft        Profile cache serves a deleted avatar
 
 ### backlog @ 200
 backlog  acme-platform
   sort  priority,filed,id
-  points  39
-  done_points  0
   more  15
-  page  treadle backlog --fields id,type,state,pts,title --cursor queue-drain
+  page  treadle backlog --fields id,type,state,title --cursor queue-drain
 
 items  9 of 24
-  ID            TYPE   STATE        PTS  TITLE
-  sso-saml      story  in_progress  8    SAML login for enterprise tenants
-  log-redact    task   in_progress  3    Redact tokens from request logs
-  sess-timeout  bug    draft        3    Session survives a password change
-  auth-refresh  story  in_progress  5    Refresh the access token on a 401
-  rate-limit    story  in_review    3    Return 429 with a retry-after header
-  flaky-e2e     bug    ready        2    Checkout suite fails, one run in five
-  audit-log     story  draft        8    Record who changed what and when
-  gdpr-export   story  ready        5    Export everything we hold on one account
-  stale-cache   bug    draft        2    Profile cache serves a deleted avatar
+  ID            TYPE   STATE        TITLE
+  sso-saml      story  in_progress  SAML login for enterprise tenants
+  log-redact    task   in_progress  Redact tokens from request logs
+  sess-timeout  bug    draft        Session survives a password change
+  auth-refresh  story  in_progress  Refresh the access token on a 401
+  rate-limit    story  in_review    Return 429 with a retry-after header
+  flaky-e2e     bug    ready        Checkout suite fails, one run in five
+  audit-log     story  draft        Record who changed what and when
+  gdpr-export   story  ready        Export everything we hold on one account
+  stale-cache   bug    draft        Profile cache serves a deleted avatar
 
 ### backlog-empty @ 60
 backlog  acme-platform
@@ -163,55 +154,49 @@ items  0 of 0
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
-  points  18
-  done_points  0
   absent  sso-saml
   clause  state want ready got in_progress
 
 items  6 of 6
-  ID             TYPE   STATE  PTS  TITLE
-  flaky-e2e      bug    ready  2    Checkout suite fails,…
-  gdpr-export    story  ready  5    Export everything we …
-  csv-export     story  ready  5    Export a filtered lis…
-  webhook-retry  task   ready  3    Retry a failed webhoo…
-  dep-bump       chore  ready  1    Move the toolchain to…
-  avatar-crop    task   ready  2    Crop an uploaded avat…
+  ID             TYPE   STATE  TITLE
+  flaky-e2e      bug    ready  Checkout suite fails, one …
+  gdpr-export    story  ready  Export everything we hold …
+  csv-export     story  ready  Export a filtered list to …
+  webhook-retry  task   ready  Retry a failed webhook thr…
+  dep-bump       chore  ready  Move the toolchain to the …
+  avatar-crop    task   ready  Crop an uploaded avatar to…
 
 ### backlog-absence @ 80
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
-  points  18
-  done_points  0
   absent  sso-saml
   clause  state want ready got in_progress
 
 items  6 of 6
-  ID             TYPE   STATE  PTS  TITLE
-  flaky-e2e      bug    ready  2    Checkout suite fails, one run in five
-  gdpr-export    story  ready  5    Export everything we hold on one account
-  csv-export     story  ready  5    Export a filtered list to CSV
-  webhook-retry  task   ready  3    Retry a failed webhook three times
-  dep-bump       chore  ready  1    Move the toolchain to the current release
-  avatar-crop    task   ready  2    Crop an uploaded avatar to a square
+  ID             TYPE   STATE  TITLE
+  flaky-e2e      bug    ready  Checkout suite fails, one run in five
+  gdpr-export    story  ready  Export everything we hold on one account
+  csv-export     story  ready  Export a filtered list to CSV
+  webhook-retry  task   ready  Retry a failed webhook three times
+  dep-bump       chore  ready  Move the toolchain to the current release
+  avatar-crop    task   ready  Crop an uploaded avatar to a square
 
 ### backlog-absence @ 200
 backlog  acme-platform
   filter  state ready
   sort  priority,filed,id
-  points  18
-  done_points  0
   absent  sso-saml
   clause  state want ready got in_progress
 
 items  6 of 6
-  ID             TYPE   STATE  PTS  TITLE
-  flaky-e2e      bug    ready  2    Checkout suite fails, one run in five
-  gdpr-export    story  ready  5    Export everything we hold on one account
-  csv-export     story  ready  5    Export a filtered list to CSV
-  webhook-retry  task   ready  3    Retry a failed webhook three times
-  dep-bump       chore  ready  1    Move the toolchain to the current release
-  avatar-crop    task   ready  2    Crop an uploaded avatar to a square
+  ID             TYPE   STATE  TITLE
+  flaky-e2e      bug    ready  Checkout suite fails, one run in five
+  gdpr-export    story  ready  Export everything we hold on one account
+  csv-export     story  ready  Export a filtered list to CSV
+  webhook-retry  task   ready  Retry a failed webhook three times
+  dep-bump       chore  ready  Move the toolchain to the current release
+  avatar-crop    task   ready  Crop an uploaded avatar to a square
 
 ### show @ 60
 show  acme-platform
@@ -220,7 +205,6 @@ show  acme-platform
   state  in_progress
   filed  2026-08-20T09:00:00Z
   v  3
-  pts  5
   pri  2
   ac  0/2
   assignee
@@ -239,7 +223,6 @@ show  acme-platform
   state  in_progress
   filed  2026-08-20T09:00:00Z
   v  3
-  pts  5
   pri  2
   ac  0/2
   assignee
@@ -258,7 +241,6 @@ show  acme-platform
   state  in_progress
   filed  2026-08-20T09:00:00Z
   v  3
-  pts  5
   pri  2
   ac  0/2
   assignee
@@ -300,42 +282,39 @@ criteria  2 of 2
 
 ### next @ 60
 next  acme-platform
-  weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
   page  treadle next --cursor webhook-retry
 
 next  3 of 6
-  ID           PTS  SCORE  PARTS
-  flaky-e2e    2    69     p4/a11/d0/s0/m0/u0/v3
-    Checkout suite fails, one run in five
-  csv-export   5    42     p3/a12/d0/s0/m0/u0/v0
-    Export a filtered list to CSV
-  gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0
-    Export everything we hold on one account
+  ID           SCORE  PARTS               TITLE
+  flaky-e2e    69     p4/a11/d0/m0/u0/v3  Checkout suite …
+  csv-export   42     p3/a12/d0/m0/u0/v0  Export a filter…
+  gdpr-export  42     p4/a2/d0/m0/u0/v0   Export everythi…
 
 ### next @ 80
 next  acme-platform
-  weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
   page  treadle next --cursor webhook-retry
 
 next  3 of 6
-  ID           PTS  SCORE  PARTS                  TITLE
-  flaky-e2e    2    69     p4/a11/d0/s0/m0/u0/v3  Checkout suite fails, one r…
-  csv-export   5    42     p3/a12/d0/s0/m0/u0/v0  Export a filtered list to C…
-  gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0   Export everything we hold o…
+  ID           SCORE  PARTS               TITLE
+  flaky-e2e    69     p4/a11/d0/m0/u0/v3  Checkout suite fails, one run in fi…
+  csv-export   42     p3/a12/d0/m0/u0/v0  Export a filtered list to CSV
+  gdpr-export  42     p4/a2/d0/m0/u0/v0   Export everything we hold on one ac…
 
 ### next @ 200
 next  acme-platform
-  weights  pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6
+  weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
   page  treadle next --cursor webhook-retry
 
 next  3 of 6
-  ID           PTS  SCORE  PARTS                  TITLE
-  flaky-e2e    2    69     p4/a11/d0/s0/m0/u0/v3  Checkout suite fails, one run in five
-  csv-export   5    42     p3/a12/d0/s0/m0/u0/v0  Export a filtered list to CSV
-  gdpr-export  5    42     p4/a2/d0/s0/m0/u0/v0   Export everything we hold on one account
+  ID           SCORE  PARTS               TITLE
+  flaky-e2e    69     p4/a11/d0/m0/u0/v3  Checkout suite fails, one run in five
+  csv-export   42     p3/a12/d0/m0/u0/v0  Export a filtered list to CSV
+  gdpr-export  42     p4/a2/d0/m0/u0/v0   Export everything we hold on one account
 
 ### explain @ 60
 explain  acme-platform
@@ -350,9 +329,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  8/11 pass
+  rules  7/10 pass
 
-gates  3 of 11
+gates  3 of 10
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<nam…
   done  DOD4  fail     treadle set sso-saml acceptance_cr…
@@ -378,9 +357,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  8/11 pass
+  rules  7/10 pass
 
-gates  3 of 11
+gates  3 of 10
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
@@ -406,9 +385,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  8/11 pass
+  rules  7/10 pass
 
-gates  3 of 11
+gates  3 of 10
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
@@ -436,7 +415,7 @@ events  3 of 3
     dana
   2026-08-21T09:00:00Z  human  item.file
     type=story,state=draft,filed_at=2026-08-21T09:00:00Z,
-    priority=1,points=8,assignee=kim
+    priority=1,assignee=kim
     dana
 
 reasons  2 of 2
@@ -456,8 +435,7 @@ events  3 of 3
   2026-08-21T09:00:00Z  human  item.transition  state=draft->ready
     dana
   2026-08-21T09:00:00Z  human  item.file
-    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,
-    assignee=kim
+    type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,assignee=kim
     dana
 
 reasons  2 of 2
@@ -471,10 +449,10 @@ history  acme-platform
   sort  at desc
 
 events  3 of 3
-  AT                    KIND   OP               WHAT                                                                                   BY
-  2026-08-21T09:00:00Z  human  item.transition  state=ready->in_progress                                                               dana
-  2026-08-21T09:00:00Z  human  item.transition  state=draft->ready                                                                     dana
-  2026-08-21T09:00:00Z  human  item.file        type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,points=8,assignee=kim  dana
+  AT                    KIND   OP               WHAT                                                                          BY
+  2026-08-21T09:00:00Z  human  item.transition  state=ready->in_progress                                                      dana
+  2026-08-21T09:00:00Z  human  item.transition  state=draft->ready                                                            dana
+  2026-08-21T09:00:00Z  human  item.file        type=story,state=draft,filed_at=2026-08-21T09:00:00Z,priority=1,assignee=kim  dana
 
 reasons  2 of 2
   AT                    OP               WHY
@@ -498,27 +476,24 @@ help  acme-platform
     description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to
     pick up
-  example  treadle board # the open sprint, one section per
-    live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
+  example  treadle set checkout-500 expected="both orders
+    are listed" actual="one is charged" # fill in what a bug
+    was filed without, which is what the ready gate reads
 
-commands  22 of 22
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
   show        read    no        Print the stored fields o…
   backlog     read    yes       List the items that match…
-  board       read    no        Group the live work by st…
   transition  mutate  no        Move one item to a target…
   set         mutate  no        Write one or more stored …
   mark        mutate  no        Set the severity or the p…
   evidence    mutate  no        Append one bounded pointe…
   relation    mutate  no        Link two items with a typ…
   remove      mutate  no        Take one mis-filed item o…
-  sprint      mutate  no        Open a sprint, commit ite…
-  sprints     read    no        List the sprints, or prin…
-  ceremonies  read    no        List the retrospectives, …
   config      mutate  no        Read every configuration …
   doctor      read    no        Report what the stored fi…
   next        read    yes       Rank what to pick up, and…
@@ -544,27 +519,24 @@ help  acme-platform
   example  treadle show auth-refresh --field desc # the description whole,
     rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
-  example  treadle board # the open sprint, one section per live state, blocked
-    work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
+  example  treadle set checkout-500 expected="both orders are listed"
+    actual="one is charged" # fill in what a bug was filed without, which is
+    what the ready gate reads
 
-commands  22 of 22
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one st…
-  board       read    no        Group the live work by state, scoped to the o…
   transition  mutate  no        Move one item to a target state, with every g…
   set         mutate  no        Write one or more stored fields of an item th…
   mark        mutate  no        Set the severity or the priority of one item,…
   evidence    mutate  no        Append one bounded pointer at an artefact a t…
   relation    mutate  no        Link two items with a typed edge, or remove o…
   remove      mutate  no        Take one mis-filed item out of the records, k…
-  sprint      mutate  no        Open a sprint, commit items to it, and close …
-  sprints     read    no        List the sprints, or print one with its dates…
-  ceremonies  read    no        List the retrospectives, or print one with it…
   config      mutate  no        Read every configuration key with the value i…
   doctor      read    no        Report what the stored files say that no writ…
   next        read    yes       Rank what to pick up, and print the component…
@@ -586,25 +558,21 @@ help  acme-platform
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
   example  treadle backlog --state ready # what is ready to pick up
-  example  treadle board # the open sprint, one section per live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 
-commands  22 of 22
+commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
   show        read    no        Print the stored fields of one item.
   backlog     read    yes       List the items that match a filter, in one stated order.
-  board       read    no        Group the live work by state, scoped to the open sprint, with blocked work first in every column.
   transition  mutate  no        Move one item to a target state, with every guard on that edge evaluated.
   set         mutate  no        Write one or more stored fields of an item that is already filed.
   mark        mutate  no        Set the severity or the priority of one item, with the reason and both values in the log.
   evidence    mutate  no        Append one bounded pointer at an artefact a third party can open.
   relation    mutate  no        Link two items with a typed edge, or remove one; the inverse is derived, never stored.
   remove      mutate  no        Take one mis-filed item out of the records, keeping every event it earned in the log.
-  sprint      mutate  no        Open a sprint, commit items to it, and close it with what carried over recorded.
-  sprints     read    no        List the sprints, or print one with its dates, its committed set and what carried over.
-  ceremonies  read    no        List the retrospectives, or print one with its prose and the chores it produced.
   config      mutate  no        Read every configuration key with the value in force and its source, or set one.
   doctor      read    no        Report what the stored files say that no write path would have accepted.
   next        read    yes       Rank what to pick up, and print the components and weights that produced the order.
@@ -645,10 +613,8 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --dry-run
     # the field diff and the exit status the real run would
     return
-  example  treadle transition sso-saml in_progress --preview
-    # which store and which guards, evaluating none of them
 
-flags  20 of 20
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what …
   --version          N        another scope: passing it h…
@@ -657,13 +623,10 @@ flags  20 of 20
   --quiet            S        supported: it changes what …
   --verbose          S        supported: it changes what …
   --log-values       S        supported: it lets -vvv pri…
-  --color            A        accepted and ignored: no re…
   --ascii            S        supported: it writes the hu…
   --workspace        S        supported: it changes what …
   --dry-run          S        supported: it changes what …
-  --preview          S        supported: it changes what …
   --yes              A        accepted and ignored: this …
-  --no-input         A        accepted and ignored: this …
   --actor            S        supported: it names who the…
   --width            S        supported: it lays the huma…
   --fields           X        refused: ignoring it would …
@@ -695,10 +658,8 @@ help  acme-platform
     queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff
     and the exit status the real run would return
-  example  treadle transition sso-saml in_progress --preview # which store and
-    which guards, evaluating none of them
 
-flags  20 of 20
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or…
   --version          N        another scope: passing it here is a validation …
@@ -707,13 +668,10 @@ flags  20 of 20
   --quiet            S        supported: it changes what this command does or…
   --verbose          S        supported: it changes what this command does or…
   --log-values       S        supported: it lets -vvv print field values, rep…
-  --color            A        accepted and ignored: no rendering emits colour…
   --ascii            S        supported: it writes the human rendering trunca…
   --workspace        S        supported: it changes what this command does or…
   --dry-run          S        supported: it changes what this command does or…
-  --preview          S        supported: it changes what this command does or…
   --yes              A        accepted and ignored: this command has no confi…
-  --no-input         A        accepted and ignored: this command has no confi…
   --actor            S        supported: it names who the event records; TREA…
   --width            S        supported: it lays the human rendering out at t…
   --fields           X        refused: ignoring it would answer a question th…
@@ -736,9 +694,8 @@ help  acme-platform
   example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
   example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
-  example  treadle transition sso-saml in_progress --preview # which store and which guards, evaluating none of them
 
-flags  20 of 20
+flags  17 of 17
   FLAG               VERDICT  NOTE
   --help             S        supported: it changes what this command does or shows
   --version          N        another scope: passing it here is a validation error naming the correct form
@@ -747,13 +704,10 @@ flags  20 of 20
   --quiet            S        supported: it changes what this command does or shows
   --verbose          S        supported: it changes what this command does or shows
   --log-values       S        supported: it lets -vvv print field values, reported by name and size without it
-  --color            A        accepted and ignored: no rendering emits colour at all, so there is no colour to switch
   --ascii            S        supported: it writes the human rendering truncation mark as three dots, not an ellipsis
   --workspace        S        supported: it changes what this command does or shows
   --dry-run          S        supported: it changes what this command does or shows
-  --preview          S        supported: it changes what this command does or shows
   --yes              A        accepted and ignored: this command has no confirmation to answer
-  --no-input         A        accepted and ignored: this command has no confirmation to suppress
   --actor            S        supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and the default is unknown
   --width            S        supported: it lays the human rendering out at that many display cells, clamped to 40 to 200
   --fields           X        refused: ignoring it would answer a question the caller did not ask
@@ -799,7 +753,7 @@ transition  acme-platform  0 changed  txn -
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   events  1 item.transition
 
 ### transition-dry-run @ 80
@@ -809,7 +763,7 @@ transition  acme-platform  0 changed  txn -
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   events  1 item.transition
 
 ### transition-dry-run @ 200
@@ -819,45 +773,15 @@ transition  acme-platform  0 changed  txn -
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   events  1 item.transition
-
-### transition-preview @ 60
-transition  acme-platform  0 changed  txn -
-  preview  1
-  item  csv-export
-  store  /w/platform/.work
-  state  ready
-  will_evaluate  G2 G3 G4
-  will_write  item.transition
-  note  guards not evaluated; use --dry-run for the outcome
-
-### transition-preview @ 80
-transition  acme-platform  0 changed  txn -
-  preview  1
-  item  csv-export
-  store  /w/platform/.work
-  state  ready
-  will_evaluate  G2 G3 G4
-  will_write  item.transition
-  note  guards not evaluated; use --dry-run for the outcome
-
-### transition-preview @ 200
-transition  acme-platform  0 changed  txn -
-  preview  1
-  item  csv-export
-  store  /w/platform/.work
-  state  ready
-  will_evaluate  G2 G3 G4
-  will_write  item.transition
-  note  guards not evaluated; use --dry-run for the outcome
 
 ### transition @ 60
 transition  acme-platform  1 changed  txn t0901
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   event  e0901
 
 ### transition @ 80
@@ -865,7 +789,7 @@ transition  acme-platform  1 changed  txn t0901
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   event  e0901
 
 ### transition @ 200
@@ -873,7 +797,7 @@ transition  acme-platform  1 changed  txn t0901
   item  csv-export
   state  ready -> in_progress
   v  2 -> 3
-  guards  G2 pass G3 pass G4 pass
+  guards  G2 pass G3 pass
   event  e0901
 
 ### transition-already @ 60
@@ -955,7 +879,6 @@ file  acme-platform  1 changed  txn t0902
   set  state - -> draft
   set  filed_at - -> 2026-09-04T09:30:00Z
   set  priority - -> 4
-  set  points - -> 1
   event  e0902
 
 ### file @ 80
@@ -969,7 +892,6 @@ file  acme-platform  1 changed  txn t0902
   set  state - -> draft
   set  filed_at - -> 2026-09-04T09:30:00Z
   set  priority - -> 4
-  set  points - -> 1
   event  e0902
 
 ### file @ 200
@@ -983,14 +905,12 @@ file  acme-platform  1 changed  txn t0902
   set  state - -> draft
   set  filed_at - -> 2026-09-04T09:30:00Z
   set  priority - -> 4
-  set  points - -> 1
   event  e0902
 
 ### status-overdue @ 60
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
@@ -1012,16 +932,15 @@ health  1 of 1
   H17   key-rotate  2026-08-28T09:00:00Z
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    69     Checkout suite fails, one ru…
-  gdpr-export    5    42     Export everything we hold on…
-  webhook-retry  3    33     Retry a failed webhook three…
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in …
+  gdpr-export    42     Export everything we hold on one …
+  webhook-retry  33     Retry a failed webhook three times
 
 ### status-overdue @ 80
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
@@ -1042,16 +961,15 @@ health  1 of 1
   H17   key-rotate  2026-08-28T09:00:00Z
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    69     Checkout suite fails, one run in five
-  gdpr-export    5    42     Export everything we hold on one account
-  webhook-retry  3    33     Retry a failed webhook three times
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
 
 ### status-overdue @ 200
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
@@ -1072,16 +990,15 @@ health  1 of 1
   H17   key-rotate  2026-08-28T09:00:00Z
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    69     Checkout suite fails, one run in five
-  gdpr-export    5    42     Export everything we hold on one account
-  webhook-retry  3    33     Retry a failed webhook three times
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
 
 ### status-not-yet-overdue @ 60
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record
@@ -1098,16 +1015,15 @@ states  7 of 7
   ready        5
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    61     Checkout suite fails, one ru…
-  gdpr-export    5    40     Export everything we hold on…
-  webhook-retry  3    30     Retry a failed webhook three…
+  ID             SCORE  TITLE
+  flaky-e2e      61     Checkout suite fails, one run in …
+  gdpr-export    40     Export everything we hold on one …
+  webhook-retry  30     Retry a failed webhook three times
 
 ### status-not-yet-overdue @ 80
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record against the event log
@@ -1123,16 +1039,15 @@ states  7 of 7
   ready        5
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    61     Checkout suite fails, one run in five
-  gdpr-export    5    40     Export everything we hold on one account
-  webhook-retry  3    30     Retry a failed webhook three times
+  ID             SCORE  TITLE
+  flaky-e2e      61     Checkout suite fails, one run in five
+  gdpr-export    40     Export everything we hold on one account
+  webhook-retry  30     Retry a failed webhook three times
 
 ### status-not-yet-overdue @ 200
 status  acme-platform
   store  /w/platform/.work
   items  26
-  points  84
   findings  0
   defects  S1 1 S2 1 S3 1
   audit  not run here; treadle doctor reads every record against the event log
@@ -1148,17 +1063,17 @@ states  7 of 7
   ready        5
 
 next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    61     Checkout suite fails, one run in five
-  gdpr-export    5    40     Export everything we hold on one account
-  webhook-retry  3    30     Retry a failed webhook three times
+  ID             SCORE  TITLE
+  flaky-e2e      61     Checkout suite fails, one run in five
+  gdpr-export    40     Export everything we hold on one account
+  webhook-retry  30     Retry a failed webhook three times
 
 ### set @ 60
 set  acme-platform  1 changed  txn t0904
   item  health-endpoint
   v  1 -> 2
   set  assignee - -> kim
-  set  component - -> platform
+  set  reviewer - -> dana
   event  e0904
 
 ### set @ 80
@@ -1166,7 +1081,7 @@ set  acme-platform  1 changed  txn t0904
   item  health-endpoint
   v  1 -> 2
   set  assignee - -> kim
-  set  component - -> platform
+  set  reviewer - -> dana
   event  e0904
 
 ### set @ 200
@@ -1174,7 +1089,7 @@ set  acme-platform  1 changed  txn t0904
   item  health-endpoint
   v  1 -> 2
   set  assignee - -> kim
-  set  component - -> platform
+  set  reviewer - -> dana
   event  e0904
 
 ### relation @ 60
@@ -1212,9 +1127,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  6/11 pass
+  rules  5/10 pass
 
-gates  5 of 11
+gates  5 of 10
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain re…
   ready  DOR4  fail     treadle set theme-dark acceptance…
@@ -1239,9 +1154,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  6/11 pass
+  rules  5/10 pass
 
-gates  5 of 11
+gates  5 of 10
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
@@ -1266,9 +1181,9 @@ explain  acme-platform
   blocks  -
   by
     dana
-  rules  6/11 pass
+  rules  5/10 pass
 
-gates  5 of 11
+gates  5 of 10
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
@@ -1289,7 +1204,6 @@ show  acme-platform
   state  draft
   filed  2026-09-04T08:00:00Z
   v  2
-  pts  3
   pri  2
   title
     Drain the dead letter queue on deploy
@@ -1305,7 +1219,6 @@ show  acme-platform
   state  draft
   filed  2026-09-04T08:00:00Z
   v  2
-  pts  3
   pri  2
   title
     Drain the dead letter queue on deploy
@@ -1321,7 +1234,6 @@ show  acme-platform
   state  draft
   filed  2026-09-04T08:00:00Z
   v  2
-  pts  3
   pri  2
   title
     Drain the dead letter queue on deploy
@@ -1330,759 +1242,97 @@ relations  1 of 1
   KIND    OTHER
   blocks  theme-dark
 
-### board @ 60
-board  acme-platform
-  scope  workspace
-  sort  blocked,priority,filed,id
-  blocked  1
-  done  1
-  cancelled  1
-
-draft  9 of 13
-  ID            TYPE   PTS  SEV  BLOCKED
-  theme-dark    story  5    -    queue-drain
-    Ship a dark theme
-  sess-timeout  bug    3    S1   -
-    Session survives a password change
-  key-rotate    task   -    -    -
-    Rotate the signing key
-  audit-log     story  8    -    -
-    Record who changed what and when
-  stale-cache   bug    2    S3   -
-    Profile cache serves a deleted avatar
-  queue-drain   task   3    -    -
-    Drain the dead letter queue on deploy
-  search-rank   spike  -    -    -
-    Which ranker do we adopt
-  bulk-import   story  8    -    -
-    Import a list of accounts from CSV
-  perm-audit    spike  -    -    -
-    Do we need row level permissions
-
-ready  5 of 5
-  ID             TYPE   PTS  SEV  BLOCKED  TITLE
-  flaky-e2e      bug    2    S2   -        Checkout suite…
-  gdpr-export    story  5    -    -        Export everyth…
-  webhook-retry  task   3    -    -        Retry a failed…
-  dep-bump       chore  1    -    -        Move the toolc…
-  avatar-crop    task   2    -    -        Crop an upload…
-
-in_progress  4 of 4
-  ID            TYPE   PTS  SEV  BLOCKED  TITLE
-  sso-saml      story  8    -    -        SAML login for …
-  log-redact    task   3    -    -        Redact tokens f…
-  auth-refresh  story  5    -    -        Refresh the acc…
-  csv-export    story  5    -    -        Export a filter…
-
-in_review  1 of 1
-  ID          TYPE   PTS  SEV  BLOCKED  TITLE
-  rate-limit  story  3    -    -        Return 429 with a…
-
-on_hold  1 of 1
-  ID            TYPE  PTS  SEV  BLOCKED  TITLE
-  onboard-copy  task  2    -    -        Rewrite the firs…
-
-### board @ 80
-board  acme-platform
-  scope  workspace
-  sort  blocked,priority,filed,id
-  blocked  1
-  done  1
-  cancelled  1
-
-draft  9 of 13
-  ID            TYPE   PTS  SEV  BLOCKED      TITLE
-  theme-dark    story  5    -    queue-drain  Ship a dark theme
-  sess-timeout  bug    3    S1   -            Session survives a password cha…
-  key-rotate    task   -    -    -            Rotate the signing key
-  audit-log     story  8    -    -            Record who changed what and when
-  stale-cache   bug    2    S3   -            Profile cache serves a deleted …
-  queue-drain   task   3    -    -            Drain the dead letter queue on …
-  search-rank   spike  -    -    -            Which ranker do we adopt
-  bulk-import   story  8    -    -            Import a list of accounts from …
-  perm-audit    spike  -    -    -            Do we need row level permissions
-
-ready  5 of 5
-  ID             TYPE   PTS  SEV  BLOCKED  TITLE
-  flaky-e2e      bug    2    S2   -        Checkout suite fails, one run in f…
-  gdpr-export    story  5    -    -        Export everything we hold on one a…
-  webhook-retry  task   3    -    -        Retry a failed webhook three times
-  dep-bump       chore  1    -    -        Move the toolchain to the current …
-  avatar-crop    task   2    -    -        Crop an uploaded avatar to a square
-
-in_progress  4 of 4
-  ID            TYPE   PTS  SEV  BLOCKED  TITLE
-  sso-saml      story  8    -    -        SAML login for enterprise tenants
-  log-redact    task   3    -    -        Redact tokens from request logs
-  auth-refresh  story  5    -    -        Refresh the access token on a 401
-  csv-export    story  5    -    -        Export a filtered list to CSV
-
-in_review  1 of 1
-  ID          TYPE   PTS  SEV  BLOCKED  TITLE
-  rate-limit  story  3    -    -        Return 429 with a retry-after header
-
-on_hold  1 of 1
-  ID            TYPE  PTS  SEV  BLOCKED  TITLE
-  onboard-copy  task  2    -    -        Rewrite the first-run text
-
-### board @ 200
-board  acme-platform
-  scope  workspace
-  sort  blocked,priority,filed,id
-  blocked  1
-  done  1
-  cancelled  1
-
-draft  9 of 13
-  ID            TYPE   PTS  SEV  BLOCKED      TITLE
-  theme-dark    story  5    -    queue-drain  Ship a dark theme
-  sess-timeout  bug    3    S1   -            Session survives a password change
-  key-rotate    task   -    -    -            Rotate the signing key
-  audit-log     story  8    -    -            Record who changed what and when
-  stale-cache   bug    2    S3   -            Profile cache serves a deleted avatar
-  queue-drain   task   3    -    -            Drain the dead letter queue on deploy
-  search-rank   spike  -    -    -            Which ranker do we adopt
-  bulk-import   story  8    -    -            Import a list of accounts from CSV
-  perm-audit    spike  -    -    -            Do we need row level permissions
-
-ready  5 of 5
-  ID             TYPE   PTS  SEV  BLOCKED  TITLE
-  flaky-e2e      bug    2    S2   -        Checkout suite fails, one run in five
-  gdpr-export    story  5    -    -        Export everything we hold on one account
-  webhook-retry  task   3    -    -        Retry a failed webhook three times
-  dep-bump       chore  1    -    -        Move the toolchain to the current release
-  avatar-crop    task   2    -    -        Crop an uploaded avatar to a square
-
-in_progress  4 of 4
-  ID            TYPE   PTS  SEV  BLOCKED  TITLE
-  sso-saml      story  8    -    -        SAML login for enterprise tenants
-  log-redact    task   3    -    -        Redact tokens from request logs
-  auth-refresh  story  5    -    -        Refresh the access token on a 401
-  csv-export    story  5    -    -        Export a filtered list to CSV
-
-in_review  1 of 1
-  ID          TYPE   PTS  SEV  BLOCKED  TITLE
-  rate-limit  story  3    -    -        Return 429 with a retry-after header
-
-on_hold  1 of 1
-  ID            TYPE  PTS  SEV  BLOCKED  TITLE
-  onboard-copy  task  2    -    -        Rewrite the first-run text
-
-### sprint-open @ 60
-sprint  acme-platform  1 changed  txn t0906
-  sprint  sprint-31
-  state  open
-  v  1
-  set  start - -> 2026-09-07
-  set  end - -> 2026-09-18
-  set  goal - -> Ship the token refresh
-  event  e0906
-
-### sprint-open @ 80
-sprint  acme-platform  1 changed  txn t0906
-  sprint  sprint-31
-  state  open
-  v  1
-  set  start - -> 2026-09-07
-  set  end - -> 2026-09-18
-  set  goal - -> Ship the token refresh
-  event  e0906
-
-### sprint-open @ 200
-sprint  acme-platform  1 changed  txn t0906
-  sprint  sprint-31
-  state  open
-  v  1
-  set  start - -> 2026-09-07
-  set  end - -> 2026-09-18
-  set  goal - -> Ship the token refresh
-  event  e0906
-
-### sprint-commit @ 60
-sprint  acme-platform  2 changed  txn t0907
-  sprint  sprint-31
-  state  open
-  committed  webhook-retry - -> sprint-31
-  committed  avatar-crop - -> sprint-31
-  events  2 item.commit
-
-### sprint-commit @ 80
-sprint  acme-platform  2 changed  txn t0907
-  sprint  sprint-31
-  state  open
-  committed  webhook-retry - -> sprint-31
-  committed  avatar-crop - -> sprint-31
-  events  2 item.commit
-
-### sprint-commit @ 200
-sprint  acme-platform  2 changed  txn t0907
-  sprint  sprint-31
-  state  open
-  committed  webhook-retry - -> sprint-31
-  committed  avatar-crop - -> sprint-31
-  events  2 item.commit
-
 ### history-txn @ 60
 history  acme-platform
   sort  at desc
-  transaction  t0907
+  transaction  t0905
 
-events  2 of 2
-  AT                    KIND   OP           WHAT
-  2026-09-04T09:30:00Z  human  item.commit
-    entity=avatar-crop,sprint_id=(unset)->sprint-31
-    dana
-  2026-09-04T09:30:00Z  human  item.commit
-    entity=webhook-retry,sprint_id=(unset)->sprint-31
+events  1 of 1
+  AT                    KIND   OP                 WHAT
+  2026-09-04T09:30:00Z  human  item.relation.add
+    entity=queue-drain,relation=blocks:theme-dark
     dana
 
 ### history-txn @ 80
 history  acme-platform
   sort  at desc
-  transaction  t0907
+  transaction  t0905
 
-events  2 of 2
-  AT                    KIND   OP           WHAT
-  2026-09-04T09:30:00Z  human  item.commit
-    entity=avatar-crop,sprint_id=(unset)->sprint-31
-    dana
-  2026-09-04T09:30:00Z  human  item.commit
-    entity=webhook-retry,sprint_id=(unset)->sprint-31
+events  1 of 1
+  AT                    KIND   OP                 WHAT
+  2026-09-04T09:30:00Z  human  item.relation.add
+    entity=queue-drain,relation=blocks:theme-dark
     dana
 
 ### history-txn @ 200
 history  acme-platform
   sort  at desc
-  transaction  t0907
-
-events  2 of 2
-  AT                    KIND   OP           WHAT                                               BY
-  2026-09-04T09:30:00Z  human  item.commit  entity=avatar-crop,sprint_id=(unset)->sprint-31    dana
-  2026-09-04T09:30:00Z  human  item.commit  entity=webhook-retry,sprint_id=(unset)->sprint-31  dana
-
-### sprint-refused @ 60
-theme-dark is not ready to be worked: DOR3 blocked by
-queue-drain
-
-  entity theme-dark
-  rule   I4
-
-Do one of these
-
-  treadle transition queue-drain ready
-
-  treadle explain theme-dark
-
-### sprint-refused @ 80
-theme-dark is not ready to be worked: DOR3 blocked by queue-drain
-
-  entity theme-dark
-  rule   I4
-
-Do one of these
-
-  treadle transition queue-drain ready
-
-  treadle explain theme-dark
-
-### sprint-refused @ 200
-theme-dark is not ready to be worked: DOR3 blocked by queue-drain
-
-  entity theme-dark
-  rule   I4
-
-Do one of these
-
-  treadle transition queue-drain ready
-
-  treadle explain theme-dark
-
-### status-sprint @ 60
-status  acme-platform
-  store  /w/platform/.work
-  items  26
-  points  84
-  findings  0
-  overdue  1
-  defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record
-    against the event log
-
-states  7 of 7
-  STATE        N
-  cancelled    1
-  done         1
-  draft        13
-  in_progress  4
-  in_review    1
-  on_hold      1
-  ready        5
-
-health  1 of 1
-  RULE  ITEM        SAW
-  H17   key-rotate  2026-08-28T09:00:00Z
-
-next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    74     Checkout suite fails, one ru…
-  gdpr-export    5    47     Export everything we hold on…
-  webhook-retry  3    46     Retry a failed webhook three…
-
-sprints  1 of 1
-  ID         DAY   ITEMS  PTS  TITLE
-  sprint-31  3/12  0/2    0/5  Sprint 31
-
-### status-sprint @ 80
-status  acme-platform
-  store  /w/platform/.work
-  items  26
-  points  84
-  findings  0
-  overdue  1
-  defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
-
-states  7 of 7
-  STATE        N
-  cancelled    1
-  done         1
-  draft        13
-  in_progress  4
-  in_review    1
-  on_hold      1
-  ready        5
-
-health  1 of 1
-  RULE  ITEM        SAW
-  H17   key-rotate  2026-08-28T09:00:00Z
-
-next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    74     Checkout suite fails, one run in five
-  gdpr-export    5    47     Export everything we hold on one account
-  webhook-retry  3    46     Retry a failed webhook three times
-
-sprints  1 of 1
-  ID         DAY   ITEMS  PTS  TITLE
-  sprint-31  3/12  0/2    0/5  Sprint 31
-
-### status-sprint @ 200
-status  acme-platform
-  store  /w/platform/.work
-  items  26
-  points  84
-  findings  0
-  overdue  1
-  defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
-
-states  7 of 7
-  STATE        N
-  cancelled    1
-  done         1
-  draft        13
-  in_progress  4
-  in_review    1
-  on_hold      1
-  ready        5
-
-health  1 of 1
-  RULE  ITEM        SAW
-  H17   key-rotate  2026-08-28T09:00:00Z
-
-next  3 of 3
-  ID             PTS  SCORE  TITLE
-  flaky-e2e      2    74     Checkout suite fails, one run in five
-  gdpr-export    5    47     Export everything we hold on one account
-  webhook-retry  3    46     Retry a failed webhook three times
-
-sprints  1 of 1
-  ID         DAY   ITEMS  PTS  TITLE
-  sprint-31  3/12  0/2    0/5  Sprint 31
-
-### board-sprint @ 60
-board  acme-platform
-  scope  sprint-31 open day 3/12
-  whole  treadle board --all
-  sort  blocked,priority,filed,id
-  blocked  0
-  done  0
-  cancelled  0
-
-draft  0 of 0
-
-ready  2 of 2
-  ID             TYPE  PTS  SEV  BLOCKED  TITLE
-  webhook-retry  task  3    -    -        Retry a failed …
-  avatar-crop    task  2    -    -        Crop an uploade…
-
-in_progress  0 of 0
-
-in_review  0 of 0
-
-on_hold  0 of 0
-
-### board-sprint @ 80
-board  acme-platform
-  scope  sprint-31 open day 3/12
-  whole  treadle board --all
-  sort  blocked,priority,filed,id
-  blocked  0
-  done  0
-  cancelled  0
-
-draft  0 of 0
-
-ready  2 of 2
-  ID             TYPE  PTS  SEV  BLOCKED  TITLE
-  webhook-retry  task  3    -    -        Retry a failed webhook three times
-  avatar-crop    task  2    -    -        Crop an uploaded avatar to a square
-
-in_progress  0 of 0
-
-in_review  0 of 0
-
-on_hold  0 of 0
-
-### board-sprint @ 200
-board  acme-platform
-  scope  sprint-31 open day 3/12
-  whole  treadle board --all
-  sort  blocked,priority,filed,id
-  blocked  0
-  done  0
-  cancelled  0
-
-draft  0 of 0
-
-ready  2 of 2
-  ID             TYPE  PTS  SEV  BLOCKED  TITLE
-  webhook-retry  task  3    -    -        Retry a failed webhook three times
-  avatar-crop    task  2    -    -        Crop an uploaded avatar to a square
-
-in_progress  0 of 0
-
-in_review  0 of 0
-
-on_hold  0 of 0
-
-### sprints-open @ 60
-sprints  acme-platform
-  sprint  sprint-31
-  state  open
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  v  1
-  day  3/12
-  committed  2
-  done  0
-  pts  0/5
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-
-### sprints-open @ 80
-sprints  acme-platform
-  sprint  sprint-31
-  state  open
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  v  1
-  day  3/12
-  committed  2
-  done  0
-  pts  0/5
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-
-### sprints-open @ 200
-sprints  acme-platform
-  sprint  sprint-31
-  state  open
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  v  1
-  day  3/12
-  committed  2
-  done  0
-  pts  0/5
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-
-### sprint-close @ 60
-sprint  acme-platform  1 changed  txn t0910
-  sprint  sprint-31
-  state  open -> closed
-  v  1 -> 2
-  set  state open -> closed
-  set  closed_at - -> 2026-09-04T09:30:00Z
-  set  finished - -> webhook-retry
-  set  carried - -> avatar-crop
-  set  done - -> 1
-  set  done_points - -> 3
-  set  cancelled - -> 0
-  set  points - -> 5
-  carried  avatar-crop
-  event  e0911
-
-### sprint-close @ 80
-sprint  acme-platform  1 changed  txn t0910
-  sprint  sprint-31
-  state  open -> closed
-  v  1 -> 2
-  set  state open -> closed
-  set  closed_at - -> 2026-09-04T09:30:00Z
-  set  finished - -> webhook-retry
-  set  carried - -> avatar-crop
-  set  done - -> 1
-  set  done_points - -> 3
-  set  cancelled - -> 0
-  set  points - -> 5
-  carried  avatar-crop
-  event  e0911
-
-### sprint-close @ 200
-sprint  acme-platform  1 changed  txn t0910
-  sprint  sprint-31
-  state  open -> closed
-  v  1 -> 2
-  set  state open -> closed
-  set  closed_at - -> 2026-09-04T09:30:00Z
-  set  finished - -> webhook-retry
-  set  carried - -> avatar-crop
-  set  done - -> 1
-  set  done_points - -> 3
-  set  cancelled - -> 0
-  set  points - -> 5
-  carried  avatar-crop
-  event  e0911
-
-### sprints @ 60
-sprints  acme-platform
-
-sprints  1 of 1
-  ID         STATE   START       END         ITEMS  PTS
-  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5
-    Sprint 31
-
-### sprints @ 80
-sprints  acme-platform
-
-sprints  1 of 1
-  ID         STATE   START       END         ITEMS  PTS  TITLE
-  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5  Sprint 31
-
-### sprints @ 200
-sprints  acme-platform
-
-sprints  1 of 1
-  ID         STATE   START       END         ITEMS  PTS  TITLE
-  sprint-31  closed  2026-09-07  2026-09-18  1/2    3/5  Sprint 31
-
-### sprints-closed @ 60
-sprints  acme-platform
-  sprint  sprint-31
-  state  closed
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  closed  2026-09-04T09:30:00Z
-  v  2
-  committed  2
-  done  1
-  cancelled  0
-  pts  3/5
-  carried  avatar-crop
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-  members  avatar-crop,webhook-retry
-
-### sprints-closed @ 80
-sprints  acme-platform
-  sprint  sprint-31
-  state  closed
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  closed  2026-09-04T09:30:00Z
-  v  2
-  committed  2
-  done  1
-  cancelled  0
-  pts  3/5
-  carried  avatar-crop
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-  members  avatar-crop,webhook-retry
-
-### sprints-closed @ 200
-sprints  acme-platform
-  sprint  sprint-31
-  state  closed
-  start  2026-09-07
-  end  2026-09-18
-  filed  2026-09-04T09:30:00Z
-  closed  2026-09-04T09:30:00Z
-  v  2
-  committed  2
-  done  1
-  cancelled  0
-  pts  3/5
-  carried  avatar-crop
-  title
-    Sprint 31
-  goal
-    Ship the token refresh
-  members  avatar-crop,webhook-retry
+  transaction  t0905
+
+events  1 of 1
+  AT                    KIND   OP                 WHAT                                           BY
+  2026-09-04T09:30:00Z  human  item.relation.add  entity=queue-drain,relation=blocks:theme-dark  dana
 
 ### config-set @ 60
-config  acme-platform  1 changed  txn t0911
+config  acme-platform  1 changed  txn t0906
   key  wip_limits
   v  0 -> 1
   set  wip_limits - -> in_progress=5, in_review=2
-  event  e0912
+  event  e0906
 
 ### config-set @ 80
-config  acme-platform  1 changed  txn t0911
+config  acme-platform  1 changed  txn t0906
   key  wip_limits
   v  0 -> 1
   set  wip_limits - -> in_progress=5, in_review=2
-  event  e0912
+  event  e0906
 
 ### config-set @ 200
-config  acme-platform  1 changed  txn t0911
+config  acme-platform  1 changed  txn t0906
   key  wip_limits
   v  0 -> 1
   set  wip_limits - -> in_progress=5, in_review=2
-  event  e0912
+  event  e0906
 
 ### config @ 60
 config  acme-platform  0 changed  txn -
   v  1
   store  /w/platform/.work
 
-config  9 of 9
-  KEY                       SOURCE   VALUE
-  review_step               default  story, bug, epic
-  point_scale               default  1, 2, 3, 5, 8, 13
-  next_weights              default  pri=10, age=1, dep=5…
-  wip_limits                file     in_progress=5, in_re…
-  aging_days                default  0
-  cycle_time_excludes_hold  default  false
-  start_requires_sprint     default  false
-  ready_gate                default  DOR1 all field_prese…
-  done_gate                 default  DOD1 all no_open_chi…
+config  6 of 6
+  KEY           SOURCE   VALUE
+  review_step   default  story, bug, epic
+  next_weights  default  pri=10, age=1, dep=5, asg=8, due…
+  wip_limits    file     in_progress=5, in_review=2
+  aging_days    default  0
+  ready_gate    default  DOR1 all field_present:title The…
+  done_gate     default  DOD1 all no_open_child Every chi…
 
 ### config @ 80
 config  acme-platform  0 changed  txn -
   v  1
   store  /w/platform/.work
 
-config  9 of 9
-  KEY                       SOURCE   VALUE
-  review_step               default  story, bug, epic
-  point_scale               default  1, 2, 3, 5, 8, 13
-  next_weights              default  pri=10, age=1, dep=5, spr=8, asg=8, due=…
-  wip_limits                file     in_progress=5, in_review=2
-  aging_days                default  0
-  cycle_time_excludes_hold  default  false
-  start_requires_sprint     default  false
-  ready_gate                default  DOR1 all field_present:title The item ha…
-  done_gate                 default  DOD1 all no_open_child Every child is do…
+config  6 of 6
+  KEY           SOURCE   VALUE
+  review_step   default  story, bug, epic
+  next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
+  wip_limits    file     in_progress=5, in_review=2
+  aging_days    default  0
+  ready_gate    default  DOR1 all field_present:title The item has a title.|D…
+  done_gate     default  DOD1 all no_open_child Every child is done or cancel…
 
 ### config @ 200
 config  acme-platform  0 changed  txn -
   v  1
   store  /w/platform/.work
 
-config  9 of 9
-  KEY                       SOURCE   VALUE
-  review_step               default  story, bug, epic
-  point_scale               default  1, 2, 3, 5, 8, 13
-  next_weights              default  pri=10, age=1, dep=5, spr=8, asg=8, due=4, sev=6
-  wip_limits                file     in_progress=5, in_review=2
-  aging_days                default  0
-  cycle_time_excludes_hold  default  false
-  start_requires_sprint     default  false
-  ready_gate                default  DOR1 all field_present:title The item has a title.|DOR2 all type_required_fields The fields the type requires at creation are present.|DOR3 all no_active_blocke…
-  done_gate                 default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_fr…
-
-### ceremonies @ 60
-ceremonies  acme-platform
-
-ceremonies  1 of 1
-  ID               FILED                 SPRINT     ACTIONS
-  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1
-    Retro sprint-31
-
-### ceremonies @ 80
-ceremonies  acme-platform
-
-ceremonies  1 of 1
-  ID               FILED                 SPRINT     ACTIONS  TITLE
-  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1        Retro sprint-31
-
-### ceremonies @ 200
-ceremonies  acme-platform
-
-ceremonies  1 of 1
-  ID               FILED                 SPRINT     ACTIONS  TITLE
-  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1        Retro sprint-31
-
-### ceremonies-one @ 60
-ceremonies  acme-platform
-  ceremony  retro-sprint-31
-  state  recorded
-  filed  2026-09-18T16:00:00Z
-  v  1
-  sprint  sprint-31
-  actions  split-carried
-  title
-    Retro sprint-31
-  well
-    The token refresh shipped without a hotfix.
-  badly
-    Two stories carried for the third sprint running.
-
-### ceremonies-one @ 80
-ceremonies  acme-platform
-  ceremony  retro-sprint-31
-  state  recorded
-  filed  2026-09-18T16:00:00Z
-  v  1
-  sprint  sprint-31
-  actions  split-carried
-  title
-    Retro sprint-31
-  well
-    The token refresh shipped without a hotfix.
-  badly
-    Two stories carried for the third sprint running.
-
-### ceremonies-one @ 200
-ceremonies  acme-platform
-  ceremony  retro-sprint-31
-  state  recorded
-  filed  2026-09-18T16:00:00Z
-  v  1
-  sprint  sprint-31
-  actions  split-carried
-  title
-    Retro sprint-31
-  well
-    The token refresh shipped without a hotfix.
-  badly
-    Two stories carried for the third sprint running.
+config  6 of 6
+  KEY           SOURCE   VALUE
+  review_step   default  story, bug, epic
+  next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
+  wip_limits    file     in_progress=5, in_review=2
+  aging_days    default  0
+  ready_gate    default  DOR1 all field_present:title The item has a title.|DOR2 all type_required_fields The fields the type requires at creation are present.|DOR3 all no_active_blocker Nothing ac…
+  done_gate     default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_from_assignee …
 

@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-07
 **Implements:** the captain decision `first-run-gaps-before-publish`, over findings STR-3, STR-4, STR-5, STR-6 and STR-10 of the round-six report
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the sprint, so the closed-sprint referrer below and the `sprint set` verb are gone and `I5` is now `V9`; the removal, the label and the title search stand
 
 ## Context
 

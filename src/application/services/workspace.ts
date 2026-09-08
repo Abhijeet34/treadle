@@ -11,7 +11,8 @@ import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, t
 
 export const INIT_SHAPE: ResultShape = {
   command: 'init',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Create a workspace here, and say what it created and what it did not.',
   properties: [
@@ -22,7 +23,6 @@ export const INIT_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'not_created', type: 'string' },
     { kind: 'list', key: 'next' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },

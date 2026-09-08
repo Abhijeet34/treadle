@@ -18,8 +18,6 @@ import {
   type HierarchyGraph,
   type ItemId,
   type RelationGraph,
-  type Ceremony,
-  type Sprint,
   type TransitionContext,
   type WorkItem,
   type WorkItemState,
@@ -65,20 +63,6 @@ export type WorkspaceView = {
   readonly byId: ReadonlyMap<ItemId, WorkItemSummary>
   readonly hierarchy: HierarchyGraph
   readonly relations: RelationGraph
-  /**
-   * Every sprint, whole. There are tens of them where there are tens of thousands of items,
-   * and a sprint's record is a few lines, so the read that projects items to their summary
-   * fields carries the sprints as they are (ADR-0016).
-   */
-  readonly sprints: readonly Sprint[]
-  readonly sprintById: ReadonlyMap<string, Sprint>
-  /**
-   * Every retrospective, whole, for the reason the sprints are: a retro is filed once a
-   * sprint, so the set is tens of records against tens of thousands of items, and the id
-   * namespace every command resolves an id against is the three kinds together (ADR-0028).
-   */
-  readonly ceremonies: readonly Ceremony[]
-  readonly ceremonyById: ReadonlyMap<string, Ceremony>
 }
 
 /**
@@ -120,10 +104,6 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   if (!identity.ok) return identity
   const items = await store.summaries()
   if (!items.ok) return items
-  const sprints = await store.sprints()
-  if (!sprints.ok) return sprints
-  const ceremonies = await store.ceremonies()
-  if (!ceremonies.ok) return ceremonies
   const findings = await store.findings()
   if (!findings.ok) return findings
 
@@ -147,10 +127,6 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
       byId: new Map(items.value.map((item) => [item.id, item])),
       hierarchy: hierarchyFrom(items.value),
       relations: relationGraphFrom(items.value),
-      sprints: sprints.value,
-      sprintById: new Map(sprints.value.map((sprint) => [sprint.id, sprint])),
-      ceremonies: ceremonies.value,
-      ceremonyById: new Map(ceremonies.value.map((ceremony) => [ceremony.id, ceremony])),
     },
   }
 }
@@ -163,24 +139,6 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
 export async function wholeItem(store: Store, view: WorkspaceView, id: ItemId): Promise<StoreResult<WorkItem | undefined>> {
   if (!view.byId.has(id)) return storeOk(undefined)
   return store.get(id)
-}
-
-/**
- * The committed items nobody has groomed. A sprint takes them, because planning one with
- * work that is not refined yet is ordinary and `file --sprint` files in `draft` by
- * construction; what the tool owed the reader is this list. `next` ranks `ready` only, so
- * these are exactly the committed items it will not suggest, and a team reading `3 committed,
- * 1 done` could not tell that one of the three was not workable at all. ADR-0022 argues it.
- */
-export function notGroomed(items: readonly WorkItemSummary[]): readonly ItemId[] {
-  return items.filter((item) => item.state === 'draft').map((item) => item.id).sort()
-}
-
-/** The sentence a command that commits work prints when some of what it committed is draft. */
-export function notGroomedNote(ids: readonly ItemId[]): string {
-  const first = ids[0] as ItemId
-  const subject = ids.length === 1 ? `${first} is` : `${ids.join(',')} are`
-  return `${subject} draft, and next ranks ready work; treadle transition ${first} ready`
 }
 
 export function activeBlockers(view: WorkspaceView, id: ItemId): readonly ItemId[] {
@@ -320,18 +278,6 @@ export function guardReads(view: WorkspaceView, item: WorkItem): readonly ItemRe
 }
 
 /**
- * The sprint a column count and G4's membership are scoped to: the one open sprint, or none.
- * It is the board's own default scope (ADR-0018), which is what makes a limit a team reads
- * off `board` the limit `G3` enforces. Two open sprints is a scope the board refuses to
- * choose between and a guard may not refuse a move over, so it falls back to the workspace,
- * which is the wider count and therefore the one that refuses sooner rather than later.
- */
-function scopedSprint(view: WorkspaceView): Sprint | undefined {
-  const open = view.sprints.filter((sprint) => sprint.state === 'open')
-  return open.length === 1 ? open[0] : undefined
-}
-
-/**
  * `G3`'s input for one target state: how many records already sit in that column, and the
  * configured limit. A state the workspace limits nowhere yields no column at all, which is
  * the shape `TransitionContext` documents as "no board" and which G3 passes on, so a
@@ -341,17 +287,14 @@ function columnFor(view: WorkspaceView, to: WorkItemState | undefined): Transiti
   if (to === undefined) return undefined
   const limit = view.config.wip_limits.get(to)
   if (limit === undefined) return undefined
-  const sprint = scopedSprint(view)
-  const used = view.items.filter((other) =>
-    other.state === to && (sprint === undefined || other.sprint_id === sprint.id)).length
+  const used = view.items.filter((other) => other.state === to).length
   return { name: to, used, limit }
 }
 
 /**
  * The facts one transition is decided against. `to` is the state the caller is asking for,
- * which only `G3` reads: the column a move is INTO is the one whose limit binds, and a
- * context built without a target carries none, which is what `preview` and every non-`start`
- * edge want.
+ * which only `G3` reads: the state a move is INTO is the one whose limit binds, and a
+ * context built without a target carries none, which is what every non-`start` edge wants.
  */
 export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState): TransitionContext {
   const column = columnFor(view, to)
@@ -361,11 +304,6 @@ export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: W
     doneGate: doneVerdict(view, item),
     blockers: gateItems(view, activeBlockers(view, item.id)),
     ...(column === undefined ? {} : { column }),
-    // ADR-0018 left G4 disarmed because the board is a projection of every live item, so
-    // "on the board" was true of everything. `start_requires_sprint` is what a team that
-    // runs sprints turns on to mean the other half of the guard: work starts from a sprint.
-    iterationMember: !view.config.start_requires_sprint
-      || (item.sprint_id !== undefined && view.sprintById.get(item.sprint_id)?.state === 'open'),
     reviewStep: hasReviewStep(view.config, item.type),
     blockedByThis: blockedByThis(view, item.id),
     openChildren: openChildrenOf(view, item.id),

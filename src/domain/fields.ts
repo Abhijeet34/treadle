@@ -8,7 +8,6 @@ import { validateFieldKeys } from './record.ts'
 import { andList, findUnsafeCharacter, isSafeText, withArticle } from './text.ts'
 import {
   BUG_SEVERITIES,
-  DEFAULT_POINT_SCALE,
   EVIDENCE_KINDS,
   FOUND_IN_STAGES,
   RELATION_KINDS,
@@ -49,8 +48,8 @@ export const MAX_RELATION_ENTRIES = 50
 
 const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
-  'description', 'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due', 'evidence',
+  'description', 'priority', 'parent_id',
+  'assignee', 'reporter', 'reviewer', 'labels', 'due', 'evidence',
   'relations', 'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
 ] as const
 
@@ -59,7 +58,7 @@ const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
   story: ['acceptance_criteria'],
   task: [],
   bug: ['severity', 'repro_steps', 'expected', 'actual', 'found_in', 'fix_confirmed'],
-  spike: ['question', 'timebox_hours', 'findings'],
+  spike: ['question', 'findings'],
   chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
@@ -72,7 +71,7 @@ const REQUIRED_AT_CREATION: Readonly<Record<WorkItemType, readonly string[]>> = 
   story: [],
   task: [],
   bug: ['severity', 'repro_steps', 'found_in'],
-  spike: ['question', 'timebox_hours'],
+  spike: ['question'],
   chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
@@ -118,17 +117,13 @@ const FIELD_ALIASES: Readonly<Record<string, string>> = {
   v: 'version',
   desc: 'description',
   pri: 'priority',
-  pts: 'points',
-  hrs: 'hours_estimate',
   parent: 'parent_id',
-  sprint: 'sprint_id',
   hold: 'hold_reason',
   ac: 'acceptance_criteria',
   sev: 'severity',
   repro: 'repro_steps',
   found: 'found_in',
   fixed: 'fix_confirmed',
-  timebox: 'timebox_hours',
 }
 
 const SHORT_OF = new Map(Object.entries(FIELD_ALIASES).map(([short, field]) => [field, short]))
@@ -155,7 +150,6 @@ const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
   priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
   evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
   relations: { kind: 'command', usage: 'treadle relation add <id> <blocks|duplicates|relates-to> <other>' },
-  sprint_id: { kind: 'command', usage: 'treadle sprint commit <sprint> <id>' },
   resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
   hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
   hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant> --reason "<why>"' },
@@ -185,17 +179,13 @@ export function writeCommand(field: string, id: string, value: string): string |
 
 /**
  * The placeholder a remedy prints where a field's value goes, so a line the reader fills in
- * is filled with something the field accepts. `timebox_hours=<value>` sent a caller to a
- * refusal that `timebox_hours=<n>` does not; prose fields take `<value>`.
+ * is filled with something the field accepts. `priority=<value>` sent a caller to a
+ * refusal that `priority=<1-5>` does not; prose fields take `<value>`.
  */
 const PLACEHOLDER_OF: Readonly<Record<string, string>> = {
-  points: '<n>',
-  hours_estimate: '<n>',
-  timebox_hours: '<n>',
   priority: '<1-5>',
   severity: '<S1-S4>',
   parent_id: '<id>',
-  sprint_id: '<id>',
   assignee: '<name>',
   reporter: '<name>',
   reviewer: '<name>',
@@ -231,8 +221,8 @@ const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
  * a rule about ids applied to a field that is not one. Two rather than one is where the
  * meaning stops: a one-character label is indistinguishable from a typed-past value, and it
  * would make `backlog --label a` a filter nobody can read back. The ceiling stays 64, and
- * `id`, `parent_id`, `sprint_id` and a relation target keep the three-character floor,
- * because those name records and a two-character id collides far sooner than a label does.
+ * `id`, `parent_id` and a relation target keep the three-character floor, because those
+ * name records and a two-character id collides far sooner than a label does.
  */
 const LABEL = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
@@ -264,12 +254,12 @@ const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const
 
 /**
  * A real calendar date, `YYYY-MM-DD`. The shape alone lets `2026-02-30` through, and
- * `Date.parse` then reads it as the second of March; a sprint boundary that two people read
+ * `Date.parse` then reads it as the second of March; a due date that two people read
  * differently is the failure the date rule exists to prevent, so a date names the day it
  * denotes or is refused. Checked against the calendar rather than through a `Date`, because
  * this layer touches no clock and the layering test reads the constructor as one.
  */
-export function isCalendarDate(value: unknown): value is string {
+function isCalendarDate(value: unknown): value is string {
   if (typeof value !== 'string' || !DAY.test(value)) return false
   const [year, month, day] = value.split('-').map(Number) as [number, number, number]
   const leap = (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0
@@ -280,9 +270,9 @@ export function isCalendarDate(value: unknown): value is string {
 /**
  * A day written `YYYY-MM-DD` as its first instant in UTC, or the value unchanged.
  *
- * The two grammars this tool teaches disagreed: `sprint open --end 2026-09-30` takes a day and
- * `set x due=2026-09-30` was refused for a value that names exactly the day meant. A due date
- * and a hold's end are days, so both write paths widen here - `coerce` for `due`, the
+ * The two grammars this tool teaches disagreed: `transition x on_hold --until 2026-09-30`
+ * takes a day and `set x due=2026-09-30` was refused for a value that names exactly the day
+ * meant. A due date and a hold's end are days, so both write paths widen here - for `due`, the
  * `--until` flag for `hold_until` - and one record format is stored either way. A malformed
  * day such as `2026-13-40` is not widened at all, so it reaches `isInstant` as itself and earns
  * the refusal that names both forms: widening it first would have manufactured a well-shaped
@@ -295,13 +285,8 @@ export function asInstant(value: string): string {
 /** The clause the two day-taking fields add to their refusal, so a caller learns the form. */
 const DAY_OR_INSTANT = ', or a day such as 2026-09-05, which is stored as its first instant'
 
-/** The load path's structural ceiling on an estimate; the workspace's scale is the write bound. */
-const MAX_POINTS = 100_000
-
 export type ValidateOptions = {
   readonly now: Instant
-  /** The workspace's estimation scale; defaults to the model's 1,2,3,5,8,13. */
-  readonly pointScale?: readonly number[]
   /**
    * Set by the store, and by nothing else. `description` was 100,000 characters before it
    * was narrowed to MAX_DESCRIPTION, so files exist that carry more; applying the write
@@ -376,27 +361,10 @@ const CHECKS: Readonly<Record<string, Check>> = {
   description: (value, _item, options) =>
     text('description', options.storedProse === true ? Number.MAX_SAFE_INTEGER : MAX_DESCRIPTION)(value, _item, options),
   priority: int('priority', 1, 5),
-  // The scale is write-time only, the same `storedProse` distinction every narrowed bound
-  // here uses. A workspace that widens its scale writes an estimate an older compiled-in
-  // scale does not carry, and applying the write bound on load would quarantine the record
-  // the tool had just written; the load path holds the shape and the write path holds the
-  // scale, so `config set point_scale` can never make a served record unservable.
-  points: (value, _item, options) => {
-    if (options.storedProse === true) {
-      return isBoundedInt(value, 0, MAX_POINTS) ? undefined : `points must be a whole number from 0 to ${MAX_POINTS}`
-    }
-    const scale = options.pointScale ?? DEFAULT_POINT_SCALE
-    return typeof value === 'number' && scale.includes(value)
-      ? undefined
-      : `points must be one of the workspace scale ${scale.join(', ')}`
-  },
-  hours_estimate: int('hours_estimate', 1, 400),
   parent_id: slug('parent_id'),
   assignee: line('assignee', MAX_LINE),
   reporter: line('reporter', MAX_LINE),
   reviewer: line('reviewer', MAX_LINE),
-  component: line('component', MAX_LINE),
-  sprint_id: slug('sprint_id'),
   labels: (value) => {
     if (!Array.isArray(value)) return 'labels must be a list of slugs'
     const labels = value as readonly unknown[]
@@ -506,7 +474,6 @@ const CHECKS: Readonly<Record<string, Check>> = {
   found_in: oneOf('found_in', FOUND_IN_STAGES),
   fix_confirmed: (value) => (typeof value === 'boolean' ? undefined : 'fix_confirmed must be true or false'),
   question: text('question', 1000),
-  timebox_hours: int('timebox_hours', 1, 80),
   findings: text('findings', 10_000),
   // The same bound as `outcome` and `question`: a paragraph saying what would clear the
   // blocker, not the plan itself, which belongs in the item that carries it out.

@@ -71,10 +71,10 @@ describe('the parser', () => {
     assert.deepEqual(other.ok ? other.value.filterOrder : [], ['state', 'assignee'])
   })
 
-  it('refuses --dry-run with --preview rather than picking one silently', () => {
-    const parsed = parse(['transition', 'a', 'ready', '--dry-run', '--preview'])
+  it('refuses a flag no command declares rather than accepting it silently', () => {
+    const parsed = parse(['transition', 'a', 'ready', '--preview'])
     assert.equal(parsed.ok, false)
-    assert.match(parsed.ok ? '' : parsed.cause, /different questions/)
+    assert.match(parsed.ok ? '' : parsed.cause, /--preview is not a flag of transition/)
   })
 
   it('refuses a flag this command answers X or N to, and names the correct form', () => {

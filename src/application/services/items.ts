@@ -7,7 +7,6 @@ import {
   asInstant,
   canonicalField,
   daysOverdue,
-  evaluateCommit,
   placeholderOf,
   relationsOf,
   requiredAtCreation,
@@ -36,18 +35,16 @@ import {
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { notGroomedNote, readWorkspace, readyVerdict, wholeItem, type WorkspaceView } from './context.ts'
+import { readWorkspace, wholeItem, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
 /** Columns a list row may carry. `text` marks free text, which the renderer places last (F3). */
-export const ITEM_COLUMNS: readonly ColumnSpec[] = [
+const ITEM_COLUMNS: readonly ColumnSpec[] = [
   { name: 'id' },
   { name: 'type' },
   { name: 'state' },
-  { name: 'pts' },
   { name: 'pri' },
-  { name: 'sprint' },
   { name: 'assignee', text: true },
   { name: 'title', text: true },
   { name: 'sev' },
@@ -59,9 +56,9 @@ export const ITEM_COLUMNS: readonly ColumnSpec[] = [
 /**
  * `sev` is in the default set because severity was required at creation and then printed
  * nowhere: a caller triaging defects had no read surface that carried it. It costs one `-`
- * cell on a non-bug row, which is what `pts` already costs an unestimated one.
+ * cell on a non-bug row, which is the price of every optional column in a default set.
  */
-export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'pts', 'sev', 'title'] as const
+export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'sev', 'title'] as const
 
 /** The page size every list defaults to; `next` has its own, smaller one. */
 export const DEFAULT_LIMIT = 9
@@ -87,7 +84,7 @@ export function invocation(command: string, operands: readonly string[], flags: 
 }
 
 /** The filter, column and limit flags a list was asked with, for the line that continues it. */
-export function listFlags(
+function listFlags(
   filters: readonly Filter[], columns: readonly string[], defaults: readonly string[], limit: number,
 ): readonly CarriedFlag[] {
   const chosen = columns.length === defaults.length && columns.every((name, at) => name === defaults[at])
@@ -100,7 +97,9 @@ export function listFlags(
 
 export const FILE_SHAPE: ResultShape = {
   command: 'file',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag and `not_ready`, which only
+  // a `file --sprint` could set.
+  version: 2,
   effect: 'mutate',
   summary: 'File one work item of a type, and report the fields it was created with.',
   properties: [
@@ -113,18 +112,16 @@ export const FILE_SHAPE: ResultShape = {
     { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'event', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },
-    // Last, which STABILITY's output-schema rule makes a non-breaking addition.
-    { kind: 'scalar', key: 'not_ready', type: 'string' },
   ],
 }
 
 export const SHOW_SHAPE: ResultShape = {
   command: 'show',
-  version: 1,
+  // v2 dropped `pts`, `sprint`, `hrs`, `timebox` and `component` with the fields they printed.
+  version: 2,
   effect: 'read',
   summary: 'Print the stored fields of one item.',
   properties: [
@@ -133,9 +130,7 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'state', type: 'string' },
     { kind: 'scalar', key: 'filed', type: 'string' },
     { kind: 'scalar', key: 'v', type: 'integer' },
-    { kind: 'scalar', key: 'pts', type: 'integer' },
     { kind: 'scalar', key: 'pri', type: 'integer' },
-    { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'parent', type: 'string' },
     { kind: 'scalar', key: 'ac', type: 'string' },
     { kind: 'scalar', key: 'due', type: 'string' },
@@ -150,17 +145,14 @@ export const SHOW_SHAPE: ResultShape = {
     // end of the property order a non-breaking change and a reordering a breaking one, and
     // the line rendering is a projection of this order. A field absent from a record is an
     // absent line, so a story pays nothing for a bug's six.
-    { kind: 'scalar', key: 'hrs', type: 'integer' },
     { kind: 'scalar', key: 'labels', type: 'string' },
     { kind: 'scalar', key: 'found', type: 'string' },
     { kind: 'scalar', key: 'fixed', type: 'boolean' },
-    { kind: 'scalar', key: 'timebox', type: 'integer' },
     { kind: 'scalar', key: 'hold_until', type: 'string' },
     { kind: 'scalar', key: 'held_from', type: 'string' },
     { kind: 'scalar', key: 'extra', type: 'integer' },
     { kind: 'text', key: 'reporter' },
     { kind: 'text', key: 'reviewer' },
-    { kind: 'text', key: 'component' },
     { kind: 'text', key: 'hold' },
     { kind: 'text', key: 'outcome' },
     { kind: 'text', key: 'question' },
@@ -200,16 +192,15 @@ export const SHOW_SHAPE: ResultShape = {
 
 export const BACKLOG_SHAPE: ResultShape = {
   command: 'backlog',
-  // v2 renamed the completed-points scalar from `done` to `done_points`; schemas/README.md
-  // is the rule that a change to a shape's properties bumps the shape.
-  version: 2,
+  // v3 dropped the two estimate aggregates and the `pts` and `sprint` columns with the
+  // estimation and sprint surfaces; schemas/README.md is the rule that a change to a shape's
+  // properties bumps the shape.
+  version: 3,
   effect: 'read',
   summary: 'List the items that match a filter, in one stated order.',
   properties: [
     { kind: 'scalar', key: 'filter', type: 'string' },
     { kind: 'scalar', key: 'sort', type: 'string' },
-    { kind: 'scalar', key: 'points', type: 'integer' },
-    { kind: 'scalar', key: 'done_points', type: 'integer' },
     { kind: 'scalar', key: 'none', type: 'string' },
     { kind: 'scalar', key: 'narrowest', type: 'string' },
     { kind: 'scalar', key: 'absent', type: 'string' },
@@ -217,9 +208,6 @@ export const BACKLOG_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'more', type: 'integer' },
     { kind: 'scalar', key: 'page', type: 'string' },
-    // Appended after the scalars already declared, which STABILITY's output-schema rule makes
-    // a non-breaking addition: which set a closed `--sprint` scope reads.
-    { kind: 'scalar', key: 'note', type: 'string' },
     { kind: 'block', key: 'items', columns: ITEM_COLUMNS },
   ],
 }
@@ -245,7 +233,7 @@ function slugHead(base: string): string {
 /**
  * A readable id a person reviewing the file recognises, deduped against what is stored, or
  * undefined when the title carries nothing an id can be made of. `kind` is the word a
- * too-short title is prefixed with: the item's type, or `sprint`.
+ * too-short title is prefixed with, which is the item's type.
  *
  * The undefined case is a title whose every character folds away: NFKD handles Latin
  * diacritics, so `Ünïcödé ✨ only` becomes `u-ni-co-de-only`, and a script it cannot fold
@@ -279,7 +267,7 @@ export type FileRequest = {
   readonly actor: Actor
 }
 
-const INT_FIELDS = new Set(['priority', 'points', 'hours_estimate', 'timebox_hours'])
+const INT_FIELDS = new Set(['priority'])
 const LIST_FIELDS = new Set(['labels'])
 const CRITERIA_FIELDS = new Set(['acceptance_criteria'])
 
@@ -316,10 +304,10 @@ export function coerce(name: string, value: string): unknown {
 
 /** The fields a `file` reports as set, in the field dictionary's order. */
 const REPORTED = [
-  'type', 'state', 'filed_at', 'description', 'priority', 'points', 'hours_estimate',
-  'parent_id', 'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id', 'due',
+  'type', 'state', 'filed_at', 'description', 'priority',
+  'parent_id', 'assignee', 'reporter', 'reviewer', 'labels', 'due',
   'outcome', 'acceptance_criteria', 'severity', 'repro_steps', 'expected', 'actual',
-  'found_in', 'fix_confirmed', 'question', 'timebox_hours', 'findings', 'proposed_resolution',
+  'found_in', 'fix_confirmed', 'question', 'findings', 'proposed_resolution',
 ] as const
 
 /** The longest a reported value prints before it is reported as its size instead. */
@@ -348,7 +336,7 @@ export async function fileItem(
   const now = clock.now()
   const spoken = namedByRecord(view.value)
   const id = request.id ?? slugFor(request.title, request.type, new Set([
-    ...view.value.byId.keys(), ...view.value.sprintById.keys(), ...view.value.ceremonyById.keys(), ...spoken.keys(),
+    ...view.value.byId.keys(), ...spoken.keys(),
   ]))
   if (id === undefined) {
     return errorResult({
@@ -358,43 +346,23 @@ export async function fileItem(
     })
   }
   // An id another record still names is not free, whatever the store no longer holds under
-  // it. A record deleted by hand leaves its `blocks` edges and its sprint's `members` and
-  // `carried` lists pointing at the id, and refiling the title reissued it: the new draft
-  // read `blocked yes item-aa` on an edge it never had, and a closed sprint counted it as a
-  // member it never committed. `doctor` names each of those as `H24` or `H28`, and this is
-  // the same fact refused at the one point that would otherwise resolve it silently.
+  // it. A record deleted by hand leaves its `blocks` edges pointing at the id, and refiling
+  // the title reissued it: the new draft read `blocked yes item-aa` on an edge it never had.
+  // `doctor` names that as `H24`, and this is the same fact refused at the one point that
+  // would otherwise resolve it silently.
   const holder = spoken.get(id)
   if (holder !== undefined) {
     return errorResult({
-      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'V9', entity: id,
       cause: `${holder} still names ${id} and no record here carries it, so filing under that id would attach a stored reference to an item that never had it`,
       fix: ['treadle doctor', `treadle file ${request.type} "<title>" --id <slug>`],
     })
   }
-  // The same rule `sprint open` holds from its side: an id names one thing, and the log
-  // that `history` reads is keyed by id alone.
-  if (view.value.sprintById.has(id)) {
-    return errorResult({
-      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
-      cause: `${id} is a sprint here, and an id names one thing: an item cannot share a sprint's id`,
-      fix: [`treadle sprints ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
-    })
-  }
-  // The third kind, held the same way and for the same reason: the log `history` reads is
-  // keyed by id alone, so a ceremony and an item that shared one would share their trail.
-  if (view.value.ceremonyById.has(id)) {
-    return errorResult({
-      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
-      cause: `${id} is a ceremony here, and an id names one thing: an item cannot share a ceremony's id`,
-      fix: [`treadle ceremonies ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
-    })
-  }
-  // The same answer `sprint open --id` gives for a sprint id already taken. Left to the store
-  // this was `CONFLICT S10`, "already exists at version 1", which a caller reads as a stale
-  // write to re-read and retry, and no retry of the same line can land.
+  // Left to the store this was `CONFLICT S10`, "already exists at version 1", which a caller
+  // reads as a stale write to re-read and retry, and no retry of the same line can land.
   if (view.value.byId.has(id)) {
     return errorResult({
-      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'I5', entity: id,
+      code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'V9', entity: id,
       cause: `${id} is already an item here, and an id names one thing`,
       fix: [`treadle show ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
     })
@@ -410,7 +378,7 @@ export async function fileItem(
   }
 
   const item = draft as unknown as WorkItem
-  const valid = validateWorkItem(item, { now, pointScale: view.value.config.point_scale })
+  const valid = validateWorkItem(item, { now })
   if (!valid.ok) {
     // The line that files it with every field the type requires, so a refusal for a missing
     // field is answered once. Built from the type's own list and the dictionary's
@@ -431,29 +399,6 @@ export async function fileItem(
     if (refused !== undefined) return refused
   }
 
-  // `--sprint` at creation is a commit, and it is held to the commit's rules: the sprint
-  // exists and is open, and the item is ready to be worked. Before sprints were records the
-  // flag stored any string, which is the one narrowing this change makes to the surface.
-  // A record filed here is `draft`, which those rules admit, so this is also where the tool
-  // says that `next` will not rank it yet (ADR-0022); the note is set after the write.
-  if (item.sprint_id !== undefined) {
-    const sprint = view.value.sprintById.get(item.sprint_id)
-    if (sprint === undefined) return noSprint('file', 'mutate', workspace, view.value, item.sprint_id)
-    const outcome = evaluateCommit({ sprint, item: { ...item, sprint_id: undefined }, current: undefined, readyGate: readyVerdict(view.value, item) })
-    if (outcome.outcome === 'refused') {
-      // Nothing was filed, so the commit's own fixes, which name the item, would each exit
-      // NOT_FOUND. The line offered files it without the sprint, with the fields its type
-      // cannot be filed without, and the commit is the second line once it is ready.
-      const required = requiredAtCreation(request.type).map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
-      return errorResult({
-        code: 'GUARD_REFUSED', command: 'file', workspace, effect: 'mutate',
-        rule: outcome.error.rule ?? 'I4', entity: id,
-        cause: `${outcome.error.message}; nothing was filed, so file it without --sprint and commit it once it is ready`,
-        fix: [`treadle file ${request.type} "<title>"${required}`, `treadle sprint commit ${sprint.id} <id>`],
-      })
-    }
-  }
-
   const txn = ids.txn()
   const eventId = ids.event()
   const changes = diffOf(undefined, item, REPORTED)
@@ -463,21 +408,6 @@ export async function fileItem(
     state: 'draft',
     title: request.title,
     set: changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`),
-  }
-  if (item.sprint_id !== undefined) {
-    data['not_ready'] = id
-    data['note'] = notGroomedNote([id])
-  }
-
-  if (mode === 'preview') {
-    return okResult(FILE_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        item: id, type: request.type, title: request.title, preview: 1,
-        store: view.value.identity.path ?? '-',
-        note: 'guards not evaluated; use --dry-run for the outcome',
-      },
-    })
   }
 
   const applied = await store.apply({
@@ -551,9 +481,7 @@ export async function showItem(
     filed: item.filed_at,
     v: item.version,
   }
-  if (item.points !== undefined) data['pts'] = item.points
   if (item.priority !== undefined) data['pri'] = item.priority
-  if (item.sprint_id !== undefined) data['sprint'] = item.sprint_id
   if (item.parent_id !== undefined) data['parent'] = item.parent_id
   const ticked = tickedOf(item.acceptance_criteria)
   if (ticked !== undefined) data['ac'] = ticked
@@ -569,11 +497,9 @@ export async function showItem(
   // The rest of the field dictionary, in the shape's own appended order. Each was stored on
   // every write and printed by nothing, which is the defect class the sweep in
   // test/architecture/field-visibility.test.ts now holds the whole dictionary to.
-  if (item.hours_estimate !== undefined) data['hrs'] = item.hours_estimate
   if (item.labels !== undefined && item.labels.length > 0) data['labels'] = item.labels.join(',')
   if (item.found_in !== undefined) data['found'] = item.found_in
   if (item.fix_confirmed !== undefined) data['fixed'] = item.fix_confirmed
-  if (item.timebox_hours !== undefined) data['timebox'] = item.timebox_hours
   if (item.hold_until !== undefined) data['hold_until'] = item.hold_until
   if (item.held_from !== undefined) data['held_from'] = item.held_from
   // A count and not the values: `extra` holds keys a newer writer produced that this build
@@ -583,7 +509,6 @@ export async function showItem(
   if (item.extra !== undefined && item.extra.size > 0) data['extra'] = item.extra.size
   if (item.reporter !== undefined) data['reporter'] = item.reporter
   if (item.reviewer !== undefined) data['reviewer'] = item.reviewer
-  if (item.component !== undefined) data['component'] = item.component
   if (item.hold_reason !== undefined) data['hold'] = item.hold_reason
   if (item.outcome !== undefined) data['outcome'] = item.outcome
   if (item.question !== undefined) data['question'] = item.question
@@ -649,12 +574,12 @@ export async function showItem(
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */
 export type Filter = {
-  readonly field: 'state' | 'type' | 'sprint' | 'assignee' | 'priority' | 'resolution' | 'label' | 'title'
+  readonly field: 'state' | 'type' | 'assignee' | 'priority' | 'resolution' | 'label' | 'title'
   readonly value: string
 }
 
 /**
- * The value a clause is compared against, for the six clauses that compare one stored scalar
+ * The value a clause is compared against, for the five clauses that compare one stored scalar
  * for equality. `label` and `title` are not among them: a label is one entry of a list and a
  * title is matched by its words, so both answer through `holds` below and print what the item
  * carries here, which is what `--explain-absence` reads back as "got".
@@ -662,7 +587,6 @@ export type Filter = {
 function fieldOf(item: WorkItemSummary, field: Filter['field']): string | undefined {
   if (field === 'state') return item.state
   if (field === 'type') return item.type
-  if (field === 'sprint') return item.sprint_id
   if (field === 'assignee') return item.assignee
   if (field === 'resolution') return item.resolution
   if (field === 'label') return item.labels === undefined || item.labels.length === 0 ? undefined : item.labels.join(',')
@@ -703,22 +627,20 @@ export function matches(item: WorkItemSummary, filters: readonly Filter[]): bool
 
 const NO_PRIORITY = 6
 
-export function backlogOrder(a: WorkItemSummary, b: WorkItemSummary): number {
+function backlogOrder(a: WorkItemSummary, b: WorkItemSummary): number {
   const priority = (a.priority ?? NO_PRIORITY) - (b.priority ?? NO_PRIORITY)
   if (priority !== 0) return priority
   if (a.filed_at !== b.filed_at) return a.filed_at < b.filed_at ? -1 : 1
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-export function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
+function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
   const row: Record<string, string | number | null> = {}
   for (const column of columns) {
     if (column === 'id') row[column] = item.id
     else if (column === 'type') row[column] = item.type
     else if (column === 'state') row[column] = item.state
-    else if (column === 'pts') row[column] = item.points ?? null
     else if (column === 'pri') row[column] = item.priority ?? null
-    else if (column === 'sprint') row[column] = item.sprint_id ?? null
     else if (column === 'assignee') row[column] = item.assignee ?? null
     else if (column === 'title') row[column] = item.title
     else if (column === 'sev') row[column] = item.severity ?? null
@@ -747,7 +669,7 @@ function columnsFor(names: readonly string[]): readonly ColumnSpec[] {
  * a set no ordering can rescue, and a row that parses into the wrong fields with no error
  * is worse than a refusal.
  */
-export function columnRefusal(
+function columnRefusal(
   command: string, workspace: string, columns: readonly string[], known: readonly ColumnSpec[],
 ): ResultObject | undefined {
   const unknown = columns.find((name) => !known.some((column) => column.name === name))
@@ -788,8 +710,6 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 
   const refused = columnRefusal('backlog', workspace, request.columns, ITEM_COLUMNS)
   if (refused !== undefined) return refused
-  const scoped = sprintScope(view.value, request.filters)
-  if (scoped !== undefined && 'refusal' in scoped) return scoped.refusal
 
   const line = (cursor?: string): string =>
     invocation('backlog', [], [...listFlags(request.filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
@@ -810,15 +730,6 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   }
   // A sort and an aggregate over nothing are noise; the `none` line is the answer there.
   if (page.length > 0) data['sort'] = 'priority,filed,id'
-  if (page.length > 0) {
-    data['points'] = page.reduce((sum, item) => sum + (item.points ?? 0), 0)
-    // `done` was this key's name, and beside a list where one of two items is in state
-    // `done` a `done 0` line reads as a count of items rather than of their estimates.
-    // Both aggregates now say what they aggregate over.
-    data['done_points'] = page
-      .filter((item) => item.state === 'done')
-      .reduce((sum, item) => sum + (item.points ?? 0), 0)
-  }
 
   if (matched.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
@@ -829,8 +740,6 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   if (request.explainAbsence !== undefined) {
     Object.assign(data, absence(view.value, request.filters, request.explainAbsence))
   }
-  if (scoped !== undefined && 'note' in scoped) data['note'] = scoped.note
-
   const remaining = matched.length - (from + page.length)
   if (remaining > 0) {
     data['more'] = remaining
@@ -843,9 +752,9 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 
 /**
  * Every id some record still names that no record here carries, to the record that names it.
- * A stored `blocks` edge and a closed sprint's `carried` or `finished` list both survive a
- * hand-deleted record, and both would silently re-attach to whatever takes the slug next.
- * The value is the sentence fragment a refusal reads, so it names which record to look at.
+ * A stored `blocks` edge survives a hand-deleted record and would silently re-attach to
+ * whatever takes the slug next. The value is the sentence fragment a refusal reads, so it
+ * names which record to look at.
  */
 function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
   const dangling = new Map<ItemId, string>()
@@ -855,46 +764,11 @@ function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
   // Only the target can dangle: the graph is read off the records themselves, so every
   // source is a record this view holds.
   for (const relation of view.relations.relations) claim(relation.target, `${relation.source}'s ${relation.kind} edge`)
-  for (const sprint of view.sprints) {
-    for (const field of ['carried', 'finished'] as const) {
-      for (const member of sprint[field] ?? []) claim(member, `sprint ${sprint.id}'s ${field} list`)
-    }
-  }
   return dangling
 }
 
-/**
- * What `--sprint <id>` names, for the two commands that take it as a filter rather than as a
- * scope. Three answers about one closed sprint used to be readable at once: `sprints` counts
- * the set the close recorded, this filter counts what points at the sprint now, and `board`
- * counts the live states of those. The sets agree while a sprint is open and diverge the
- * moment a member is committed onward, so a closed scope says here which of them it reads;
- * `help board` already said it for the board and nothing said it for the backlog.
- *
- * An id that names no sprint and that no item points at is a typo, and it gets the refusal
- * `board --sprint` already gives rather than an empty list under `ok`.
- */
-function sprintScope(
-  view: WorkspaceView, filters: readonly Filter[],
-): { readonly refusal: ResultObject } | { readonly note: string } | undefined {
-  const named = filters.find((filter) => filter.field === 'sprint')
-  if (named === undefined) return undefined
-  const sprint = view.sprintById.get(named.value)
-  if (sprint === undefined) {
-    // A closed sprint's leftovers and an `H26` value some record still carries are both
-    // scopes with something to show, so an id an item points at is not a typo.
-    return view.items.some((item) => item.sprint_id === named.value)
-      ? undefined
-      : { refusal: noSprint('backlog', 'read', view.identity.id, view, named.value) }
-  }
-  if (sprint.state !== 'closed') return undefined
-  return {
-    note: `${sprint.id} is closed; this reads the items whose sprint_id is ${sprint.id} now, not the set its close recorded; treadle sprints ${sprint.id}`,
-  }
-}
-
 /** The clause whose own selectivity was lowest, so a caller learns which term to relax. */
-export function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Filter[]): string | undefined {
+function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Filter[]): string | undefined {
   let best: { readonly filter: Filter; readonly hits: number } | undefined
   for (const filter of filters) {
     const hits = items.filter((item) => holds(item, filter)).length
@@ -920,7 +794,7 @@ export function absence(
 }
 
 /** Up to three candidates by edit distance then id order, never auto-corrected (A.6 rule 4). */
-export function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
+function nearIds(known: Iterable<ItemId>, wanted: ItemId): readonly ItemId[] {
   return [...known]
     .map((id) => ({ id, distance: editDistance(id, wanted) }))
     .filter((candidate) => candidate.distance <= Math.max(2, Math.ceil(wanted.length * 0.4)))
@@ -949,78 +823,22 @@ function editDistance(a: string, b: string): number {
  * here is a genuine absence and not the silent first-match wearing a different hat.
  *
  * The effect is the caller's, not this function's. Hard-coding `read` here made every
- * `NOT_FOUND` from `transition`, `set`, `mark`, `evidence`, `relation` and `sprint` declare
- * itself a read, which is exactly the inference R6 exists to forbid; a caller deciding whether
- * a failed call may have written anything reads this field.
- *
- * A sprint is a record with an id, and this used to search items alone, so `show sprint-31`
- * and `explain sprint-31` told a caller the id named nothing while `history sprint-31`
- * answered from it. The sprint ids are searched too now: an exact one is a refusal that
- * names the read that works, and a near one reaches the `near` list, so a mistyped sprint id
- * gets the same two-step correction a mistyped item id gets.
+ * `NOT_FOUND` from `transition`, `set`, `mark`, `evidence` and `relation` declare itself a
+ * read, which is exactly the inference R6 exists to forbid; a caller deciding whether a
+ * failed call may have written anything reads this field.
  */
 export function notFound(
   command: string, effect: Effect, workspace: string, view: WorkspaceView, id: ItemId,
 ): ResultObject {
-  if (view.ceremonyById.has(id)) {
-    return errorResult({
-      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-      cause: `${id} is a ceremony here, not an item, and ${command} takes an item id`,
-      fix: [`treadle ceremonies ${id}`, 'treadle ceremonies'],
-    })
-  }
-  if (view.sprintById.has(id)) {
-    // `set` is the one command whose caller was reaching for a sprint's own field editor, so
-    // it gets the line that does what they meant. The other callers of this refusal were
-    // reading, and the two reads below are what they wanted.
-    const instead = command === 'set'
-      ? [`treadle sprint set ${id} --goal "<text>"`, `treadle sprints ${id}`]
-      : [`treadle sprints ${id}`, `treadle backlog --sprint ${id}`]
-    return errorResult({
-      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-      cause: `${id} is a sprint here, not an item, and ${command} takes an item id`,
-      fix: instead,
-    })
-  }
   const held = view.items.length
   return errorResult({
     code: 'NOT_FOUND', command, workspace, effect, entity: id,
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
     // The workspace's own id is in the near set because the log is keyed by entity and the
     // workspace is one: `history <workspace>` is what reads a configuration change back, and
-    // a typed id that missed it had no way of learning which of three kinds it was near.
-    near: nearIds([...view.byId.keys(), ...view.sprintById.keys(), ...view.ceremonyById.keys(), view.identity.id], id),
+    // a typed id that missed it had no way of learning which of the two kinds it was near.
+    near: nearIds([...view.byId.keys(), view.identity.id], id),
     fix: ['treadle backlog'],
-  })
-}
-
-/**
- * `notFound`'s mirror for a sprint id nothing here carries. It searched the sprint ids alone,
- * so the operand-order slip `sprint commit <item> <item>` said "no sprint here" with no `near`
- * line and never that the id was an item, while `show <sprint>` said "is a sprint here, not an
- * item" with two fix lines. Both refusals now answer the same way from either side.
- */
-export function noSprint(command: string, effect: Effect, workspace: string, view: WorkspaceView, id: string): ResultObject {
-  if (view.ceremonyById.has(id)) {
-    return errorResult({
-      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-      cause: `${id} is a ceremony here, not a sprint, and ${command} takes a sprint id`,
-      fix: [`treadle ceremonies ${id}`, 'treadle sprints'],
-    })
-  }
-  if (view.byId.has(id)) {
-    return errorResult({
-      code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-      cause: `${id} is an item here, not a sprint, and ${command} takes a sprint id`,
-      fix: [`treadle show ${id}`, 'treadle sprints'],
-    })
-  }
-  const held = view.sprints.length
-  return errorResult({
-    code: 'NOT_FOUND', command, workspace, effect, rule: 'I5', entity: id,
-    cause: `${id} is no sprint here; this workspace holds ${held} ${held === 1 ? 'sprint' : 'sprints'}`,
-    near: nearIds([...view.sprintById.keys(), ...view.byId.keys(), ...view.ceremonyById.keys()], id),
-    fix: ['treadle sprints'],
   })
 }
 
@@ -1045,14 +863,11 @@ export function parentRefusal(
   const edge = setParent(graph, child.id, parentId)
   if (edge.ok) return undefined
   const unknown = edge.error.rule === 'P4'
-  // A sprint id in the parent slot gets the answer every other command gives it, not a `near`
-  // list of items that happen to spell like it.
-  if (unknown && view.sprintById.has(parentId)) return notFound(command, 'mutate', workspace, view, parentId)
   const parents = ALLOWED_PARENT_PAIRS.filter((pair) => pair.child === child.type)
     .map((pair) => `treadle backlog --type ${pair.parent}`)
   // A type nothing may parent has no list to offer. For a filed item the record is the answer;
   // for `file` nothing was filed, so `show <id>` named a record that did not exist and the
-  // line is the one that files it without the parent, as the `--sprint` refusal does.
+  // line is the one that files it without the parent.
   const required = requiredAtCreation(child.type).map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
   const alone = filed ? `treadle show ${child.id}` : `treadle file ${child.type} "<title>"${required}`
   // A chain that already closes a cycle above the parent is the store's finding, not this write's.

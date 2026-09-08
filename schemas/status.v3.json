@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "status.v2.json",
-  "title": "status/2",
+  "$id": "status.v3.json",
+  "title": "status/3",
   "description": "Orient a caller in the workspace in one call.",
   "type": "object",
   "additionalProperties": false,
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "status/2"
+      "const": "status/3"
     },
     "ok": {
       "type": "boolean"
@@ -72,12 +72,6 @@
             "null"
           ]
         },
-        "points": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
         "findings": {
           "type": [
             "integer",
@@ -91,12 +85,6 @@
           ]
         },
         "defects": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "not_ready": {
           "type": [
             "string",
             "null"
@@ -287,80 +275,7 @@
               "name": "id"
             },
             {
-              "name": "pts"
-            },
-            {
               "name": "score"
-            },
-            {
-              "name": "title",
-              "trust": "data"
-            }
-          ]
-        },
-        "sprints": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": [
-            "columns",
-            "shown",
-            "total",
-            "rows"
-          ],
-          "properties": {
-            "columns": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": false,
-                "required": [
-                  "name"
-                ],
-                "properties": {
-                  "name": {
-                    "type": "string"
-                  },
-                  "text": {
-                    "const": true
-                  },
-                  "data": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            "shown": {
-              "type": "integer"
-            },
-            "total": {
-              "type": "integer"
-            },
-            "rows": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "additionalProperties": {
-                  "type": [
-                    "string",
-                    "number",
-                    "null"
-                  ]
-                }
-              }
-            }
-          },
-          "x-columns": [
-            {
-              "name": "id"
-            },
-            {
-              "name": "day"
-            },
-            {
-              "name": "items"
-            },
-            {
-              "name": "pts"
             },
             {
               "name": "title",

@@ -3,7 +3,7 @@
 // required to say what would clear it, holding work up through the same `blocks` edge every
 // other item uses, and freeing that work by reaching `done` with nothing unlinked.
 //
-// `status` printed `absent_features board impediment` and DOD2 could never fail,
+// `status` printed `absent_features impediment` and DOD2 could never fail,
 // because nothing could be open against an item. Both are what this file drives.
 
 import assert from 'node:assert/strict'
@@ -113,7 +113,7 @@ describe('raising an impediment', () => {
 
   it('is listed under its type with its severity, and status no longer calls it absent', async () => {
     const listed = await cli(['backlog', '--type', 'impediment'])
-    assert.match(listed.out, /^cert-expired impediment draft - S2 Staging certificate expired$/m)
+    assert.match(listed.out, /^cert-expired impediment draft S2 Staging certificate expired$/m)
     assert.equal(line(await cli(['status']), 'absent_features'), undefined, 'every feature the line named has landed')
   })
 })
@@ -124,7 +124,7 @@ describe('an impediment raised against a draft story', () => {
     demo = await aDemoWorkspace()
     const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
     // A story that passes every other ready rule, so DOR3 is the one thing in its way.
-    assert.equal((await cli(['file', 'story', 'Ship SAML login for tenants', '--id', 'saml-login', '--set', 'points=5', '--set', 'acceptance_criteria=metadata upload works'])).code, 0)
+    assert.equal((await cli(['file', 'story', 'Ship SAML login for tenants', '--id', 'saml-login', '--set', 'acceptance_criteria=metadata upload works'])).code, 0)
     assert.equal((await cli(['file', 'impediment', 'Staging certificate expired', '--id', 'cert-expired', '--set', 'severity=S1', '--set', `proposed_resolution=${RESOLUTION}`])).code, 0)
     assert.equal((await cli(['relation', 'add', 'cert-expired', 'blocks', 'saml-login'])).code, 0)
   })
@@ -200,8 +200,8 @@ describe('an impediment raised against ready work', () => {
   it('ranks the impediment where the blocked item would have been, with its severity as v and what it frees as d', async () => {
     const ranked = await cli(['next', '--limit', '20'])
     assert.equal(ranked.out.includes('\navatar-crop '), false, 'the blocked item is not ranked')
-    assert.match(ranked.out, /\ncert-expired - 29 p0\/a0\/d1\/s0\/m0\/u0\/v4 /, 'an S1 blocking one item: d1 x 5 plus v4 x 6')
-    assert.match(ranked.out, /\nvendor-hold - 17 p0\/a0\/d1\/s0\/m0\/u0\/v2 /, 'an S3 blocking one item: d1 x 5 plus v2 x 6')
+    assert.match(ranked.out, /\ncert-expired 29 p0\/a0\/d1\/m0\/u0\/v4 /, 'an S1 blocking one item: d1 x 5 plus v4 x 6')
+    assert.match(ranked.out, /\nvendor-hold 17 p0\/a0\/d1\/m0\/u0\/v2 /, 'an S3 blocking one item: d1 x 5 plus v2 x 6')
     assert.ok(ranked.out.indexOf('\ncert-expired ') < ranked.out.indexOf('\nvendor-hold '), 'the S1 outranks the S3')
     assert.equal(line(await cli(['next', '--explain-absence', 'avatar-crop']), 'clause'), 'clause blocked by vendor-hold')
   })
@@ -269,14 +269,4 @@ describe('nesting and the graph an impediment joins', () => {
     assert.match(refused.err, /vendor-hold -> sec-review -> vendor-hold/)
   })
 
-  it('may carry a sprint, because resolving one is work someone commits to', async () => {
-    // sec-review blocks vendor-hold above, so it, and not vendor-hold, still passes its own
-    // ready gate here; the point proven is that an impediment may be committed at all. It is
-    // groomed first because a sprint takes work that has been groomed (I4).
-    assert.equal((await cli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'])).code, 0)
-    assert.equal((await cli(['transition', 'sec-review', 'ready'])).code, 0)
-    const committed = await cli(['sprint', 'commit', 'sprint-31', 'sec-review'])
-    assert.equal(committed.code, 0, committed.err)
-    assert.equal(line(await cli(['show', 'sec-review']), 'sprint'), 'sprint sprint-31')
-  })
 })

@@ -161,7 +161,7 @@ describe('the guards and the ranking that read blockers', () => {
   it('leaves a blocked item out of next and names the blockers when asked why', async () => {
     const ranked = await cli(['next', '--limit', '20'])
     assert.equal(ranked.out.includes('\navatar-crop '), false, ranked.out)
-    assert.match(ranked.out, /\nwebhook-retry \d+ \d+ p\d+\/a\d+\/d1\//, 'd counts the one active item it blocks')
+    assert.match(ranked.out, /\nwebhook-retry \d+ p\d+\/a\d+\/d1\//, 'd counts the one active item it blocks')
     const why = await cli(['next', '--explain-absence', 'avatar-crop'])
     assert.equal(line(why, 'clause'), 'clause blocked by webhook-retry')
   })
@@ -194,9 +194,8 @@ describe('the guards and the ranking that read blockers', () => {
   })
 })
 
-// `duplicates` fed `R4` and `show` and nothing else, so a copy could be groomed, started and
-// committed to a sprint beside its original. It carries one rule now, and it is the ready gate,
-// because all three of those surfaces read the same verdict (ADR-0022).
+// `duplicates` fed `R4` and `show` and nothing else, so a copy could be groomed and started
+// beside its original. It carries one rule now, and it is the ready gate (ADR-0022).
 describe('a copy is not separate work, which is DOR10 on the ready gate', () => {
   let demo: Demo
   before(async () => {
@@ -215,14 +214,6 @@ describe('a copy is not separate work, which is DOR10 on the ready gate', () => 
     assert.match(refused.err, /^fix treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
     const why = await cli(['explain', 'metrics-p95'])
     assert.match(why.out, /^ready DOR10 fail treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
-  })
-
-  it('refuses to commit the copy to a sprint, because the commit reads that same gate', async () => {
-    assert.equal((await cli(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2026-09-18'])).code, 0)
-    const refused = await cli(['sprint', 'commit', 'sprint-31', 'metrics-p95'])
-    assert.equal(refused.code, 3)
-    assert.equal(line(refused, 'rule'), 'rule I4')
-    assert.match(refused.err, /DOR10 it duplicates i18n-dates, and a copy is not separate work/)
   })
 
   it('leaves the original alone, and lets the copy through once the edge is dropped', async () => {

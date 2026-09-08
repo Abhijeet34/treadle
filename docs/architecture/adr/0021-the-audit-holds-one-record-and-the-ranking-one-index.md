@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** DR8's peak-memory budget over the two commands the corpus could not price until it carried a relation graph
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `board` from the operations the read budget is weighed over; the streaming audit and the ranking index are unchanged
 
 ## Context
 

@@ -15,16 +15,15 @@
 
 import { parseArgs, type ParseArgsConfig } from 'node:util'
 
-import { shellWord } from '../domain/index.ts'
 import { GLOBAL_FLAGS, commandNamed, verdictFor, type GlobalFlag } from './inventory.ts'
 
 type OptionConfig = NonNullable<ParseArgsConfig['options']>
 
 /**
  * The flags every command takes. Exported so a test can hold the rule that `help <command>`
- * names every one of them: `--contract`, `--ascii`, `--no-color` and `--log-values` were
- * accepted by this table and printed by no help page, and `--contract` is the grammar an
- * agent needs before it can parse anything else.
+ * names every one of them: `--contract`, `--ascii` and `--log-values` were accepted by this
+ * table and printed by no help page, and `--contract` is the grammar an agent needs before
+ * it can parse anything else.
  */
 export const GLOBAL_OPTIONS: OptionConfig = {
   help: { type: 'boolean', short: 'h' },
@@ -33,13 +32,10 @@ export const GLOBAL_OPTIONS: OptionConfig = {
   out: { type: 'string' },
   quiet: { type: 'boolean', short: 'q' },
   verbose: { type: 'boolean', short: 'v', multiple: true },
-  color: { type: 'string' },
   ascii: { type: 'boolean' },
   workspace: { type: 'string' },
   'dry-run': { type: 'boolean' },
-  preview: { type: 'boolean' },
   yes: { type: 'boolean', short: 'y' },
-  'no-input': { type: 'boolean' },
   actor: { type: 'string' },
   width: { type: 'string' },
   fields: { type: 'string' },
@@ -59,11 +55,9 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   init: { name: { type: 'string' } },
   file: {
     id: { type: 'string' },
-    points: { type: 'string' },
     priority: { type: 'string' },
     assignee: { type: 'string' },
     desc: { type: 'string' },
-    sprint: { type: 'string' },
     parent: { type: 'string' },
     label: { type: 'string', multiple: true },
     set: { type: 'string', multiple: true },
@@ -72,7 +66,6 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   backlog: {
     state: { type: 'string' },
     type: { type: 'string' },
-    sprint: { type: 'string' },
     assignee: { type: 'string' },
     priority: { type: 'string' },
     resolution: { type: 'string' },
@@ -81,17 +74,6 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     // `b` alone; and an item carries a list, so "carrying both" is the question to ask of it.
     label: { type: 'string', multiple: true },
     title: { type: 'string' },
-  },
-  board: {
-    state: { type: 'string' },
-    type: { type: 'string' },
-    sprint: { type: 'string' },
-    assignee: { type: 'string' },
-    priority: { type: 'string' },
-    resolution: { type: 'string' },
-    label: { type: 'string', multiple: true },
-    title: { type: 'string' },
-    all: { type: 'boolean' },
   },
   transition: {
     reason: { type: 'string' },
@@ -110,17 +92,6 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
   evidence: {},
   relation: {},
   remove: { reason: { type: 'string' } },
-  sprint: {
-    id: { type: 'string' },
-    start: { type: 'string' },
-    end: { type: 'string' },
-    goal: { type: 'string' },
-    // `sprint set` writes the title a later `sprint open` would have taken as its operand:
-    // an operand there would read as a second sprint id beside the one being edited.
-    title: { type: 'string' },
-  },
-  sprints: {},
-  ceremonies: {},
   doctor: {},
   next: { for: { type: 'string' } },
   explain: {},
@@ -136,7 +107,7 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
  * no flag falls back to and moving an existing entry would change which clause an existing
  * caller's `narrowest` and `--explain-absence` lines name.
  */
-export const FILTER_FLAGS = ['state', 'type', 'sprint', 'assignee', 'priority', 'resolution', 'label', 'title'] as const
+export const FILTER_FLAGS = ['state', 'type', 'assignee', 'priority', 'resolution', 'label', 'title'] as const
 export type FilterFlag = (typeof FILTER_FLAGS)[number]
 
 export type Parsed = {
@@ -303,12 +274,7 @@ function flagRefusal(
   }
 }
 
-/**
- * The global flags `emit` in main.ts reads to render a result, and nothing else. `--color` is
- * parsed and read by no renderer, so naming it here would promise a refusal something no other
- * path delivers either. `--no-color` was a second spelling of that same nothing, accepted by
- * the table and named by no help page; it is gone, and `--color` is the one documented knob.
- */
+/** The global flags `emit` in main.ts reads to render a result, and nothing else. */
 const PRESENTATION = ['out', 'width', 'quiet', 'ascii'] as const
 
 /**
@@ -393,17 +359,6 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
 
   const repeated = repeatRefusal(argv, { ...GLOBAL_OPTIONS, ...(COMMAND_OPTIONS[command] ?? {}) }, command)
   if (repeated !== undefined) return repeated
-
-  if (passed.has('dry-run') && passed.has('preview')) {
-    // The caller's own line with one of the two flags taken off, operands and all: a fix that
-    // named the command word alone was refused for having no id and no target.
-    const without = (flag: string): string => `treadle ${argv.filter((token) => token !== flag).map(shellWord).join(' ')}`
-    return {
-      ok: false,
-      cause: '--dry-run and --preview ask different questions: preview resolves the target and evaluates nothing, dry run evaluates every guard',
-      fix: [without('--dry-run'), without('--preview')],
-    }
-  }
 
   return {
     ok: true,

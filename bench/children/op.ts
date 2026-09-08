@@ -11,7 +11,6 @@
 //
 // Usage: op.ts <root> <op> [argument]
 
-import { board } from '../../src/application/services/board.ts'
 import { readWorkspace } from '../../src/application/services/context.ts'
 import { systemClock } from '../../src/adapters/clock.ts'
 import { doctor } from '../../src/application/services/doctor.ts'
@@ -85,9 +84,10 @@ switch (op) {
     break
   }
   case 'list': {
-    const rows = unwrap(await store.list({ state: argument as WorkItemState, limit: 50 }))
+    let rows = 0
+    unwrap(await store.eachItem({ state: argument as WorkItemState, limit: 50 }, () => { rows += 1 }))
     ops = 1
-    detail = { rows: rows.length, state: argument }
+    detail = { rows, state: argument }
     break
   }
   // The read every command performs, and the largest one the product has: `readWorkspace`
@@ -133,23 +133,9 @@ switch (op) {
     detail = { id: found.id, from: found.state, to: next, version: applied.writes[0]?.version }
     break
   }
-  // Three commands rather than store calls, because each pays something the store seam
-  // cannot see. `board` is the widest read in the tool: the whole-workspace read plus the
-  // relation graph indexed by blocked item plus five grouped columns. `next` ranks every
-  // ready item and asks the graph for each one's blockers. `doctor` pairs every item with
-  // its events and runs the load-time relation cycle check.
-  case 'board': {
-    // The whole workspace rather than the open sprint: the budget prices the widest read the
-    // product performs, and `--all` is that form of this command.
-    const result = await board(store, CLOCK, { filters: [], columns: [], limit: 50, all: true })
-    if (!result.ok) {
-      process.stderr.write(`${result.code}: ${String(result.data['cause'])}\n`)
-      process.exit(3)
-    }
-    ops = 1
-    detail = { blocked: result.data['blocked'], scope: result.data['scope'] }
-    break
-  }
+  // Two commands rather than store calls, because each pays something the store seam
+  // cannot see. `next` ranks every ready item and asks the graph for each one's blockers.
+  // `doctor` pairs every item with its events and runs the load-time relation cycle check.
   case 'next': {
     const result = await nextUp(store, CLOCK, { limit: 50 })
     if (!result.ok) {

@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "transition.v1.json",
-  "title": "transition/1",
-  "description": "Move one item to a target state, with every guard on that edge evaluated.",
+  "$id": "mark.v2.json",
+  "title": "mark/2",
+  "description": "Set the severity or the priority of one item, with the reason and both values in the log.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "transition/1"
+      "const": "mark/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "transition"
+      "const": "mark"
     },
     "workspace": {
       "type": "string"
@@ -60,49 +60,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "would_exit": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "already": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
         "item": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "store": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "state": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "since": {
           "type": [
             "string",
             "null"
@@ -121,25 +79,25 @@
           },
           "x-trust": "data"
         },
-        "guards": {
+        "already": {
           "type": [
             "string",
             "null"
           ]
         },
-        "will_evaluate": {
+        "dry_run": {
           "type": [
-            "string",
+            "integer",
             "null"
           ]
         },
-        "will_write": {
+        "would_exit": {
           "type": [
-            "string",
+            "integer",
             "null"
           ]
         },
-        "events": {
+        "store": {
           "type": [
             "string",
             "null"

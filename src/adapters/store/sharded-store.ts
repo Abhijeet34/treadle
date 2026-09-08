@@ -18,10 +18,8 @@ import {
   defaultConfig,
   findParentCycle,
   type BugSeverity,
-  type Ceremony,
   type Resolution,
   type StoredRelation,
-  type Sprint,
   type WorkItem,
   type WorkItemState,
   type WorkItemSummary,
@@ -56,12 +54,10 @@ import {
   type ParsedFile,
   type ParsedRecord,
 } from './grammar.ts'
-import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedCeremony, type IndexedItem, type IndexedSource, type IndexedSprint, type SummaryRow } from './index-cache.ts'
+import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
-import { decodeSprint, encodeSprint } from './sprint-codec.ts'
-import { decodeCeremony, encodeCeremony } from './ceremony-codec.ts'
 import { decodeWorkspace, encodeWorkspace, type WorkspaceRecord } from './workspace-codec.ts'
-import { actionMissing, idTaken, parentMissing, stillNamed, type Referrer } from './referential.ts'
+import { parentMissing, stillNamed, type Referrer } from './referential.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
 import { setImmediate as yieldToLoop } from 'node:timers/promises'
@@ -70,19 +66,9 @@ import { setImmediate as yieldToLoop } from 'node:timers/promises'
 export const SCHEMA = 1
 
 export const WORKSPACE_FILE = 'workspace.md'
-/**
- * Every sprint, in one file beside the shards. A sprint spans months, so a month key would
- * be a lie about it, and there are few enough that one file is read whole (ADR-0016).
- */
-const SPRINTS_FILE = 'sprints.md'
 /** A read keeps no parse: only `apply` names the shards whose parse it will reuse. */
 const NO_FILES: ReadonlySet<string> = new Set()
 const ITEMS_DIR = 'items'
-/**
- * The retrospectives, month-sharded by `filed_at` exactly as the items are. DR2 drew this
- * file and ADR-0002 recorded the layout as still covering it; ADR-0028 is what filled it in.
- */
-const CEREMONIES_DIR = 'ceremonies'
 const EVENTS_DIR = 'events'
 const INDEX_DIR = '.index'
 const JOURNAL_DIR = path.join(INDEX_DIR, 'txn')
@@ -95,7 +81,7 @@ const LOCK_FILE = '.lock'
  * would put every write outside the directory `init` promised to stay inside. The root
  * itself is on the list because the walk that found it went through `stat`.
  */
-const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, CEREMONIES_DIR, EVENTS_DIR, INDEX_DIR, JOURNAL_DIR] as const
+const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, INDEX_DIR, JOURNAL_DIR] as const
 
 export type ShardedStoreOptions = {
   readonly lockTimeoutMs?: number
@@ -121,21 +107,6 @@ function monthOf(instant: string): string {
 
 function hashOf(text: string | Buffer): string {
   return createHash('sha256').update(text).digest('hex')
-}
-
-/** Resolves the store by walking up from a directory, as DR2 specifies. Never creates one. */
-export async function resolveWorkspace(from: string): Promise<string | undefined> {
-  let at = path.resolve(from)
-  for (;;) {
-    try {
-      await stat(path.join(at, WORKSPACE_FILE))
-      return at
-    } catch {
-      const up = path.dirname(at)
-      if (up === at) return undefined
-      at = up
-    }
-  }
 }
 
 /**
@@ -267,12 +238,6 @@ export class ShardedStore implements Store {
     return this.#decodeRow(row)
   }
 
-  async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
-    const items: WorkItem[] = []
-    const scanned = await this.eachItem(query, (item) => items.push(item))
-    return scanned.ok ? storeOk(items) : scanned
-  }
-
   async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
@@ -304,34 +269,6 @@ export class ShardedStore implements Store {
     return storeOk(items)
   }
 
-  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    const sprints: Sprint[] = []
-    for (const row of this.#index.listSprints()) {
-      const parsed = parseRecordSource(row.source, row.line)
-      if (!parsed.ok) return storeFail('INTEGRITY', parsed.rule, `${row.file} line ${row.line}: ${parsed.reason}`, [row.id])
-      const sprint = decodeSprint(parsed.record)
-      if (!sprint.ok) return sprint
-      sprints.push(sprint.value)
-    }
-    return storeOk(sprints)
-  }
-
-  async ceremonies(): Promise<StoreResult<readonly Ceremony[]>> {
-    const fresh = await this.#refresh()
-    if (!fresh.ok) return fresh
-    const ceremonies: Ceremony[] = []
-    for (const row of this.#index.listCeremonies()) {
-      const parsed = parseRecordSource(row.source, row.line)
-      if (!parsed.ok) return storeFail('INTEGRITY', parsed.rule, `${row.file} line ${row.line}: ${parsed.reason}`, [row.id])
-      const ceremony = decodeCeremony(parsed.record)
-      if (!ceremony.ok) return ceremony
-      ceremonies.push(ceremony.value)
-    }
-    return storeOk(ceremonies)
-  }
-
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
@@ -352,12 +289,7 @@ export class ShardedStore implements Store {
   async findings(): Promise<StoreResult<readonly Finding[]>> {
     const fresh = await this.#refresh()
     if (!fresh.ok) return fresh
-    // The kind is derived here rather than stored, because the file a finding names already
-    // decides it and the index is a cache a schema change would have to rebuild.
-    return storeOk([...this.#index.findings(), ...this.#cycleFindings].map((finding) => (
-      finding.id === undefined || finding.file === WORKSPACE_FILE
-        ? finding
-        : { ...finding, kind: kindOfFile(finding.file) })))
+    return storeOk([...this.#index.findings(), ...this.#cycleFindings])
   }
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
@@ -369,8 +301,6 @@ export class ShardedStore implements Store {
     // 76 MiB one mutation allocated; `#readShard` proves the bytes have not moved before
     // reusing one.
     const writing = new Set(transaction.writes.map((write) => `${ITEMS_DIR}/${monthOf(write.item.filed_at)}.md`))
-    if ((transaction.sprints ?? []).length > 0) writing.add(SPRINTS_FILE)
-    for (const write of transaction.ceremonies ?? []) writing.add(ceremonyShardOf(write.ceremony))
     const warm = await this.#refresh(writing)
     if (!warm.ok) return warm
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
@@ -431,10 +361,8 @@ export class ShardedStore implements Store {
   }
 
   async #storeFiles(): Promise<readonly string[]> {
-    // The sprint file is named whether or not it exists: the stat that follows skips an
-    // absent one, and a file that was indexed and then removed by hand drops its rows.
-    const out: string[] = [WORKSPACE_FILE, SPRINTS_FILE]
-    for (const [dir, ext] of [[ITEMS_DIR, '.md'], [CEREMONIES_DIR, '.md'], [EVENTS_DIR, '.jsonl']] as const) {
+    const out: string[] = [WORKSPACE_FILE]
+    for (const [dir, ext] of [[ITEMS_DIR, '.md'], [EVENTS_DIR, '.jsonl']] as const) {
       let names: string[]
       try {
         names = await readdir(path.join(this.#root, dir))
@@ -598,42 +526,6 @@ export class ShardedStore implements Store {
       ? { file, line: q.line, rule: q.rule, reason: q.reason }
       : { file, line: q.line, rule: q.rule, reason: q.reason, id: q.id }))
 
-    if (file === SPRINTS_FILE) {
-      const sprints: IndexedSprint[] = []
-      for (const record of parsed.value.records) {
-        const sprint = decodeSprint(record)
-        if (!sprint.ok) {
-          findings.push({ file, line: record.line, rule: sprint.error.rule, reason: sprint.error.message, id: record.id })
-          continue
-        }
-        sprints.push(sprintRowOf(sprint.value, file, record.line, record.source))
-      }
-      if (parsed.value.crlf) {
-        findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
-      }
-      this.#index.replaceSprintFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, sprints, findings)
-      this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
-      return storeOk(false)
-    }
-    if (file.startsWith(`${CEREMONIES_DIR}/`)) {
-      const ceremonies: IndexedCeremony[] = []
-      const actions: { ceremony: string; item: string }[] = []
-      for (const record of parsed.value.records) {
-        const ceremony = decodeCeremony(record)
-        if (!ceremony.ok) {
-          findings.push({ file, line: record.line, rule: ceremony.error.rule, reason: ceremony.error.message, id: record.id })
-          continue
-        }
-        ceremonies.push({ id: ceremony.value.id, file, line: record.line, filed_at: ceremony.value.filed_at, source: record.source })
-        for (const item of ceremony.value.actions ?? []) actions.push({ ceremony: ceremony.value.id, item })
-      }
-      if (parsed.value.crlf) {
-        findings.push({ file, line: 1, rule: 'H16', reason: `${file} carries CRLF line endings; the next write to it normalises them to LF` })
-      }
-      const replaced = this.#index.replaceCeremonyFile(file, { size, mtime, hash: hashOf(text), lines: 0 }, ceremonies, actions, findings)
-      this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
-      return storeOk(replaced.invalidated)
-    }
     if (file === WORKSPACE_FILE) {
       // The one decode `identity` performs, run again here so a configuration this build
       // cannot read is reported rather than silently defaulted. `H14` is the finding the
@@ -783,38 +675,14 @@ export class ShardedStore implements Store {
   // -- writing ---------------------------------------------------------------------------
 
   /**
-   * Every closed sprint this transaction leaves behind, for the referential check below. A
-   * sprint record that will not parse or decode is skipped rather than failing the write: it
-   * is already a finding the store reports on every read, and a damaged sprint elsewhere in
-   * that file is no reason to refuse a removal that has nothing to do with it. `sprints()`
-   * fails on one because a caller asking for the sprints has been handed a wrong answer
-   * otherwise; a caller removing an item has not.
-   */
-  #closedSprints(transaction: StoreTransaction): readonly Sprint[] {
-    const closed = new Map<string, Sprint>()
-    for (const row of this.#index.listSprints()) {
-      if (row.state !== 'closed') continue
-      const parsed = parseRecordSource(row.source, row.line)
-      if (!parsed.ok) continue
-      const sprint = decodeSprint(parsed.record)
-      if (sprint.ok) closed.set(sprint.value.id, sprint.value)
-    }
-    for (const write of transaction.sprints ?? []) {
-      if (write.sprint.state === 'closed') closed.set(write.sprint.id, write.sprint)
-      else closed.delete(write.sprint.id)
-    }
-    return [...closed.values()]
-  }
-
-  /**
    * The referential rule: no transaction may leave a record naming an id the store does not
    * hold. It runs inside the lock every write already holds, after the read set and before
    * any shard is rewritten, so a refusal leaves nothing half-applied and there is no window
    * between the check and the write.
    *
    * A read set cannot carry this. `remove`'s guards are all about a neighbour that does not
-   * exist yet - an edge, a child's parent, a closed sprint's member written after the guard
-   * read the store - and no `reads` entry can name a record that was not there to be read.
+   * exist yet - an edge or a child's parent written after the guard read the store - and no
+   * `reads` entry can name a record that was not there to be read.
    * `set parent_id=` and `file --parent` are the same defect in the other order: neither
    * carries a read set at all, so the parent can leave between the decision and the write.
    * `removeItem` keeps its own `R6` refusal, which fires first with the friendlier cause and
@@ -846,76 +714,27 @@ export class ShardedStore implements Store {
       return parentMissing(parent, write.item.id)
     }
 
-    // One id, one record, across all three kinds. The tables are separate, so nothing else
-    // would refuse a ceremony filed under an id an item or a sprint already holds, and every
-    // read that resolves an id would then pick by lookup order rather than by fact.
-    for (const write of transaction.ceremonies ?? []) {
-      const { id } = write.ceremony
-      if (removed.has(id)) continue
-      if (written.has(id) || this.#index.versionOf(id) !== undefined) return idTaken(id, 'an item')
-      if (this.#index.listSprints().some((sprint) => sprint.id === id)) return idTaken(id, 'a sprint')
-    }
-
-    // The other order for the fourth referrer: a retrospective written naming a chore
-    // nothing holds. It is bounded to the write that INTRODUCES the action, as the parent
-    // check above is: an id the stored record already carries is `H32` for `doctor` to
-    // report, and refusing every rewrite of that record would refuse the remedy too.
-    for (const write of transaction.ceremonies ?? []) {
-      const held = this.#index.ceremonyRow(write.ceremony.id)
-      const before = held === undefined ? [] : storedActionsOf(held)
-      for (const action of write.ceremony.actions ?? []) {
-        if (written.has(action)) continue
-        if (before.includes(action)) continue
-        if (!removed.has(action) && this.#index.versionOf(action) !== undefined) continue
-        return actionMissing(action, write.ceremony.id)
-      }
-    }
-
     if (removed.size === 0) return undefined
     // Every id this transaction touches is answered from the transaction rather than from the
     // index, so they are the rows the two lookups skip: a record being removed leaves nothing
     // and a record being rewritten is judged above, and neither is what the index still says.
     const touched = [...removed, ...written.keys()]
-    const sprints = this.#closedSprints(transaction)
-    // Every ceremony this transaction writes, as the action list it will leave behind. A
-    // retrospective removed is not a case: no command takes a ceremony out of the store.
-    const ceremonies = new Map<string, readonly string[]>()
-    for (const write of transaction.ceremonies ?? []) ceremonies.set(write.ceremony.id, write.ceremony.actions ?? [])
     for (const id of removed) {
-      const referrer = this.#referrerOf(id, touched, sprints, ceremonies)
+      const referrer = this.#referrerOf(id, touched)
       if (referrer !== undefined) return stillNamed(id, referrer)
     }
     return undefined
   }
 
   /**
-   * The first record this transaction would leave naming `id`, or `undefined`. The three
-   * kinds are the three ways one record holds another's id: a child's parent, a stored
-   * relation edge, and a closed sprint's committed set - which is read both as the frozen
-   * `carried` and `finished` lists this build writes and as the `sprint_id` a sprint closed
-   * by an older build left its members pointing at.
+   * The first record this transaction would leave naming `id`, or `undefined`. The two kinds
+   * are the two ways one record holds another's id: a child's parent and a stored relation edge.
    */
-  #referrerOf(
-    id: string, skip: readonly string[], sprints: readonly Sprint[], ceremonies: ReadonlyMap<string, readonly string[]>,
-  ): Referrer | undefined {
+  #referrerOf(id: string, skip: readonly string[]): Referrer | undefined {
     const child = this.#index.childOf(id, skip)
     if (child !== undefined) return { kind: 'parent', id: child }
     const edge = this.#index.relationTo(id, skip)
     if (edge !== undefined) return { kind: 'relation', id: edge.id, relation: edge.kind }
-    const row = this.#index.itemRow(id)
-    for (const sprint of sprints) {
-      const frozen = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
-      if (frozen.includes(id) || row?.sprint === sprint.id) return { kind: 'sprint', id: sprint.id }
-    }
-    // The action lists this transaction writes are consulted before the index's, for the
-    // reason every other lookup here skips the ids it touches: a retrospective filed in the
-    // same transaction as its chores is not yet a row, and one being rewritten answers as
-    // this transaction leaves it rather than as the index still holds it.
-    for (const [ceremony, actions] of ceremonies) {
-      if (actions.includes(id)) return { kind: 'ceremony', id: ceremony }
-    }
-    const naming = this.#index.ceremonyNaming(id, [...ceremonies.keys()])
-    if (naming !== undefined) return { kind: 'ceremony', id: naming }
     return undefined
   }
 
@@ -1000,68 +819,6 @@ export class ShardedStore implements Store {
       shards.set(row.file, withoutRecord(shard, removal.id))
     }
 
-    for (const write of transaction.sprints ?? []) {
-      const shard = shards.get(SPRINTS_FILE) ?? await this.#readShard(SPRINTS_FILE)
-      if (!('chunks' in shard)) return shard
-      shards.set(SPRINTS_FILE, shard)
-
-      const at = shard.chunkById.get(write.sprint.id)
-      const chunk = at === undefined ? undefined : shard.chunks[at]
-      if (chunk !== undefined && chunk.kind === 'quarantine') {
-        return storeFail(
-          'CONFLICT', chunk.quarantine.rule,
-          `${write.sprint.id} is a record ${SPRINTS_FILE} does not serve, so a write cannot say what it is changing: line ${chunk.quarantine.line}: ${chunk.quarantine.reason}`,
-          [write.sprint.id],
-        )
-      }
-      const stored = chunk === undefined ? undefined : chunk.record
-      const conflict = await this.#compareAndSet(write.sprint.id, stored, write.ifVersion)
-      if (conflict !== undefined) return conflict
-
-      const version = (stored === undefined ? 0 : Number(stored.fields.get('version') ?? 0)) + 1
-      const encoded = encodeSprint({ ...write.sprint, version }, stored)
-      if (!encoded.ok) return encoded
-      const source = renderRecord(encoded.value)
-      const back = parseRecordSource(source, 0)
-      if (!back.ok) return storeFail('VALIDATION', 'V4', `${write.sprint.id}: the record as written would not be served back: ${back.reason}`, [write.sprint.id])
-      const served = decodeSprint(back.record)
-      if (!served.ok) return storeFail('VALIDATION', 'V4', `${write.sprint.id}: the record as written would not be served back: ${served.error.message}`, [write.sprint.id])
-
-      shards.set(SPRINTS_FILE, withRecord(shard, { ...encoded.value, source, line: 0 }))
-      applied.push({ id: write.sprint.id, version })
-    }
-
-    for (const write of transaction.ceremonies ?? []) {
-      await yieldToLoop()
-      const file = ceremonyShardOf(write.ceremony)
-      const shard = shards.get(file) ?? await this.#readShard(file)
-      if (!('chunks' in shard)) return shard
-      shards.set(file, shard)
-
-      const resolved = this.#resolveCeremony(write.ceremony.id, file, shard, findings)
-      if (!resolved.ok) return resolved
-      const stored = resolved.value
-      const conflict = await this.#compareAndSet(write.ceremony.id, stored, write.ifVersion)
-      if (conflict !== undefined) return conflict
-
-      const version = (stored === undefined ? 0 : Number(stored.fields.get('version') ?? 0)) + 1
-      const encoded = encodeCeremony({ ...write.ceremony, version }, stored)
-      if (!encoded.ok) return encoded
-      const source = renderRecord(encoded.value)
-      // The record as it will be read, parsed once before it is written: the store never
-      // writes a record it would not serve back, which is the rule the item path holds too.
-      const unserved = (why: string): StoreResult<never> => storeFail(
-        'VALIDATION', 'V4', `${write.ceremony.id}: the record as written would not be served back: ${why}`, [write.ceremony.id],
-      )
-      const back = parseRecordSource(source, 0)
-      if (!back.ok) return unserved(back.reason)
-      const served = decodeCeremony(back.record)
-      if (!served.ok) return unserved(served.error.message)
-
-      shards.set(file, withRecord(shard, { ...encoded.value, source, line: 0 }))
-      applied.push({ id: write.ceremony.id, version })
-    }
-
     const workspace = transaction.workspace
     if (workspace !== undefined) {
       const shard = shards.get(WORKSPACE_FILE) ?? await this.#readShard(WORKSPACE_FILE)
@@ -1075,7 +832,7 @@ export class ShardedStore implements Store {
       }
       const stored = decodeWorkspace(chunk.record)
       if (!stored.ok) return stored
-      // The same compare-and-set an item and a sprint are under, read off the record's own
+      // The same compare-and-set an item is under, read off the record's own
       // `version` line. A workspace written before this build carries none, reads as zero,
       // and takes version 1 on its first configured write; two `config set` calls racing
       // therefore refuse the second with `S10` naming who moved it, rather than one of them
@@ -1218,35 +975,6 @@ export class ShardedStore implements Store {
   }
 
   /**
-   * `#resolve` for a ceremony: the same two owners of an identity, over the ceremony table.
-   * A shard is month-sharded, so both halves apply - the parser refuses a repeated id inside
-   * one file, and the `ceremonies` primary key refuses one across two shards - and a write to
-   * either is refused rather than resolved by document order.
-   */
-  #resolveCeremony(
-    id: string, home: string, shard: ParsedFile, findings: readonly Finding[],
-  ): StoreResult<ParsedRecord | undefined> {
-    const clash = duplicateRefusal(id, findings)
-    if (clash !== undefined) return clash
-
-    const at = shard.chunkById.get(id)
-    const chunk = at === undefined ? undefined : shard.chunks[at]
-    if (chunk !== undefined && chunk.kind === 'quarantine') {
-      return storeFail(
-        'CONFLICT', chunk.quarantine.rule,
-        `${id} is a record ${home} does not serve, so a write cannot say what it is changing: line ${chunk.quarantine.line}: ${chunk.quarantine.reason}`,
-        [id],
-      )
-    }
-
-    const row = this.#index.ceremonyRow(id)
-    if (row !== undefined && row.file !== home) {
-      return storeFail('CONFLICT', 'S3', `${id} is already a record in ${row.file}; a record never moves between shards`, [id])
-    }
-    return storeOk(chunk === undefined ? undefined : chunk.record)
-  }
-
-  /**
    * The lock is asked before every byte a transaction commits. A holder that stalled past
    * the stale window, or whose token another writer replaced, refuses here instead of
    * writing over the reclaimer's work; ADR-0004 carries the measurement.
@@ -1318,29 +1046,6 @@ class LockLost extends Error {
   }
 }
 
-/** The shard a retrospective lives in, which is the month of the instant it was held. */
-function ceremonyShardOf(ceremony: Ceremony): string {
-  return `${CEREMONIES_DIR}/${monthOf(ceremony.filed_at)}.md`
-}
-
-/** The action list a stored ceremony row already carries, or none where the row will not decode. */
-function storedActionsOf(row: IndexedCeremony): readonly string[] {
-  const parsed = parseRecordSource(row.source, row.line)
-  if (!parsed.ok) return []
-  const ceremony = decodeCeremony(parsed.record)
-  return ceremony.ok ? (ceremony.value.actions ?? []) : []
-}
-
-/**
- * Which record kind a finding's id names, derived from the file it was read out of. A
- * quarantined record still exists, so a neighbour naming its id is not dangling; the kind is
- * what keeps a reader of one flat set from taking that too broadly.
- */
-function kindOfFile(file: string): 'item' | 'sprint' | 'ceremony' {
-  if (file === SPRINTS_FILE) return 'sprint'
-  return file.startsWith(`${CEREMONIES_DIR}/`) ? 'ceremony' : 'item'
-}
-
 function groupEvents(events: readonly StoreEvent[]): Journal['events'] {
   const byFile = new Map<string, { lines: string[]; ids: string[] }>()
   for (const event of events) {
@@ -1357,8 +1062,6 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
   return {
     id: item.id, file, line, type: item.type, state: item.state,
     parent: item.parent_id ?? null,
-    sprint: item.sprint_id ?? null,
-    points: item.points ?? null,
     priority: item.priority ?? null,
     version: item.version,
     assignee: item.assignee ?? null,
@@ -1373,13 +1076,9 @@ export function rowOf(item: WorkItem, file: string, line: number, source: string
   }
 }
 
-function sprintRowOf(sprint: Sprint, file: string, line: number, source: string): IndexedSprint {
-  return { id: sprint.id, file, line, state: sprint.state, filed_at: sprint.filed_at, source }
-}
-
 /**
  * The inverse of `rowOf` over the columns a summary carries. An absent field is absent, not
- * null, so a summary reads exactly as the item `list` decodes from the same record.
+ * null, so a summary reads exactly as the whole item decodes from the same record.
  */
 export function summaryOf(row: SummaryRow, intern: (value: string) => string = (value) => value): WorkItemSummary {
   return {
@@ -1390,10 +1089,8 @@ export function summaryOf(row: SummaryRow, intern: (value: string) => string = (
     filed_at: row.filed_at,
     version: row.version,
     ...(row.priority === null ? {} : { priority: row.priority }),
-    ...(row.points === null ? {} : { points: row.points }),
     ...(row.parent === null ? {} : { parent_id: row.parent }),
     ...(row.assignee === null ? {} : { assignee: intern(row.assignee) }),
-    ...(row.sprint === null ? {} : { sprint_id: intern(row.sprint) }),
     ...(row.resolution === null ? {} : { resolution: intern(row.resolution) as Resolution }),
     ...(row.due === null ? {} : { due: row.due }),
     ...(row.severity === null ? {} : { severity: intern(row.severity) as BugSeverity }),

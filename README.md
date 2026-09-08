@@ -1,15 +1,17 @@
 # treadle
 
-Agile work management for a team and its agents, over files you commit to git.
+The record of the work between people and agents, over files you commit to git.
 
 A backlog that lives in a database is a backlog you cannot branch, diff, or review.
 A backlog that lives in a hand-written markdown list is one the tool cannot enforce anything about.
 treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
+It is not a Rally and not a Kanban board. What it records is a task, a decision, or a question put to a person with the answer its raiser would give, so that none of it is lost while an agent works; what it computes about that work is nothing the work does not already say. [ADR-0029](docs/architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) is where the sprint, the board, the retrospective and the estimate were removed against that sentence.
+
 **This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
 The domain core has the seven work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, a derived SQLite index that is safe to delete at any moment, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs twenty-two commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `sprint`, `sprints`, `ceremonies`, `config`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
+`bin/treadle.js` runs eighteen commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `config`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -91,11 +93,10 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 
 See [Status](#status) for the line between implemented and specified-only.
 
-- **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never enter a sprint.
+- **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story, a bug and an epic pass through `in_review` on the way to `done`; a task, a spike, a chore and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
-- **Sprints, with the carry-over on the record.** `sprint open`, `sprint commit` and `sprint close`; an item is in one sprint, a closed sprint names what it did not finish, and `next` ranks work in an open sprint above the rest.
-- **A board that stores nothing.** `board` is the backlog grouped by state, scoped to the open sprint unless told otherwise, with a blocked row first in its column and its blocker named beside it; it takes every filter `backlog` takes and caps each column at `--limit` with the column's total beside the cap.
-- **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a preview and a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change. A mutation hands back the transaction id it wrote under, and `treadle history --txn <txn>` spends it: an agent auditing the command it just ran reads every record that one command moved, rather than one item at a time.
+- **The human in the loop, as configuration.** `config` sets what `ready` and `done` mean for this workspace, which types pass through review, how much may sit in `in_review` at once, and what `next` weighs. An agent cannot skip a gate a person set, and a refusal names the rule and prints the line that clears it.
+- **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change. A mutation hands back the transaction id it wrote under, and `treadle history --txn <txn>` spends it: an agent auditing the command it just ran reads every record that one command moved, rather than one item at a time.
 - **Finding work, and unfiling it.** `backlog --title <words>` searches titles by their words, `--label <slug>` filters on a label and `--fields +labels` prints the list, and `remove` takes a mis-filed record out of its shard while the append-only log keeps every event it earned, so `history <id>` still answers after it. A removal is refused wherever another record would be left naming it: [ADR-0024](docs/architecture/adr/0024-a-record-leaves-the-store-and-the-log-keeps-it.md).
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
@@ -103,27 +104,28 @@ See [Status](#status) for the line between implemented and specified-only.
 
 | Area | State |
 |---|---|
-| Domain core: types, lifecycle, relations, hierarchy, gates | Implemented |
-| Store: month shards, event log, derived index, lock, compare-and-set, transactions | Implemented for work items and events |
-| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Implemented; ten of the twelve comparison axes measured, two not (no metrics layer, no adapter generator) |
-| Store: sprint records in `sprints.md` | Implemented |
-| Store: retrospective records in `ceremonies/YYYY-MM.md` | Implemented: one ceremony kind, the retrospective, [ADR-0028](docs/architecture/adr/0028-a-retrospective-is-a-record-of-its-own-kind.md); no standup and no review record, and an impediment is a work-item type in the month shards rather than a record of its own, [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
-| Store: `migrate` | Specified, not implemented |
-| Application services, the result object, the JSON Schemas | Implemented for the commands below |
-| Workspace configuration: a closed key set and two gate sections on `workspace.md`, read by the review step, the point scale, the `next` weights, `G3`, `G4` and both gates | Implemented: [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
-| Renderers: the compact agent line format, JSON, human | Implemented |
-| Commands: `init`, `file`, `show`, `backlog`, `board`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `sprint`, `sprints`, `ceremonies`, `config`, `config set`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Implemented |
-| Anti-ambiguity: `--dry-run`, `--preview`, `--explain-absence`, ranking rationale | Implemented |
-| Commands: `estimate`, `assign`, `split`, `undo`, `gate` | Specified, not implemented; `set` covers what `estimate` and `assign` would write, as `set <id> points=<n>` and `set <id> assignee=<name>`, `relation add` and `relation remove` are what the design called `link` and `unlink`, and `remove` is not `undo`: it takes one named record out and reverses nothing |
-| `history --txn`, which resolves a transaction id back to the events it wrote | Implemented; the two scopes are one question each and a line naming both is refused |
-| `doctor`: fourteen findings over records, the event log, the relation graph, the parent hierarchy, the sprint records, impediments and the workspace's configured thresholds; the rest wait on entities that do not exist yet | Partly implemented |
-| Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add`, resolved by reaching `done` | Implemented |
-| Boards, as a projection: `board` groups by state and scopes to the open sprint; guards `G3` and `G4` read the limits and the membership rule the workspace record carries, and are disarmed until it does | Implemented: [ADR-0018](docs/architecture/adr/0018-the-board-is-a-projection.md), [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
-| Metrics, export, completions | Specified, not implemented |
-| Hooks | Specified, refused for v1: [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
-| Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Implemented; inside budget, enforced by the build in CI |
-| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Implemented; never fired, because firing it needs a signed tag |
+| Domain core: types, lifecycle, relations, hierarchy, gates | Shipped |
+| Store: month shards, event log, derived index, lock, compare-and-set, transactions, workspace configuration | Shipped: [ADR-0002](docs/architecture/adr/0002-storage-layout.md) to [ADR-0006](docs/architecture/adr/0006-the-store-seam.md), [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
+| Store: `migrate` | Declined [ADR-0003](docs/architecture/adr/0003-record-format-and-migration.md) No schema 2 exists, and `S9` names the reason on the day one does. |
+| Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `config`, `config set`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Shipped |
+| Commands: `gate` | Queued `gate-command` |
+| Renderings: `--out md` | Queued `export` |
+| Renderings: `csv` | Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) Threat-model finding F4 closes by absence, since the formula guard has nothing to guard. |
+| Sprints, the board, the retrospective, estimation, `split`, `undo`, metrics, completions, the man page | Removed [ADR-0029](docs/architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) |
+| `estimate`, `assign` | Removed [ADR-0029](docs/architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) `estimate` went with estimation, and `assign` is `set <id> assignee=<name>`. |
+| Hooks, and the adapter generator | Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) An executable named in a cloned repository is the surface the threat model refuses. |
+| Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add` | Shipped: [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
+| `history --txn`, which resolves a transaction id back to the events it wrote | Shipped: #61 |
+| `doctor`: eleven findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
+| Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A9 Removed [ADR-0029](docs/architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md) with metrics, A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
+| Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
+| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
+
+Every row's State is one of four words, and each carries a pointer this repository holds it to.
+**Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Removed** names the record that took it out.
+"Specified, not implemented" and "Partly implemented" are gone, because neither said who owned the gap, and a gap nobody owns is documentation standing in for a decision.
+`test/architecture/documented-numbers.test.ts` reads this table: a Queued row has to name an item `.work` holds in `ready` or `draft`, and a Declined or Removed row has to name a file that exists.
 
 Twelve of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
 In the store: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
@@ -140,13 +142,15 @@ It is the proof that the tool can manage its own backlog, and it is readable and
 ```bash
 treadle status                                  # where the project stands
 treadle next                                    # what to pick up, and why that order
-treadle explain history                         # why one item is still in draft
-treadle backlog --state ready --explain-absence history
+treadle explain export                          # why one item is still in draft
+treadle backlog --state ready --explain-absence export
 ```
 
-Fifteen items, of which five are `done`, three are `ready`, six are `draft` and one is `cancelled`.
-The six in `draft` are stories with no acceptance criteria, which is `DOR4` refusing them rather than a gap in the list, and `treadle explain <id>` names that rule on each.
-The five that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped: `set` writes the fields the design gave `estimate` and `assign`, and the board stores nothing, so the work-in-progress limit and the board membership guards `G3` and `G4` moved to `workspace-config`, which is where they are now read from.
+Fifteen items, of which seven are `done`, one is `ready`, one is `draft` and six are `cancelled`.
+The one in `draft` is a story with no acceptance criteria, which is `DOR4` refusing it rather than a gap in the list, and `treadle explain export` names that rule.
+The seven that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped.
+Six are `cancelled` with resolution `wont_do`: `hooks` against [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md), and five against [ADR-0029](docs/architecture/adr/0029-the-record-is-the-product-and-the-agile-surface-is-not.md), each with the reason in the event log where `treadle history <id>` reads it back.
+`sprints-boards` stays `done` rather than joining them, because the work it names was done and then removed; the record of why it is gone is the ADR, not a rewritten item.
 
 ## Documentation
 

@@ -12,7 +12,6 @@ import { MAX_REASON, overLength } from './fields.ts'
 import {
   ATTEMPT_OUTCOMES,
   RESOLUTIONS,
-  WORK_ITEM_STATES,
   type AttemptOutcome,
   type GateItem,
   type GateVerdict,
@@ -37,7 +36,7 @@ const HOLDABLE: readonly WorkItemState[] = ['draft', 'ready', 'in_progress', 'in
 export const TRANSITION_TABLE: readonly TransitionSpec[] = [
   { name: 'groom', from: 'draft', to: 'ready', guards: ['G1'], requiresReason: false },
   { name: 'ungroom', from: 'ready', to: 'draft', guards: [], requiresReason: true },
-  { name: 'start', from: 'ready', to: 'in_progress', guards: ['G2', 'G3', 'G4'], requiresReason: false },
+  { name: 'start', from: 'ready', to: 'in_progress', guards: ['G2', 'G3'], requiresReason: false },
   { name: 'submit', from: 'in_progress', to: 'in_review', guards: ['G5'], requiresReason: false },
   { name: 'finish', from: 'in_progress', to: 'done', guards: ['G5', 'G6'], requiresReason: false },
   { name: 'rework', from: 'in_review', to: 'in_progress', guards: [], requiresReason: true },
@@ -53,8 +52,8 @@ export const TRANSITION_TABLE: readonly TransitionSpec[] = [
     { name: 'cancel', from, to: 'cancelled', guards: ['G7'], requiresReason: true }
   )),
   // An attempt that ended without the work being done has no legal exit that says so: a
-  // hold leaves `next`, which ranks `ready` only, and a cancel leaves the board. The item
-  // goes back to the queue and the log carries who tried and why it did not take.
+  // hold leaves `next`, which ranks `ready` only, and a cancel leaves the queue entirely.
+  // The item goes back to the queue and the log carries who tried and why it did not take.
   { name: 'release', from: 'in_progress', to: 'ready', guards: [], requiresReason: true },
   { name: 'revive', from: 'cancelled', to: 'draft', guards: [], requiresReason: true },
 ]
@@ -94,10 +93,8 @@ export type TransitionContext = {
   readonly doneGate: GateVerdict
   /** G2: active blockers, derived from the relation graph, each with the state its remedy is run from. */
   readonly blockers: readonly GateItem[]
-  /** G3: the target column's usage. A limit of zero means unlimited. Absent means no board. */
+  /** G3: the target state's usage. A limit of zero means unlimited. Absent means no limit. */
   readonly column?: { readonly name: string; readonly used: number; readonly limit: number }
-  /** G4: the item is in the active sprint, or on the board. */
-  readonly iterationMember: boolean
   /** G5: this type has a review step in this workspace. */
   readonly reviewStep: boolean
   /** G7: active items this one blocks. */
@@ -257,10 +254,6 @@ function evaluateGuard(
       if (column.limit === 0 || column.used < column.limit) return pass(observed)
       return no(`the ${column.name} column is at its limit of ${column.limit}`, overrideCommand(item.id, spec.to, 'G3', request.resolution), observed)
     }
-    case 'G4':
-      return context.iterationMember
-        ? pass()
-        : no(`${item.id} is in no sprint and on no board`, `treadle sprint commit <sprint> ${item.id}`)
     case 'G5': {
       const wantsReview = spec.name === 'submit'
       if (wantsReview === context.reviewStep) return pass(context.reviewStep ? 'review' : 'no-review')
@@ -298,10 +291,6 @@ export function evaluateTransition(
   const { item } = context
   const { target } = request
 
-  if (target !== 'resume' && !(WORK_ITEM_STATES as readonly string[]).includes(target)) {
-    return refuse(fail('VALIDATION', 'T2', `${String(target)} is not a state; the targets are ${WORK_ITEM_STATES.join(', ')} and resume`, [item.id]).error)
-  }
-
   if (target !== 'resume' && target === item.state) {
     return { outcome: 'already', state: item.state }
   }
@@ -311,10 +300,9 @@ export function evaluateTransition(
     if (item.state !== 'on_hold') {
       return refuse(fail('GUARD_REFUSED', 'T3', `resume is legal only from on_hold, and ${item.id} is ${item.state}`, [item.id]).error)
     }
-    if (item.held_from === undefined) {
-      return refuse(fail('INTEGRITY', 'T3', `${item.id} is on_hold with no held_from recorded, so resume has no state to restore`, [item.id]).error)
-    }
-    to = item.held_from
+    // `V4` requires `held_from` on every on_hold record and the store quarantines one
+    // without it, so an item that reaches here on_hold carries the state to restore.
+    to = item.held_from as WorkItemState
   } else {
     to = target
   }

@@ -47,10 +47,10 @@ describe('severity reaches every read surface a caller would look at', () => {
 
   it('carries a sev column in the default backlog, and one dash for an item with none', async () => {
     const list = await cli(['backlog', '--type', 'bug'])
-    assert.match(list.out, /^#id type state pts sev "title$/m)
-    assert.match(list.out, /^sess-timeout bug draft 3 S1 /m)
+    assert.match(list.out, /^#id type state sev "title$/m)
+    assert.match(list.out, /^sess-timeout bug draft S1 /m)
     const mixed = await cli(['backlog', '--type', 'chore'])
-    assert.match(mixed.out, /^dep-bump chore ready 1 - /m)
+    assert.match(mixed.out, /^dep-bump chore ready - /m)
   })
 
   it('counts the open defects on status, by severity, and only the open ones', async () => {
@@ -96,14 +96,14 @@ describe('next weights severity, so an S1 and an S4 no longer rank identically',
 
   it('prints the severity weight beside the others, so the order is checkable (R11)', async () => {
     const ranked = await runCli(['next'], { cwd: demo.root })
-    assert.match(ranked.out, /^weights pri 10 age 1 dep 5 spr 8 asg 0 due 4 sev 6$/m)
+    assert.match(ranked.out, /^weights pri 10 age 1 dep 5 asg 0 due 4 sev 6$/m)
   })
 
   it('lets severity lift a defect at most 2.4 priority levels, never more', async () => {
     // The bound the weight was chosen for: an S1 is 4 x 6 = 24 and a priority level is 10.
     const ranked = await runCli(['next', '--limit', '40'], { cwd: demo.root })
     const scoreOf = (id: string): number => Number(
-      (ranked.out.split('\n').find((line) => line.startsWith(`${id} `)) as string).split(' ')[2])
+      (ranked.out.split('\n').find((line) => line.startsWith(`${id} `)) as string).split(' ')[1])
     assert.equal(scoreOf('sev-one') - scoreOf('sev-none'), 24)
   })
 })
@@ -184,7 +184,7 @@ describe('a change to severity or priority is an event with a before and an afte
   })
 })
 
-describe('mark and evidence answer the two anti-ambiguity modes the flag matrix advertises', () => {
+describe('mark and evidence answer the anti-ambiguity mode the flag matrix advertises', () => {
   let demo: Demo
   beforeEach(async () => { demo = await aDemoWorkspace() })
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
@@ -201,22 +201,12 @@ describe('mark and evidence answer the two anti-ambiguity modes the flag matrix 
     await demo.dispose()
   })
 
-  it('names the store and evaluates nothing under --preview, and says so', async () => {
-    const run = await cli(['mark', 'sess-timeout', '--severity', 'S3', '--reason', 'it has a workaround', '--preview'])
-    assert.equal(run.code, 0)
-    assert.match(run.out, /^preview 1$/m)
-    assert.match(run.out, /^note nothing evaluated; use --dry-run for the outcome$/m)
-    await demo.dispose()
-  })
-
   it('does the same for an evidence add', async () => {
     const before = await shardOf()
     const dry = await cli(['evidence', 'add', 'sess-timeout', 'run', '8813', '--dry-run'])
     assert.equal(dry.code, 0)
     assert.match(dry.out, /^dry_run 1$/m)
     assert.equal(await shardOf(), before)
-    const preview = await cli(['evidence', 'add', 'sess-timeout', 'run', '8813', '--preview'])
-    assert.match(preview.out, /^preview 1$/m)
     await demo.dispose()
   })
 
@@ -445,7 +435,7 @@ describe('evidence is a bounded pointer list, and done requires one', () => {
   })
 
   it('leaves a type with no review step alone, exactly as DOD3 does', async () => {
-    await cli(['file', 'chore', 'Move the toolchain', '--id', 'toolchain', '--set', 'points=1'])
+    await cli(['file', 'chore', 'Move the toolchain', '--id', 'toolchain'])
     for (const state of ['ready', 'in_progress']) await cli(['transition', 'toolchain', state])
     assert.equal((await cli(['transition', 'toolchain', 'done'])).code, 0)
     assert.doesNotMatch((await cli(['doctor'])).out, /H21/)

@@ -14,7 +14,7 @@ import { describe, it } from 'node:test'
 
 import { parseEventLine, parseRecordSource } from '../../src/adapters/store/index.ts'
 import { MAX_JSON_DEPTH } from '../../src/adapters/store/index.ts'
-import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 const POLLUTED = 'polluted'
 
@@ -49,7 +49,7 @@ describe('a record field key that names a prototype slot', () => {
       const text = await readFile(shard, 'utf8')
       await writeFile(shard, text.replace('# item-two: A first task\n\n', '# item-two: A first task\n\n__proto__: polluted\n'))
 
-      const items = await workspace.store.list()
+      const items = await allItems(workspace.store)
       assert.deepEqual(items.ok ? items.value.map((i) => i.id) : [], ['item-one'])
       const findings = await workspace.store.findings()
       assert.ok(findings.ok)

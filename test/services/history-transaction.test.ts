@@ -3,15 +3,20 @@
 //
 // Every event the log holds carries the `txn` of the write that made it, and a mutation's
 // own result hands that id back on its envelope. Until this flag there was no way to spend
-// it: an agent that had just run `sprint commit sprint-31 a b c` and been told `ok sprint
-// probe tj0vksb 3` could ask what changed about one item at a time, or open the JSONL.
+// it: an agent told `ok set probe tj0vksb 3` could ask what changed about one item at a
+// time, or open the JSONL.
 //
-// The case that makes it worth a flag is the one where a command writes several events. The
-// three `item.commit` rows of that transaction render an identical `what` cell,
-// `sprint_id=(unset)->sprint-31`, so the record each one moved is the only thing telling them
-// apart and it is not on the row. That is why the transaction-scoped read leads the `what`
-// cell with `entity=<id>` and the entity-scoped read does not: there it is the `item` scalar
-// and constant on every row.
+// The case that makes it worth a flag is the one where a transaction writes several events,
+// each moving a different record with an identical `what` cell, so the record is the only
+// thing telling the rows apart and it is not on the row. That is why the transaction-scoped
+// read leads the `what` cell with `entity=<id>` and the entity-scoped read does not: there
+// it is the `item` scalar and constant on every row.
+//
+// No command in this build writes more than one event per transaction, so the multi-record
+// case is built through `apply` directly. That is honest rather than contrived: the port
+// takes N writes and N events under one `txn`, `history --txn` is the reader of exactly that
+// shape, and a suite that only ever saw one row would stop holding the column that exists
+// for the many-row case.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
@@ -22,6 +27,7 @@ import { describe, it, before, after } from 'node:test'
 import { history } from '../../src/application/services/history.ts'
 import { makeEvent } from '../../src/application/services/mutation.ts'
 import { EXIT_OF } from '../../src/application/result.ts'
+import { openWorkspace } from '../../src/adapters/store/index.ts'
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli, type Run } from '../helpers/cli-run.ts'
 
@@ -52,11 +58,37 @@ describe('history --txn lists every event one command wrote', () => {
     }
     await must(['init', '--name', 'txn'])
     for (const id of ['auth-refresh', 'sso-saml', 'rate-limit']) {
-      await must(['file', 'story', `Story ${id}`, '--id', id, '--points', '3', '--set', 'acceptance_criteria=one|two'])
+      await must(['file', 'story', `Story ${id}`, '--id', id, '--set', 'acceptance_criteria=one|two'])
       await must(['transition', id, 'ready'])
     }
-    await must(['sprint', 'open', 'Sprint 31', '--id', 'sprint-31', '--end', '2030-01-31'])
-    commit = txnOf(await must(['sprint', 'commit', 'sprint-31', 'auth-refresh', 'sso-saml', 'rate-limit']))
+    // One transaction over three records, written through the port because no command in
+    // this build produces one; see the header. Each event moves the same field, so the
+    // `entity=<id>` the transaction-scoped read leads with is what tells the rows apart.
+    commit = 'tmulti1'
+    const opened = await openWorkspace(path.join(root, '.work'))
+    assert.ok(opened.ok, opened.ok ? '' : opened.error.message)
+    const store = opened.value
+    try {
+      const held = await Promise.all(['auth-refresh', 'sso-saml', 'rate-limit'].map(async (id) => {
+        const item = await store.get(id)
+        assert.ok(item.ok && item.value !== undefined, `${id} is not stored`)
+        return item.value
+      }))
+      const applied = await store.apply({
+        txn: commit,
+        writes: held.map((item) => ({ item: { ...item, reviewer: 'kim' }, ifVersion: item.version })),
+        events: held.map((item, at) => ({
+          id: `emulti${at + 1}`,
+          at: `2026-03-04T09:0${at}:00Z`,
+          actor: 'dana', actor_kind: 'human', entity_kind: 'item', entity: item.id,
+          op: 'item.set', before: { reviewer: '-' }, after: { reviewer: 'kim' },
+          cmd: 'set', txn: commit,
+        })),
+      })
+      assert.ok(applied.ok, applied.ok ? '' : applied.error.message)
+    } finally {
+      await store.close()
+    }
     await must(['file', 'task', 'Filed twice', '--id', 'login-cta-2'])
     removal = txnOf(await must(['remove', 'login-cta-2', '--reason', 'filed twice by the same import', '--yes']))
   })
@@ -69,7 +101,7 @@ describe('history --txn lists every event one command wrote', () => {
     assert.match(run.out, new RegExp(`^transaction ${commit}$`, 'm'), run.out)
     assert.match(run.out, /^~events 3 3$/m, run.out)
     for (const id of ['auth-refresh', 'sso-saml', 'rate-limit']) {
-      assert.match(run.out, new RegExp(`item\\.commit entity=${id},sprint_id=\\(unset\\)->sprint-31 dana$`, 'm'), run.out)
+      assert.match(run.out, new RegExp(`item\\.set entity=${id},reviewer=\\(unset\\)->kim dana$`, 'm'), run.out)
     }
     // The entity-scoped read is unchanged: one record, so the entity is the scalar.
     const one = await cli(['history', 'auth-refresh'])

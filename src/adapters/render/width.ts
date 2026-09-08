@@ -80,7 +80,7 @@ function commaParts(value: string): readonly string[] {
  *
  * A comma is preferred to a cluster boundary where one is available. The one unbreakable word
  * this renderer meets in practice is `history`'s `what` cell, which joins `field=from->to`
- * pairs with commas: about 150 characters for a sprint close, and cut at the cell boundary it
+ * pairs with commas: about 150 characters for a transition, and cut at the cell boundary it
  * read `...,do` / `ne=(unset)->1`. Breaking after a comma keeps every pair whole and costs a
  * cluster split only for a part that is itself wider than the room.
  */

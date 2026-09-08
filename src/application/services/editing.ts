@@ -16,7 +16,6 @@
 // with no entry there is `set`'s, which is the default that cannot re-create the dead end.
 
 import {
-  WORK_ITEM_TYPES,
   canonicalField,
   fieldsOf,
   isKnownField,
@@ -38,7 +37,8 @@ import { storeRefusal } from './refusal.ts'
 
 export const SET_SHAPE: ResultShape = {
   command: 'set',
-  version: 1,
+  // v2 dropped the `preview` scalar with the `--preview` flag.
+  version: 2,
   effect: 'mutate',
   summary: 'Write one or more stored fields of an item that is already filed.',
   properties: [
@@ -49,18 +49,12 @@ export const SET_SHAPE: ResultShape = {
     { kind: 'list', key: 'set', data: true },
     { kind: 'scalar', key: 'already', type: 'string' },
     { kind: 'scalar', key: 'dry_run', type: 'integer' },
-    { kind: 'scalar', key: 'preview', type: 'integer' },
     { kind: 'scalar', key: 'would_exit', type: 'integer' },
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'event', type: 'string' },
     { kind: 'scalar', key: 'note', type: 'string' },
   ],
 }
-
-/** Every field `set` writes: the whole dictionary, less what another command owns. */
-export const SETTABLE_FIELDS: readonly string[] = [
-  ...new Set(WORK_ITEM_TYPES.flatMap((type) => fieldsOf(type))),
-].filter((field) => writerOf(field).kind === 'set').sort()
 
 export type SetRequest = {
   readonly id: ItemId
@@ -157,7 +151,7 @@ export async function setFields(
   }
 
   const now = clock.now()
-  const valid = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
+  const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadle show ${item.id}`])
   }
@@ -167,16 +161,6 @@ export async function setFields(
   }
 
   const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)
-  if (mode === 'preview') {
-    return okResult(SET_SHAPE, {
-      workspace, txn: null, changed: 0,
-      data: {
-        preview: 1, item: item.id, store: view.value.identity.path ?? workspace,
-        set, note: 'nothing evaluated; use --dry-run for the outcome',
-      },
-    })
-  }
-
   const txn = ids.txn()
   const eventId = ids.event()
   const applied = await store.apply({

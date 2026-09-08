@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-// The two presentation flags, against what the tool actually does with them.
+// The presentation flags, against what the tool actually does with them.
 //
 // Measured on 2026-09-07: `treadle help <cmd>` said of `--width` and `--color`, on nine
 // commands that all present something, "accepted and ignored: it only changes presentation,
 // and here there is nothing to present". Half of that verdict was wrong in each direction.
 // `--width` is read by the human rendering on every command, so it is supported and a caller
-// who believed the note would never pass it; `--color` is read by no rendering at all, so it
-// is ignored for a reason the note does not give.
+// who believed the note would never pass it; `--color` was read by no rendering at all, and
+// ADR-0029 removed it rather than documenting a knob that turns nothing.
 //
 // The rule this file holds is the inventory's own: a letter is a verdict and a note is its
 // reason, and a reason that is true of the letter in general but false of this flag is worse
@@ -108,18 +108,6 @@ describe('a flag that takes a count refuses a value that is not one', () => {
       const run = await runCli(['backlog', '--width', value], { cwd: demoRoot })
       assert.equal(run.code, 0, `--width ${value} was refused:\n${run.err}`)
     }
-  })
-})
-
-describe('--color is ignored for the reason it is ignored', () => {
-  it('gives a reason that is about colour and not about this command', () => {
-    const note = notesOf('backlog').get('--color')
-    assert.equal(note?.verdict, 'A')
-    assert.ok(
-      !note.note.includes('nothing to present'),
-      `backlog presents a table, and its help says of --color: ${note.note}`,
-    )
-    assert.match(note.note, /colour/, `the note for --color does not mention colour: ${note.note}`)
   })
 })
 

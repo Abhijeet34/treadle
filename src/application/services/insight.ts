@@ -8,7 +8,6 @@
 
 import {
   BUG_SEVERITIES,
-  sprintDay,
   edgeRequirements,
   daysOverdue,
   healthFindings,
@@ -31,7 +30,6 @@ import {
   doneVerdict,
   hasReviewStep,
   hidesContent,
-  notGroomed,
   readWorkspace,
   wholeItem,
   readyVerdict,
@@ -39,7 +37,6 @@ import {
 } from './context.ts'
 import { auditImpediment, auditItem, auditParentOf, auditRelationsOf } from './doctor.ts'
 import { invocation, notFound } from './items.ts'
-import { committedTo } from './sprints.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
 // The weights and their default are the workspace's own configuration and live in
@@ -63,7 +60,8 @@ const DAY_MS = 86_400_000
 
 export const NEXT_SHAPE: ResultShape = {
   command: 'next',
-  version: 1,
+  // v2 dropped the `pts` column with the estimate it printed.
+  version: 2,
   effect: 'read',
   summary: 'Rank what to pick up, and print the components and weights that produced the order.',
   properties: [
@@ -77,14 +75,15 @@ export const NEXT_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'next',
-      columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'parts' }, { name: 'title', text: true }],
+      columns: [{ name: 'id' }, { name: 'score' }, { name: 'parts' }, { name: 'title', text: true }],
     },
   ],
 }
 
 export const EXPLAIN_SHAPE: ResultShape = {
   command: 'explain',
-  version: 1,
+  // v2 dropped the `sprint` scalar with the field it printed.
+  version: 2,
   effect: 'read',
   summary: 'Say why one item is where it is, and what each legal next move needs.',
   properties: [
@@ -95,7 +94,6 @@ export const EXPLAIN_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'from_event', type: 'string' },
     { kind: 'text', key: 'reason' },
     { kind: 'scalar', key: 'blocked', type: 'string' },
-    { kind: 'scalar', key: 'sprint', type: 'string' },
     { kind: 'scalar', key: 'parent', type: 'string' },
     { kind: 'scalar', key: 'blocks', type: 'string' },
     { kind: 'scalar', key: 'sev', type: 'string' },
@@ -126,26 +124,24 @@ export const EXPLAIN_SHAPE: ResultShape = {
 }
 
 // v2 dropped `absent_features`, which named the capabilities this build did not have yet.
-// It was a string literal in the result builder, hand-edited by the four pull requests that
-// landed relation, sprint, impediment and board, and the last of them left it writing
-// nothing. Every other key here is a fact about the workspace the caller passed; that one was
-// a fact about the build, and there is nothing in a workspace to compute it from. What this
-// build can do is `treadle --contract` and `help`, both derived from the command inventory.
+// It was a string literal in the result builder, hand-edited by four pull requests, and the
+// last of them left it writing nothing. Every other key here is a fact about the workspace
+// the caller passed; that one was a fact about the build, and there is nothing in a workspace
+// to compute it from. What this build can do is `treadle --contract` and `help`, both derived
+// from the command inventory.
 export const STATUS_SHAPE: ResultShape = {
   command: 'status',
-  version: 2,
+  // v3 dropped `points`, `not_ready`, the `sprints` block and the `pts` column of `next`,
+  // with estimation and the sprint surface.
+  version: 3,
   effect: 'read',
   summary: 'Orient a caller in the workspace in one call.',
   properties: [
     { kind: 'scalar', key: 'store', type: 'string' },
     { kind: 'scalar', key: 'items', type: 'integer' },
-    { kind: 'scalar', key: 'points', type: 'integer' },
     { kind: 'scalar', key: 'findings', type: 'integer' },
     { kind: 'scalar', key: 'overdue', type: 'integer' },
     { kind: 'scalar', key: 'defects', type: 'string' },
-    // Last of the non-block properties, which is as late as the renderer's blocks-last rule
-    // allows and moves nothing already declared.
-    { kind: 'scalar', key: 'not_ready', type: 'string' },
     // Which set `findings` counts, and which command counts the other one.
     { kind: 'scalar', key: 'audit', type: 'string' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
@@ -153,14 +149,7 @@ export const STATUS_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'next',
-      columns: [{ name: 'id' }, { name: 'pts' }, { name: 'score' }, { name: 'title', text: true }],
-    },
-    // Appended last, which STABILITY's output-schema rule makes a non-breaking addition, and
-    // absent when no sprint is open, so a workspace that runs none pays nothing for it.
-    {
-      kind: 'block',
-      key: 'sprints',
-      columns: [{ name: 'id' }, { name: 'day' }, { name: 'items' }, { name: 'pts' }, { name: 'title', text: true }],
+      columns: [{ name: 'id' }, { name: 'score' }, { name: 'title', text: true }],
     },
   ],
 }
@@ -179,7 +168,7 @@ function ageDays(filed: string, now: string): number {
 export function scoreOf(
   view: WorkspaceView, item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
 ): Score {
-  return scored(view, item, now, weights, forActor, blockedByThis(view, item.id).length)
+  return scored(item, now, weights, forActor, blockedByThis(view, item.id).length)
 }
 
 /**
@@ -190,24 +179,21 @@ export function scoreOf(
  * freed one link at a time.
  */
 function scored(
-  view: WorkspaceView, item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
+  item: WorkItemSummary, now: string, weights: Weights, forActor: string | undefined,
   dependents: number,
 ): Score {
   const priority = item.priority === undefined ? 0 : 6 - item.priority
   const age = ageDays(item.filed_at, now)
-  // Membership of an open sprint, and only an open one: work left behind in a closed sprint
-  // gets no lift until it is committed onward, which is what carry-over asks a team to do.
-  const sprint = item.sprint_id !== undefined && view.sprintById.get(item.sprint_id)?.state === 'open' ? 1 : 0
   const match = forActor !== undefined && item.assignee === forActor ? 1 : 0
   const overdue = daysOverdue(item, now)
   const severity = severityRank(item)
   const score = priority * weights.pri + age * weights.age + dependents * weights.dep
-    + sprint * weights.spr + match * (forActor === undefined ? 0 : weights.asg)
+    + match * (forActor === undefined ? 0 : weights.asg)
     + overdue * weights.due + severity * weights.sev
   return {
     item,
     score,
-    parts: `p${priority}/a${age}/d${dependents}/s${sprint}/m${match}/u${overdue}/v${severity}`,
+    parts: `p${priority}/a${age}/d${dependents}/m${match}/u${overdue}/v${severity}`,
   }
 }
 
@@ -225,7 +211,7 @@ export function rank(
   const blocking = blockedByThisIndex(view)
   return view.items
     .filter((item) => item.state === 'ready' && !blockers.has(item.id))
-    .map((item) => scored(view, item, now, weights, forActor, blocking.get(item.id)?.length ?? 0))
+    .map((item) => scored(item, now, weights, forActor, blocking.get(item.id)?.length ?? 0))
     .sort((a, b) => (a.score === b.score ? (a.item.id < b.item.id ? -1 : 1) : b.score - a.score))
 }
 
@@ -258,7 +244,6 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
     total: ranked.length,
     rows: page.map((scored): Row => ({
       id: scored.item.id,
-      pts: scored.item.points ?? null,
       score: scored.score,
       parts: scored.parts,
       title: scored.item.title,
@@ -267,7 +252,7 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
 
   const asg = request.forActor === undefined ? 0 : weights.asg
   const data: Record<string, Value> = {
-    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} spr ${weights.spr} asg ${asg} due ${weights.due} sev ${weights.sev}`,
+    weights: `pri ${weights.pri} age ${weights.age} dep ${weights.dep} asg ${asg} due ${weights.due} sev ${weights.sev}`,
   }
   if (ranked.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
@@ -386,7 +371,6 @@ export async function explain(store: Store, clock: Clock, id: ItemId): Promise<R
     if (at.reason !== undefined) data['reason'] = at.reason
   }
   data['blocked'] = blockers.length === 0 ? 'no' : `yes ${blockers.join(',')}`
-  if (item.sprint_id !== undefined) data['sprint'] = item.sprint_id
   if (item.parent_id !== undefined) data['parent'] = item.parent_id
   const blocking = blockedByThis(view.value, id)
   data['blocks'] = blocking.length === 0 ? '-' : blocking.join(',')
@@ -402,7 +386,7 @@ export async function explain(store: Store, clock: Clock, id: ItemId): Promise<R
 
   // The audit over the list already read is free here, and is the per-item half of `doctor`.
   const audit = [
-    ...auditItem(item, log, { config: view.value.config, now: clock.now(), sprints: view.value.sprints }),
+    ...auditItem(item, log, { config: view.value.config, now: clock.now() }),
     ...auditParentOf(new Set(view.value.byId.keys()), item),
     ...auditRelationsOf(new Set(view.value.byId.keys()), item),
     ...auditImpediment(item),
@@ -440,31 +424,11 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   const ranked = rank(view.value, now, view.value.config.next_weights, undefined).slice(0, 3)
   const overdue = view.value.items.filter((item) => isOverdue(item, now))
   const health = healthFindings(view.value.items, now)
-  // `committedTo` is a scan of every item, so the open sprints' sets are taken once and both
-  // the rows and the not-ready line are read off them.
-  const running = view.value.sprints
-    .filter((sprint) => sprint.state === 'open')
-    .map((sprint) => ({ sprint, committed: committedTo(view.value, sprint) }))
-  const sprintRows = running.map(({ sprint, committed }): Row => {
-    const done = committed.filter((item) => item.state === 'done')
-    return {
-      id: sprint.id,
-      day: sprintDay(sprint, now),
-      items: `${done.length}/${committed.length}`,
-      pts: `${done.reduce((sum, item) => sum + (item.points ?? 0), 0)}/${committed.reduce((sum, item) => sum + (item.points ?? 0), 0)}`,
-      title: sprint.title,
-    }
-  })
-  // The `items` column above is a tally, and a tally cannot say which of the committed items
-  // this call's own `next` block will never offer. The ids are the answer, and the line is
-  // absent when there are none, as `overdue` and `defects` are (ADR-0022).
-  const ungroomed = notGroomed(running.flatMap((entry) => entry.committed))
   return okResult(STATUS_SHAPE, {
     workspace,
     data: {
       store: view.value.identity.path ?? workspace,
       items: view.value.items.length,
-      points: view.value.items.reduce((sum, item) => sum + (item.points ?? 0), 0),
       // The same predicate `doctor` subtracts by, so the two calls count one set rather than
       // two. Without it, a store whose only finding is an `H16` printed `findings 1` here
       // while `doctor` served every record and exited 0, and the `audit` line below defines
@@ -474,7 +438,6 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // orientation call the same 440 bytes it was for a workspace that misses no dates.
       ...(overdue.length === 0 ? {} : { overdue: overdue.length }),
       ...(defects === undefined ? {} : { defects }),
-      ...(ungroomed.length === 0 ? {} : { not_ready: ungroomed.join(',') }),
       // What `findings` above counts, said where it is read. That number is the structural
       // set the store computes on the read this call already performs: a record it holds and
       // cannot serve. `doctor` reads every record against the event log and its gates
@@ -482,7 +445,8 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // there, and a caller that treated the orientation call as the whole check never ran
       // the other one. Running the audit here instead would put this call at doctor's cost,
       // 3,523 ms against 479 at 50,000 items (bench/budgets.json), so the orientation call
-      // stays the cheap one and says what it did not do.
+      // stays the cheap one and says what it did not do. `H26` was one of the rules that made
+      // that gap, and `H20` still does.
       audit: 'not run here; treadle doctor reads every record against the event log',
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
@@ -504,19 +468,10 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
         total: ranked.length,
         rows: ranked.map((scored): Row => ({
           id: scored.item.id,
-          pts: scored.item.points ?? null,
           score: scored.score,
           title: scored.item.title,
         })),
       },
-      ...(sprintRows.length === 0 ? {} : {
-        sprints: {
-          columns: columnsOf(STATUS_SHAPE, 'sprints'),
-          shown: sprintRows.length,
-          total: sprintRows.length,
-          rows: sprintRows,
-        },
-      }),
     },
   })
 }

@@ -30,29 +30,23 @@ import { gateContext, item } from '../helpers/fixtures.ts'
 /** A value every key accepts, spelled as a caller would type it on a `config set` line. */
 const ACCEPTED: Readonly<Record<ConfigKey, string>> = {
   review_step: 'story, bug',
-  point_scale: '1, 2, 3, 5, 8, 13, 21',
   next_weights: 'pri=20, age=2',
   wip_limits: 'in_progress=5, in_review=2',
   aging_days: '5',
-  cycle_time_excludes_hold: 'true',
-  start_requires_sprint: 'true',
-  ready_gate: 'DOR1 all field_present:title The item has a title|DOR5 story estimate_set The story is estimated',
+  ready_gate: 'DOR1 all field_present:title The item has a title|DOR4 story field_non_empty_list:acceptance_criteria The story has a criterion',
   done_gate: 'DOD1 all no_open_child Every child is done or cancelled',
 }
 
 /** A value every key refuses, and the substring the refusal has to name. */
 const REFUSED: Readonly<Record<ConfigKey, readonly (readonly [string, string])[]>> = {
   review_step: [['story, nonesuch', 'nonesuch'], ['story, story', 'twice']],
-  point_scale: [['1, banana', 'banana'], ['', 'whole number'], ['1, 1', 'twice']],
   next_weights: [['pri=10, nope=1', 'nope'], ['pri', 'pri'], ['pri=-1', 'pri=-1']],
   wip_limits: [['nonesuch=5', 'nonesuch'], ['in_progress=x', 'in_progress=x'], ['in_progress=5, in_progress=6', 'twice']],
   aging_days: [['-1', 'whole number'], ['five', 'whole number']],
-  cycle_time_excludes_hold: [['yes', 'true or false']],
-  start_requires_sprint: [['1', 'true or false']],
   ready_gate: [
     ['DOR1 all field_present:nonesuch A field that is not one', 'nonesuch'],
     ['DOR1 all field_present:severity A story has no severity', 'severity'],
-    ['DOR1 all field_present:title A title|DOR1 story estimate_set Estimated', 'twice'],
+    ['DOR1 all field_present:title A title|DOR1 story not_a_duplicate Not a copy', 'twice'],
     ['DOR1 all no_such_check The check does not exist', 'no_such_check'],
     ['DOR1 nonesuch field_present:title A title', 'nonesuch'],
     ['DOR1 all field_present:title', 'is not'],

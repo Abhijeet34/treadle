@@ -87,7 +87,7 @@ carries the load either side of it; judge a number against its load column and a
 ten-run series in the report, not on its own.
 
 The corpus carries what the product stores, and adding a shape to it is how a cost stops
-hiding. It had no relation edge, no sprint record and no impediment until 2026-09-06, so three
+hiding. It had no relation edge and no impediment until 2026-09-06, so three
 superlinear paths went unpriced until then: `relationGraphFrom` scanned its accumulated edges
 per edge and every command paid it through `readWorkspace`, `findRelationCycle` ran a walk per
 edge, and `rank` in `insight.ts` asked the whole relation list twice per ready item. All three
@@ -97,16 +97,16 @@ are linear now, and the shape is held by a test rather than a wall time:
 60 items. Adding an operation to `READ_OPS` in `bench/axes/a4-latency.ts` widens what the
 peak-RSS read budget prices, which is deliberate and is how `doctor` at 1,021 MiB became
 visible; it held 500,000 decoded events beside 50,000 whole records to look at each once, and
-ADR-0021 records the streaming reads that replaced that. Two ceilings the generator found rather than the other way round are in
-`docs/BENCHMARKS.md`: a sprint past 744 item ids cannot write its own `carried` line, and
-`packageFacts` weighed whatever `dist/treadle.js` was on disk until it learned to refuse one
-older than the sources.
+ADR-0021 records the streaming reads that replaced that. One ceiling the generator found
+rather than the other way round is in `docs/BENCHMARKS.md`: `packageFacts` weighed whatever
+`dist/treadle.js` was on disk until it learned to refuse one older than the sources.
 
 An axis that asserts an absence is the one that goes stale, because nothing fails when a
-capability closes it. A2 published "there is no sprint entity in this tree" for a release after
-that stopped being true and "there is no history verb" for months. So a question with a command
-to aim at is aimed at it, including when the expected answer is a refusal, and A12 names every
-command in the inventory it never drove.
+capability closes it, and nothing fails when one is removed either. A2 published "there is no
+sprint entity in this tree" for a release after that stopped being true and "there is no history
+verb" for months, and five of its questions now carry prose again because ADR-0029 removed the
+sprint and the board. So a question with a command to aim at is aimed at it, including when the
+expected answer is a refusal, and A12 names every command in the inventory it never drove.
 
 Six of the twelve comparison axes score behaviour rather than time and share one harness,
 `bench/axes/surface.ts`, which builds a workspace by running `init` and `file` and drives
@@ -208,16 +208,14 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. `doctor` raises fourteen of them and
+same audit for one item off the events it already reads. `doctor` raises eleven of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
-event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016,
-`H27` with ADR-0017, `H28` and `H29` with ADR-0023, and `H30` with ADR-0025.
+event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017, and
+`H30` with ADR-0025; ADR-0029 removed `H26`, `H28` and `H29` with the sprint.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
-raises. A membership test here asks whether the store HOLDS an id, served or quarantined,
-and per record kind: a quarantined record still exists, so a neighbour pointing at it is
-not dangling, and a quarantined item must not answer for a `sprint_id`. `Finding.kind` is
-what carries that, derived by the store from the file it read. `doctor`'s exit reads
+raises. A membership test here asks whether the store HOLDS an id, served or quarantined: a
+quarantined record still exists, so a neighbour pointing at it is not dangling. `doctor`'s exit reads
 `hidesContent`, the predicate `readWorkspace` already uses, so a table whose every row is
 `SERVED_ANYWAY` prints under a `serving` line and exits 0. `status`'s `findings` count stays
 what it always was, the store's own load-time findings, and its `audit` line says so.
@@ -260,11 +258,12 @@ Before hand-checking any of these, run the suite: it already checks them.
   correct has nothing left holding it. Read what the test does with the symbol before
   deciding, because a missing wire and dead code look identical to a grep.
 - A command's operands are bounded by the usage lines it declares in `src/cli/inventory.ts`,
-  not by a list anyone maintains. `<id>`, `<sprint>` and `<other>` in a usage line are what
-  make `src/cli/operands.ts` refuse a delimiter in that position before any service reads it,
-  so a new command with `<id>` in its usage is guarded when it is written; a new placeholder
-  of its own fails `test/cli/operand-guard.test.ts`, which also refuses an entity operand no
-  line in that file poisons. Adding a command means writing its usage before its dispatch arm.
+  not by a list anyone maintains. `<id>` and `<other>` in a usage line are what make
+  `src/cli/operands.ts` refuse a delimiter in that position before any service reads it, so a
+  new command with `<id>` in its usage is guarded when it is written. A placeholder of its own
+  is guarded by nothing, so classify it in `ENTITY_OPERANDS` and add a line to
+  `test/cli/operand-guard.test.ts` in the same change. Adding a command means writing its
+  usage before its dispatch arm.
 - Nothing anywhere under `src` starts a process, evaluates a string or reads a setting named
   `hooks`, and only the store's five modules and `src/adapters/workspace.ts` touch the
   filesystem. `test/security/f1-f7-no-execution.test.ts` and
@@ -424,8 +423,8 @@ An edge between two items is stored once, as a `## Relations` section on its sou
 Everything else is derived on read from that one direction: `show`'s inverse rows (`blocked_by`), `explain`'s `blocked` and `blocks` lines, the `dep` component of `next`, and guards `G2`, `G7` and `DOR3`.
 `src/domain/relations.ts` owns the graph and `relationGraphFrom` is its load path; `src/application/services/relation.ts` is the only writer.
 `addRelation` returns the ids whose edges its cycle check read, and the writer passes them as the transaction's `reads`, which the store refuses with `S10` if one moved: without that, two processes adding the two halves of a cycle at once both landed.
-`guardReads` in `src/application/services/context.ts` is the same read set for every guard and gate rule that reads a neighbour, and `transition` and `sprint commit` pass it: a start decided against a done blocker landed after the blocker was reopened, and an accept landed after a done child was, until they did.
-A read set closes a decision made against a neighbour that then MOVES, and closes nothing about a neighbour that did not exist when the decision was made: an edge, a child's parent or a closed sprint's member written between `readWorkspace` and the write is nameable by no `reads` entry, and `remove`'s `R6` guards are all of that shape.
+`guardReads` in `src/application/services/context.ts` is the same read set for every guard and gate rule that reads a neighbour, and `transition` passes it: a start decided against a done blocker landed after the blocker was reopened, and an accept landed after a done child was, until they did.
+A read set closes a decision made against a neighbour that then MOVES, and closes nothing about a neighbour that did not exist when the decision was made: an edge or a child's parent written between `readWorkspace` and the write is nameable by no `reads` entry, and `remove`'s `R6` guards are all of that shape.
 That half is the store's, as `S17` inside the lock `apply` already holds (ADR-0025), so a guard about a neighbour that does not exist yet belongs there and not in a bigger read set.
 Two rules of it are load-bearing and neither is obvious: it checks the write that INTRODUCES a reference rather than the reference, or a record whose parent has already gone is refused every write including the remedy `H30` prints; and it does not check a relation target on a write at all, because an edge naming a record the store does not hold is `H24`, a state a hand edit may leave and a file that carries one must still be writable.
 A new guard that reads another record's state adds that record there, or `test/services/guard-race.test.ts` is where its race shows.
@@ -433,7 +432,7 @@ Both traversals walk an adjacency map; a traversal that filters the relation lis
 If you find yourself writing the inverse onto the other record, that is the defect: ADR-0015 records why one truth has one place, what happens when the other end is cancelled or removed (`H24`), and why the `G2` refusal on `start` is not a breaking change.
 
 An impediment is a work-item type, not an entity of its own: it blocks through that same edge, `DOD2` reads its active impediment blockers, and resolving it is reaching `done`, which frees the work with nothing unlinked because a terminal blocker is already inactive on every read.
-It requires `severity` and `proposed_resolution` at creation, one that blocks nothing is `H27`, and ADR-0017 carries the four argued calls (resolution, nesting, ranking, sprint membership).
+It requires `severity` and `proposed_resolution` at creation, one that blocks nothing is `H27`, and ADR-0017 carries the argued calls around resolution, nesting and ranking.
 A `G1` or `G6` refusal carries the failing gate rules' remedies as fix lines, so a change to a gate remedy changes a refusal's fix list too.
 
 ## Where a record's identity and its boundary are decided
@@ -486,8 +485,7 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 
 A figure taken at the store seam is not a figure about a command. Every command goes through
 `readWorkspace`, which reads every item's summary fields off the index, indexes them by id,
-builds the hierarchy and reads the sprint records whole (tens of rows, a few lines each,
-measured at no change to the 50,000-item peak), and a command that acts on one record
+builds the hierarchy, and a command that acts on one record
 then reads that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
 of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
 a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
@@ -505,70 +503,25 @@ answer at all at 50,000 until it did. `MAX_FILE_BYTES` is read on the read path 
 month past 8 MiB is written happily and then refused by every command with `S4` and no way
 back. "Where it stops scaling" in `docs/BENCHMARKS.md` carries the measurements.
 
-## An open sprint's committed set is derived and a closed one's is a record
+## There is one record kind, and a retired field is not a migration
 
-`sprints.md` holds every sprint in the record grammar the shards use, indexed in its own
-table and quarantined the same way; `src/domain/sprint.ts` is the dictionary and the three
-commit refusals (`I2` closed, `I3` in another open sprint, `I4` cannot be worked), and
-ADR-0016 argues every judgement call. An OPEN sprint's committed set is the items whose
-`sprint_id` points at it. A CLOSED sprint's is `carried` plus the `## Finished` section,
-the two disjoint halves the close wrote, unioned by `membersOf` and read by `committedTo` in
-`src/application/services/sprints.ts`, which is the one place either answer is produced.
-A close leaves unfinished items pointing at the closed sprint; `next`'s `spr` component is
-1 only for a member of an open sprint, so leftover work is not boosted until it is
-committed onward. A close freezes `done`, `done_points`, `cancelled` and `points` beside
-those two lists, and every number is counted over them, because a set recomputed after the
-close shrank the moment a terminal member was revived and committed onward; `points` is the
-field that says a close froze a complete record, since an empty list is written to no
-record at all, and a sprint without it reads live. ADR-0023 carries the argument, and
-`finished` is a section rather than a field because a field value is bounded at 8 KiB. `I2` also refuses a
-reopen once a carried item has since been committed onward: a reopen clears `carried`, and
-dropping that item would shrink a record a team already read. A sprint admits `draft` work
-and every surface
-that commits or reads a committed set names it through `notGroomed` in `context.ts`, rather
-than refusing it, because `file --sprint` files in `draft` by construction. ADR-0022 argues
-both. `sprint_id` is owned by `sprint commit` in `writerOf`, and `file --sprint`
-is held to the same rules. Guard `G4` reads the workspace's `start_requires_sprint`, which
-is `false` by default so that a workspace running no sprints starts work as it always did;
-arming it makes the guard exactly its sprint half, which is the half that exists.
+The store holds work items and events. It held sprints in `sprints.md` and retrospectives in
+`ceremonies/YYYY-MM.md` until ADR-0029 removed both, along with the board, story points, the
+`component` field, `--preview`, `--color`, `--no-input` and two configuration keys, against
+the tool's statement of purpose: what treadle records is an interaction, a decision or a task,
+and none of those four recorded one. Read that record before proposing any of them back; the
+argument for each is still in ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028, all five
+marked superseded.
 
-## The retrospective is the third record kind, and the only ceremony that gets one
-
-`ceremonies/YYYY-MM.md` holds retrospectives in the record grammar the item shards use,
-month-sharded by `filed_at` and indexed in its own table with `type: retro` and
-`state: recorded` as constants, because the grammar's damaged-heading resynchroniser keys on
-four mandatory field lines. `src/domain/ceremony.ts` is the dictionary and
-`src/adapters/store/ceremony-codec.ts` the codec; `ceremonies [<id>]` is the read and
-ADR-0028 argues every judgement call, including why the standup and the review get no
-record at all. Do not add a `CeremonyType` union or a `kind` discriminator: one kind is the
-decision, and a second one is a task on top of this rather than a slot left open for it.
-
-A retrospective's `actions` are chores named once, on the record, because relations target
-items only. That link is `S17`'s fourth referrer, so `remove` of a named chore is `R6` from
-`namedBy` in `removal.ts` before the lock and `S17` from `#referrerOf` under it; the edge is
-kept in the `ceremony_actions` table with an index on the item, because `S17` runs inside
-the write lock on every removal and a scan of the records' `actions` field would decode
-every ceremony there. The three kinds share one id namespace, since the event log is keyed
-by entity id alone: `file`, `sprint open` and `slugFor` all treat a ceremony id as taken,
-and the store refuses a ceremony written under an item's or a sprint's id with `S3`.
-`doctor` does not audit these records yet; `H31` and `H32` are the findings that will.
-
-## A board stores nothing, and its columns are blocks of one shape
-
-`board` is `backlog` grouped by state: `src/application/services/board.ts` reuses the
-backlog's filters, columns, rows and absence clauses, and adds one column, `blocked`, fed
-from `activeBlockerIndex` in `context.ts`, which is one pass over the relation graph where
-`activeBlockers` is one pass per call. Each of the five live states is a block property of
-the one shape, in flow order, printed empty; `done` and `cancelled` are counts. Nothing is
-stored, so `G3`'s limit and `G4`'s membership rule are read from `workspace.md` instead of
-from a board, and both guards stay disarmed until a workspace configures them; ADR-0018
-argues the projection and ADR-0026 the two keys. `G3`'s column count is scoped exactly as
-the board scopes itself, to the one open sprint or to the workspace, so a limit read off
-`board` is the limit `G3` enforces. The scope is the one open sprint
-unless `--sprint` or `--all` says otherwise, two open sprints are a `C1` refusal naming
-both, and a blocked row sorts first in its column because a column is capped at `--limit`
-and the stuck work must be inside the cap. `--limit` without `--cursor` is the inventory's
-`capped` attribute, which is how the flag matrix stays derived.
+A field leaving the dictionary is not a file migration and must not become one. `isKnownField`
+is what `decodeItem` asks, so `sprint_id`, `points`, `hours_estimate`, `timebox_hours` and
+`component` are unknown keys now: they land in `extra`, travel with the item, and `encodeItem`
+writes them back unchanged (DR3). A workspace written before the cut therefore loads, serves and
+round-trips whole, `show` reports an `extra` count rather than values this build cannot
+validate, and `doctor` says nothing about it because nothing is wrong. `test/store/retired-fields.test.ts`
+is that behaviour as a test. Removing a field means removing it from the dictionary and from
+the surfaces that print it, and nothing else; adding it to `RETIRED_FIELDS` would be the wrong
+move, because that map renames a key rather than retiring one.
 
 ## Where a terminal nuance goes, and where a derived flag goes
 

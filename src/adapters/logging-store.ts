@@ -6,7 +6,7 @@
 import type {
   Applied, EventQuery, Finding, ItemQuery, Store, StoreEvent, StoreIdentity, StoreResult, StoreTransaction,
 } from '../application/ports/store.ts'
-import type { Ceremony, Sprint, WorkItem, WorkItemSummary } from '../domain/index.ts'
+import type { WorkItem, WorkItemSummary } from '../domain/index.ts'
 
 export interface OperationLog {
   store(operation: string, fields: Readonly<Record<string, unknown>>): void
@@ -35,13 +35,6 @@ export class LoggingStore implements Store {
     return result
   }
 
-  async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
-    const result = await this.#inner.list(query)
-    if (result.ok) for (const item of result.value) this.#log.store('read', fieldsOf(item))
-    this.#log.store('list', { n: result.ok ? result.value.length : 0 })
-    return result
-  }
-
   async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
     const result = await this.#inner.eachItem(query, (item) => {
       this.#log.store('read', fieldsOf(item))
@@ -55,18 +48,6 @@ export class LoggingStore implements Store {
     const result = await this.#inner.summaries(query)
     if (result.ok) for (const item of result.value) this.#log.store('read', fieldsOf(item))
     this.#log.store('summaries', { n: result.ok ? result.value.length : 0 })
-    return result
-  }
-
-  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
-    const result = await this.#inner.sprints()
-    this.#log.store('sprints', { n: result.ok ? result.value.length : 0 })
-    return result
-  }
-
-  async ceremonies(): Promise<StoreResult<readonly Ceremony[]>> {
-    const result = await this.#inner.ceremonies()
-    this.#log.store('ceremonies', { n: result.ok ? result.value.length : 0 })
     return result
   }
 
@@ -84,12 +65,6 @@ export class LoggingStore implements Store {
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     for (const write of transaction.writes) this.#log.store('write', fieldsOf(write.item))
-    for (const write of transaction.sprints ?? []) this.#log.store('write', { id: write.sprint.id, state: write.sprint.state })
-    // The id and the size of the list, never the prose: F10's rule is that -vvv reports a
-    // value by name and size, and a retrospective's two halves are the caller's own text.
-    for (const write of transaction.ceremonies ?? []) {
-      this.#log.store('write', { id: write.ceremony.id, actions: (write.ceremony.actions ?? []).length })
-    }
     const result = await this.#inner.apply(transaction)
     this.#log.store('apply', { txn: transaction.txn, ok: result.ok })
     return result

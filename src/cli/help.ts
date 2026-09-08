@@ -19,7 +19,7 @@ const VERDICT_NOTE: Readonly<Record<string, string>> = {
 
 /**
  * The note a flag earns when its verdict letter is true for a reason the general note does not
- * give. `A` is one letter for four different reasons, and the general note is true of only one
+ * give. `A` is one letter for several different reasons, and the general note is true of only one
  * of them: `--yes` is ignored here because the command asks nothing, not because it is about
  * presentation. A note that says the wrong reason is worse than a terse one, because a caller
  * reads it as the rule and then predicts the next command wrong. Three `S` flags need the same
@@ -31,12 +31,9 @@ const VERDICT_NOTE: Readonly<Record<string, string>> = {
  */
 const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
   '--yes A': 'accepted and ignored: this command has no confirmation to answer',
-  '--no-input A': 'accepted and ignored: this command has no confirmation to suppress',
   '--dry-run A': 'accepted and ignored: this command writes nothing, so there is nothing to withhold',
-  '--preview A': 'accepted and ignored: this command writes nothing, so there is nothing to preview',
   '--actor A': 'accepted and ignored: this command records no event, so no actor is attributed',
   '--actor S': 'supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and the default is unknown',
-  '--color A': 'accepted and ignored: no rendering emits colour at all, so there is no colour to switch',
   '--width S': `supported: it lays the human rendering out at that many display cells, clamped to ${MIN_WIDTH} to ${MAX_WIDTH}`,
   '--contract S': `supported: it prints the ${CONTRACT} line grammar and runs no command`,
   '--out S': `supported: it selects the rendering, one of ${RENDERINGS.join(', ')}`,

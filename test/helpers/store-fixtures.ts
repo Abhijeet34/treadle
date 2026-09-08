@@ -9,7 +9,6 @@ import path from 'node:path'
 
 import {
   BUG_SEVERITIES,
-  DEFAULT_POINT_SCALE,
   FOUND_IN_STAGES,
   RELATION_KINDS,
   RESOLUTIONS,
@@ -21,7 +20,18 @@ import {
 } from '../../src/domain/index.ts'
 import { createWorkspace, type ShardedStoreOptions } from '../../src/adapters/store/index.ts'
 import { ShardedStore } from '../../src/adapters/store/index.ts'
-import type { StoreEvent } from '../../src/application/ports/store.ts'
+import type { Store, StoreEvent, StoreResult } from '../../src/application/ports/store.ts'
+
+/**
+ * Every item the store serves, as one array. The port streams (`eachItem`) rather than
+ * materialising, because `doctor` is the only reader over the whole set and it looks at one
+ * record at a time; a suite that asserts over the set collects them here instead.
+ */
+export async function allItems(store: Store): Promise<StoreResult<readonly WorkItem[]>> {
+  const items: WorkItem[] = []
+  const scanned = await store.eachItem({}, (item) => items.push(item))
+  return scanned.ok ? { ok: true, value: items } : scanned
+}
 
 /** mulberry32: 32 bits of state, uniform enough for fixtures and exactly reproducible. */
 export function random(seed: number): () => number {
@@ -132,12 +142,8 @@ export class Gen {
     }
     if (this.chance(0.6)) base['description'] = this.safeBody()
     if (this.chance(0.5)) base['priority'] = this.int(1, 5)
-    if (this.chance(0.5)) base['points'] = this.pick(DEFAULT_POINT_SCALE)
-    if (this.chance(0.3)) base['hours_estimate'] = this.int(1, 400)
     if (this.chance(0.4)) base['assignee'] = this.safeLine(1, 30)
     if (this.chance(0.3)) base['reporter'] = this.safeLine(1, 30)
-    if (this.chance(0.3)) base['component'] = this.safeLine(1, 30)
-    if (this.chance(0.4)) base['sprint_id'] = this.slug()
     if (this.chance(0.4)) base['due'] = this.instant()
     if (this.chance(0.4)) {
       const labels = new Set<string>()
@@ -167,7 +173,6 @@ export class Gen {
     }
     if (type === 'spike') {
       base['question'] = this.safeBody()
-      base['timebox_hours'] = this.int(1, 80)
       if (this.chance(0.5)) base['findings'] = this.safeBody()
     }
     if (type === 'impediment') {

@@ -36,10 +36,10 @@ const STORED = { now: STRUCTURAL_NOW, storedProse: true } as const
 /** The single-line fields, in the order 2.14 lists them. Unknown keys render after these. */
 const FIELD_ORDER = [
   'type', 'state', 'filed_at', 'version',
-  'priority', 'points', 'hours_estimate', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'component', 'labels', 'sprint_id',
+  'priority', 'parent_id',
+  'assignee', 'reporter', 'reviewer', 'labels',
   'hold_reason', 'hold_until', 'held_from', 'resolution', 'due',
-  'severity', 'found_in', 'fix_confirmed', 'timebox_hours',
+  'severity', 'found_in', 'fix_confirmed',
 ] as const
 
 /**
@@ -68,7 +68,7 @@ const SECTION_FIELD: readonly (readonly [string, string])[] = [
 
 const SECTION_BY_NAME = new Map(SECTION_FIELD)
 
-const INT_FIELDS = ['version', 'priority', 'points', 'hours_estimate', 'timebox_hours'] as const
+const INT_FIELDS = ['version', 'priority'] as const
 const TICKED = /^- \[([ x])\] (.+)$/
 /**
  * One evidence pointer per line. Bounded and linear like every other pattern here: the ref

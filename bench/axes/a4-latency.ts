@@ -49,7 +49,7 @@ export type RelationCycleRow = {
   readonly cycle: string
 }
 
-export const READ_OPS = ['identity', 'get', 'list', 'workspace', 'board', 'next', 'doctor'] as const
+export const READ_OPS = ['identity', 'get', 'list', 'workspace', 'next', 'doctor'] as const
 export const WRITE_OPS = ['create', 'transition'] as const
 
 export async function runA4(

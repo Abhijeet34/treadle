@@ -16,7 +16,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
-import { WORK_ITEM_STATES } from '../../src/domain/index.ts'
+import { WORK_ITEM_STATES, type WorkItem } from '../../src/domain/index.ts'
 import { openWorkspace, parseFile } from '../../src/adapters/store/index.ts'
 import { Gen } from '../helpers/store-fixtures.ts'
 import { runCli } from '../helpers/cli-run.ts'
@@ -28,11 +28,11 @@ const INDEX_DIR = '.index'
 
 /** Each type with the fields its own policy requires at creation, so a filing succeeds. */
 const FILINGS: readonly (readonly [string, readonly string[]])[] = [
-  ['story', ['--set', 'acceptance_criteria=the repeat is a no-op', '--points', '3', '--priority', '2']],
-  ['task', ['--points', '2', '--priority', '3']],
-  ['chore', ['--points', '1', '--priority', '4']],
-  ['spike', ['--set', 'question=which ranker', '--set', 'timebox_hours=8', '--priority', '3']],
-  ['bug', ['--set', 'severity=S2', '--set', 'found_in=test', '--set', 'repro_steps=run it twice', '--points', '2', '--priority', '1']],
+  ['story', ['--set', 'acceptance_criteria=the repeat is a no-op', '--priority', '2']],
+  ['task', ['--priority', '3']],
+  ['chore', ['--priority', '4']],
+  ['spike', ['--set', 'question=which ranker', '--priority', '3']],
+  ['bug', ['--set', 'severity=S2', '--set', 'found_in=test', '--set', 'repro_steps=run it twice', '--priority', '1']],
 ]
 const READS = ['status', 'next', 'backlog', 'show', 'explain'] as const
 
@@ -85,12 +85,13 @@ async function invariants(root: string, where: string): Promise<number> {
   assert.ok(opened.ok, `${where}: the workspace no longer opens`)
   const store = opened.value
   try {
-    const listed = await store.list({})
-    assert.ok(listed.ok, `${where}: the store cannot list its items`)
-    assert.equal(listed.value.length, records, `${where}: the index and the shards disagree`)
+    const listed: WorkItem[] = []
+    const scanned = await store.eachItem({}, (item) => listed.push(item))
+    assert.ok(scanned.ok, `${where}: the store cannot list its items`)
+    assert.equal(listed.length, records, `${where}: the index and the shards disagree`)
 
-    const ids = new Set(listed.value.map((item) => item.id))
-    for (const item of listed.value) {
+    const ids = new Set(listed.map((item) => item.id))
+    for (const item of listed) {
       assert.ok((WORK_ITEM_STATES as readonly string[]).includes(item.state), `${where}: ${item.id} is in ${item.state}`)
       assert.ok(item.version >= 1, `${where}: ${item.id} is at version ${item.version}`)
     }
@@ -101,7 +102,7 @@ async function invariants(root: string, where: string): Promise<number> {
       if (event.entity_kind !== 'work_item') continue
       assert.ok(ids.has(event.entity), `${where}: an event names ${event.entity}, which no record holds`)
     }
-    return listed.value.length
+    return listed.length
   } finally {
     await store.close()
   }

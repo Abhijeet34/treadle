@@ -117,17 +117,17 @@ export function toMarkdown(report: RunReport): string {
     push(`| ${c.itemsInStore} | ${c.months.length} | ${c.largestMonth}: ${c.largestMonthItems} records, ${bytes(c.largestMonthBytes)} | ${c.readyMatches} | ${bytes(c.bytes.items)} | ${bytes(c.bytes.events)} | ${bytes(c.bytes.index)} | ${c.reused ? 'reused from cache' : `${((c.generatedMs ?? 0) / 1000).toFixed(1)} s`} |`)
   }
   push('')
-  push('Each corpus also carries the shapes the four new capabilities added, because a corpus with none of them priced nothing that reads the relation graph and every command reads it.')
+  push('Each corpus also carries impediments and relation edges, because a corpus with none of them priced nothing that reads the relation graph and every command reads it.')
   push('')
-  push('| Items in store | Sprints | Open sprint | Impediments | Relations | blocks | duplicates | relates_to | Largest carry-over, wanted/stored |', '|---|---|---|---|---|---|---|---|---|')
+  push('| Items in store | Impediments | Relations | blocks | duplicates | relates_to |', '|---|---|---|---|---|---|')
   for (const c of report.corpora) {
-    push(`| ${c.itemsInStore} | ${c.sprintsWritten} | ${c.openSprint} | ${c.impediments} | ${c.relations.total} | ${c.relations.blocks} | ${c.relations.duplicates} | ${c.relations.relates_to} | ${c.carryOver.largestWanted}/${c.carryOver.largestStored}${c.carryOver.sprintsTruncated === 0 ? '' : `, ${c.carryOver.sprintsTruncated} truncated`} |`)
+    push(`| ${c.itemsInStore} | ${c.impediments} | ${c.relations.total} | ${c.relations.blocks} | ${c.relations.duplicates} | ${c.relations.relates_to} |`)
   }
   push('')
 
   push('## Latency, one cold process per sample', '')
   push('`net p95` is the wall p95 with the spawn floor removed. `in-process p95` excludes Node startup and module loading entirely, which is the form axis A4 targets.')
-  push('`identity`, `get`, `list`, `create` and `transition` are store operations: the timed children call the store directly so a millisecond is not mostly argument parsing. `workspace` is the read every command performs, and `board`, `next` and `doctor` are the three commands whose cost is not the store\'s; none of the eight renders. What a caller gets back is scored by axes A2, A6, A7, A8, A10 and A12 below, which weigh behaviour rather than time.')
+  push('`identity`, `get`, `list`, `create` and `transition` are store operations: the timed children call the store directly so a millisecond is not mostly argument parsing. `workspace` is the read every command performs, and `next` and `doctor` are the two commands whose cost is not the store\'s; none of the seven renders. What a caller gets back is scored by axes A2, A6, A7, A8, A10 and A12 below, which weigh behaviour rather than time.')
   push('')
   for (const scale of report.latency) {
     push(`### ${scale.items} items, ${scale.shards} shards, largest shard ${scale.largestShardRecords} records`, '')

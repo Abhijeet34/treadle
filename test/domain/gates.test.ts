@@ -48,19 +48,18 @@ describe('gate shape', () => {
 })
 
 describe('the default ready gate', () => {
-  it('fails a story with no acceptance criteria and no points, and says what would satisfy each', () => {
+  it('fails a story with no acceptance criteria, and says what would satisfy it', () => {
     const verdict = evaluateGate(DEFAULT_READY_GATE, gateContext(item('story')))
     assert.equal(verdict.pass, false)
-    assert.deepEqual(failed(verdict), ['DOR4', 'DOR5'])
+    assert.deepEqual(failed(verdict), ['DOR4'])
     for (const rule of verdict.rules.filter((r) => !r.pass)) {
       assert.ok(rule.reason !== undefined && rule.reason.length > 0, `${rule.rule} needs a reason`)
       assert.ok(rule.remedy !== undefined && rule.remedy.length > 0, `${rule.rule} needs a remedy`)
     }
   })
 
-  it('passes the same story once it has a criterion and points', () => {
+  it('passes the same story once it has a criterion', () => {
     const ready = item('story', {
-      points: 5,
       acceptance_criteria: [{ text: 'A 401 refreshes the token once', ticked: false }],
     })
     assert.equal(evaluateGate(DEFAULT_READY_GATE, gateContext(ready)).pass, true)
@@ -105,7 +104,6 @@ describe('the default done gate', () => {
   it('fails a story whose acceptance criteria are not all ticked', () => {
     const story = item('story', {
       state: 'in_review',
-      points: 5,
       acceptance_criteria: [
         { text: 'refresh once', ticked: true },
         { text: 'log the refusal', ticked: false },
@@ -119,7 +117,6 @@ describe('the default done gate', () => {
   it('passes the same story once every criterion is ticked', () => {
     const story = item('story', {
       state: 'in_review',
-      points: 5,
       acceptance_criteria: [{ text: 'refresh once', ticked: true }],
     })
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(story)).pass, true)
@@ -143,7 +140,7 @@ describe('the default done gate', () => {
 
   it('refuses a done that points at no evidence, and only where the type has a review step', () => {
     const bare = gateContext(item('story', {
-      state: 'in_review', points: 5, reviewer: 'kim', assignee: 'dana',
+      state: 'in_review', reviewer: 'kim', assignee: 'dana',
       acceptance_criteria: [{ text: 'refresh once', ticked: true }],
     }), { reviewStep: true })
     assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, bare)), ['DOD7'])
@@ -151,7 +148,7 @@ describe('the default done gate', () => {
       .find((r) => r.rule === 'DOD7')?.remedy?.startsWith('treadle evidence add'))
 
     const pointed = gateContext(item('story', {
-      state: 'in_review', points: 5, reviewer: 'kim', assignee: 'dana',
+      state: 'in_review', reviewer: 'kim', assignee: 'dana',
       acceptance_criteria: [{ text: 'refresh once', ticked: true }],
       evidence: [{ kind: 'pr', ref: 'https://example.test/pr/42', label: 'the fix' }],
     }), { reviewStep: true })

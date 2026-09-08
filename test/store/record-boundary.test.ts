@@ -14,7 +14,7 @@ import path from 'node:path'
 import { describe, it } from 'node:test'
 
 import { parseFile, renderFile, renderHeader, renderRecord } from '../../src/adapters/store/index.ts'
-import { Gen, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
+import { allItems, Gen, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 const SHARD = 'items/2026-09.md'
 
@@ -55,7 +55,7 @@ describe('a record heading a hand edit damaged', () => {
         // A function replacement, because a `$` sequence in a plain one is substitution syntax.
         await writeFile(shard, text.replace(HEADING, () => damaged))
 
-        const listed = await workspace.store.list()
+        const listed = await allItems(workspace.store)
         assert.ok(listed.ok, listed.ok ? '' : listed.error.message)
         const ids = listed.value.map((item) => item.id)
 

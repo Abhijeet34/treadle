@@ -1,7 +1,7 @@
 {
   "name": "treadle",
   "version": "0.1.0",
-  "description": "Agile work management for a team and its agents, over files you commit to git.",
+  "description": "The record of the work between people and agents, over files you commit to git.",
   "license": "Apache-2.0",
   "bin": {
     "treadle": "dist/treadle.js"
@@ -21,14 +21,11 @@
     "THIRD-PARTY-NOTICES.md"
   ],
   "keywords": [
-    "agile",
-    "scrum",
-    "kanban",
     "backlog",
     "issue-tracker",
-    "project-management",
     "work-management",
-    "sprint",
+    "audit-log",
+    "decision-record",
     "cli",
     "local-first",
     "git-native",

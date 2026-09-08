@@ -140,32 +140,6 @@ describe('SEAM-8: file names every wrong value at once, as it names every missin
   })
 })
 
-describe('SEAM-7 and STR-8: a sprint reports what moved and says when its window is behind', () => {
-  let root: string
-  let cli: Cli
-  before(async () => { ({ root, cli } = await aWorkspace()) })
-  after(async () => { await rm(root, { recursive: true, force: true }) })
-
-  it('writes no set line for a close that finished nothing', async () => {
-    must(await cli(['sprint', 'open', 'Sprint two', '--id', 'sp2', '--end', '2026-12-31']), 'open')
-    const closed = must(await cli(['sprint', 'close', 'sp2']), 'close')
-    assert.doesNotMatch(closed.out, /^"set finished - -> -$/m, closed.out)
-    assert.doesNotMatch(closed.out, /^"set carried - -> -$/m, closed.out)
-    assert.match(closed.out, /^"set state open -> closed$/m)
-
-    const log = must(await cli(['history', 'sp2']), 'history')
-    assert.doesNotMatch(log.out, /finished=\(unset\)->\(unset\)/, log.out)
-    assert.match(log.out, /state=open->closed/)
-  })
-
-  it('says so when a sprint opens after its own end date', async () => {
-    const opened = must(await cli([
-      'sprint', 'open', 'Old sprint', '--id', 'old-sprint', '--start', '2026-01-01', '--end', '2026-01-14',
-    ]), 'open')
-    assert.match(opened.out, /^note this sprint's window closed on 2026-01-14, \d+ days ago, so every read reports it as ended\+\d+d\/14/m, opened.out)
-  })
-})
-
 describe('STR-1 and STR-2: an id that names nothing, and a workspace inside a workspace', () => {
   let root: string
   let cli: Cli

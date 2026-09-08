@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "mark.v1.json",
-  "title": "mark/1",
-  "description": "Set the severity or the priority of one item, with the reason and both values in the log.",
+  "$id": "evidence.v2.json",
+  "title": "evidence/2",
+  "description": "Append one bounded pointer at an artefact a third party can open.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -18,7 +18,7 @@
   ],
   "properties": {
     "schema": {
-      "const": "mark/1"
+      "const": "evidence/2"
     },
     "ok": {
       "type": "boolean"
@@ -36,7 +36,7 @@
       ]
     },
     "command": {
-      "const": "mark"
+      "const": "evidence"
     },
     "workspace": {
       "type": "string"
@@ -72,26 +72,30 @@
             "null"
           ]
         },
-        "set": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ref": {
+          "type": [
+            "string",
+            "null"
+          ],
           "x-trust": "data"
         },
-        "already": {
+        "label": {
+          "type": "string",
+          "x-trust": "data"
+        },
+        "entries": {
           "type": [
             "string",
             "null"
           ]
         },
         "dry_run": {
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "preview": {
           "type": [
             "integer",
             "null"

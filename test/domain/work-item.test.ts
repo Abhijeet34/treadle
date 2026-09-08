@@ -34,7 +34,7 @@ describe('per-type required fields at creation', () => {
     story: [],
     task: [],
     bug: ['severity', 'repro_steps', 'found_in'],
-    spike: ['question', 'timebox_hours'],
+    spike: ['question'],
     chore: [],
     impediment: ['severity', 'proposed_resolution'],
   }
@@ -76,8 +76,8 @@ describe('fields a type does not own', () => {
     assert.ok(error.message.includes('severity'))
   })
 
-  it('refuses a timebox on a chore', () => {
-    assert.equal(errorOf(validateWorkItem(item('chore', { timebox_hours: 4 }), OPTIONS)).rule, 'V5')
+  it('refuses a bug field on a chore', () => {
+    assert.equal(errorOf(validateWorkItem(item('chore', { fix_confirmed: true }), OPTIONS)).rule, 'V5')
   })
 
   it('accepts a common field on every type', () => {
@@ -100,7 +100,6 @@ describe('field validation from the field dictionary', () => {
     ['an empty title', { title: '' }],
     ['a priority outside 1 to 5', { priority: 9 }],
     ['a points value outside the scale', { points: 4 }],
-    ['an hours estimate above 400', { hours_estimate: 401 }],
     ['a duplicate label', { labels: ['gate', 'gate'] }],
     ['a label that is not a slug', { labels: ['Not A Slug'] }],
     ['a description carrying a C0 control other than newline or tab', { description: 'x\u0000y' }],
@@ -120,17 +119,6 @@ describe('field validation from the field dictionary', () => {
     assert.equal(result.ok, true)
   })
 
-  it('accepts every configured point value and refuses one off the configured scale', () => {
-    for (const points of [1, 2, 3, 5, 8, 13]) {
-      assert.equal(validateWorkItem(item('story', { points }), OPTIONS).ok, true)
-    }
-    assert.equal(validateWorkItem(item('story', { points: 20 }), OPTIONS).ok, false)
-    // The scale is workspace configuration, not a constant.
-    assert.equal(
-      validateWorkItem(item('story', { points: 20 }), { now: NOW, pointScale: [20] }).ok,
-      true,
-    )
-  })
 })
 
 describe('the hold fields', () => {

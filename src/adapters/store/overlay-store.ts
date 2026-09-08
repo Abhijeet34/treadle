@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The second real implementation of the store seam (DR6): a copy-on-write layer over a
 // base store. It is how `--dry-run` evaluates every guard and diffs every entity without
-// writing, which is a product requirement (2.15) rather than a test double. `--preview` is
+// writing, which is a product requirement (2.15) rather than a test double. A dry run is
 // the cheaper question beside it: it resolves the target and evaluates no guard, so it runs
 // against the real store and never reaches here.
 //
@@ -10,7 +10,7 @@
 // goes through encode, render, parse and decode exactly as the sharded store's does, so a
 // dry run can never approve a record the real store would refuse to write.
 
-import { summaryOf, type Ceremony, type Sprint, type WorkItem, type WorkItemSummary, type WorkspaceConfig } from '../../domain/index.ts'
+import { summaryOf, type WorkItem, type WorkItemSummary, type WorkspaceConfig } from '../../domain/index.ts'
 import {
   duplicateRefusal,
   storeFail,
@@ -28,14 +28,11 @@ import {
 } from '../../application/ports/store.ts'
 import { parseRecordSource, renderRecord } from './grammar.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
-import { decodeSprint, encodeSprint } from './sprint-codec.ts'
-import { decodeCeremony, encodeCeremony } from './ceremony-codec.ts'
-import { actionMissing, idTaken, parentMissing, stillNamed, type Referrer } from './referential.ts'
+import { parentMissing, stillNamed, type Referrer } from './referential.ts'
 
 function matches(item: WorkItemSummary, query: ItemQuery): boolean {
   if (query.state !== undefined && item.state !== query.state) return false
   if (query.type !== undefined && item.type !== query.type) return false
-  if (query.sprint !== undefined && item.sprint_id !== query.sprint) return false
   return true
 }
 
@@ -43,7 +40,7 @@ function order(a: WorkItemSummary, b: WorkItemSummary): number {
   return a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at)
 }
 
-/** The base store's rows with this layer's writes over them and its removals taken out, in `list`'s order. */
+/** The base store's rows with this layer's writes over them and its removals taken out, in read order. */
 function merged<T extends WorkItemSummary>(
   base: readonly T[], pending: Iterable<T>, removed: ReadonlySet<string>, query: ItemQuery,
 ): readonly T[] {
@@ -57,8 +54,6 @@ function merged<T extends WorkItemSummary>(
 export class OverlayStore implements Store {
   readonly #base: Store
   readonly #items = new Map<string, WorkItem>()
-  readonly #sprints = new Map<string, Sprint>()
-  readonly #ceremonies = new Map<string, Ceremony>()
   /** Ids this layer has removed, which the base store still holds; see `ItemRemoval`. */
   readonly #removed = new Set<string>()
   readonly #events: StoreEvent[] = []
@@ -82,42 +77,28 @@ export class OverlayStore implements Store {
     return this.#base.get(id)
   }
 
-  async list(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItem[]>> {
-    const base = await this.#base.list({})
+  // The overlay merges its pending writes over the whole base list on every read, which
+  // ADR-0006 records as its cost, so its streaming read holds what an array read would and
+  // keeps only the contract: the same items, the same order, the same refusal.
+  async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
+    const base = await this.#whole()
     if (!base.ok) return base
-    return storeOk(merged(base.value, this.#items.values(), this.#removed, query))
+    const items = merged(base.value, this.#items.values(), this.#removed, query)
+    for (const item of items) visit(item)
+    return storeOk(items.length)
   }
 
-  // The overlay merges its pending writes over the whole base list on every read, which
-  // ADR-0006 records as its cost, so its streaming reads hold what its array reads hold and
-  // keep only the contract: the same items, the same order, the same refusal.
-  async eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>> {
-    const items = await this.list(query)
-    if (!items.ok) return items
-    for (const item of items.value) visit(item)
-    return storeOk(items.value.length)
+  /** Every whole record the base store holds, which is what the merge above layers over. */
+  async #whole(): Promise<StoreResult<readonly WorkItem[]>> {
+    const items: WorkItem[] = []
+    const scanned = await this.#base.eachItem({}, (item) => items.push(item))
+    return scanned.ok ? storeOk(items) : scanned
   }
 
   async summaries(query: ItemQuery = {}): Promise<StoreResult<readonly WorkItemSummary[]>> {
     const base = await this.#base.summaries({})
     if (!base.ok) return base
     return storeOk(merged(base.value, [...this.#items.values()].map(summaryOf), this.#removed, query))
-  }
-
-  async sprints(): Promise<StoreResult<readonly Sprint[]>> {
-    const base = await this.#base.sprints()
-    if (!base.ok) return base
-    const byId = new Map(base.value.map((sprint) => [sprint.id, sprint]))
-    for (const sprint of this.#sprints.values()) byId.set(sprint.id, sprint)
-    return storeOk([...byId.values()].sort((a, b) => (a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at))))
-  }
-
-  async ceremonies(): Promise<StoreResult<readonly Ceremony[]>> {
-    const base = await this.#base.ceremonies()
-    if (!base.ok) return base
-    const byId = new Map(base.value.map((ceremony) => [ceremony.id, ceremony]))
-    for (const ceremony of this.#ceremonies.values()) byId.set(ceremony.id, ceremony)
-    return storeOk([...byId.values()].sort((a, b) => (a.filed_at === b.filed_at ? a.id.localeCompare(b.id) : a.filed_at.localeCompare(b.filed_at))))
   }
 
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
@@ -189,50 +170,6 @@ export class OverlayStore implements Store {
       applied.push({ id: write.item.id, version })
     }
 
-    const stagedSprints = new Map<string, Sprint>()
-    for (const write of transaction.sprints ?? []) {
-      const held = stagedSprints.get(write.sprint.id) ?? await this.sprints()
-        .then((r) => (r.ok ? r.value.find((sprint) => sprint.id === write.sprint.id) : undefined))
-      const conflict = compareAndSet(write.sprint.id, held, write.ifVersion)
-      if (conflict !== undefined) return conflict
-      const version = (held?.version ?? 0) + 1
-      const encoded = encodeSprint({ ...write.sprint, version })
-      if (!encoded.ok) return encoded
-      const parsed = parseRecordSource(renderRecord(encoded.value), 1)
-      if (!parsed.ok) return storeFail('VALIDATION', parsed.rule, `${write.sprint.id}: ${parsed.reason}`, [write.sprint.id])
-      const round = decodeSprint(parsed.record)
-      if (!round.ok) return round
-      stagedSprints.set(write.sprint.id, round.value)
-      applied.push({ id: write.sprint.id, version })
-    }
-
-    const stagedCeremonies = new Map<string, Ceremony>()
-    for (const write of transaction.ceremonies ?? []) {
-      const clash = duplicateRefusal(write.ceremony.id, findings.value)
-      if (clash !== undefined) return clash
-      const held = stagedCeremonies.get(write.ceremony.id) ?? await this.ceremonies()
-        .then((r) => (r.ok ? r.value.find((ceremony) => ceremony.id === write.ceremony.id) : undefined))
-      const conflict = compareAndSet(write.ceremony.id, held, write.ifVersion)
-      if (conflict !== undefined) return conflict
-      const version = (held?.version ?? 0) + 1
-      // The sharded store carries a stored record's unknown field keys forward from the
-      // bytes it is rewriting; the overlay carries them from the record it is layering over,
-      // so a dry run diffs the same bytes the real write would produce.
-      const extra = new Map([...(held?.extra ?? []), ...(write.ceremony.extra ?? [])])
-      const encoded = encodeCeremony({
-        ...write.ceremony,
-        version,
-        ...(extra.size === 0 ? {} : { extra }),
-      })
-      if (!encoded.ok) return encoded
-      const parsed = parseRecordSource(renderRecord(encoded.value), 1)
-      if (!parsed.ok) return storeFail('VALIDATION', parsed.rule, `${write.ceremony.id}: ${parsed.reason}`, [write.ceremony.id])
-      const round = decodeCeremony(parsed.record)
-      if (!round.ok) return round
-      stagedCeremonies.set(write.ceremony.id, round.value)
-      applied.push({ id: write.ceremony.id, version })
-    }
-
     const workspace = transaction.workspace
     let stagedWorkspace: { readonly version: number; readonly config: WorkspaceConfig } | undefined
     if (workspace !== undefined) {
@@ -252,15 +189,13 @@ export class OverlayStore implements Store {
     }
 
     // The same referential rule the sharded store runs under its write lock (ADR-0025), so a
-    // dry run refuses what the real write would. It reads the merged summaries and the merged
-    // sprints, which already carry this layer's own writes over the base store's rows.
-    const dangling = await this.#referentialRefusal(transaction, staged, stagedSprints, stagedCeremonies, parentWas)
+    // dry run refuses what the real write would. It reads the merged summaries, which already
+    // carry this layer's own writes over the base store's rows.
+    const dangling = await this.#referentialRefusal(transaction, staged, parentWas)
     if (dangling !== undefined) return dangling
 
     for (const [id, item] of staged) this.#items.set(id, item)
     for (const id of dropped) { this.#items.delete(id); this.#removed.add(id) }
-    for (const [id, sprint] of stagedSprints) this.#sprints.set(id, sprint)
-    for (const [id, ceremony] of stagedCeremonies) this.#ceremonies.set(id, ceremony)
     if (stagedWorkspace !== undefined) this.#workspace = stagedWorkspace
     this.#events.push(...transaction.events)
     return storeOk({ txn: transaction.txn, writes: applied, events: transaction.events.length })
@@ -276,8 +211,6 @@ export class OverlayStore implements Store {
   async #referentialRefusal(
     transaction: StoreTransaction,
     staged: ReadonlyMap<string, WorkItem>,
-    stagedSprints: ReadonlyMap<string, Sprint>,
-    stagedCeremonies: ReadonlyMap<string, Ceremony>,
     parentWas: ReadonlyMap<string, string | undefined>,
   ): Promise<StoreResult<never> | undefined> {
     const removed = new Set((transaction.removes ?? []).map((removal) => removal.id))
@@ -294,37 +227,9 @@ export class OverlayStore implements Store {
       return parentMissing(parent, item.id)
     }
 
-    // One id, one record, across all three kinds; the rule the sharded store runs under its
-    // write lock, decided here over the arrays this layer already merges.
-    const sprints = await this.sprints()
-    if (!sprints.ok) return sprints
-    for (const ceremony of stagedCeremonies.values()) {
-      if (removed.has(ceremony.id)) continue
-      if (held.has(ceremony.id)) return idTaken(ceremony.id, 'an item')
-      if (sprints.value.some((sprint) => sprint.id === ceremony.id)) return idTaken(ceremony.id, 'a sprint')
-    }
-
-    const before = await this.#base.ceremonies()
-    if (!before.ok) return before
-    const wasNaming = new Map(before.value.map((ceremony) => [ceremony.id, ceremony.actions ?? []]))
-    for (const ceremony of stagedCeremonies.values()) {
-      for (const action of ceremony.actions ?? []) {
-        if (staged.has(action)) continue
-        if ((wasNaming.get(ceremony.id) ?? []).includes(action)) continue
-        if (!removed.has(action) && held.has(action)) continue
-        return actionMissing(action, ceremony.id)
-      }
-    }
-
     if (removed.size === 0) return undefined
-    const closed = sprints.value
-      .map((sprint) => stagedSprints.get(sprint.id) ?? sprint)
-      .filter((sprint) => sprint.state === 'closed')
-    const ceremonies = await this.ceremonies()
-    if (!ceremonies.ok) return ceremonies
-    const naming = ceremonies.value.map((ceremony) => stagedCeremonies.get(ceremony.id) ?? ceremony)
     for (const id of removed) {
-      const referrer = referrerIn(id, items.value, staged, removed, closed, naming)
+      const referrer = referrerIn(id, items.value, staged, removed)
       if (referrer !== undefined) return stillNamed(id, referrer)
     }
     return undefined
@@ -332,8 +237,6 @@ export class OverlayStore implements Store {
 
   async close(): Promise<void> {
     this.#items.clear()
-    this.#sprints.clear()
-    this.#ceremonies.clear()
     this.#removed.clear()
     this.#workspace = undefined
     this.#events.length = 0
@@ -356,17 +259,13 @@ function compareAndSet(
 
 /**
  * The first record left naming `id` after this transaction, in the order the sharded store
- * asks the same four questions: a child's parent, a stored relation edge, a closed sprint's
- * committed set, read as its frozen lists and as the `sprint_id` an older build's close left
- * pointing at it, and last a retrospective's action list.
+ * asks the same two questions: a child's parent and a stored relation edge.
  */
 function referrerIn(
   id: string,
   items: readonly WorkItemSummary[],
   staged: ReadonlyMap<string, WorkItem>,
   removed: ReadonlySet<string>,
-  closed: readonly Sprint[],
-  ceremonies: readonly Ceremony[],
 ): Referrer | undefined {
   const left = items.filter((item) => !removed.has(item.id) && !staged.has(item.id))
   const child = left.find((item) => item.parent_id === id)
@@ -374,14 +273,6 @@ function referrerIn(
   for (const item of left) {
     const edge = (item.relations ?? []).find((relation) => relation.target === id)
     if (edge !== undefined) return { kind: 'relation', id: item.id, relation: edge.kind }
-  }
-  const member = items.find((item) => item.id === id)
-  for (const sprint of closed) {
-    const frozen = [...(sprint.carried ?? []), ...(sprint.finished ?? [])]
-    if (frozen.includes(id) || member?.sprint_id === sprint.id) return { kind: 'sprint', id: sprint.id }
-  }
-  for (const ceremony of ceremonies) {
-    if ((ceremony.actions ?? []).includes(id)) return { kind: 'ceremony', id: ceremony.id }
   }
   return undefined
 }

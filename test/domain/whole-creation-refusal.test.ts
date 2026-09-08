@@ -40,10 +40,10 @@ describe('a creation refusal names every field the type requires and has not got
   }
 
   it('still names one field alone when one is all that is missing', () => {
-    const item = { ...bare('spike'), question: 'do we retry in the queue' } as unknown as WorkItem
+    const item = { ...bare('bug'), severity: 'S1', repro_steps: 'reload twice' } as unknown as WorkItem
     const verdict = validateWorkItem(item, { now: NOW })
     assert.equal(verdict.ok, false)
     const cause = verdict.ok ? '' : verdict.error.message
-    assert.equal(cause, 'a spike needs timebox_hours at creation')
+    assert.equal(cause, 'a bug needs found_in at creation')
   })
 })

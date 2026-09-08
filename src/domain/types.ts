@@ -49,7 +49,7 @@ export type Resolution = (typeof RESOLUTIONS)[number]
 export const ATTEMPT_OUTCOMES = ['failed', 'yielded'] as const
 export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number]
 
-export const GUARD_IDS = ['G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8'] as const
+export const GUARD_IDS = ['G1', 'G2', 'G3', 'G5', 'G6', 'G7', 'G8'] as const
 export type GuardId = (typeof GUARD_IDS)[number]
 
 export const RELATION_KINDS = [
@@ -92,9 +92,6 @@ export type EvidencePointer = {
   readonly label?: string
 }
 
-/** The workspace may configure its own scale; this is the default (2.14). */
-export const DEFAULT_POINT_SCALE = [1, 2, 3, 5, 8, 13] as const
-
 export type AcceptanceCriterion = {
   readonly text: string
   readonly ticked: boolean
@@ -109,7 +106,7 @@ export type AcceptanceCriterion = {
  */
 export const SUMMARY_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
-  'priority', 'points', 'parent_id', 'assignee', 'sprint_id', 'resolution', 'due', 'severity',
+  'priority', 'parent_id', 'assignee', 'resolution', 'due', 'severity',
   // The relation graph is read off every item on every read, so the edges are a scan field.
   'relations',
   // `backlog --label` filters on this and `--fields +labels` prints it, and both are reads
@@ -137,15 +134,11 @@ export type WorkItem = {
 
   readonly description?: string
   readonly priority?: number
-  readonly points?: number
-  readonly hours_estimate?: number
   readonly parent_id?: ItemId
   readonly assignee?: string
   readonly reporter?: string
   readonly reviewer?: string
-  readonly component?: string
   readonly labels?: readonly string[]
-  readonly sprint_id?: string
   /** Bounded pointers at artefacts a third party can open, appended and never edited. */
   readonly evidence?: readonly EvidencePointer[]
   /** Typed edges to other items, stored on this record only; relations.ts derives the rest. */
@@ -175,7 +168,6 @@ export type WorkItem = {
   readonly found_in?: FoundInStage
   readonly fix_confirmed?: boolean
   readonly question?: string
-  readonly timebox_hours?: number
   readonly findings?: string
   /** What would clear an impediment, required when it is raised; without it, it is a complaint. */
   readonly proposed_resolution?: string

@@ -10,42 +10,22 @@
 // The bound lives here rather than at each call site because the set of id-taking commands
 // is the thing that grows, and a rule written in prose is a rule the next command breaks. It
 // is read from the usage lines the inventory already publishes, so a command added with
-// `<id>` in its usage is bounded the moment it is written, and a command added with a
-// placeholder this file does not classify fails test/cli/operand-guard.test.ts instead of
-// shipping unguarded.
+// `<id>` in its usage is bounded the moment it is written.
 
 import { findUnsafeCharacter } from '../domain/index.ts'
 import { errorResult, type ResultObject } from '../application/result.ts'
-import { COMMANDS, commandNamed, type Command } from './inventory.ts'
+import { commandNamed, type Command } from './inventory.ts'
 
 /**
  * The usage placeholders that name a record, and what a refusal calls each. `<other>` is the
  * far end of a relation, which is an item id like `<id>` and reads better named separately.
+ * Every other placeholder is a value held to its own field's rule one layer down, which names
+ * that rule better than a line bound would: a title carrying a newline is `V4 title must be a
+ * single line`, not a word about ids.
  */
 const ENTITY_OPERANDS: ReadonlyMap<string, string> = new Map([
   ['id', 'id'],
-  ['sprint', 'sprint id'],
-  ['ceremony', 'ceremony id'],
   ['other', 'id'],
-])
-
-/** The listing a refusal about one of these points at, since `backlog` lists neither kind. */
-const LISTING_FOR: ReadonlyMap<string, string> = new Map([
-  ['sprint id', 'treadle sprints'],
-  ['ceremony id', 'treadle ceremonies'],
-])
-
-/**
- * Every other operand placeholder the usage lines carry. Each is a value held to its own
- * field's rule one layer down, which names that rule better than a line bound would: a title
- * carrying a newline is `V4 title must be a single line`, not a word about ids.
- */
-const VALUE_OPERANDS: ReadonlySet<string> = new Set([
-  'type', 'title', 'target', 'kind', 'ref', 'label', 'command', 'field=value',
-  'blocks|duplicates|relates-to',
-  // `config set`'s two. The key is held to the closed set and the value to that key's own
-  // rule, both of which name the refusal better than a line bound about ids would.
-  'key', 'value',
 ])
 
 type Slot =
@@ -58,7 +38,7 @@ type Shape = { readonly slots: readonly Slot[]; readonly repeats: boolean }
 /**
  * A usage line's operand shape. Everything from the first flag token on is a flag and its
  * value, and neither is an operand; `[<id> ...]` ends the line by repeating the slot before
- * the marker, which is how `sprint commit` takes a sprint and then any number of items.
+ * the marker, which is how a usage line takes any number of trailing ids.
  */
 function shapeOf(usage: string, command: string): Shape {
   const tokens = usage.split(' ').filter((token) => token.length > 0)
@@ -97,7 +77,7 @@ function shapeFor(command: Command, operands: readonly string[]): Shape | undefi
 export type EntityOperand = {
   /** Its index among the operands, counting from zero. */
   readonly at: number
-  /** `id` or `sprint id`, which is what the refusal calls it. */
+  /** What the refusal calls this operand, which is `id`. */
   readonly what: string
   readonly value: string
 }
@@ -137,28 +117,8 @@ export function operandRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
       cause: `the ${what} in operand ${at + 1} carries ${found.label} at character ${found.at + 1}, and no ${what} holds one: an id is a single line of lowercase letters, digits and hyphens`,
-      fix: [LISTING_FOR.get(what) ?? 'treadle backlog'],
+      fix: ['treadle backlog'],
     })
   }
   return undefined
-}
-
-/**
- * Every operand placeholder in the inventory, with the command that writes it. The
- * vocabulary test reads this: a command added with a placeholder neither set above carries
- * is unclassified, which is the one way a new id-taking command could reach a service
- * unbounded, and it fails there rather than shipping.
- */
-export function operandPlaceholders(): readonly (readonly [string, string])[] {
-  return COMMANDS.flatMap((command) =>
-    shapesOf(command).flatMap(({ slots }) =>
-      slots.filter((slot) => slot.kind === 'operand').map((slot) => [command.name, slot.name] as const)))
-}
-
-export function isClassified(placeholder: string): boolean {
-  return ENTITY_OPERANDS.has(placeholder) || VALUE_OPERANDS.has(placeholder)
-}
-
-export function isEntityPlaceholder(placeholder: string): boolean {
-  return ENTITY_OPERANDS.has(placeholder)
 }

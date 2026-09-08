@@ -61,7 +61,6 @@ const FILL: Readonly<Record<string, string>> = {
   '<name>': 'kim',
   '<id>': 'ready-task',
   '<other>': 'spare-task',
-  '<sprint>': 'sprint-open',
   '<slug>': 'fresh-slug',
   '<S1-S4>': 'S2',
   '<1-5>': '3',
@@ -178,7 +177,7 @@ async function baseWorkspace(dir: string): Promise<void> {
     for (const state of to) await m(['transition', id, state, '--reason', 'fixture'])
   }
   const story = async (id: string, to: readonly string[], flags: readonly string[] = []): Promise<void> => {
-    await m(['file', 'story', `Story ${id}`, '--id', id, '--points', '3', '--set', 'acceptance_criteria=one|two', '--assignee', 'dana', ...flags])
+    await m(['file', 'story', `Story ${id}`, '--id', id, '--set', 'acceptance_criteria=one|two', '--assignee', 'dana', ...flags])
     for (const state of to) await m(['transition', id, state, '--reason', 'fixture'])
   }
 
@@ -203,14 +202,7 @@ async function baseWorkspace(dir: string): Promise<void> {
   for (const state of ['ready', 'in_progress']) await m(['transition', 'epic-one', state])
   await m(['file', 'bug', 'Bug cold', '--id', 'bug-cold', '--set', 'severity=S1', '--set', 'repro_steps=reload', '--set', 'found_in=test'])
   await m(['file', 'story', 'Story without criteria', '--id', 'draft-story-noac'])
-  // One closed sprint that carried an item, and the one open sprint every `<sprint>` fills to.
   await task('carried-task', ['ready'])
-  await m(['sprint', 'open', 'Sprint closed', '--id', 'sprint-closed', '--start', '2026-01-05', '--end', '2026-01-16'])
-  await m(['sprint', 'commit', 'sprint-closed', 'carried-task'])
-  await m(['sprint', 'close', 'sprint-closed'])
-  await task('sprint-task', ['ready'], ['--assignee', 'dana', '--priority', '1'])
-  await m(['sprint', 'open', 'Sprint open', '--id', 'sprint-open', '--end', '2030-01-31'])
-  await m(['sprint', 'commit', 'sprint-open', 'sprint-task'])
   await task('committed-task', ['ready'])
   // Three more drafts, so a filtered page of two has a page after it.
   await task('draft-two')
@@ -279,10 +271,10 @@ async function configuredWorkspace(dir: string): Promise<void> {
   await m(['init', '--name', 'configured'])
   await m(['config', 'set', 'wip_limits', 'in_progress=1'])
   await m(['config', 'set', 'aging_days', '1'])
-  await m(['config', 'set', 'ready_gate', 'TEAM1 all field_present:component A record names the component it changes'])
+  await m(['config', 'set', 'ready_gate', 'TEAM1 all field_present:reporter A record names who reported it'])
 
   for (const id of ['wip-one', 'wip-two']) {
-    await m(['file', 'task', `Task ${id}`, '--id', id, '--set', 'component=payments'])
+    await m(['file', 'task', `Task ${id}`, '--id', id, '--set', 'reporter=ravi'])
     await m(['transition', id, 'ready'])
   }
   // Two in the column of one: the first start passes, the second is `G3` and is overridden,
@@ -290,7 +282,7 @@ async function configuredWorkspace(dir: string): Promise<void> {
   await m(['transition', 'wip-one', 'in_progress'])
   await m(['transition', 'wip-two', 'in_progress', '--override', 'G3', '--reason', 'the release needs it'])
   // A record the configured ready gate refuses, which is where its remedy comes from.
-  await m(['file', 'task', 'Task without a component', '--id', 'no-component'])
+  await m(['file', 'task', 'Task without a reporter', '--id', 'no-reporter'])
   // An item aged past the threshold. The record carries its state and never when it took it,
   // so `H03` reads the log; the fixture backdates the one event that says when it was taken,
   // because the clock a CLI run reads is the system's and cannot be moved.
@@ -299,7 +291,7 @@ async function configuredWorkspace(dir: string): Promise<void> {
 
 const SCENARIOS: readonly Scenario[] = [
   {
-    name: 'a workspace with blockers in every state, review-step work in progress and two sprints',
+    name: 'a workspace with blockers in every state and review-step work in progress',
     build: baseWorkspace,
     provocations: [
       // The gate and guard remedies, on every edge a blocker or a child can stand in the way of.
@@ -318,7 +310,6 @@ const SCENARIOS: readonly Scenario[] = [
       ['explain', 'epic-one'],
       ['explain', 'bug-cold'],
       // The transition command's own refusals.
-      ['transition', 'task-plain', 'ready', '--dry-run', '--preview'],
       ['transition', 'task-plain', 'on_hold'],
       ['transition', 'task-plain', 'cancelled', '--reason', 'no resolution given'],
       ['transition', 'imp-hold', 'done'],
@@ -334,7 +325,6 @@ const SCENARIOS: readonly Scenario[] = [
       ['set', 'task-plain', 'priority=1'],
       ['set', 'bug-cold', 'severity=S2'],
       ['set', 'task-plain', 'severity=S2'],
-      ['set', 'task-plain', 'sprint_id=sprint-open'],
       ['set', 'task-plain', 'resolution=wont_do'],
       ['set', 'task-plain', 'hold_reason=x'],
       ['set', 'task-plain', 'hold_until=2030-01-01T00:00:00Z'],
@@ -355,7 +345,6 @@ const SCENARIOS: readonly Scenario[] = [
       ['set', 'task-plain', 'parent_id=nope'],
       ['file', 'task', 'Under nothing', '--parent', 'nope'],
       ['file', 'impediment', 'Under an epic', '--parent', 'epic-one', '--set', 'severity=S1', '--set', 'proposed_resolution=renew it'],
-      ['file', 'task', 'Under a sprint', '--parent', 'sprint-open'],
       ['file', 'task', 'Both parents', '--parent', 'epic-one', '--set', 'parent_id=spare-task'],
       ['file', 'task', 'Taken twice', '--id', 'task-plain'],
       ['set', 'task-plain', 'title='],
@@ -378,28 +367,8 @@ const SCENARIOS: readonly Scenario[] = [
       ['relation', 'add', 'task-plain', 'blocks', 'nope'],
       ['relation', 'add'],
       ['relation', 'nope'],
-      // Sprints: taken ids, closed and other sprints, items that are not ready, and `file --sprint`.
-      ['sprint', 'open', 'Again', '--id', 'sprint-open', '--end', '2030-03-31'],
-      ['sprint', 'open', 'Again', '--id', 'task-plain', '--end', '2030-03-31'],
-      ['sprint', 'open', 'Again'],
-      ['sprint', 'open'],
-      ['sprint', 'nope'],
-      ['sprint', 'close'],
-      ['sprint', 'commit'],
-      ['sprint', 'commit', 'sprint-open'],
-      ['sprint', 'commit', 'nope', 'task-plain'],
-      ['sprint', 'commit', 'task-plain', 'spare-task'],
-      ['sprint', 'commit', 'sprint-closed', 'task-plain'],
-      ['show', 'sprint-open'],
-      ['sprint', 'commit', 'sprint-open', 'draft-story-noac'],
-      ['sprint', 'commit', 'sprint-open', 'done-task'],
-      ['sprint', 'uncommit'],
-      ['sprint', 'uncommit', 'carried-task'],
-      ['sprints', 'nope'],
-      ['file', 'task', 'Taken', '--id', 'sprint-open'],
-      ['file', 'story', 'Filed into a sprint', '--sprint', 'sprint-open'],
-      ['file', 'bug', 'Filed into a sprint', '--set', 'severity=S1', '--set', 'repro_steps=x', '--set', 'found_in=test', '--sprint', 'sprint-open'],
-      ['file', 'story', 'Filed into nothing', '--sprint', 'nope'],
+      // An id that names one thing, which is `V9`, and a creation missing its type's fields.
+      ['file', 'task', 'Taken', '--id', 'task-plain'],
       ['file', 'bug', 'Cold'],
       ['file', 'nope', 'x'],
       ['file'],
@@ -416,10 +385,7 @@ const SCENARIOS: readonly Scenario[] = [
       ['history', 'blocked-held', '--limit', '1'],
       ['history', 'blocked-held', '--cursor', 'nope'],
       ['history', 'nope'],
-      ['board', '--type', 'task'],
-      ['board', '--fields', 'id,title,desc'],
-      ['board', '--all', '--sprint', 'sprint-open'],
-      ['board', '--sprint', 'nope'],
+      ['backlog', '--fields', 'id,title,desc'],
       // Reads over nothing, and the parser's own refusals.
       ['show', 'nope'],
       ['show', 'task-plain', '--field', 'nope'],
@@ -430,19 +396,6 @@ const SCENARIOS: readonly Scenario[] = [
       ['nope'],
       ['status', '--out', 'nope'],
       ['help', 'nope'],
-    ],
-  },
-  {
-    name: 'two open sprints, and a closed one whose carry-over moved on',
-    build: async (dir) => {
-      await baseWorkspace(dir)
-      await must(dir, ['sprint', 'open', 'Sprint two', '--id', 'sprint-two', '--end', '2030-02-28'])
-      await must(dir, ['sprint', 'commit', 'sprint-two', 'committed-task', 'carried-task'])
-    },
-    provocations: [
-      ['sprint', 'commit', 'sprint-open', 'committed-task'],
-      ['sprint', 'reopen', 'sprint-closed'],
-      ['board'],
     ],
   },
   {
@@ -512,8 +465,8 @@ const SCENARIOS: readonly Scenario[] = [
     build: configuredWorkspace,
     provocations: [
       // The configured gate's own remedy, through the guard and through `explain`.
-      ['transition', 'no-component', 'ready'],
-      ['explain', 'no-component'],
+      ['transition', 'no-reporter', 'ready'],
+      ['explain', 'no-reporter'],
       // `H03` and `H04`, whose details each end in one line to run.
       ['doctor'],
       ['explain', 'wip-one'],
@@ -546,24 +499,19 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a transaction-scoped history page keeping its transaction', /^treadle history --txn tknown1 --limit 1 --cursor \S+$/],
   ['an event id answered with the transaction that wrote it', /^treadle history --txn tknown1$/],
   ['two scopes on one line answered with each of them alone', /^treadle history ready-task$/],
-  ['a whole line carrying the filter', /^treadle board --type task --all$/],
-  ['a dry-run fix keeping its operands', /^treadle transition task-plain ready --dry-run( --out json)?$/],
-  ['a sprint open line carrying --end', /^treadle sprint open "<title>" --end <date> --id <slug>$/],
   ['a hold line carrying --reason', /^treadle transition task-plain on_hold --until <instant> --reason "<why>"$/],
   ['a mark line naming the field the type has', /^treadle mark task-plain --priority <1-5> --reason "<why>"$/],
   ['an unknown field answered with the set syntax', /^treadle set task-plain <field>=<value>$/],
-  ['file --sprint refused with a line that files it', /^treadle file bug "<title>" --set severity=<S1-S4> --set repro_steps=<value> --set found_in=<[a-z|]+>$/],
+  ['a bug filed without its required fields answered with the line that files it', /^treadle file bug "<title>" --set severity=<S1-S4> --set repro_steps=<value> --set found_in=<[a-z|]+>$/],
   ['an older schema answered with version, not init', /^treadle version$/],
   ['a refused parent answered with the types that may parent the item', /^treadle backlog --type epic$/],
   ['a field that refuses to clear answered with the write that fills it', /^treadle set bug-cold repro_steps=<value>$/],
   ['a parent refused on a type nothing may parent answered with the line that files it alone', /^treadle file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>$/],
-  ['an item id in a sprint slot answered with the item read', /^treadle show task-plain$/],
   ['a missing reason answered with the caller\'s line completed', /^treadle transition task-plain cancelled --resolution wont_do --reason "<why>"$/],
   ['a missing outcome answered with the release completed', /^treadle transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
   ['an override without a reason answered with the reason added', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
-  ['a reopen refused for carry-over that moved on, naming both sprints', /^treadle sprints sprint-two$/],
-  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-component component=<value>$/],
-  ['a column over its configured limit answered with the board that shows it', /^treadle board --state in_progress$/],
+  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-reporter reporter=<value>$/],
+  ['a state over its configured limit answered with the list that shows it', /^treadle backlog --state in_progress$/],
   ['an aged item answered with the read that says what it waits on', /^treadle explain wip-one$/],
   ['a configuration refusal answered with the reading of every key', /^treadle config$/],
 ]
@@ -697,18 +645,4 @@ describe('every line the tool prints for the reader to run is runnable as printe
     assert.deepEqual(paged.ids, whole.ids)
   })
 
-  it('a board\'s whole line keeps the filter the scoped board was asked with', async () => {
-    const dir = await copyOf(SCENARIOS[0] as Scenario)
-    const scoped = await runCli(['board', '--type', 'impediment', '--out', 'json'], { cwd: dir, env: ENV })
-    assert.equal(scoped.code, 0, scoped.err)
-    const data = JSON.parse(scoped.out).data as { whole: string }
-    assert.equal(data.whole, 'treadle board --type impediment --all')
-    const whole = await runCli([...shellSplit(data.whole).slice(1), '--out', 'json'], { cwd: dir, env: ENV })
-    assert.equal(whole.code, 0, whole.err)
-    const rows = Object.values(JSON.parse(whole.out).data as Record<string, unknown>)
-      .filter((value): value is { rows: { type: string }[] } => typeof value === 'object' && value !== null && 'rows' in value)
-      .flatMap((block) => block.rows)
-    assert.ok(rows.length >= 4, `the whole board shows ${rows.length} rows`)
-    assert.deepEqual(rows.filter((row) => row.type !== 'impediment'), [], 'the whole board dropped the type filter')
-  })
 })

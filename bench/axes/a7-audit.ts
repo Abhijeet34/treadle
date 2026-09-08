@@ -99,7 +99,7 @@ export async function runA7(seed: number): Promise<{
       const type = i % 5 === 0 ? 'story' : 'task'
       const id = `a7-item-${String(i).padStart(2, '0')}`
       const filed = await surface.run([
-        'file', type, `Audit item ${i}`, '--id', id, '--points', '3', '--priority', '3',
+        'file', type, `Audit item ${i}`, '--id', id, '--priority', '3',
         ...(type === 'story' ? ['--set', 'acceptance_criteria=the chain reads back'] : []),
       ])
       if (filed.code !== 0) throw new Error(`${id}: file refused: ${filed.err}`)

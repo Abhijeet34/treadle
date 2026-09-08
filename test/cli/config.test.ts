@@ -34,7 +34,7 @@ describe('a configured ready gate is the gate the transition enforces', () => {
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: rig.root })
 
   it('refuses the move under the configured rule id, and explain names the same rule', async () => {
-    const filed = await cli(['file', 'story', 'Ship the token refresh', '--id', 'token-refresh', '--points', '5'])
+    const filed = await cli(['file', 'story', 'Ship the token refresh', '--id', 'token-refresh'])
     assert.equal(filed.code, 0, filed.err)
     // Ready under the built-in gate: a title, the type's required fields, no blocker, one
     // acceptance criterion and an estimate. DOR4 is the criterion, so it is filled first.
@@ -48,7 +48,7 @@ describe('a configured ready gate is the gate the transition enforces', () => {
 
     // One rule, with an id this build has never compiled in, over a field the story has and
     // has not set. It replaces the ready gate whole, which is what the design specifies.
-    const set = await cli(['config', 'set', 'ready_gate', 'TEAM1 story field_present:component A story names the component it changes'])
+    const set = await cli(['config', 'set', 'ready_gate', 'TEAM1 story field_present:reporter A story names who reported it'])
     assert.equal(set.code, 0, set.err)
 
     const refused = await cli(['transition', 'token-refresh', 'ready'])
@@ -63,7 +63,7 @@ describe('a configured ready gate is the gate the transition enforces', () => {
 
     // The remedy the configured rule prints is a line that clears it, which is the rule
     // every gate remedy in this tool is held to.
-    const fixed = await cli(['set', 'token-refresh', 'component=payments'])
+    const fixed = await cli(['set', 'token-refresh', 'reporter=ravi'])
     assert.equal(fixed.code, 0, fixed.err)
     const allowed = await cli(['transition', 'token-refresh', 'ready'])
     assert.equal(allowed.code, 0, allowed.err)
@@ -78,7 +78,7 @@ describe('G3 is armed by the configured column limit', () => {
 
   it('refuses the sixth start into a column limited to five, and passes with the limit at zero', async () => {
     for (let n = 1; n <= 6; n += 1) {
-      const filed = await cli(['file', 'task', `Task number ${n}`, '--id', `task-${n}`, '--points', '1'])
+      const filed = await cli(['file', 'task', `Task number ${n}`, '--id', `task-${n}`])
       assert.equal(filed.code, 0, filed.err)
       const groomed = await cli(['transition', `task-${n}`, 'ready'])
       assert.equal(groomed.code, 0, groomed.err)
@@ -108,7 +108,7 @@ describe('G3 is armed by the configured column limit', () => {
     // that wants the column back without losing the key writes.
     const unlimited = await cli(['config', 'set', 'wip_limits', 'in_progress=0'])
     assert.equal(unlimited.code, 0, unlimited.err)
-    const seventh = await cli(['file', 'task', 'Task number 7', '--id', 'task-7', '--points', '1'])
+    const seventh = await cli(['file', 'task', 'Task number 7', '--id', 'task-7'])
     assert.equal(seventh.code, 0, seventh.err)
     assert.equal((await cli(['transition', 'task-7', 'ready'])).code, 0)
     const started = await cli(['transition', 'task-7', 'in_progress'])
@@ -211,7 +211,7 @@ describe('config reads every key with the value in force and where it came from'
     const refused = await cli(['config', 'set', 'nonesuch', '1'])
     assert.equal(refused.code, 2)
     assert.match(refused.err, /^rule C1$/m)
-    assert.match(refused.err, /^"cause nonesuch is not a configuration key; they are review_step, point_scale/m)
+    assert.match(refused.err, /^"cause nonesuch is not a configuration key; they are review_step, next_weights/m)
   })
 
   it('writes only the keys this workspace set, leaving the rest to the compiled-in default', async () => {
