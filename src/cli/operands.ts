@@ -64,14 +64,18 @@ function shapesOf(command: Command): readonly Shape[] {
   return command.usage.map((line) => shapeOf(line, command.name))
 }
 
+/** Whether this line writes every subcommand word the usage line spells out. */
+function literalsMatch(shape: Shape, operands: readonly string[]): boolean {
+  return shape.slots.every((slot, at) => slot.kind !== 'literal' || operands[at] === slot.word)
+}
+
 /**
  * The usage line this call is written against: the first whose subcommand words all match.
  * A line that matches none is a line the command refuses on its own verb, and refusing it
  * here first would answer about an operand the caller has not reached yet.
  */
 function shapeFor(command: Command, operands: readonly string[]): Shape | undefined {
-  return shapesOf(command).find(({ slots }) =>
-    slots.every((slot, at) => slot.kind !== 'literal' || operands[at] === slot.word))
+  return shapesOf(command).find((shape) => literalsMatch(shape, operands))
 }
 
 export type EntityOperand = {
@@ -121,4 +125,66 @@ export function operandRefusal(
     })
   }
   return undefined
+}
+
+/** The count as this tool's prose writes it, which is a word up to five and a numeral after. */
+function counted(n: number): string {
+  return ['no', 'one', 'two', 'three', 'four', 'five'][n] ?? String(n)
+}
+
+/**
+ * How many operands a line may write, from the usage lines whose subcommand words it matches.
+ * Exported so a suite can build the line that is one operand over each command's own bound,
+ * rather than against a hand list that the fifteenth command would not be on.
+ *
+ * `undefined` means the bound does not apply, for either of two reasons. A usage line ending
+ * in `...` takes any number, which is `set`'s assignments. And a line matching no usage line
+ * that opens with a subcommand word is the command's own to refuse: `evidence list x` is
+ * answered by naming the verb, and a count past a verb the caller never reached answers
+ * nothing.
+ *
+ * A subcommand word is a literal in the FIRST slot, and only there. `transition <id>
+ * cancelled --resolution <r>` spells a literal in the second, where it names one target state
+ * of the `<target>` slot beside it rather than a verb of its own; reading that as a verb left
+ * `transition <id> ready extra` refused and `transition <id> in_progress extra` accepted,
+ * which is the bound holding for two of the seven states a caller can name.
+ */
+export function operandLimit(command: Command, operands: readonly string[]): number | undefined {
+  const shapes = shapesOf(command)
+  const verbed = shapes.filter((shape) => shape.slots[0]?.kind === 'literal')
+  if (verbed.length > 0 && !verbed.some((shape) => literalsMatch(shape, operands))) return undefined
+  let most = 0
+  for (const shape of shapes.filter((shape) => literalsMatch(shape, operands))) {
+    if (shape.repeats) return undefined
+    most = Math.max(most, shape.slots.length)
+  }
+  return most
+}
+
+/**
+ * An operand past the last one the command's usage publishes, as a refusal.
+ *
+ * Twelve of the fourteen commands read the operand indices they wanted and dropped the rest
+ * without a word: `backlog ready`, written for `backlog --state ready`, listed every item at
+ * exit 0, and `show <id> desc` printed the whole record rather than the field. The count is
+ * the whole of the answer and no operand is echoed: an extra operand is outside every slot
+ * the entity bound above reads, so it is a caller string nothing has held to a line.
+ *
+ * `remove` is the one command this passes over. It refuses the same shape one layer down with
+ * a sentence about what a dropped id would cost - a record left filed - which is the reason
+ * this bound exists at all and not a sentence a count can say.
+ */
+export function arityRefusal(
+  command: string | undefined, operands: readonly string[],
+): ResultObject | undefined {
+  if (command === undefined || command === 'remove') return undefined
+  const known = commandNamed(command)
+  if (known === undefined) return undefined
+  const most = operandLimit(known, operands)
+  if (most === undefined || operands.length <= most) return undefined
+  return errorResult({
+    code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
+    cause: `${command} takes ${counted(most)} operand${most === 1 ? '' : 's'} and this line writes ${operands.length}, so operand ${most + 1} would be read by nothing`,
+    fix: [`treadle help ${command}`],
+  })
 }

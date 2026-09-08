@@ -223,6 +223,21 @@ export const humanRenderer: Renderer = {
         const text = String(value)
         if (text.length === 0) continue
         open()
+        // A text scalar that fits the line is written on it, like every other scalar. The
+        // label-then-indented-value shape below is for a value that has to wrap, and it was
+        // reached for every text-marked field at every width up to the 200-cell ceiling:
+        // `show` printed `assignee` and then `kim` on the next line, so three fields of eight
+        // broke the alignment the other five kept, and the first thing a person sees was a
+        // record laid out two ways at once.
+        //
+        // A value carrying a newline stays a block whatever it measures. The rendering is
+        // line-oriented, the wrap below is what turns a paragraph into lines, and a delimiter
+        // reaching a scalar line is the class the operand and flag bounds exist to stop.
+        const inline = `  ${property.key}  ${isolated(text)}`
+        if (!text.includes('\n') && displayWidth(inline) <= width) {
+          lines.push(inline)
+          continue
+        }
         lines.push(`  ${property.key}`)
         for (const line of wrap(isolated(text), width - 4, '    ')) lines.push(line)
         continue
