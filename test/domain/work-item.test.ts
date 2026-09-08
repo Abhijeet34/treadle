@@ -170,3 +170,42 @@ describe('unknown fields carried alongside the known ones', () => {
     assert.equal(errorOf(validateWorkItem(item('task', { extra }), OPTIONS)).rule, 'V2')
   })
 })
+
+// `evidence add`'s own summary is "Append one bounded pointer at an artefact a third party
+// can open". `pr banana` was stored, printed by `show` as a pointer and satisfied `DOD7`, so
+// the promise was one the store did not keep for the two kinds whose shape is knowable.
+describe('an evidence ref of a kind with a knowable shape', () => {
+  const withEvidence = (kind: string, ref: string) =>
+    validateWorkItem(item('task', { evidence: [{ kind, ref } as never] }), OPTIONS)
+
+  it('refuses a pr and a url that name no artefact, and says what the form is', () => {
+    const pr = errorOf(withEvidence('pr', 'banana'))
+    assert.equal(pr.rule, 'V4')
+    assert.ok(pr.message.includes('"banana"') && pr.message.includes('<owner>/<repo>#<number>'), pr.message)
+
+    const url = errorOf(withEvidence('url', 'not-a-url'))
+    assert.ok(url.message.includes('http://') && url.message.includes('"not-a-url"'), url.message)
+  })
+
+  it('accepts every form each kind actually takes', () => {
+    for (const ref of ['42', '#42', 'acme/treadle#42', 'https://example.test/pr/42', 'http://example.test/pr/42']) {
+      assert.equal(withEvidence('pr', ref).ok, true, ref)
+    }
+    assert.equal(withEvidence('url', 'https://example.test/runbook').ok, true)
+  })
+
+  it('leaves the five kinds no pattern separates from a typo to the ref bounds alone', () => {
+    for (const kind of ['commit', 'run', 'test', 'file', 'report']) {
+      assert.equal(withEvidence(kind, 'banana').ok, true, kind)
+    }
+  })
+
+  // A field narrowing may not turn into a store outage: a record written before this check
+  // still reads, which is the `storedProse` rule every narrowed bound here follows.
+  it('still serves a record stored before the check', () => {
+    assert.equal(
+      validateWorkItem(item('task', { evidence: [{ kind: 'pr', ref: 'banana' }] }), { ...OPTIONS, storedProse: true }).ok,
+      true,
+    )
+  })
+})

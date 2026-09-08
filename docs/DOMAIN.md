@@ -130,6 +130,8 @@ It is write-time only, the same `storedProse` distinction every narrowed bound h
 `EVIDENCE_KINDS` is closed: `commit`, `pr`, `run`, `test`, `file`, `url`, `report`.
 An `EvidencePointer` is a `kind`, a `ref` and an optional `label`, and `evidence` is a list of them on every work item.
 It is a pointer at an artefact that lives elsewhere, never the artefact, because the store is committed to git and a screenshot in a shard is a binary in a text repository.
+A `url` ref begins `http://` or `https://` and a `pr` ref is a URL, a number, `#<number>` or `<owner>/<repo>#<number>`; the other five kinds are a hash, a path, a run id, a test name and a report name, which no pattern separates from a typo, so they carry the ref bounds alone.
+Both shape checks are write-time only, so a record stored before them still reads.
 [architecture/adr/0011-evidence-and-the-severity-audit.md](architecture/adr/0011-evidence-and-the-severity-audit.md) carries the argument.
 
 Readiness and doneness requirements are not here: they live in the gates, because the model's own design is that the gate is what makes a type's fields bite.
@@ -258,7 +260,7 @@ Default done gate:
 |---|---|---|
 | `DOD1` | all | Every child is done or cancelled |
 | `DOD2` | all | No impediment is still open against the item |
-| `DOD3` | all | A reviewer other than the assignee accepted it, when the type has a review step |
+| `DOD3` | all | A reviewer other than the assignee is named, when the type has a review step |
 | `DOD4` | story | Every acceptance criterion is ticked |
 | `DOD5` | spike | The spike records its findings |
 | `DOD6` | bug | The fix is confirmed |

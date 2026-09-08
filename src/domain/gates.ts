@@ -87,7 +87,10 @@ export const DEFAULT_DONE_GATE: Gate = {
   rules: [
     { id: 'DOD1', scope: 'all', sentence: 'Every child is done or cancelled.', check: { kind: 'no_open_child' } },
     { id: 'DOD2', scope: 'all', sentence: 'No impediment is still open against the item.', check: { kind: 'no_open_impediment' } },
-    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee accepted it, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
+    // The sentence says "is named" and not "accepted it" because the check reads `reviewer`
+    // against `assignee` and never the actor of `accept`; a rule's sentence is printed by
+    // `config` and `explain`, so it may not promise more than the code decides.
+    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
     { id: 'DOD4', scope: 'story', sentence: 'Every acceptance criterion is ticked.', check: { kind: 'list_all_ticked', field: 'acceptance_criteria' } },
     { id: 'DOD5', scope: 'spike', sentence: 'The spike records its findings.', check: { kind: 'field_present', field: 'findings' } },
     { id: 'DOD6', scope: 'bug', sentence: 'The fix is confirmed.', check: { kind: 'field_is_true', field: 'fix_confirmed' } },

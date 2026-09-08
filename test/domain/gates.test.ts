@@ -184,6 +184,16 @@ describe('the default done gate', () => {
     )
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, other).pass, true)
   })
+
+  // The sentence is printed by `config` and by `explain`, and it said the reviewer "accepted
+  // it" while the check reads two fields and never the actor of `accept`: the assignee named
+  // a reviewer with one `set` and accepted their own work at exit 0.
+  it('states in DOD3 what the check decides, which is that a reviewer is named', () => {
+    const rule = DEFAULT_DONE_GATE.rules.find((r) => r.id === 'DOD3')
+    assert.equal(rule?.sentence, 'A reviewer other than the assignee is named, when the type has a review step.')
+    assert.ok(!/accept/i.test(rule?.sentence ?? ''),
+      'no gate rule may claim an actor it does not read; DOD3 reads reviewer against assignee')
+  })
 })
 
 describe('a workspace-configured gate runs through the same evaluator', () => {
