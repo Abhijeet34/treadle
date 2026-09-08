@@ -59,7 +59,7 @@ Neither is required and nothing prompts for one, so a workspace run without eith
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 1,915 tests in 131 seconds on Node 24.11.1 on 2026-09-08.
+The suite ran 1,925 tests in 99 seconds on Node 24.11.1 on 2026-09-08.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
