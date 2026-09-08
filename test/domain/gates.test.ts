@@ -204,14 +204,43 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, other).pass, true)
   })
 
-  // The sentence is printed by `config` and by `explain`, and it said the reviewer "accepted
-  // it" while the check reads two fields and never the actor of `accept`: the assignee named
-  // a reviewer with one `set` and accepted their own work at exit 0.
-  it('states in DOD3 what the check decides, which is that a reviewer is named', () => {
+  // The field half of the rule is above; this is the half that reads who is asking. A gate
+  // that read the reviewer field alone made the review step a field to fill in: the assignee
+  // named any reviewer with one `set` and then ran the accept, and `transition` answered
+  // `guards G6 pass` at exit 0 over work nobody else had looked at.
+  it('refuses DOD3 when the actor running the move is the item\'s own assignee', () => {
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run', ref: '8813' }] }
+    const byReviewer = gateContext(item('task', named), { reviewStep: true, actor: 'kim' })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, byReviewer).pass, true)
+
+    const bySomeoneElse = gateContext(item('task', named), { reviewStep: true, actor: 'ravi' })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, bySomeoneElse).pass, true,
+      'the rule asks that the assignee is not the one accepting, not that the reviewer is')
+
+    const byAssignee = gateContext(item('task', named), { reviewStep: true, actor: 'dana' })
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, byAssignee)
+    assert.deepEqual(failed(verdict), ['DOD3'])
+    const rule = verdict.rules.find((r) => r.rule === 'DOD3')
+    assert.equal(rule?.reason, 'dana is the assignee, and the assignee does not accept their own work')
+    assert.equal(rule?.remedy, 'treadle set task-1 assignee=<name>',
+      'the remedy is a line the caller can run, because no command makes the caller another person')
+  })
+
+  // A gate is evaluated by `config` and by `explain` as well as by `G6`, and only a move has
+  // an actor. A context without one decides on the field alone, which is what it decided
+  // before the actor was read at all.
+  it('decides DOD3 on the reviewer field alone when no actor is supplied', () => {
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run', ref: '8813' }] }
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true })).pass, true)
+  })
+
+  // The sentence is printed by `config` and by `explain`, so it may promise neither more nor
+  // less than the check decides. It used to say the reviewer "accepted it" over a check that
+  // read two fields and no actor; the check now reads the actor, so the sentence says so.
+  it('states in DOD3 what the check decides, which is both the reviewer and the caller', () => {
     const rule = DEFAULT_DONE_GATE.rules.find((r) => r.id === 'DOD3')
-    assert.equal(rule?.sentence, 'A reviewer other than the assignee is named, when the type has a review step.')
-    assert.ok(!/accept/i.test(rule?.sentence ?? ''),
-      'no gate rule may claim an actor it does not read; DOD3 reads reviewer against assignee')
+    assert.equal(rule?.sentence,
+      'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.')
   })
 })
 

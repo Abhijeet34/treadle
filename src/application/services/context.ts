@@ -81,6 +81,16 @@ const SERVED_ANYWAY: ReadonlySet<string> = new Set([
   // workspace nothing is wrong with. A `doctor` that exited 7 for either would tell a CI job
   // that a slow story is the same event as a truncated shard.
   'H03', 'H04',
+  // The audit note, by the same test. `H19` names who wrote a field on an item they are
+  // assigned; the record serves whole and nothing about the store is wrong, and ADR-0011
+  // already says of it that "it does not refuse: the log says who, and the person reading the
+  // pull request decides". The code disagreed, because every rule not listed here refuses.
+  // That mattered little while `H19` read `item.mark` alone and matters now that it reads an
+  // assignee naming their own reviewer, which is an ordinary thing to do: `doctor` would have
+  // exited 7 on a workspace with nothing wrong with it, which is the trap `H27` was narrowed
+  // to escape. The move that stops a self-review is `DOD3`, at write time, where a refusal
+  // belongs; this stays a line a reader weighs.
+  'H19',
 ])
 
 /** Takes a store `Finding` or a `doctor` one: both name a rule and the rule is the decision. */
