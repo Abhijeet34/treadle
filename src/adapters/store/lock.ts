@@ -3,10 +3,19 @@
 // proof of death or a stopped heartbeat.
 //
 // The reference's mistake, designed out: it ran a fixed 2.5 second acquisition budget and
-// refused three of twelve serialised 300 millisecond writers. There is no budget here. A
-// waiter waits for as long as the holder is alive and heartbeating; the only things that
-// end a wait are the holder finishing, the holder dying, or its heartbeat stopping.
-// `timeoutMs` exists for a caller that explicitly wants a bound and is absent by default.
+// refused three of twelve serialised 300 millisecond writers. There is no total budget here.
+// A waiter waits for as long as the lock keeps changing hands; the things that end a wait are
+// the holder finishing, the holder dying, its heartbeat stopping, or - `holderTimeoutMs` -
+// one holder keeping it that long without ever letting go. `timeoutMs`, a bound on the whole
+// wait, exists for a caller that explicitly wants one and is absent by default.
+//
+// The distinction is what keeps the reference's failure out. A total budget refuses honest
+// contention, which resolves itself: twelve serialised 300 ms writers spend 4.17 seconds
+// waiting and every one of them should be served. A per-holder budget refuses only a lock
+// that has not moved, which does not resolve itself: measured on this store, a live holder
+// heartbeating every 500 ms held a second command silent past 20 seconds with nothing
+// printed and no bound to reach. A critical section here is milliseconds, so a holder past
+// the budget is stuck rather than busy, and saying so beats waiting forever.
 //
 // Liveness alone is not enough, which is why the heartbeat exists: a process paused in a
 // debugger answers `kill(pid, 0)` forever, while its heartbeat timer, which runs on the
@@ -54,8 +63,14 @@ export type LockHandle = {
 }
 
 export type AcquireOptions = {
-  /** Absent means no budget, which is the default and the point. */
+  /** Absent means no budget over the whole wait, which is the default and the point. */
   readonly timeoutMs?: number
+  /**
+   * How long one unchanging holder may hold the lock before a waiter refuses. Absent means
+   * without bound; the token's bytes are the identity, so a lock that changes hands resets
+   * this and serialised writers are never refused by it.
+   */
+  readonly holderTimeoutMs?: number
   /** Called once, after a second of waiting, with the holder a caller may want to report. */
   readonly onWaiting?: (token: LockToken | undefined, waitedMs: number) => void
   readonly heartbeatMs?: number
@@ -95,6 +110,10 @@ export async function acquireLock(
   const staleMs = options.staleMs ?? STALE_MS
   const started = Date.now()
   let noted = false
+  // The token's bytes, not its pid: a heartbeat only touches the mtime, so these are stable
+  // while one holder holds and different the moment the lock changes hands.
+  let holder: string | undefined
+  let holderSince = started
 
   for (;;) {
     const token: LockToken = {
@@ -121,25 +140,47 @@ export async function acquireLock(
     }
 
     const waited = Date.now() - started
+    // One read of the token serves the three judgements below, so a waiter reads the file
+    // once per attempt rather than once per question.
+    const current = await readFile(path, 'utf8').catch(() => undefined)
+    if (current !== holder) {
+      holder = current
+      holderSince = Date.now()
+    }
+
     if (options.timeoutMs !== undefined && waited >= options.timeoutMs) {
-      const holder = parseToken(await readFile(path, 'utf8').catch(() => ''))
-      return storeFail(
-        'LOCK_TIMEOUT', 'S11',
-        holder === undefined
-          ? `the lock ${path} was not acquired within ${options.timeoutMs} ms`
-          : `the lock ${path} is held by pid ${holder.pid} on ${holder.host} since ${holder.since}, and was not acquired within ${options.timeoutMs} ms`,
-        [path],
-        { waitedMs: waited },
-      )
+      return notAcquired(path, parseToken(current ?? ''), `was not acquired within ${options.timeoutMs} ms`, waited)
     }
     if (!noted && waited >= NOTE_AFTER_MS && options.onWaiting !== undefined) {
       noted = true
-      options.onWaiting(parseToken(await readFile(path, 'utf8').catch(() => '')), waited)
+      options.onWaiting(parseToken(current ?? ''), waited)
+    }
+    const holdingFor = Date.now() - holderSince
+    if (options.holderTimeoutMs !== undefined && current !== undefined && holdingFor >= options.holderTimeoutMs) {
+      return notAcquired(
+        path, parseToken(current),
+        `has not changed hands in ${holdingFor} ms, past the ${options.holderTimeoutMs} ms a holder is given; a transaction here takes milliseconds, so that holder is stuck rather than busy`,
+        waited,
+      )
     }
 
     await reclaimIfAbandoned(path, staleMs)
     await sleep(RETRY_MIN_MS + Math.floor(Math.random() * (RETRY_MAX_MS - RETRY_MIN_MS)))
   }
+}
+
+/** A wait that ended without the lock, naming the holder whenever the token can be read. */
+function notAcquired(
+  path: string, holder: LockToken | undefined, what: string, waited: number,
+): StoreResult<never> {
+  return storeFail(
+    'LOCK_TIMEOUT', 'S11',
+    holder === undefined
+      ? `the lock ${path} ${what}`
+      : `the lock ${path} is held by pid ${holder.pid} on ${holder.host} since ${holder.since}, and ${what}`,
+    [path],
+    { waitedMs: waited },
+  )
 }
 
 /**

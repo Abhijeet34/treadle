@@ -83,8 +83,20 @@ const LAYOUT = ['.', WORKSPACE_FILE, ITEMS_DIR, EVENTS_DIR, JOURNAL_DIR] as cons
 
 export type ShardedStoreOptions = {
   readonly lockTimeoutMs?: number
+  /** Overrides `HOLDER_TIMEOUT_MS`; the tests that prove the bound are what needs it small. */
+  readonly holderTimeoutMs?: number
   readonly onWaiting?: AcquireOptions['onWaiting']
 }
+
+/**
+ * How long a waiter lets one holder keep the lock before refusing. It is the store's number
+ * rather than the lock's, because the lock is a primitive with no view of what a critical
+ * section costs and this is measured against one: an `apply` is a read, a parse and two
+ * writes, milliseconds at the corpus DR2 measures against, and six times the 5 second stale
+ * window is far past anything honest work takes. A lock that keeps changing hands resets it,
+ * so contention is still waited out without a bound; only a holder that never lets go hits it.
+ */
+const HOLDER_TIMEOUT_MS = 30_000
 
 /** One file under the root, and what a stat says about it. */
 type Stamped = {
@@ -132,6 +144,59 @@ type Journal = {
   readonly txn: string
   readonly files: readonly { readonly path: string; readonly content: string }[]
   readonly events: readonly { readonly path: string; readonly lines: readonly string[]; readonly ids: readonly string[] }[]
+}
+
+/**
+ * A journal decides what the next writer writes, before anything else looks at it, and
+ * `.txn/` is a directory anything that can write the workspace can put a file in - a commit
+ * carrying an ignored path included, because `.gitignore` does not remove a tracked file on
+ * checkout. So it is parsed rather than cast. `JSON.parse(...) as Journal` turned a stray
+ * `{"garbage":true}` into `journal.files is not iterable`, uncaught, on every write forever,
+ * and a `path` of `../../elsewhere` was joined onto the root and written at exit 0.
+ */
+function parseJournal(text: string): Journal | undefined {
+  let raw: unknown
+  try {
+    raw = JSON.parse(text)
+  } catch {
+    return undefined
+  }
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const { txn, files, events } = raw as Record<string, unknown>
+  if (typeof txn !== 'string' || !Array.isArray(files) || !Array.isArray(events)) return undefined
+  for (const file of files) {
+    if (typeof file !== 'object' || file === null) return undefined
+    const entry = file as Record<string, unknown>
+    if (typeof entry['content'] !== 'string') return undefined
+    if (!writable(entry['path'], [WORKSPACE_FILE], ITEMS_DIR)) return undefined
+  }
+  for (const log of events) {
+    if (typeof log !== 'object' || log === null) return undefined
+    const entry = log as Record<string, unknown>
+    const { lines, ids } = entry
+    if (!Array.isArray(lines) || !Array.isArray(ids) || lines.length !== ids.length) return undefined
+    if (!lines.every((line) => typeof line === 'string')) return undefined
+    if (!ids.every((id) => typeof id === 'string')) return undefined
+    if (!writable(entry['path'], [], EVENTS_DIR)) return undefined
+  }
+  return raw as Journal
+}
+
+/** What a caller is told about a file in `.txn/` the store cannot replay, in one place. */
+function unreplayable(file: string): string {
+  return `${file} is not a transaction journal this store wrote, so it cannot be replayed and no write can go past it; ${JOURNAL_DIR} holds journals and nothing else, and deleting the file clears this`
+}
+
+/**
+ * The containment rule (S15) on the replay path: a journal may name the workspace record or
+ * one file directly inside a directory the layout draws, and nothing else. One segment, not
+ * a prefix match, because `items/../../x` starts with `items/` and leaves the root.
+ */
+function writable(at: unknown, exact: readonly string[], dir: string): boolean {
+  if (typeof at !== 'string') return false
+  if (exact.includes(at)) return true
+  const parts = at.split('/')
+  return parts.length === 2 && parts[0] === dir && parts[1] !== '' && parts[1] !== '.' && parts[1] !== '..'
 }
 
 function monthOf(instant: string): string {
@@ -193,9 +258,10 @@ export class ShardedStore implements Store {
   /** The `#listFiles` stamp `#records` was parsed from, and the whole of what makes it reusable. */
   #stamp: string | undefined
   /**
-   * What reading the log said about the log, kept because `doctor` asks for the findings
-   * after it has read it. A command that never reads the log never pays for the scan that
-   * would fill this, which is the whole reason it is not part of `#records`.
+   * What reading the log said about the log, and what `.txn/` holds that is not a journal,
+   * kept because `doctor` asks for the findings after it has read it. A command that never
+   * reads the log never pays for the scan that would fill this, which is the whole reason it
+   * is not part of `#records`.
    */
   #logFindings: readonly Finding[] = []
 
@@ -308,13 +374,18 @@ export class ShardedStore implements Store {
 
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     const lock = await acquireLock(path.join(this.#root, LOCK_FILE), {
+      holderTimeoutMs: this.#options.holderTimeoutMs ?? HOLDER_TIMEOUT_MS,
       ...(this.#options.lockTimeoutMs === undefined ? {} : { timeoutMs: this.#options.lockTimeoutMs }),
       ...(this.#options.onWaiting === undefined ? {} : { onWaiting: this.#options.onWaiting }),
     })
     if (!lock.ok) return lock
     try {
-      await this.#recoverJournals(lock.value)
+      const recovered = await this.#recoverJournals(lock.value)
+      if (!recovered.ok) return recovered
       await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
+      // A writer killed between the journal's exclusive create and its rename leaves a temp
+      // file the sweep over `items/` never reached, and nothing else here ever removes one.
+      await sweepTempFiles(path.join(this.#root, JOURNAL_DIR))
       // The read is taken here and nowhere earlier. Every check below decides a refusal -
       // the read set, the cross-shard id, the referential rule - and a check that decides a
       // refusal may not read anything but the files as they are under this lock.
@@ -613,7 +684,7 @@ export class ShardedStore implements Store {
     const records = await this.#read()
     if (!records.ok) return records
 
-    const findings: Finding[] = []
+    const findings: Finding[] = [...await this.#journalFindings()]
     let visited = 0
     for (const file of records.value.logFiles) {
       const full = path.join(this.#root, file)
@@ -1005,28 +1076,60 @@ export class ShardedStore implements Store {
     }
   }
 
-  /** A lock holder that finds a journal re-applies it before doing its own work (DR4). */
-  async #recoverJournals(lock: LockHandle): Promise<void> {
+  /**
+   * A lock holder that finds a journal re-applies it before doing its own work (DR4).
+   *
+   * A file here that is not a journal stops the write rather than being skipped or removed:
+   * skipping it would let a transaction the store cannot read go missing in silence, and
+   * removing it would throw away a landed transaction on the guess that it holds none. The
+   * refusal names the file, which is the whole remedy, because the directory holds nothing
+   * else and `init` already says it is safe to delete.
+   */
+  async #recoverJournals(lock: LockHandle): Promise<StoreResult<undefined>> {
     const dir = path.join(this.#root, JOURNAL_DIR)
     let names: string[]
     try {
       names = await readdir(dir)
     } catch {
-      return
+      return storeOk(undefined)
     }
     for (const name of names.sort()) {
       if (!name.endsWith('.json')) continue
-      const full = path.join(dir, name)
-      let journal: Journal
-      try {
-        journal = JSON.parse(await readFile(full, 'utf8')) as Journal
-      } catch {
-        // A journal we cannot read is a journal we cannot replay; the doctor reports it.
-        continue
+      const file = `${JOURNAL_DIR}/${name}`
+      const journal = parseJournal(await readFile(path.join(dir, name), 'utf8'))
+      if (journal === undefined) {
+        return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file])
       }
       await this.#applyJournal(journal, true, lock, journal.txn)
-      await rm(full, { force: true })
+      await rm(path.join(dir, name), { force: true })
     }
+    return storeOk(undefined)
+  }
+
+  /**
+   * The same journals, judged for a reader rather than a writer. It is scanned here, beside
+   * the log, because both are files only a command answering over the whole store opens -
+   * `doctor`, `history` and `explain` - and because a read of records that are all present
+   * is still a whole answer while a write past an unreplayable journal is not. Without this
+   * `doctor` called a workspace clean that refused every write.
+   */
+  async #journalFindings(): Promise<readonly Finding[]> {
+    const dir = path.join(this.#root, JOURNAL_DIR)
+    let names: string[]
+    try {
+      names = await readdir(dir)
+    } catch {
+      return []
+    }
+    const findings: Finding[] = []
+    for (const name of names.sort()) {
+      if (!name.endsWith('.json')) continue
+      const file = `${JOURNAL_DIR}/${name}`
+      const text = await readFile(path.join(dir, name), 'utf8').catch(() => undefined)
+      if (text !== undefined && parseJournal(text) !== undefined) continue
+      findings.push({ file, line: 1, rule: 'S13', reason: unreplayable(file) })
+    }
+    return findings
   }
 }
 
