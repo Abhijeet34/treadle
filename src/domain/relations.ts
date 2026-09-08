@@ -37,8 +37,9 @@ const SYMMETRIC: ReadonlySet<RelationKind> = new Set<RelationKind>(['relates_to'
  * capability contract spells it and `relates_to` as every other closed-set value here is
  * spelled, and both name the one stored kind.
  *
- * Every declared kind resolves here, for `add` and for `remove` alike. Three of the six
- * could be written by a text editor and by no command, so `caused_by` and `discovered_from`
+ * Every declared kind resolves here, for `add` and for `remove` alike. Three of the six the
+ * set used to declare could be written by a text editor and by no command, so `caused_by` and
+ * `discovered_from`
  * gained the writer their facts deserve - "this bug was caused by that change" is what an
  * agent holds at the moment of filing - and `split_from` went with the split feature.
  */

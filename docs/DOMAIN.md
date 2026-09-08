@@ -206,7 +206,7 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 ## Relations
 
 Five kinds, each with a defined inverse, and `relation add` writes every one of them while `relation remove` takes every one back off.
-Three of the six kinds had no writer at all, so a `caused_by` edge reached a record only through a text editor and then bound the removal rule `R6` with no command able to unbind it.
+Three of the six the set used to declare had no writer at all, so a `caused_by` edge reached a record only through a text editor and then bound the removal rule `R6` with no command able to unbind it.
 `caused_by` and `discovered_from` are facts an agent holds at the moment of filing and gained the writer; `split_from` went with the split feature, and a record still carrying one is quarantined as the unknown kind it now is, with `doctor` naming the file and the line.
 [architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries the record of the earlier decision.
 

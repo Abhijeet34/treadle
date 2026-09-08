@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// The typed relation graph (domain model 2.3): six kinds, each with a defined inverse,
+// The typed relation graph (domain model 2.3): five kinds, each with a defined inverse,
 // cycle detection on write, and the derived blocked flag computed above storage.
 
 import assert from 'node:assert/strict'
@@ -97,10 +97,10 @@ describe('writing a relation', () => {
   })
 })
 
-// Three of the six kinds resolved to nothing here, so `caused_by`, `discovered_from` and
-// `split_from` could be put on a record by a text editor and by no command, and `relation
-// remove` could not take one back off: a hand-written edge bound `R6` with nothing able to
-// unbind it. Every kind the file format reads is now a kind a command writes and removes.
+// Three of the six kinds the set used to declare resolved to nothing here, so `caused_by`,
+// `discovered_from` and `split_from` could be put on a record by a text editor and by no
+// command, and `relation remove` could not take one back off: a hand-written edge bound `R6`
+// with nothing able to unbind it. Each of the five now declared is written and removed.
 describe('the kinds a caller may write', () => {
   it('resolves every declared kind, for add and for remove alike', () => {
     for (const kind of RELATION_KINDS) assert.equal(relationKindOf(kind), kind, kind)
