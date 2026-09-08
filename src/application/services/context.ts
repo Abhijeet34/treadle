@@ -148,7 +148,7 @@ export function activeBlockers(view: WorkspaceView, id: ItemId): readonly ItemId
 /**
  * Every blocked item to its active blockers, from one pass over the graph. `activeBlockers`
  * above walks the whole relation list per call, which is the right cost for the one item a
- * command acts on and a quadratic one for a read over every item; `board` is that read.
+ * command acts on and a quadratic one for a read over every item; `next` is that read.
  * An id absent here has no active blocker, and the blockers keep the graph's order, which
  * is the order `activeBlockers` returns them in.
  */
@@ -280,7 +280,7 @@ export function guardReads(view: WorkspaceView, item: WorkItem): readonly ItemRe
 /**
  * `G3`'s input for one target state: how many records already sit in that column, and the
  * configured limit. A state the workspace limits nowhere yields no column at all, which is
- * the shape `TransitionContext` documents as "no board" and which G3 passes on, so a
+ * the shape `TransitionContext` documents as "no limit" and which G3 passes on, so a
  * workspace that configures nothing behaves exactly as ADR-0018 left it.
  */
 function columnFor(view: WorkspaceView, to: WorkItemState | undefined): TransitionContext['column'] {

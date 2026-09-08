@@ -43,6 +43,7 @@ version: 3
 priority: 2
 points: 5
 hours_estimate: 6
+timebox_hours: 4
 assignee: kim
 component: payments
 sprint_id: sprint-31
@@ -96,6 +97,7 @@ describe('a record written before the fields were retired', () => {
         ['hours_estimate', '6'],
         ['points', '5'],
         ['sprint_id', 'sprint-31'],
+        ['timebox_hours', '4'],
       ],
     )
   })
@@ -103,9 +105,9 @@ describe('a record written before the fields were retired', () => {
   it('reports them to a reader as a count, never as fields this build could validate', async () => {
     const shown = await showItem(store, fixedClock(NOW), 'legacy-story')
     assert.equal(shown.ok, true)
-    assert.equal(shown.data['extra'], 4)
+    assert.equal(shown.data['extra'], 5)
     const printed = agentRenderer.render(shown)
-    for (const gone of ['pts', 'sprint', 'hrs', 'component']) {
+    for (const gone of ['pts', 'sprint', 'hrs', 'component', 'timebox']) {
       assert.equal(printed.includes(`\n${gone} `), false, `show printed a retired key as ${gone}`)
     }
   })
@@ -117,7 +119,7 @@ describe('a record written before the fields were retired', () => {
     assert.equal(written.ok, true, String(written.data['cause']))
 
     const shard = await readFile(path.join(root, 'items', '2026-08.md'), 'utf8')
-    for (const line of ['points: 5', 'hours_estimate: 6', 'component: payments', 'sprint_id: sprint-31']) {
+    for (const line of ['points: 5', 'hours_estimate: 6', 'timebox_hours: 4', 'component: payments', 'sprint_id: sprint-31']) {
       assert.ok(shard.includes(line), `the write dropped ${JSON.stringify(line)} from the shard`)
     }
     assert.ok(shard.includes('reviewer: ravi'), 'the write did not land')

@@ -193,7 +193,7 @@ const NEVER_PROSE = new Set<string>([...AUDITED_FIELDS, 'ref'])
  * prints verbatim, and a reader splitting the cell on commas tells a continuation from a pair
  * by the `=` a pair always carries.
  */
-const LISTED = new Set<string>(['carried', 'finished', 'labels'])
+const LISTED = new Set<string>(['labels'])
 
 /**
  * The two configuration keys whose value is a list of gate rules, each ending in a sentence.

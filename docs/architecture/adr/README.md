@@ -55,8 +55,8 @@ Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
 
 A record is never rewritten when a later one overtakes part of it, because the argument it made is the thing worth reading and a rewritten record is a record of nothing.
-What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands.
-ADR-0002, ADR-0003, ADR-0004 and ADR-0006 carry that line today, each having reasoned from the absence of an entity, a command or a layer that has since been built, and ADR-0005's own hook-code bullet was the first to be marked this way.
+What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands; a record overtaken more than once carries one such line per record that overtook part of it, in the order they landed.
+ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0011, ADR-0012, ADR-0014, ADR-0017, ADR-0021, ADR-0022, ADR-0024, ADR-0025 and ADR-0026 carry that line today: some reasoned from the absence of an entity, a command or a layer that has since been built, and the rest reasoned from a surface — a flag, a field, a command or an operation — that this repository has since removed. ADR-0002 and ADR-0006 carry both kinds, one line each. ADR-0005's own hook-code bullet was the first to be marked this way.
 A record with no such line has not been overtaken, which is the claim the line exists to make checkable.
 A `**Superseded by:**` line is the stronger form of the same mark, for a record whose whole subject a later one removed rather than reshaped: the argument still reads and the surface it argued for is not in the tree.
 ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028 carry that line, all five naming ADR-0029.

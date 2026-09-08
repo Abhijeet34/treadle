@@ -195,7 +195,7 @@ walk is exact over a workspace nothing is writing to, proved by count at 50,021 
 the cursor while the walk runs is skipped, and one that moves the other way is returned twice.
 A cursor the list no longer holds is refused with `C1` rather than served as the first page,
 which is what it used to be. `invocation` in `src/application/services/items.ts` builds every
-such line, and a `whole` line on the board is built the same way.
+such line.
 
 ## Narrowing a bound after files exist
 

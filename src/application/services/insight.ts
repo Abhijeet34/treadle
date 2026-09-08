@@ -441,12 +441,11 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // What `findings` above counts, said where it is read. That number is the structural
       // set the store computes on the read this call already performs: a record it holds and
       // cannot serve. `doctor` reads every record against the event log and its gates
-      // besides, so a store with an `H26` or an `H20` reads `findings 0` here and exits 7
-      // there, and a caller that treated the orientation call as the whole check never ran
-      // the other one. Running the audit here instead would put this call at doctor's cost,
-      // 3,523 ms against 479 at 50,000 items (bench/budgets.json), so the orientation call
-      // stays the cheap one and says what it did not do. `H26` was one of the rules that made
-      // that gap, and `H20` still does.
+      // besides, so a store with an `H20` reads `findings 0` here and exits 7 there, and a
+      // caller that treated the orientation call as the whole check never ran the other one.
+      // Running the audit here instead would put this call at doctor's cost, 3,523 ms
+      // against 479 at 50,000 items (bench/budgets.json), so the orientation call stays the
+      // cheap one and says what it did not do. `H20` is one of the rules that make that gap.
       audit: 'not run here; treadle doctor reads every record against the event log',
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),

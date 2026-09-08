@@ -48,6 +48,7 @@ What is not removed is everything that records something: the seven work-item ty
 The item codec already carried an unknown field key into `extra` and wrote it back unchanged (DR3), and `sprint_id`, `points`, `hours_estimate`, `timebox_hours` and `component` become unknown keys the moment they leave the dictionary.
 So a workspace written by the build before this one loads, serves and round-trips every one of them; `show` reports them as an `extra` count rather than printing values this build cannot validate, and the next write to that record carries them forward.
 That is the file-format promise in docs/STABILITY.md kept by the mechanism that was already there, and it is what makes a removal of five fields a change no workspace has to migrate for.
+treadle's own `.work` store is not exempt from this: its records were filed before this build and keep `points` as a retired key for exactly this reason, the same `extra` path a stranger's workspace takes.
 
 **`I5` becomes `V9`.** Four of the five `I` rules were the sprint's and went with it, and the fifth was never about sprints: it is the rule that an id names one thing, which `file` raises for a taken id and `history --txn` raises for an event id given where a transaction was wanted. Both branches survive the cut, so the rule moves into the `V` namespace `docs/DOMAIN.md` already owns rather than being the last inhabitant of a namespace that is otherwise empty.
 
