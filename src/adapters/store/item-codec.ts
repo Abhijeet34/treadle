@@ -17,7 +17,7 @@ import {
   type WorkItem,
 } from '../../domain/index.ts'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
-import { unwritableBodyLine, type ParsedRecord, type Section } from './grammar.ts'
+import type { ParsedRecord, Section } from './grammar.ts'
 
 /**
  * Load-time validation checks structure, not liveness. `hold_until` must be in the future
@@ -279,10 +279,6 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
         : field === 'relations'
           ? relationsTo(value as readonly StoredRelation[])
           : (value as string)
-    const bad = unwritableBodyLine(body)
-    if (bad !== undefined) {
-      return refuse('S1', `${item.id}: ${field} has the line "${bad}", and a body line may not start with # at column 0`, item.id)
-    }
     if (body.length > 0) sections.push({ name, body })
   }
   if (base !== undefined) {

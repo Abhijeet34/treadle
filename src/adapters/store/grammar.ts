@@ -240,7 +240,7 @@ function parseSegment(lines: readonly Line[], first: number, source?: string): S
 
   const closeSection = (): void => {
     if (body === undefined) return
-    sections.push({ name: sectionName, body: trimBlankEdges(body).join('\n') })
+    sections.push({ name: sectionName, body: unescapeBody(trimBlankEdges(body).join('\n')) })
     body = undefined
   }
 
@@ -333,6 +333,35 @@ function parseSegment(lines: readonly Line[], first: number, source?: string): S
       line: first,
     },
   }
+}
+
+/** Whether a line would read as a heading once any leading backslashes are taken off. */
+function unescapesToHash(line: string): boolean {
+  let at = 0
+  while (at < line.length && line[at] === '\\') at += 1
+  return line[at] === '#'
+}
+
+/**
+ * DR3 rule 4, both directions. A body line beginning with `#` would re-parse as a record or
+ * section heading, so the canonical form carries CommonMark's own backslash escape: one
+ * backslash is added to any line matching `\\*#` on the way out and one is taken off on the
+ * way in. That is a bijection over exactly those lines, so prose that already reads `\#` is
+ * stored as `\\#` and comes back as itself; every other line is untouched in both directions.
+ * A markdown reader renders the escaped line as the literal text the record holds, which is
+ * why the escape is a backslash rather than an indent: the file still shows the prose.
+ */
+function escapeBody(body: string): string {
+  if (!body.includes('#')) return body
+  return body.split('\n').map((line) => (unescapesToHash(line) ? `\\${line}` : line)).join('\n')
+}
+
+function unescapeBody(body: string): string {
+  if (!body.includes('\\')) return body
+  return body
+    .split('\n')
+    .map((line) => (line.startsWith('\\') && unescapesToHash(line) ? line.slice(1) : line))
+    .join('\n')
 }
 
 function trimBlankEdges(lines: readonly string[]): readonly string[] {
@@ -489,14 +518,6 @@ export function withoutRecord(file: ParsedFile, id: string): ParsedFile {
   return { ...file, ...resolveIdentity(chunks) }
 }
 
-/**
- * A section body line beginning with `#` at column 0 would re-parse as a record heading or
- * a section heading, so DR3 rule 1 refuses to write one. Read stays permissive: such a line
- * in a hand-edited file is quarantined by the segment split, never silently re-homed.
- */
-export function unwritableBodyLine(body: string): string | undefined {
-  return body.split('\n').find((line) => line.startsWith('#'))
-}
 
 /**
  * One record's bytes back to a record, for a caller holding the source alone: the index
@@ -539,7 +560,7 @@ export function renderRecord(record: {
   let out = `# ${record.id}: ${record.title}\n\n`
   for (const [key, value] of record.fields) out += `${key}: ${value}\n`
   for (const section of record.sections) {
-    const body = trimBlankEdges(section.body.split('\n')).join('\n')
+    const body = escapeBody(trimBlankEdges(section.body.split('\n')).join('\n'))
     out += `\n## ${section.name}\n\n${body === '' ? '' : `${body}\n`}`
   }
   return `${out}\n`

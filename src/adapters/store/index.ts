@@ -26,7 +26,6 @@ export {
   renderFile,
   renderHeader,
   renderRecord,
-  unwritableBodyLine,
   type Chunk,
   type ParsedFile,
   type ParsedRecord,
