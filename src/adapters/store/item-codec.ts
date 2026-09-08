@@ -17,7 +17,7 @@ import {
   type WorkItem,
 } from '../../domain/index.ts'
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
-import type { ParsedRecord, Section } from './grammar.ts'
+import { hiddenRecordBoundary, type ParsedRecord, type Section } from './grammar.ts'
 
 /**
  * Load-time validation checks structure, not liveness. `hold_until` must be in the future
@@ -285,6 +285,14 @@ export function encodeItem(item: WorkItem, base?: ParsedRecord): StoreResult<Enc
     for (const section of base.sections) {
       if (!SECTION_BY_NAME.has(section.name)) sections.push(section)
     }
+  }
+
+  // A column-0 heading in prose is escaped by the grammar and needs no refusal here. What is
+  // still unwritable is a body that would re-parse as a second record: the grammar reports it
+  // with the same function the read path resynchronises on, so the two cannot drift apart.
+  const hidden = hiddenRecordBoundary({ id: item.id, title: item.title, fields, sections })
+  if (hidden !== undefined) {
+    return refuse('S1', `${item.id}: the line "${hidden}" would be read back as a second record's heading, so this record could not be read back whole`, item.id)
   }
 
   return storeOk({ id: item.id, title: item.title, fields, sections })

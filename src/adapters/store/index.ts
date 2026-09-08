@@ -21,6 +21,7 @@ export {
 } from './event-log.ts'
 
 export {
+  hiddenRecordBoundary,
   parseFile,
   parseRecordSource,
   renderFile,

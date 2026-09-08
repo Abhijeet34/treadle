@@ -537,6 +537,26 @@ function sourceOf(chunk: Chunk): string {
   return chunk.kind === 'record' ? chunk.record.source : chunk.quarantine.source
 }
 
+/**
+ * The line in a rendered record that `parseFile` would resynchronise on as a second record's
+ * heading, or undefined. The write path calls this rather than bounding a shape of its own,
+ * so the bound on a write is literally the predicate the read applies: a body that quotes a
+ * record's mandatory field block, or an indented heading above one, is refused by name
+ * instead of being written and then quarantined on the way back. `escapeBody` has already
+ * neutralised every column-0 heading by the time this runs, so an ordinary heading in prose
+ * reaches the file and only a genuine hidden boundary is refused.
+ */
+export function hiddenRecordBoundary(record: {
+  readonly id: string
+  readonly title: string
+  readonly fields: ReadonlyMap<string, string>
+  readonly sections: readonly Section[]
+}): string | undefined {
+  const lines = splitLines(renderRecord(record))
+  const at = damagedHeadingAt(lines, 1, lines.length, true)
+  return at === undefined ? undefined : (lines[at] as Line).text
+}
+
 /** Byte-exact for a file the tool has not mutated, because no chunk is re-rendered. */
 export function renderFile(file: { readonly header: string; readonly chunks: readonly Chunk[] }): string {
   return file.header + file.chunks.map(sourceOf).join('')

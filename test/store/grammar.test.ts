@@ -13,7 +13,7 @@ import {
   renderRecord,
   type Section,
 } from '../../src/adapters/store/index.ts'
-import { decodeItem, encodeItem } from '../../src/adapters/store/index.ts'
+import { decodeItem, encodeItem, hiddenRecordBoundary } from '../../src/adapters/store/index.ts'
 import { Gen } from '../helpers/store-fixtures.ts'
 
 const DOCUMENTS = 400
@@ -103,10 +103,10 @@ describe('a work item survives encode, render, parse and decode unchanged', () =
     for (let seed = 1; seed <= ITEMS; seed += 1) {
       const item = new Gen(seed + 200_000).workItem()
       const encoded = encodeItem(item)
-      // The generator can produce a section body whose line starts with `#` at column 0,
-      // which DR3 rule 4 refuses by name on the write path. That is the encoder working,
-      // not the property failing, so it is counted and the rule id is asserted; the
-      // alternative is a property that silently passes because no seed happened to hit it.
+      // What the write path still refuses is a body that would be read back as a second
+      // record, not a heading in prose; DR3 rule 4 escapes those. A refusal here is the
+      // encoder working, so it is counted and the rule id asserted, rather than the
+      // property silently passing because no seed happened to hit it.
       if (!encoded.ok) {
         assert.equal(encoded.error.rule, 'S1', `seed ${seed}: ${encoded.error.message}`)
         refused += 1
@@ -221,5 +221,124 @@ describe('a newer tool\'s fields and sections travel through a mutation', () => 
     assert.ok(re.ok)
     assert.equal(re.value.fields.get('a_field_from_2027'), 'kept')
     assert.deepEqual(re.value.sections.at(-1), { name: 'A Section From 2027', body: 'kept too' })
+  })
+})
+
+describe('a markdown heading inside a record body', () => {
+  // DR3 rule 4 escapes rather than refuses, so these are the shapes a fleet backlog body
+  // actually carries. Each must reach the file, survive the round trip byte for byte, and
+  // stay one section: an unescaped `## ` line would open a second section instead.
+  const BODIES = [
+    '# a plain heading',
+    '## The concern that must be priced into any answer',
+    '###### six hashes',
+    '#',
+    '#nospace',
+    '\\## prose that already carries a backslash',
+    '\\\\## prose that carries two',
+    '\\not a heading at all',
+    'above\n## in the middle\nbelow',
+    '# alpha-two: a title-shaped line with no field block under it',
+  ]
+
+  for (const body of BODIES) {
+    it(`round trips ${JSON.stringify(body)}`, () => {
+      const source = renderRecord({
+        id: 'alpha-one',
+        title: 'Alpha',
+        fields: new Map([['type', 'task'], ['state', 'draft']]),
+        sections: [{ name: 'Description', body }],
+      })
+      const parsed = parseRecordSource(source, 1)
+      assert.ok(parsed.ok, parsed.ok ? '' : parsed.reason)
+      assert.deepEqual(parsed.record.sections, [{ name: 'Description', body }])
+      assert.equal(renderRecord(parsed.record), source, 'the escaped record is not a fixed point')
+    })
+  }
+
+  it('writes CommonMark\'s own escape, so a reader sees the prose the record holds', () => {
+    const source = renderRecord({
+      id: 'alpha-one',
+      title: 'Alpha',
+      fields: new Map([['state', 'draft']]),
+      sections: [{ name: 'Description', body: '## A heading' }],
+    })
+    assert.match(source, /^\\## A heading$/m)
+    assert.doesNotMatch(source, /^## A heading$/m)
+  })
+
+  // At file level a `# ` body line is the record boundary itself and a `## ` one is a
+  // section heading, so this is where an unescaped heading costs a record rather than a
+  // section: the file below holds two records whatever the prose in the first one says.
+  for (const body of ['# gamma-one: a heading that reads like a record', '## Design notes']) {
+    it(`keeps a file at two records with ${JSON.stringify(body)} in the first body`, () => {
+      const first = renderRecord({
+        id: 'alpha-one',
+        title: 'Alpha',
+        fields: new Map([['type', 'task'], ['state', 'draft']]),
+        sections: [{ name: 'Description', body }],
+      })
+      const second = renderRecord({
+        id: 'gamma-one', title: 'Gamma', fields: new Map([['state', 'ready']]), sections: [],
+      })
+      const text = `${renderHeader(1)}${first}${second}`
+      const parsed = parseFile(text, 'items/2026-09.md')
+      assert.ok(parsed.ok)
+      assert.deepEqual(parsed.value.records.map((r) => r.id), ['alpha-one', 'gamma-one'])
+      assert.deepEqual(parsed.value.quarantined, [])
+      assert.deepEqual(parsed.value.records[0]?.sections, [{ name: 'Description', body }])
+      assert.equal(renderFile(parsed.value), text)
+    })
+  }
+
+  it('is not lost when the record is rewritten, because the escape does not accumulate', () => {
+    const body = '## A heading'
+    let source = renderRecord({
+      id: 'alpha-one', title: 'Alpha',
+      fields: new Map([['state', 'draft']]), sections: [{ name: 'Description', body }],
+    })
+    for (let round = 0; round < 5; round += 1) {
+      const parsed = parseRecordSource(source, 1)
+      assert.ok(parsed.ok)
+      assert.equal(parsed.record.sections[0]?.body, body, `round ${round} drifted`)
+      source = renderRecord(parsed.record)
+    }
+  })
+})
+
+describe('a body that would be read back as a second record', () => {
+  const fields = new Map([['type', 'task'], ['state', 'draft'], ['filed_at', '2026-09-01T10:00:00Z'], ['version', '1']])
+  const smuggled = 'the record I am quoting reads\n\ntype: task\nstate: draft\nfiled_at: 2026-01-01T00:00:00Z\nversion: 1'
+
+  it('is named by the same predicate the read path resynchronises on', () => {
+    const hidden = hiddenRecordBoundary({
+      id: 'carrier-one', title: 'Carrier', fields, sections: [{ name: 'Description', body: smuggled }],
+    })
+    assert.equal(hidden, 'type: task')
+  })
+
+  it('is refused at encode, rather than written and quarantined on the way back', () => {
+    const item = new Gen(1).workItem({ id: 'carrier-one', description: smuggled })
+    const encoded = encodeItem(item)
+    assert.equal(encoded.ok, false)
+    assert.equal(encoded.ok ? '' : encoded.error.rule, 'S1')
+    assert.match(encoded.ok ? '' : encoded.error.message, /would be read back as a second record's heading/)
+  })
+
+  it('covers the indented heading the column-0 bound never saw', () => {
+    const hidden = hiddenRecordBoundary({
+      id: 'carrier-one',
+      title: 'Carrier',
+      fields,
+      sections: [{ name: 'Description', body: '  ## alpha-two: a smuggled title\n\ntype: task\nstate: draft\nfiled_at: 2026-01-01T00:00:00Z\nversion: 1' }],
+    })
+    assert.equal(hidden, '  ## alpha-two: a smuggled title')
+  })
+
+  it('leaves an ordinary body alone', () => {
+    assert.equal(hiddenRecordBoundary({
+      id: 'alpha-one', title: 'Alpha', fields,
+      sections: [{ name: 'Description', body: '## A heading\n\nnote: this is prose, with no field block under it' }],
+    }), undefined)
   })
 })
