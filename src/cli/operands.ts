@@ -134,15 +134,24 @@ function counted(n: number): string {
 
 /**
  * How many operands a line may write, from the usage lines whose subcommand words it matches.
+ * Exported so a suite can build the line that is one operand over each command's own bound,
+ * rather than against a hand list that the fifteenth command would not be on.
  *
  * `undefined` means the bound does not apply, for either of two reasons. A usage line ending
  * in `...` takes any number, which is `set`'s assignments. And a line matching no usage line
- * that spells a subcommand word is the command's own to refuse: `evidence list x` is answered
- * by naming the verb, and a count past a verb the caller never reached answers nothing.
+ * that opens with a subcommand word is the command's own to refuse: `evidence list x` is
+ * answered by naming the verb, and a count past a verb the caller never reached answers
+ * nothing.
+ *
+ * A subcommand word is a literal in the FIRST slot, and only there. `transition <id>
+ * cancelled --resolution <r>` spells a literal in the second, where it names one target state
+ * of the `<target>` slot beside it rather than a verb of its own; reading that as a verb left
+ * `transition <id> ready extra` refused and `transition <id> in_progress extra` accepted,
+ * which is the bound holding for two of the seven states a caller can name.
  */
-function arityOf(command: Command, operands: readonly string[]): number | undefined {
+export function operandLimit(command: Command, operands: readonly string[]): number | undefined {
   const shapes = shapesOf(command)
-  const verbed = shapes.filter((shape) => shape.slots.some((slot) => slot.kind === 'literal'))
+  const verbed = shapes.filter((shape) => shape.slots[0]?.kind === 'literal')
   if (verbed.length > 0 && !verbed.some((shape) => literalsMatch(shape, operands))) return undefined
   let most = 0
   for (const shape of shapes.filter((shape) => literalsMatch(shape, operands))) {
@@ -171,7 +180,7 @@ export function arityRefusal(
   if (command === undefined || command === 'remove') return undefined
   const known = commandNamed(command)
   if (known === undefined) return undefined
-  const most = arityOf(known, operands)
+  const most = operandLimit(known, operands)
   if (most === undefined || operands.length <= most) return undefined
   return errorResult({
     code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
