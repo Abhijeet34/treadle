@@ -13,14 +13,19 @@
 // places for one truth, and a hand edit or a merge would move one without the other. The
 // record written is therefore the edge's source: the blocker, the copy, or for the one
 // symmetric kind the lower id, so the same edge spelled either way lands in the same place.
+//
+// Every declared kind is writable and removable. Three of the six the set used to declare
+// were neither, so a
+// `caused_by` edge could only be put there by a text editor and then bound `R6` with no
+// command able to unbind it; `split_from` went with the split feature rather than gaining one.
 
 import {
   addRelation,
   isSymmetric,
-  linkableKindOf,
+  relationKindOf,
   removeRelation,
   validateWorkItem,
-  LINKABLE_KINDS,
+  RELATION_KINDS,
   type ItemId,
   type Relation,
   type StoredRelation,
@@ -88,11 +93,11 @@ export async function relate(
   const workspace = view.value.identity.id
   const source = view.value.byId.get(request.id)
   if (source === undefined) return notFound('relation', 'mutate', workspace, view.value, request.id)
-  const kind = linkableKindOf(request.kind)
+  const kind = relationKindOf(request.kind)
   if (kind === undefined) {
     return errorResult({
       code: 'VALIDATION', command: 'relation', workspace, effect: 'mutate', rule: 'C1', entity: source.id,
-      cause: `${request.kind} is not a relation kind; the kinds are ${LINKABLE_KINDS.join(', ')}`,
+      cause: `${request.kind} is not a relation kind; the kinds are ${RELATION_KINDS.join(', ')}`,
       fix: ['treadle help relation'],
     })
   }
@@ -142,7 +147,7 @@ export async function relate(
         workspace, txn: null, changed: 0,
         // The kind is a stored token, not an English verb: "does not blocks" and "does not
         // caused_by" both came out of splicing one into a sentence that wanted one. Naming
-        // the edge instead reads correctly for all six kinds and for both directions, since
+        // the edge instead reads correctly for all five kinds and for both directions, since
         // a symmetric edge is stored on the lower id and may be held by neither end.
         data: { already: source.id, v: String(source.version), note: `no ${kind} edge between ${source.id} and ${request.other} is stored here` },
       })

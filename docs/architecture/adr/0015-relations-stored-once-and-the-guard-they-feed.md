@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** section 1 of the capability contract for the four absent features, and domain model 2.3 for the three kinds a caller may write
+**Overtaken in part by:** [ADR-0031](0031-the-word-was-the-whole-difference-and-a-declared-kind-earns-its-writer.md), under which three more of the six kinds gained a writer and `split_from` was removed, so the command now writes five of five rather than three of six; the edge stored once on its source with the inverse derived on read, the `G2` guard it feeds, and a dangling edge as a finding all stand
 
 ## Context
 

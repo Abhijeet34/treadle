@@ -27,7 +27,9 @@ The three codes are the ones the output contract maps to an exit status.
 ## Rule ids
 
 An error names a rule so a caller looks it up instead of parsing the sentence.
-The set is closed.
+The set is closed: every id below is one an error carries, and no other id reaches a caller.
+The interface specification's twelve output-contract requirements are also cited `(R1)` to `(R12)`, in [architecture/adr/0005-output-and-exit-code-contract.md](architecture/adr/0005-output-and-exit-code-contract.md) and in source comments.
+That is a second register under one prefix and none of it is ever emitted, so an `R` a caller reads is always a relation rule from the table below.
 
 | Id | Rule |
 |---|---|
@@ -69,7 +71,11 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 
 ## Types and the required-field policy
 
-`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `chore`, `impediment`.
+`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `impediment`.
+
+`chore` folded into `task` and its name is not reused.
+No rule, gate, guard, ranking or read told one from the other: neither required a field at creation, neither owned a field, neither had a review step, and both took the same moves, so the word was the whole difference.
+A caller who wants to say maintenance writes `--label chore`, which `backlog --label` filters on.
 
 | Type | Required at creation | Fields the type owns beyond the common set |
 |---|---|---|
@@ -78,11 +84,13 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `task` | none | none |
 | `bug` | `severity`, `repro_steps`, `found_in` | `severity`, `repro_steps`, `expected`, `actual`, `found_in`, `fix_confirmed` |
 | `spike` | `question` | `question`, `findings` |
-| `chore` | none | none |
 | `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
 
+An epic's `outcome` is the result the epic is for, a text field on the record; it is not the `--outcome` a `release` transition records, which is `failed` or `yielded`, says how one attempt ended, and lives in the event alone.
+The two are different things under one word, and nothing but this sentence and the one in the lifecycle section tells them apart.
+
 A `story`, a `bug` and an `epic` have a review step, and no other type does.
-That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike`, a `chore` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
+That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
 `treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
@@ -130,6 +138,8 @@ It is write-time only, the same `storedProse` distinction every narrowed bound h
 `EVIDENCE_KINDS` is closed: `commit`, `pr`, `run`, `test`, `file`, `url`, `report`.
 An `EvidencePointer` is a `kind`, a `ref` and an optional `label`, and `evidence` is a list of them on every work item.
 It is a pointer at an artefact that lives elsewhere, never the artefact, because the store is committed to git and a screenshot in a shard is a binary in a text repository.
+A `url` ref begins `http://` or `https://` and a `pr` ref is a URL, a number, `#<number>` or `<owner>/<repo>#<number>`; the other five kinds are a hash, a path, a run id, a test name and a report name, which no pattern separates from a typo, so they carry the ref bounds alone.
+Both shape checks are write-time only, so a record stored before them still reads.
 [architecture/adr/0011-evidence-and-the-severity-audit.md](architecture/adr/0011-evidence-and-the-severity-audit.md) carries the argument.
 
 Readiness and doneness requirements are not here: they live in the gates, because the model's own design is that the gate is what makes a type's fields bite.
@@ -148,6 +158,7 @@ The item returns to the queue and the event carries `outcome`, one of `failed` o
 
 Two edges record a value from a closed set, and `T6` is the one rule over both.
 `cancel` requires a `resolution` from `wont_do`, `duplicate`, `superseded`, `cannot_reproduce`, `rejected`, and stores it on the record; `release` requires an `outcome` from `failed`, `yielded`, and stores it only in the event.
+That `outcome` is the attempt's, and it is not the epic's `outcome` field: `history` prints `outcome=failed` for the event and `set` writes `outcome=` for the epic, so a reader tells them apart by which one carries a state change.
 Every other edge refuses either.
 [architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md](architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md) carries why this is not four new states.
 `evaluateTransition(context, request)` returns one of three outcomes.
@@ -167,7 +178,7 @@ G1, G5, G6 and G8 never do: the answer there is to fix the item.
 
 ## Hierarchy
 
-One parent per item, unlimited children, six allowed type pairs: epic to story, epic to task, epic to chore, story to task, story to bug, spike to task.
+One parent per item, unlimited children, five allowed type pairs: epic to story, epic to task, story to task, story to bug, spike to task.
 
 `setParent` refuses an unknown id (`P4`), a disallowed pair (`P1`) and an edge that closes a cycle (`P2`).
 `set <id> parent_id=<id>` and `file --parent <id>` run it before they write, so each refusal is an exit status: `P1` and `P2` are `GUARD_REFUSED`, and a parent naming no record is `NOT_FOUND` with the nearest ids beside it.
@@ -194,8 +205,10 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 
 ## Relations
 
-Six kinds, each with a defined inverse, and `relation add` writes three of them: `blocks`, `duplicates` and `relates_to`.
-The other three load and show from a record that carries one and gain a writer with a decision; [architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries why.
+Five kinds, each with a defined inverse, and `relation add` writes every one of them while `relation remove` takes every one back off.
+Three of the six the set used to declare had no writer at all, so a `caused_by` edge reached a record only through a text editor and then bound the removal rule `R6` with no command able to unbind it.
+`caused_by` and `discovered_from` are facts an agent holds at the moment of filing and gained the writer; `split_from` went with the split feature, and a record still carrying one is quarantined as the unknown kind it now is, with `doctor` naming the file and the line.
+[architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries the record of the earlier decision.
 
 | Kind | Inverse | Directional |
 |---|---|---|
@@ -203,13 +216,12 @@ The other three load and show from a record that carries one and gain a writer w
 | `duplicates` | `duplicated_by` | yes |
 | `caused_by` | `causes` | yes |
 | `discovered_from` | `led_to` | yes |
-| `split_from` | `split_into` | yes |
 | `relates_to` | `relates_to` | no, symmetric |
 
 `addRelation` refuses a self-edge (`R1`), for every directional kind an edge that would close a cycle (`R2`), a second `duplicates` edge out of an item that already duplicates one (`R4`), and a `blocks` edge whose source is already done or cancelled (`R5`).
 It takes the same `stateOf` reader `blockersOf` takes, because `R5` is the write-time half of the fact `blockersOf` applies on every read: a terminal blocker is inactive, so such an edge is written inert and the target reads `blocked no`.
 The edges a resolved impediment still carries were written while it was live, so `R5` refuses the write and never the stored edge.
-The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "split from" is not a thing the domain can mean.
+The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "discovered from" is not a thing the domain can mean.
 `relates_to` is symmetric, stored once in id order, and unchecked, because a cycle in it says nothing.
 
 Writing an edge twice is idempotent: the second call returns `added: false` and the same graph.
@@ -238,12 +250,15 @@ A rule is an id, a human sentence, a scope (`all` or one type), and one check fr
 `evaluateGate(gate, context)` evaluates the rules in scope for the item's type, in the gate's own order, and returns per rule a pass or a fail with the reason and what would satisfy it.
 The verdict passes only when every rule passes.
 
+`DOR1` and `DOR2` are gone and their ids are not reused, the way `DOR5` went with estimation.
+They read "the item has a title" and "the fields the type requires at creation are present", and no input could fail either: the store refuses a record whose heading is not `# <slug>: <title>` and quarantines one missing a creation-required field, both before a gate reads it.
+Two rules that always pass are two rules in every denominator, so `explain` reported six decided rules as `rules 8/8 pass`.
+The `type_required_fields` check stays, because a workspace gate may configure a rule that runs it.
+
 Default ready gate:
 
 | Id | Scope | Rule |
 |---|---|---|
-| `DOR1` | all | The item has a title |
-| `DOR2` | all | The fields the type requires at creation are present |
 | `DOR3` | all | Nothing active is blocking the item |
 | `DOR4` | story | The story has at least one acceptance criterion |
 | `DOR6` | bug | The bug records what was expected |
@@ -258,7 +273,7 @@ Default done gate:
 |---|---|---|
 | `DOD1` | all | Every child is done or cancelled |
 | `DOD2` | all | No impediment is still open against the item |
-| `DOD3` | all | A reviewer other than the assignee accepted it, when the type has a review step |
+| `DOD3` | all | A reviewer other than the assignee is named, when the type has a review step |
 | `DOD4` | story | Every acceptance criterion is ticked |
 | `DOD5` | spike | The spike records its findings |
 | `DOD6` | bug | The fix is confirmed |

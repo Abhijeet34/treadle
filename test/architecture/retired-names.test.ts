@@ -141,6 +141,16 @@ const RETIRED: readonly Retired[] = [
   // ADR-0003's rule 4 amendment: a heading in a record body is escaped rather than refused,
   // so the predicate that named the refusal is gone and `hiddenRecordBoundary` replaces it.
   { name: 'unwritableBodyLine', by: 'ADR-0003 rule 4 amendment' },
+  // The truth sweep: the work-item type that was `task` under another name. Matched only
+  // where it names the type, because `chore` stays a legitimate commit type and scope, which
+  // `chore(main): release` and `chore(deps)` are, and a caller may still write `--label chore`.
+  { name: 'chore', by: 'the truth sweep, on decision-chore-type', spelling: /['"`]chore['"`]|^\s*chore:|--type chore\b/ },
+  // The truth sweep: the relation kind that had no writer and went with the split feature,
+  // and the inverse derived from it.
+  { name: 'split_from', by: 'the truth sweep, on decision-relation-kinds' },
+  { name: 'split_into', by: 'the truth sweep, on decision-relation-kinds' },
+  { name: 'LINKABLE_KINDS', by: 'the truth sweep: every declared kind is writable now' },
+  { name: 'linkableKindOf', by: 'the truth sweep, renamed relationKindOf' },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]
@@ -162,6 +172,13 @@ const ALLOWED_FILES: readonly (readonly [RegExp, string])[] = [
   [/^src\/adapters\/store\/item-codec\.ts$/, 'RETIRED_FIELDS is where a retired field is declared'],
   [/^test\/store\/retired-fields\.test\.ts$/, 'the test that proves a retired key is dropped and an unknown one is kept'],
   [/^test\/architecture\/retired-names\.test\.ts$/, 'this file is the list'],
+  // The Conventional Commits type vocabulary, which is a different register that happens to
+  // spell one of the same words: `chore` is a commit type here and never a work-item type,
+  // and these four files are the only place that vocabulary is declared.
+  [
+    /^(\.github\/dependabot\.yml|CONTRIBUTING\.md|release-please-config\.json|scripts\/commitlint\.config\.js)$/,
+    'declares the commit-type vocabulary, where chore is a commit type and not a work-item type',
+  ],
 ]
 
 /**
@@ -169,7 +186,7 @@ const ALLOWED_FILES: readonly (readonly [RegExp, string])[] = [
  * rather than one line, because this repository writes one sentence per line and a sentence that
  * names four retired fields routinely wraps past the clause that says they were retired.
  */
-const SAYS_IT_WENT = /\bremove[sd]\b|\bdropped\b|\bwent with\b|\bsupersede[sd]\b|\bretire[sd]\b|\bno longer\b|\bused to\b|\bis gone\b|\bare gone\b/i
+const SAYS_IT_WENT = /\bremove[sd]\b|\bdropped\b|\bwent with\b|\bfolded into\b|\bsupersede[sd]\b|\bretire[sd]\b|\bno longer\b|\bused to\b|\bis gone\b|\bare gone\b/i
 const CONTEXT_LINES = 2
 
 /** Tracked files this reader can read as text, which is every one git does not call binary. */

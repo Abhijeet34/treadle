@@ -212,6 +212,9 @@ const RULED = new Set<string>(['ready_gate', 'done_gate'])
  */
 function side(value: unknown, field: string): string {
   if (value === '-') return UNSET
+  // The one non-string value the log records: `workspace.init` writes `schema` as a number,
+  // and every string rule below then reported the whole side unknown.
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
   if (typeof value !== 'string' || value.length === 0) return UNKNOWN
   if (RULED.has(field)) return `(rules:${value.split('|').length})`
   if (value.length > MAX_VALUE) {
@@ -254,9 +257,10 @@ function movedBy(event: StoreEvent): readonly string[] {
   const source = after ?? before
   if (source === undefined) return []
   const keys = Object.keys(source)
-  // An item event names record fields and a workspace event names configuration keys, so
-  // one filter serves both.
-  const known = keys.filter((key) => isKnownField(key) || isConfigKey(key))
+  // An item event names record fields and a workspace event names configuration keys or
+  // `schema`, which `workspace.init` records; one filter serves all three. Without the last
+  // of them the init row read `unknown=1`, which says a key was there and nothing else.
+  const known = keys.filter((key) => isKnownField(key) || isConfigKey(key) || key === 'schema')
   // A pair that was not set before and is not set after moved nothing, and a log of moves is
   // what this cell is: an event carrying `reviewer=(unset)->(unset)` beside the pairs that
   // did move says nothing. A creation has no before at all and prints whole.
@@ -378,8 +382,14 @@ export async function history(
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
   const scope = request.scope
-  /** An id names an item, and the log is keyed by entity, so the rows read the same. */
-  const carried = (entity: string): boolean => view.value.byId.has(entity)
+  /**
+   * An id names an item, and the log is keyed by entity, so the rows read the same. The
+   * workspace's own id is one the store always carries and no item map holds: without this
+   * clause `history <workspace-id>` and `history --txn` of a configuration change both said
+   * the record was no longer here, about the one record every command reads first.
+   */
+  const carried = (entity: string): boolean =>
+    view.value.byId.has(entity) || entity === workspace
 
   const events = await store.events(
     scope.kind === 'txn' ? { txn: scope.txn } : { entity: scope.id })

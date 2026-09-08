@@ -59,7 +59,6 @@ const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
   task: [],
   bug: ['severity', 'repro_steps', 'expected', 'actual', 'found_in', 'fix_confirmed'],
   spike: ['question', 'findings'],
-  chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
 
@@ -72,7 +71,6 @@ const REQUIRED_AT_CREATION: Readonly<Record<WorkItemType, readonly string[]>> = 
   task: [],
   bug: ['severity', 'repro_steps', 'found_in'],
   spike: ['question'],
-  chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
 
@@ -149,7 +147,7 @@ const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
   severity: { kind: 'command', usage: 'treadle mark <id> --severity <S1-S4> --reason "<why>"' },
   priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
   evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
-  relations: { kind: 'command', usage: 'treadle relation add <id> <blocks|duplicates|relates-to> <other>' },
+  relations: { kind: 'command', usage: `treadle relation add <id> <${RELATION_KINDS.join('|')}> <other>` },
   resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
   hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
   hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant> --reason "<why>"' },
@@ -226,6 +224,28 @@ const SLUG = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/
  */
 const LABEL = /^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$/
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?Z$/
+
+/**
+ * The shape of the two evidence kinds a pattern can knowably separate from a typo. `evidence
+ * add` says it appends "a pointer at an artefact a third party can open", and `pr banana`
+ * satisfied `DOD7` and printed on `show` as a pointer. A commit hash, a path, a run id, a
+ * test name and a report name have no such shape, so those five keep the ref bounds alone.
+ * Bounded and non-backtracking, like every other pattern here (threat model F8).
+ */
+// The scheme is matched case-insensitively because RFC 3986 defines it that way, and
+// `HTTPS://example.test/x` is a URL a refusal has no business calling one. A pr number starts
+// at 1: no forge issues #0, so a zero is a placeholder or an off-by-one rather than a pointer.
+const URL_REF = /^https?:\/\/\S{1,190}$/i
+const PR_NUMBER = /^#?[1-9]\d{0,11}$/
+const PR_REPO = /^[A-Za-z0-9._-]{1,64}\/[A-Za-z0-9._-]{1,64}#[1-9]\d{0,11}$/
+
+const EVIDENCE_REF_FORM: Readonly<Record<string, { readonly ok: (ref: string) => boolean; readonly form: string }>> = {
+  url: { ok: (ref) => URL_REF.test(ref), form: 'a URL beginning http:// or https://' },
+  pr: {
+    ok: (ref) => URL_REF.test(ref) || PR_NUMBER.test(ref) || PR_REPO.test(ref),
+    form: 'a URL, a number, #<number>, or <owner>/<repo>#<number>',
+  },
+}
 
 // DR3 rule 7, widened to the whole class by finding F5. text.ts owns the class so the
 // store boundary and this validator cannot drift; a single-line value additionally carries
@@ -377,7 +397,7 @@ const CHECKS: Readonly<Record<string, Check>> = {
   },
 
   due: instant('due', true),
-  evidence: (value) => {
+  evidence: (value, _item, options) => {
     if (!Array.isArray(value)) return 'evidence must be a list of pointers'
     const entries = value as readonly unknown[]
     if (entries.length > MAX_EVIDENCE_ENTRIES) {
@@ -397,6 +417,12 @@ const CHECKS: Readonly<Record<string, Check>> = {
       // A ref with a space is a sentence wearing a pointer's name, and the row grammar can
       // carry one space-bearing column, which the label already is.
       if (pointer.ref.includes(' ')) return `the evidence ref "${pointer.ref}" carries a space; a ref is a hash, a path, a run id or a URL`
+      // Write-time only, as every narrowed bound here is: a record stored before this check
+      // still reads, because a field narrowing may not turn into a store outage (STABILITY.md).
+      const form = options.storedProse === true ? undefined : EVIDENCE_REF_FORM[pointer.kind]
+      if (form !== undefined && !form.ok(pointer.ref)) {
+        return `the evidence ref "${pointer.ref}" is not ${pointer.kind === 'url' ? 'a url' : 'a pr'}; it is ${form.form}`
+      }
       if (pointer.label !== undefined && (typeof pointer.label !== 'string' || !isSingleLine(pointer.label, MAX_EVIDENCE_LABEL))) {
         return typeof pointer.label === 'string' && pointer.label.length > MAX_EVIDENCE_LABEL
           ? overLength('an evidence label', MAX_EVIDENCE_LABEL, pointer.label.length)

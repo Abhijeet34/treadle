@@ -15,8 +15,8 @@ import { NOW, errorOf, item } from '../helpers/fixtures.ts'
 const OPTIONS = { now: NOW }
 
 describe('the closed type and state sets', () => {
-  it('carries exactly the six types the model names and impediment', () => {
-    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'chore', 'impediment'])
+  it('carries five of the six the model names, plus impediment, chore folded into task', () => {
+    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'impediment'])
   })
 
   it('carries exactly the seven states the model names, and blocked is not one of them', () => {
@@ -35,7 +35,6 @@ describe('per-type required fields at creation', () => {
     task: [],
     bug: ['severity', 'repro_steps', 'found_in'],
     spike: ['question'],
-    chore: [],
     impediment: ['severity', 'proposed_resolution'],
   }
 
@@ -76,8 +75,8 @@ describe('fields a type does not own', () => {
     assert.ok(error.message.includes('severity'))
   })
 
-  it('refuses a bug field on a chore', () => {
-    assert.equal(errorOf(validateWorkItem(item('chore', { fix_confirmed: true }), OPTIONS)).rule, 'V5')
+  it('refuses a bug field on a task', () => {
+    assert.equal(errorOf(validateWorkItem(item('task', { fix_confirmed: true }), OPTIONS)).rule, 'V5')
   })
 
   it('accepts a common field on every type', () => {
@@ -168,5 +167,56 @@ describe('unknown fields carried alongside the known ones', () => {
   it('refuses an unknown field whose key is __proto__', () => {
     const extra = new Map([['__proto__', 'x']])
     assert.equal(errorOf(validateWorkItem(item('task', { extra }), OPTIONS)).rule, 'V2')
+  })
+})
+
+// `evidence add`'s own summary is "Append one bounded pointer at an artefact a third party
+// can open". `pr banana` was stored, printed by `show` as a pointer and satisfied `DOD7`, so
+// the promise was one the store did not keep for the two kinds whose shape is knowable.
+describe('an evidence ref of a kind with a knowable shape', () => {
+  const withEvidence = (kind: string, ref: string) =>
+    validateWorkItem(item('task', { evidence: [{ kind, ref } as never] }), OPTIONS)
+
+  it('refuses a pr and a url that name no artefact, and says what the form is', () => {
+    const pr = errorOf(withEvidence('pr', 'banana'))
+    assert.equal(pr.rule, 'V4')
+    assert.ok(pr.message.includes('"banana"') && pr.message.includes('<owner>/<repo>#<number>'), pr.message)
+
+    const url = errorOf(withEvidence('url', 'not-a-url'))
+    assert.ok(url.message.includes('http://') && url.message.includes('"not-a-url"'), url.message)
+  })
+
+  it('accepts every form each kind actually takes, scheme case included', () => {
+    for (const ref of [
+      '42', '#42', 'acme/treadle#42', 'https://example.test/pr/42', 'http://example.test/pr/42',
+      // RFC 3986 defines the scheme case-insensitively, so this is a URL and not a typo.
+      'HTTPS://EXAMPLE.TEST/pr/42',
+    ]) {
+      assert.equal(withEvidence('pr', ref).ok, true, ref)
+    }
+    assert.equal(withEvidence('url', 'https://example.test/runbook').ok, true)
+    assert.equal(withEvidence('url', 'HTTP://Example.Test/runbook').ok, true)
+  })
+
+  // No forge issues #0, so a zero is a placeholder or an off-by-one rather than a pointer.
+  it('refuses a pr number that no forge issues', () => {
+    for (const ref of ['0', '#0', '042', 'acme/treadle#0']) {
+      assert.equal(withEvidence('pr', ref).ok, false, ref)
+    }
+  })
+
+  it('leaves the five kinds no pattern separates from a typo to the ref bounds alone', () => {
+    for (const kind of ['commit', 'run', 'test', 'file', 'report']) {
+      assert.equal(withEvidence(kind, 'banana').ok, true, kind)
+    }
+  })
+
+  // A field narrowing may not turn into a store outage: a record written before this check
+  // still reads, which is the `storedProse` rule every narrowed bound here follows.
+  it('still serves a record stored before the check', () => {
+    assert.equal(
+      validateWorkItem(item('task', { evidence: [{ kind: 'pr', ref: 'banana' }] }), { ...OPTIONS, storedProse: true }).ok,
+      true,
+    )
   })
 })

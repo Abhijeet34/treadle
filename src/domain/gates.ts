@@ -64,10 +64,14 @@ export type GateContext = {
 export const DEFAULT_READY_GATE: Gate = {
   name: 'ready',
   rules: [
-    { id: 'DOR1', scope: 'all', sentence: 'The item has a title.', check: { kind: 'field_present', field: 'title' } },
-    { id: 'DOR2', scope: 'all', sentence: 'The fields the type requires at creation are present.', check: { kind: 'type_required_fields' } },
+    // DOR1 was "the item has a title" and DOR2 "the fields the type requires at creation are
+    // present". No input could fail either: the store refuses a record whose heading is not
+    // `# <slug>: <title>` (`S1`) and quarantines one missing a creation-required field
+    // (`V4`), both before any gate reads it, so the two sat in every denominator and
+    // `rules 8/8 pass` reported six rules as eight. `type_required_fields` stays a check a
+    // workspace gate may configure; the ids go the way DOR5 went and are not reused.
     { id: 'DOR3', scope: 'all', sentence: 'Nothing active is blocking the item.', check: { kind: 'no_active_blocker' } },
-    // DOR5 was "the story is estimated in points" and went with estimation. The id is not
+    // DOR5 was "the story is estimated in points" and went with estimation. No id here is
     // reused and the rest are not renumbered, for the reason DOR9 below records: a rule id
     // is a name a past refusal printed.
     { id: 'DOR4', scope: 'story', sentence: 'The story has at least one acceptance criterion.', check: { kind: 'field_non_empty_list', field: 'acceptance_criteria' } },
@@ -87,7 +91,10 @@ export const DEFAULT_DONE_GATE: Gate = {
   rules: [
     { id: 'DOD1', scope: 'all', sentence: 'Every child is done or cancelled.', check: { kind: 'no_open_child' } },
     { id: 'DOD2', scope: 'all', sentence: 'No impediment is still open against the item.', check: { kind: 'no_open_impediment' } },
-    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee accepted it, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
+    // The sentence says "is named" and not "accepted it" because the check reads `reviewer`
+    // against `assignee` and never the actor of `accept`; a rule's sentence is printed by
+    // `config` and `explain`, so it may not promise more than the code decides.
+    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
     { id: 'DOD4', scope: 'story', sentence: 'Every acceptance criterion is ticked.', check: { kind: 'list_all_ticked', field: 'acceptance_criteria' } },
     { id: 'DOD5', scope: 'spike', sentence: 'The spike records its findings.', check: { kind: 'field_present', field: 'findings' } },
     { id: 'DOD6', scope: 'bug', sentence: 'The fix is confirmed.', check: { kind: 'field_is_true', field: 'fix_confirmed' } },

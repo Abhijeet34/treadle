@@ -205,6 +205,14 @@ describe('the verification table counts what the suites actually drive', () => {
     assert.equal(Number(entries), traps,
       `docs/VERIFICATION.md's "No network egress" row names an entry-point count the suite does not trap; test/security/no-egress.test.ts traps ${traps}`)
   })
+
+  it('spells the union-of-fields sentence over the work-item type count the domain declares', () => {
+    const sentence = read('docs/VERIFICATION.md').split('\n')
+      .find((line) => line.includes('the union over the'))
+    assert.ok(sentence !== undefined, 'docs/VERIFICATION.md has no "the union over the <n> types" sentence')
+    assert.equal(spelled(sentence, 'types'), WORK_ITEM_TYPES.length,
+      `docs/VERIFICATION.md's "the union over the <n> types" sentence spells a work-item type count src/domain does not have; WORK_ITEM_TYPES declares ${WORK_ITEM_TYPES.length}`)
+  })
 })
 
 describe('every document states one runtime floor and one bundle budget', () => {

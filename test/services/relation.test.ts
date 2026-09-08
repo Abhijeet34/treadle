@@ -126,10 +126,29 @@ describe('the four refusals', () => {
     assert.match(run.err, /stale-cache already duplicates sess-timeout/)
   })
 
-  it('a kind the command does not write, naming the three it does', async () => {
-    const run = await cli(['relation', 'add', 'csv-export', 'caused_by', 'flaky-e2e'])
+  it('a token that is no relation kind, naming the five that are', async () => {
+    // The token here is the kind this sweep removed, so the refusal is also the proof it went.
+    const run = await cli(['relation', 'add', 'csv-export', 'split_from', 'flaky-e2e'])
     assert.equal(run.code, 2)
-    assert.match(run.err, /the kinds are blocks, duplicates, relates_to/)
+    assert.match(run.err, /the kinds are blocks, duplicates, caused_by, discovered_from, relates_to/)
+  })
+
+  // `caused_by` and `discovered_from` reached a record only through a text editor, and
+  // `relation remove` refused them too, so a hand-written edge bound `R6` with no command
+  // able to unbind it. Both halves are driven here, add then remove, end to end.
+  it('writes and removes the two kinds that had no writer', async () => {
+    for (const kind of ['caused_by', 'discovered_from']) {
+      const added = await cli(['relation', 'add', 'csv-export', kind, 'flaky-e2e'])
+      assert.equal(added.code, 0, added.err)
+      assert.match(added.out, new RegExp(`^kind ${kind}$`, 'm'))
+
+      const shown = await cli(['show', 'csv-export', '--field', 'relations'])
+      assert.match(shown.out, new RegExp(`^${kind} flaky-e2e$`, 'm'))
+
+      const removed = await cli(['relation', 'remove', 'csv-export', kind, 'flaky-e2e'])
+      assert.equal(removed.code, 0, removed.err)
+      assert.match(removed.out, new RegExp(`^kind ${kind}$`, 'm'))
+    }
   })
 })
 

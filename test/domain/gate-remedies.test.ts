@@ -63,6 +63,10 @@ function checkKinds(): readonly string[] {
 const PROBES: readonly Gate[] = ([
   { kind: 'parent_present' },
   { kind: 'child_present' },
+  // `type_required_fields` joined them when DOR1 and DOR2 left the default ready gate: the
+  // store quarantines a record missing a creation-required field before a gate reads it, so
+  // no shipped rule can fail on it and only a configured gate reaches it.
+  { kind: 'type_required_fields' },
 ] as const satisfies readonly GateCheck[]).map((check): Gate => ({
   name: `probe-${check.kind}`,
   rules: [{ id: 'P1', scope: 'all', sentence: 'a probe.', check }],
@@ -80,8 +84,8 @@ function everyRemedy(): readonly Emitted[] {
     gateContext(item('bug', { id: 'b1' }), { reviewStep: true }),
     gateContext(item('story', { id: 's1', acceptance_criteria: [{ text: 'the header row', ticked: false }] })),
     gateContext(item('story', { id: 's0' })),
-    // A bug with its creation-required fields cleared, which is the only way DOR2 fails: the
-    // store refuses to write one, and a record from an older writer or a hand edit carries it.
+    // A bug with its creation-required fields cleared, which is the only way the
+    // `type_required_fields` probe fails: the store refuses to write one.
     gateContext(item('bug', { id: 'b0', severity: undefined, repro_steps: undefined, found_in: undefined })),
     gateContext(item('epic', { id: 'e1' }), {
       blockers: [neighbour('x1')],

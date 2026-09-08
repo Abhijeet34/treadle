@@ -9,11 +9,17 @@ export type ItemId = string
 export type Instant = string
 
 /**
- * The model's six, and `impediment`: a blocker as a record of its own, flowing through the
- * same states, where `done` means resolved. It is a type rather than a second machine, and it
- * holds up work through the same `blocks` edge every other item uses; ADR-0017.
+ * Five of the model's six, and `impediment`: a blocker as a record of its own, flowing
+ * through the same states, where `done` means resolved. It is a type rather than a second
+ * machine, and it holds up work through the same `blocks` edge every other item uses;
+ * ADR-0017.
+ *
+ * `chore` folded into `task`. No rule, gate, guard, ranking or read told one from the other:
+ * both had no required fields, no fields of their own, no review step and the same moves, so
+ * the word was the whole difference and `labels` carries a word. A caller who wants to say
+ * maintenance writes `--label chore`.
  */
-export const WORK_ITEM_TYPES = ['epic', 'story', 'task', 'bug', 'spike', 'chore', 'impediment'] as const
+export const WORK_ITEM_TYPES = ['epic', 'story', 'task', 'bug', 'spike', 'impediment'] as const
 export type WorkItemType = (typeof WORK_ITEM_TYPES)[number]
 
 export const WORK_ITEM_STATES = [
@@ -52,8 +58,14 @@ export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number]
 export const GUARD_IDS = ['G1', 'G2', 'G3', 'G5', 'G6', 'G7', 'G8'] as const
 export type GuardId = (typeof GUARD_IDS)[number]
 
+/**
+ * Five kinds, each writable by `relation add` and removable by `relation remove`. `split_from`
+ * went with the split feature: it had no writer, so the only way to store one was a text
+ * editor, and a hand-written edge then bound the removal rule `R6` with no command able to
+ * unbind it. A record still carrying one is quarantined as the unknown kind it now is.
+ */
 export const RELATION_KINDS = [
-  'blocks', 'duplicates', 'caused_by', 'discovered_from', 'split_from', 'relates_to',
+  'blocks', 'duplicates', 'caused_by', 'discovered_from', 'relates_to',
 ] as const
 export type RelationKind = (typeof RELATION_KINDS)[number]
 

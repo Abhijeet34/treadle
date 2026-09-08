@@ -28,7 +28,6 @@ const COMMANDS_PER_SEQUENCE = 25
 const FILINGS: readonly (readonly [string, readonly string[]])[] = [
   ['story', ['--set', 'acceptance_criteria=the repeat is a no-op', '--priority', '2']],
   ['task', ['--priority', '3']],
-  ['chore', ['--priority', '4']],
   ['spike', ['--set', 'question=which ranker', '--priority', '3']],
   ['bug', ['--set', 'severity=S2', '--set', 'found_in=test', '--set', 'repro_steps=run it twice', '--priority', '1']],
 ]
@@ -136,7 +135,10 @@ describe('a mutation applied twice reports the second as a no-op and changes not
           assert.equal(await fingerprint(session.root), settled, `the repeat of ${state} wrote to the store`)
         }
       }
-      assert.ok(repeats >= 8, `only ${repeats} repeats were exercised`)
+      // Two per type that stops at `in_progress` and more for the two with a review step.
+      // It was nine over five filings; `chore` folded into `task` and took one filing and
+      // its two repeats with it. The per-repeat assertions above are the property itself.
+      assert.ok(repeats >= 7, `only ${repeats} repeats were exercised over ${FILINGS.length} filings`)
       t.diagnostic(`${repeats} repeated mutations, every one a no-op that wrote zero bytes`)
     } finally {
       await session.dispose()

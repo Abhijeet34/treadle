@@ -4,6 +4,9 @@
 
 import {
   ALLOWED_PARENT_PAIRS,
+  RESOLUTIONS,
+  WORK_ITEM_STATES,
+  WORK_ITEM_TYPES,
   asInstant,
   canonicalField,
   daysOverdue,
@@ -14,6 +17,7 @@ import {
   shellWord,
   shortField,
   validateWorkItem,
+  withArticle,
   type AcceptanceCriterion,
   type ItemId,
   type WorkItem,
@@ -703,12 +707,44 @@ function columnRefusal(
   return undefined
 }
 
+/**
+ * The filters whose value comes from a closed set, and the set. A value outside it answered
+ * `matched 0` at exit 0, which a caller reads as "no items like that" where it means "no such
+ * value": `--type chore` says nothing about the fold that removed the type, and
+ * `--state banana` never said anything at all. It is the absence-wearing-a-value shape a
+ * stored field is already held to, on the read side. `label`, `title` and `assignee` are open
+ * on purpose - any string is a legitimate thing to look for, and finding none of it is an
+ * answer rather than a mistake.
+ */
+const CLOSED_FILTERS: Readonly<Partial<Record<Filter['field'], readonly string[]>>> = {
+  type: WORK_ITEM_TYPES,
+  state: WORK_ITEM_STATES,
+  resolution: RESOLUTIONS,
+  priority: ['1', '2', '3', '4', '5'],
+}
+
+function filterRefusal(
+  command: string, workspace: string, filters: readonly Filter[],
+): ResultObject | undefined {
+  for (const filter of filters) {
+    const allowed = CLOSED_FILTERS[filter.field]
+    if (allowed === undefined || allowed.includes(filter.value)) continue
+    return errorResult({
+      code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C1',
+      cause: `${filter.value} is not ${withArticle(filter.field)}; the set is ${allowed.join(', ')}`,
+      fix: [`treadle help ${command}`],
+    })
+  }
+  return undefined
+}
+
 export async function backlog(store: Store, request: BacklogRequest): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('backlog', 'read', view.error, undefined)
   const workspace = view.value.identity.id
 
   const refused = columnRefusal('backlog', workspace, request.columns, ITEM_COLUMNS)
+    ?? filterRefusal('backlog', workspace, request.filters)
   if (refused !== undefined) return refused
 
   const line = (cursor?: string): string =>

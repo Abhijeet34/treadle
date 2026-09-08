@@ -11,6 +11,7 @@ import { withArticle } from './text.ts'
 import { MAX_REASON, overLength } from './fields.ts'
 import {
   ATTEMPT_OUTCOMES,
+  GUARD_IDS,
   RESOLUTIONS,
   type AttemptOutcome,
   type GateItem,
@@ -74,6 +75,39 @@ const CLOSED_VALUE: Readonly<Record<string, {
 
 /** G2, G3 and G7 yield to an explicit override with a reason (2.2). The rest never do. */
 export const OVERRIDABLE_GUARDS: readonly GuardId[] = ['G2', 'G3', 'G7']
+
+/** The one phrasing of a closed-set value outside its set, read by both refusal paths. */
+function outsideSet(name: string, given: string, allowed: readonly string[]): string {
+  return `${given} is not ${withArticle(name)}; the set is ${allowed.join(', ')}`
+}
+
+/**
+ * What is wrong with a request whatever edge it names: a closed-set value outside its set,
+ * and an override naming something that is not a guard or is not overridable. The idempotent
+ * answer below is given before an edge is chosen, and these were checked only after it, so
+ * `transition alpha draft --resolution bogus --outcome bogus --override G9` on a draft item
+ * exited 0 while every one of those tokens is `T5` or `T6` on any real edge.
+ */
+function requestRefusal(item: WorkItem, request: TransitionRequest): TransitionOutcome | undefined {
+  const causes: { readonly rule: 'T5' | 'T6'; readonly cause: string }[] = []
+  for (const [name, rule] of Object.entries(CLOSED_VALUE)) {
+    const given = request[name as 'resolution' | 'outcome']
+    if (given !== undefined && !rule.allowed.includes(given)) {
+      causes.push({ rule: 'T6', cause: outsideSet(name, given, rule.allowed) })
+    }
+  }
+  for (const guard of request.overrides ?? []) {
+    if (!(GUARD_IDS as readonly string[]).includes(guard)) {
+      causes.push({ rule: 'T5', cause: `${guard} is not a guard; the guards are ${GUARD_IDS.join(', ')}` })
+    } else if (!OVERRIDABLE_GUARDS.includes(guard)) {
+      causes.push({ rule: 'T5', cause: `${guard} cannot be overridden; fix the item instead` })
+    }
+  }
+  const first = causes[0]
+  return first === undefined
+    ? undefined
+    : refuse(fail('VALIDATION', first.rule, causes.map((c) => c.cause).join('; '), [item.id]).error)
+}
 
 export type GuardResult = {
   readonly guard: GuardId
@@ -292,7 +326,7 @@ export function evaluateTransition(
   const { target } = request
 
   if (target !== 'resume' && target === item.state) {
-    return { outcome: 'already', state: item.state }
+    return requestRefusal(item, request) ?? { outcome: 'already', state: item.state }
   }
 
   let to: WorkItemState
@@ -346,7 +380,7 @@ export function evaluateTransition(
     if (given === undefined) {
       records.push({ rule: 'T6', cause: `the ${rule.on} transition records ${name}, ${rule.what}, and none was given; the set is ${rule.allowed.join(', ')}` })
     } else if (!rule.allowed.includes(given)) {
-      records.push({ rule: 'T6', cause: `${given} is not ${withArticle(name)}; the set is ${rule.allowed.join(', ')}` })
+      records.push({ rule: 'T6', cause: outsideSet(name, given, rule.allowed) })
     }
   }
 

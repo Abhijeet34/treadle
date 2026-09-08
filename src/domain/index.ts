@@ -156,11 +156,10 @@ export {
 
 export {
   MAX_RELATION_DEPTH,
-  LINKABLE_KINDS,
   addRelation,
   blockersOf,
   findRelationCycle,
-  linkableKindOf,
+  relationKindOf,
   relationGraphFrom,
   inverseOf,
   isSymmetric,
