@@ -10,7 +10,8 @@ Five steps, and a person is the third one.
 
 1. Work merges to `main` through a pull request, as always.
 2. `release-please` opens or updates a release pull request on every push to `main`. It carries the version bump and the changelog entry and nothing else.
-3. Someone reviews that pull request and merges it. Merging is what makes `main`'s head releasable.
+3. Someone reviews that pull request, approves its parked checks, and merges it. Merging is what makes `main`'s head releasable.
+   The approval is not a review approval and not an oversight: see "Why the release pull request's checks wait for a person".
 4. Someone tags `main`'s head with a signed annotated tag and pushes it:
 
    ```sh
@@ -115,6 +116,41 @@ One more setting belongs in that list, and it closes a hole nothing in this tree
 Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
 The workflow's own path is already closed by construction - the `publish` job downloads the attested tarball the `artifacts` job packed one step after `npm run build` and `release-preflight`, and verifies it against `SHA256SUMS` - and `scripts/check-dist-fresh.ts` explains why a `prepack` hook cannot be the answer here.
 
+## Why the release pull request's checks wait for a person
+
+The release pull request is opened by `github-actions[bot]`, and every workflow run on it is created and then parked rather than executed.
+
+```text
+$ gh-axi api repos/Abhijeet34/treadle/actions/permissions/fork-pr-contributor-approval
+approval_policy: first_time_contributors
+```
+
+GitHub documents that value as requiring approval for a contributor opening their first pull request to the repository.
+The bot holds no write access and has never had a pull request merged here, so it is that contributor on every release pull request, forever.
+
+A parked run is not a slow run.
+Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
+Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
+`.github/rulesets/main.json` requires the `checks` and `tests kept` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 3 above stops there.
+
+Releasing them is one call, and the person who signs the tag is already at the terminal:
+
+```sh
+gh-axi run list -R Abhijeet34/treadle --branch release-please--branches--main--components--treadle
+gh-axi api -X POST "repos/Abhijeet34/treadle/actions/runs/<run-id>/approve"
+```
+
+Measured against that same run on 2026-09-08: `completed` with conclusion `action_required` and zero jobs before the call, `in_progress` with eight jobs after it.
+Approving a run executes that branch's workflow files, so read the diff before approving, exactly as you would before merging.
+
+Three other ways to unpark them, and none of them is taken here.
+Loosening `approval_policy` buys an unattended release by removing a control on every fork pull request this public repository will ever receive, which is why `.github/settings/actions-fork-pr-approval.json` records the strict value in the tree and `test/release/repo-settings.test.ts` asserts it.
+A stored token with wider rights would raise the pull request under an identity whose runs execute, and "Why Actions may create pull requests" below rules that out for the whole release design.
+A script that approves the parked runs was weighed in ADR-0009 and rejected: 165 lines plus a test, to make an unattended release unattended, on a path that is human-initiated by design.
+
+The gate that already holds this release is a person.
+Do not spend a credential to route around one.
+
 ## Rolling back
 
 A published version cannot be taken back.
@@ -192,6 +228,7 @@ A settings script that half-applies is worse than one that refuses, because the 
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives, and deleting a branch once its pull request merges |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
 | `.github/settings/actions-workflow-permissions.json` | A read-only default token, and permission for Actions to open a pull request. See "Why Actions may create pull requests" |
+| `.github/settings/actions-fork-pr-approval.json` | `first_time_contributors`, which is why the release pull request's checks park. See "Why the release pull request's checks wait for a person" |
 
 The `npm-publish` environment and its required reviewer are not in that script.
 An environment that gates publication should be created deliberately by the person who owns the account, at the moment they decide to open the gate.

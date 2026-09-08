@@ -58,7 +58,7 @@ async function apply(refuse = ''): Promise<Result> {
   return { code, stderr, calls }
 }
 
-/** The five calls that change something, as opposed to the two that only read the ruleset
+/** The six calls that change something, as opposed to the two that only read the ruleset
  *  list. Each is identified by the file whose contents it sends. */
 const WRITES = [
   '.github/rulesets/main.json',
@@ -66,6 +66,7 @@ const WRITES = [
   '.github/settings/repository.json',
   '.github/settings/actions-workflow-permissions.json',
   '.github/settings/actions-permissions.json',
+  '.github/settings/actions-fork-pr-approval.json',
 ]
 
 function sent(calls: readonly string[], file: string): boolean {
@@ -82,7 +83,7 @@ describe('apply-repo-settings.sh', () => {
 
   it('applies everything else when one call is refused, rather than stopping there', async () => {
     const { code, calls, stderr } = await apply('--input .github/rulesets/tags.json')
-    // The three that used to be skipped, because they follow the tag ruleset in the script.
+    // The ones that used to be skipped, because they follow the tag ruleset in the script.
     for (const file of WRITES.slice(2)) {
       assert.ok(sent(calls, file), `${file} was skipped after an earlier failure: ${calls.join(' | ')}`)
     }
@@ -96,6 +97,21 @@ describe('apply-repo-settings.sh', () => {
     const { code, stderr } = await apply('.json')
     assert.equal(code, 1)
     for (const file of WRITES) assert.ok(stderr.includes(file), `${file} is missing from: ${stderr}`)
+  })
+})
+
+describe('.github/settings/actions-fork-pr-approval.json', () => {
+  // The release pull request is opened by github-actions[bot], which holds no write access and
+  // has never had a pull request merged here, so `first_time_contributors` parks every check on
+  // it at `action_required`: fourteen consecutive runs on the release branch were created,
+  // started and updated at the same instant with zero jobs (2026-09-07 to 2026-09-08).
+  // The remedy is the person who signs the tag approving them, per ADR-0009, and the wrong
+  // remedy is loosening this value, so the value is asserted rather than merely applied.
+  it('records the strict policy, which is what makes the parked checks a human step', async () => {
+    const policy = JSON.parse(
+      await readFile(path.join(ROOT, '.github/settings/actions-fork-pr-approval.json'), 'utf8'),
+    ) as { approval_policy: string }
+    assert.equal(policy.approval_policy, 'first_time_contributors')
   })
 })
 

@@ -68,6 +68,14 @@ gh-axi api -X PUT "repos/$REPO/actions/permissions" \
   --input .github/settings/actions-permissions.json \
   || fail 'Actions permissions from .github/settings/actions-permissions.json'
 
+# The setting that parks the release pull request's checks. It is applied to the value it
+# already has: the point of the call is that the value is readable out of the tree and moves
+# only by editing this file, because loosening it is the obvious wrong way to unpark them.
+# docs/RELEASING.md, "Why the release pull request's checks wait for a person".
+gh-axi api -X PUT "repos/$REPO/actions/permissions/fork-pr-contributor-approval" \
+  --input .github/settings/actions-fork-pr-approval.json \
+  || fail 'fork pull request approval from .github/settings/actions-fork-pr-approval.json'
+
 if [ -n "$failed" ]; then
   echo "did NOT apply:" >&2
   printf '%s\n' "$failed" | sed 's/^/  - /' >&2
@@ -78,3 +86,4 @@ fi
 echo "applied. verify:"
 echo "  gh-axi api \"repos/$REPO/rulesets\""
 echo "  gh-axi api \"repos/$REPO/actions/permissions/workflow\""
+echo "  gh-axi api \"repos/$REPO/actions/permissions/fork-pr-contributor-approval\""

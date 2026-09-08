@@ -57,7 +57,7 @@ function calls(uses: readonly string[]): readonly string[] {
 }
 
 describe('a called workflow cannot request more than its caller grants', () => {
-  const files = readdirSync(WORKFLOWS).filter((name) => name.endsWith('.yml'))
+  const files = readdirSync(WORKFLOWS).filter((name) => name.endsWith('.yml') || name.endsWith('.yaml'))
 
   it('checks every local workflow call in the tree', () => {
     const pairs: string[] = []
@@ -71,7 +71,13 @@ describe('a called workflow cannot request more than its caller grants', () => {
           // The job's own block wins; without one the called workflow gets the caller
           // workflow's grant. A caller that declares neither leaves this unknowable from the
           // tree alone, because the repository's default token permission decides it.
-          const declared = Object.keys(model.permissions).length > 0 ? model.permissions : caller
+          //
+          // `permissions: {}` on one line grants nothing, and the block parser reports it the
+          // same way it reports an absent block, so it is read off the job's own text: without
+          // this, the strictest grant a caller can write would fall through to the loosest.
+          const inlineOnJob = /^ {4}permissions:[ \t]*\S/m.test(model.text)
+          const declared =
+            Object.keys(model.permissions).length > 0 || inlineOnJob ? model.permissions : caller
           assert.notEqual(
             declared,
             undefined,
