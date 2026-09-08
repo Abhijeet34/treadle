@@ -213,6 +213,19 @@ describe('the release pull request carries its own parked state', () => {
     assert.match(statuses(result)[0] as string, /state=failure/)
   })
 
+  // If the head still shows zero runs once the wait budget is spent, that head is unknown
+  // rather than confirmed clear, so it must not fall through to the same success the
+  // no-parked-runs case earns.
+  it('reports pending rather than clear when no runs are ever observed on the head', async () => {
+    const result = await drive({ pulls: `69\t${HEAD}\n`, [`count-${HEAD}`]: '0\n' })
+
+    assert.equal(result.code, 0, `the job failed main:\n${result.stdout}`)
+    const posted = statuses(result)
+    assert.equal(posted.length, 1, `expected one status post, got ${JSON.stringify(posted)}`)
+    assert.match(posted[0] as string, /state=pending/)
+    assert.doesNotMatch(posted[0] as string, /state=success/)
+  })
+
   // The last line of `gh --jq @tsv` output has no trailing newline, which leaves `read` at
   // exit 1 with the fields already set. Without the `|| [ -n ... ]` guard the loop drops it,
   // and a lone parked pull request would be reported as clear.

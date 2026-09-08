@@ -154,7 +154,7 @@ A parked run attaches no check to the pull request, so the pull request page rep
 Forty-six runs had concluded `action_required` by then.
 
 `.github/workflows/release.yml`'s `parked-checks` job is what says so now, on the pull request rather than on the trunk.
-It runs after `release-pr` on the same push to `main`, asks the API which runs on the pull request's current head commit are at `action_required`, and posts a `release checks approved` commit status on that head: red while they are parked, green once they are not.
+It runs after `release-pr` on the same push to `main`, asks the API which runs on the pull request's current head commit are at `action_required`, and posts a `release checks approved` commit status on that head: red while they are parked, green once they are confirmed clear, and yellow (pending) while no runs have been observed on the head at all.
 `gh pr checks 69` reads commit statuses, so the surface that answered nothing now answers.
 The approve command for each parked run goes into the Release run's step summary, and the status links there.
 The job reports and never approves: `statuses: write` over two reads, the run's own token, no stored credential, and the click stays where ADR-0009 put it.
@@ -167,6 +167,7 @@ A red that never clears is a red nobody reads, and it makes every other red on `
 Keying it on the head commit rather than the branch is what keeps it honest, because a run parked on a commit the pull request has moved past stays `action_required` for the life of the repository.
 `needs: release-pr` is there because the job read the pull request one second into run `34288199967` and answered about the head commit release-please replaced two minutes later.
 GitHub then created the runs on that new head two seconds after `release-pr` finished, so a head sha carrying no runs at all is read again rather than called clear.
+A head that still carries no runs once that budget expires stays pending rather than falling through to success, because unknown and clear are different claims, and an absent signal reading as a pass is the exact defect class this repository has been removing.
 
 One thing the status cannot do is refresh itself.
 It describes the head commit as of the last push to `main`, so between approving the runs and the next push it is behind, and merging the pull request is what ends that window.
