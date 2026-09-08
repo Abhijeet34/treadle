@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** the captain's statement of purpose, under the decision `cut-the-agile-surface`
-**Supersedes:** [ADR-0016](0016-sprints.md), [ADR-0018](0018-the-board-is-a-projection.md), [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md), [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md), [ADR-0028](0028-a-retrospective-is-a-record-of-its-own-kind.md), and the point-scale key of [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md)
+**Supersedes:** [ADR-0016](history/0016-sprints.md), [ADR-0018](history/0018-the-board-is-a-projection.md), [ADR-0022](history/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md), [ADR-0023](history/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md), [ADR-0028](history/0028-a-retrospective-is-a-record-of-its-own-kind.md), and the point-scale key of [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md)
 **Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the derived index this record's own recap of ADR-0002's layout still names; month-sharded items and an append-only log are the whole layout now
 
 ## Context

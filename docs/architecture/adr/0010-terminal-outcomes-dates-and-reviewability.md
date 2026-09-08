@@ -117,3 +117,17 @@ Measured on the golden 24-item workspace, in the `agent/1` rendering:
 - A fifth resolution value that is not a reason for stopping. The set is closed on the argument that a resolution says why work stopped; a value that says something else means the field is being used for two things.
 - `doctor` landing, which takes the `health` block off `status` and gives `healthFindings` its intended home.
 - A measured case where an attempt outcome has to be queried rather than read in the log. It is an event key today precisely because it describes an attempt and not an item; a filter over it would mean it belongs on the record after all.
+
+## Folded in from ADR-0023
+
+[ADR-0023](history/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) moved to `history/` with the surface it was written for. One of its sections decides what `explain` and `transition` read, which is a reviewability control this record owns and which ships. They are reproduced unchanged, under the record that owns them.
+
+### `explain` and `transition` read one table
+
+`explain`'s `moves` block gains a `records` column: the values the edge writes and refuses to be taken without, spelled as the flag that carries each.
+`edgeRequirements` in `src/domain/state-machine.ts` returns the guards and the records of one edge, and both `explain` and the evaluator read it, so the two cannot drift.
+Before this, `explain` printed guard ids alone and said `-` on eight of the thirteen transition names, each of which `transition` then refused with `T4` or `T6` for a value the row never mentioned.
+An agent that reads `explain` before acting, which is the whole point of the command, paid one refusal per move.
+
+`explain` also prints `rules <passing>/<evaluated> pass`.
+The `gates` block shows the failing rules and is the one block in the tool whose unshown rows no page or flag can fetch, so `~gates 0 8` could not be told from eight rows withheld.

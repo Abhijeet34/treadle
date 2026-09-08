@@ -3,11 +3,11 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** section 2.7 of the domain model, under the captain decision `remaining-unbuilt-scope` and the decision `ceremony-set`
-**Superseded by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
+**Superseded by:** [ADR-0029](../0029-the-record-is-the-product-and-the-agile-surface-is-not.md), which removes the surface this record designed
 
 ## Context
 
-DR2 drew `ceremonies/YYYY-MM.md` and [ADR-0002](0002-storage-layout.md) recorded it as unwritten for want of a domain type.
+DR2 drew `ceremonies/YYYY-MM.md` and [ADR-0002](../0002-storage-layout.md) recorded it as unwritten for want of a domain type.
 The layout has carried an empty directory name ever since, and two of the doctor's remaining findings, `H31` and `H32`, wait on the record existing.
 
 Two questions had to be answered, not one.
@@ -27,7 +27,7 @@ It also produces something the store can hold honestly: the actions are chores, 
 
 **A retrospective is a record kind of its own, the third after the item and the sprint, and it is the only ceremony that gets one.**
 
-The precedent that holds is [ADR-0016](0016-sprints.md), not [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md).
+The precedent that holds is [ADR-0016](0016-sprints.md), not [ADR-0017](../0017-an-impediment-is-a-type-that-blocks.md).
 The test both applied is whether the thing is work someone does, moving through the seven states, with `done` meaning something.
 An impediment is: someone resolves it, it has an assignee and an estimate and a sprint.
 A retrospective is not.

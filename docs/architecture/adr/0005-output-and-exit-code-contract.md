@@ -166,3 +166,23 @@ The help note gives that reason rather than the presentation reason it would oth
 
 - A command whose result is unbounded, such as `history`. The line format is already line-delimited; JSON would need a document-per-line variant, and the shape would gain a stream marker.
 - A budget in A.3 failing on real content rather than on the fixture, which sends the change back to content and not to the contract.
+
+## Folded in from ADR-0023
+
+[ADR-0023](history/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) moved to `history/` with the surface it was written for. Two of its sections decide the exit rule and the data marking, both of them this record's contract and both shipping. Its sprint findings `H28` and `H29` went with ADR-0029 and stay in the moved record. They are reproduced unchanged, under the record that owns them.
+
+### `doctor`'s exit reads what a finding hides
+
+The verdict was "the table is not empty", so a git checkout with `autocrlf` exited 7, which is also what a truncated shard exits, and a CI job could not tell them apart.
+The exit now reads `hidesContent`, the same predicate that decides whether a read over the store is refused, so the one status meaning "no answer over this store is whole" is decided in one place.
+A table carrying only `SERVED_ANYWAY` rows prints them, says so on a `serving` line, and exits 0.
+An audit finding is always over a served record and always counts.
+
+### A line carrying a value the tool did not choose is marked
+
+`ColumnSpec`, the `list` property and the `scalar` property each gain `data`, which is the contract's `marked-scalar` kind: the `"` marker without the free-text column's placement rule.
+Every `set` list is marked, because `set <field> <before> -> <after>` ends in a value a caller wrote.
+`history`'s `what`, `show`'s `ref` and its `evidence` scalar, and `doctor`'s `id` and `where` are marked columns, each of them a projection of bytes read from a file.
+`guardCell` still holds every one of them to a single field, so nothing moves placement.
+
+`--limit` was already refused for anything but a whole number of at least 1 by the entry-point work of PR #52, and `status` keeps its cheap structural `findings` count and adds an `audit` line naming the check it did not run.

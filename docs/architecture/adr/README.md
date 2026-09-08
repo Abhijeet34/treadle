@@ -1,29 +1,12 @@
 # Architecture decision records
 
 One record per decision that a later change has to argue with rather than merely notice.
-The numbers match the design records they implement, so ADR-0002 is DR2's storage layout and ADR-0006 is DR6's store seam; the gaps are records that belong to layers not built yet.
-ADR-0009 is the exception: the design phase wrote no record for release and CI, and the threat model's F13 fix asks for one, so it carries the next free number rather than a design record's.
-ADR-0012 is the other kind of exception: it records a piece of DR6 that was refused rather than built, so it carries the next free number and leaves ADR-0006 to the seam that shipped.
-ADR-0013 belongs to no design record at all: it answers an incident in this repository's history, so it carries the next free number too.
-ADR-0014 carries the next free number for the same reason ADR-0009 does: the read it reshapes is one the design never priced.
-ADR-0015 carries the next free number because the sprint is DR2's entity built under a design the four absent capabilities share, and that design is not a numbered design record.
-ADR-0016 carries the next free number for the same reason, and ADR-0017 carries the next free number after it for the same reason again: an impediment is one of the same four absent capabilities.
-ADR-0018 is the fourth of them, the board.
-ADR-0019 belongs to no design record either: like ADR-0013 it answers an incident in this repository's own history, so it carries the next free number.
-ADR-0021 carries the next free number for ADR-0014's reason: it reshapes two commands the design never priced, found the first time the corpus carried a relation graph.
-ADR-0022 carries the next free number because it answers one audit's findings across four of the records above rather than belonging to any one of them.
-ADR-0024 carries the next free number for the same reason, over a second audit's findings and one captain decision about which of them to build.
-ADR-0025 carries the next free number because it answers a scout report's measurement of ADR-0024's own rule at the wrong layer.
-ADR-0026 carries the next free number because workspace configuration is the fifth of the absent capabilities the sprint, the impediment and the board were three of, and it fills the Policy seam DR6 named.
-ADR-0027 carries the next free number for ADR-0009's reason: it moves a number DR8 set, and the argument for moving it is the thing worth reading.
-ADR-0028 carries the next free number because the retrospective is the sixth of the absent capabilities, and because its own draft claimed ADR-0026, which workspace configuration took while it was queued.
-ADR-0029 carries the next free number because it answers the tool's statement of purpose rather than any one design record, and it is the first record here that supersedes rather than overtakes: five of the records above it designed a surface it removes whole.
-ADR-0030 carries the next free number for the same reason ADR-0027 does: it moves a decision DR2 made, and the argument for moving it is the thing worth reading.
+Numbers 2 to 8 match the design records they implement, so ADR-0002 is DR2's storage layout and ADR-0006 is DR6's store seam; every later record takes the next free number, because it answers something the design never priced.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
 |---|---|
-| [ADR-0002](0002-storage-layout.md) | Month-sharded record files with a derived SQLite index that is never authoritative |
+| [ADR-0002](0002-storage-layout.md) | Month-sharded record files as the source of truth, with the freshness stat a read checks them against |
 | [ADR-0003](0003-record-format-and-migration.md) | One Markdown record grammar, explicit typed fields, unknown lines preserved, `migrate` as the only rewrite |
 | [ADR-0004](0004-concurrency-and-durability.md) | One advisory lock with a heartbeat, exclusive-create atomic writes, per-record compare-and-set |
 | [ADR-0005](0005-output-and-exit-code-contract.md) | One result object per command, three renderings behind one seam, and one exit table over its `code` |
@@ -37,31 +20,22 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0013](0013-a-branch-may-not-remove-a-test-main-has.md) | A pull request may not remove a test the merge base has without declaring it, and the check that says so is required by name outside the workflow file |
 | [ADR-0014](0014-the-view-is-a-projection.md) | The view every command reads holds the fields a scan reads, the one record a command acts on is read on demand, and the shard a write touches is parsed once |
 | [ADR-0015](0015-relations-stored-once-and-the-guard-they-feed.md) | A relation is one stored direction on its source record with the inverse derived on read, the `G2` guard it feeds already existed, and a dangling edge is a finding |
-| [ADR-0016](0016-sprints.md) | A sprint is a period with a committed set, kept in one `sprints.md`, whose close records the carry-over and leaves unfinished work pointing at it |
 | [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) | An impediment is a work-item type that blocks through the relation graph, required at creation to say what would clear it, resolved by reaching `done` with nothing unlinked |
-| [ADR-0018](0018-the-board-is-a-projection.md) | The board is the backlog grouped by live state and scoped to the open sprint, stores nothing, sorts blocked work first, and leaves `G3` and `G4` disarmed |
 | [ADR-0019](0019-no-harness-specific-instruction-file.md) | No tracked file at the repository root may be one a single agent harness loads by itself, and the test that says so is kept by the guard ADR-0013 already put outside the branch |
-| [ADR-0020](0020-a-finding-is-decided-by-a-whole-read.md) | A finding is a verdict on the files cached like any row, only the pass that read a file whole may decide a duplicate, an append that meets one hands the file back, and `doctor` re-derives the index so the fix line every refusal prints is the recovery |
 | [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md) | `doctor` is fed one record and one event at a time through two streaming reads on the store seam, `next` ranks off one index over the graph, and both are gated as a ratio to the read every command performs |
-| [ADR-0022](0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) | A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time |
-| [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) | A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked |
 | [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and the label, title-word and open-sprint readers that were missing |
 | [ADR-0025](0025-the-referential-rule-lives-under-the-write-lock.md) | No transaction may leave a record naming an id the store does not hold, checked inside the lock the write already takes rather than against a read taken before it, with `H30` reporting the ones the files already carry |
 | [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md) | Workspace configuration is a closed set of optional fields and two gate sections on `workspace.md`, a configured gate replaces the default whole through the one evaluator, a configuration this build cannot read hides content, and the record is written under the same compare-and-set as every other |
 | [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
-| [ADR-0028](0028-a-retrospective-is-a-record-of-its-own-kind.md) | The retrospective is the one ceremony that gets a record, a kind of its own in `ceremonies/YYYY-MM.md` with no lifecycle and no family around it, its actions named once on the record and held there by `S17`'s fourth referrer |
 | [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) | The sprint, the board, the retrospective and the estimate are removed because none of them records an interaction, a decision or a task; a record written before the cut keeps its retired fields through `extra` and reads unchanged |
 | [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md) | The derived index is removed and every read parses the month shards; `S14` goes with it, the journal moves to `.txn/`, the log is read only by a command that answers from it, and an errno on a path the store must read is `S13` naming the path rather than an empty answer |
 
-Each record has a "Departures from the design record" section.
+Most records carry a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
 
 A record is never rewritten when a later one overtakes part of it, because the argument it made is the thing worth reading and a rewritten record is a record of nothing.
-What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands; a record overtaken more than once carries one such line per record that overtook part of it, in the order they landed.
-ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0011, ADR-0012, ADR-0014, ADR-0017, ADR-0021, ADR-0022, ADR-0024, ADR-0025, ADR-0026 and ADR-0029 carry that line today: some reasoned from the absence of an entity, a command or a layer that has since been built, and the rest reasoned from a surface, a flag, a field, a command or an operation, that this repository has since removed. ADR-0002 and ADR-0006 carry both kinds, three lines each: one from an absence since built, two from a surface this repository has since removed. ADR-0005's own hook-code bullet was the first to be marked this way.
-A record with no such line has not been overtaken, which is the claim the line exists to make checkable.
+What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record and says what moved and what still stands, one line per record that overtook part of it, in the order they landed.
 A `**Superseded by:**` line is the stronger form of the same mark, for a record whose whole subject a later one removed rather than reshaped: the argument still reads and the surface it argued for is not in the tree.
-ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028 carry that line, all five naming ADR-0029, and ADR-0020 carries it naming ADR-0030.
 
 ## The store's rule ids
 
@@ -134,3 +108,15 @@ The set is closed.
 | `C1` | The invocation is not usable as written: a missing operand, a value outside a closed set, or two flags that ask different questions |
 | `C2` | A named field or column is not one this command has, or is named more than once in a set printed once |
 | `C3` | A column set names two free-text columns, which no row ordering can render unambiguously |
+
+## Records moved to history
+
+These six designed a surface this repository removed before anyone outside it had the tool, so none of them is a decision a maintainer reopens.
+Each is whole in `history/`, with its header, its alternatives and who decided it, and each is still the record of why that surface existed.
+
+- [ADR-0016](history/0016-sprints.md) - A sprint is a period with a committed set, kept in one `sprints.md`, whose close records the carry-over and leaves unfinished work pointing at it
+- [ADR-0018](history/0018-the-board-is-a-projection.md) - The board is the backlog grouped by live state and scoped to the open sprint, stores nothing, sorts blocked work first, and leaves `G3` and `G4` disarmed
+- [ADR-0020](history/0020-a-finding-is-decided-by-a-whole-read.md) - A finding is a verdict on the files cached like any row, only the pass that read a file whole may decide a duplicate, an append that meets one hands the file back, and `doctor` re-derives the index so the fix line every refusal prints is the recovery
+- [ADR-0022](history/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) - A closed sprint answers from the tally its close recorded, `H27` reports a raised impediment while `DOR9` refuses to raise one that holds nothing up, a sprint still admits ungroomed work and five surfaces name it, `notFound` routes a sprint id, and `R5` and `DOR10` give the two relation kinds a rule at write time
+- [ADR-0023](history/0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) - A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked
+- [ADR-0028](history/0028-a-retrospective-is-a-record-of-its-own-kind.md) - The retrospective is the one ceremony that gets a record, a kind of its own in `ceremonies/YYYY-MM.md` with no lifecycle and no family around it, its actions named once on the record and held there by `S17`'s fourth referrer

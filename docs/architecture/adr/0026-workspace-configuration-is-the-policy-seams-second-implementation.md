@@ -14,7 +14,7 @@ Six things in this tree waited on workspace configuration by name, and every one
 | the review step, guard `G5`'s input | `src/application/services/context.ts`, "Workspace configuration owns this once `config` lands" |
 | the point scale | `validateWorkItem`'s `pointScale` option, [../../DOMAIN.md](../../DOMAIN.md) |
 | `next`'s weights | `DEFAULT_WEIGHTS` in `insight.ts` |
-| work-in-progress limits, guard `G3` | [0018-the-board-is-a-projection.md](0018-the-board-is-a-projection.md), "`G3` and `G4` stay disarmed" |
+| work-in-progress limits, guard `G3` | [0018-the-board-is-a-projection.md](history/0018-the-board-is-a-projection.md), "`G3` and `G4` stay disarmed" |
 | `G4`'s membership test | the same record |
 | the Policy seam's second implementation | [../../ARCHITECTURE.md](../../ARCHITECTURE.md), "`validateGate` is what makes a configured gate safe to load, and nothing loads one today" |
 
@@ -82,7 +82,7 @@ Refused above: it makes the file and the enforcement disagree silently, which is
 Refused: DR3's forward-compatibility rule is that an older tool writing a newer file loses nothing it did not understand, and the item and sprint codecs both keep it. The key set is closed where a caller types a key, which is `config set`, and the silence a carried-forward key would otherwise leave is closed by the `extra` count.
 
 **Scoping `G3`'s column count to the whole workspace always.**
-Refused: [0018-the-board-is-a-projection.md](0018-the-board-is-a-projection.md) scopes the board to the one open sprint, and a limit a team reads off `board` has to be the limit `G3` enforces. Two open sprints is a scope the board refuses to choose between and a guard may not refuse a move over, so that case falls back to the workspace, which is the wider count and refuses sooner rather than later.
+Refused: [0018-the-board-is-a-projection.md](history/0018-the-board-is-a-projection.md) scopes the board to the one open sprint, and a limit a team reads off `board` has to be the limit `G3` enforces. Two open sprints is a scope the board refuses to choose between and a guard may not refuse a move over, so that case falls back to the workspace, which is the wider count and refuses sooner rather than later.
 
 ## Consequences
 

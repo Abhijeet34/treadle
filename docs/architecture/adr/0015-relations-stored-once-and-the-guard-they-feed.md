@@ -94,7 +94,7 @@ Re-running the whole check under the lock was priced and refused: it needs the w
 
 `absent_features` is `sprint board impediment`.
 
-The key itself is gone: [ADR-0018](0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
+The key itself is gone: [ADR-0018](history/0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
 
 ## Alternatives considered
 
@@ -140,3 +140,25 @@ The model's `blocked` flag is unchanged: derived, never stored, and shown beside
 
 A second caller for one of the three unexposed kinds, argued rather than assumed.
 A workspace whose `blocks` graph is deep enough that direct dependents mis-rank the item that would free the most, which would be a measurement on a real backlog rather than a theory.
+
+## Folded in from ADR-0022
+
+[ADR-0022](history/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) moved to `history/` with the surface it was written for. One of its sections decides two rules over the relation graph, `R5` and `DOR10`, which this record owns and which ship. They are reproduced unchanged, under the record that owns them.
+
+### `R5` refuses a `blocks` edge that would block nothing, and `duplicates` earns `DOR10`
+
+`addRelation` takes the same `stateOf` reader `blockersOf` takes, and refuses a `blocks` edge whose source is already done or cancelled.
+That edge is inert on every read by `blockersOf`'s own rule, so accepting it wrote a record whose only effect was to make the caller believe something they had not done.
+The previous round's note on the result was the tool saying so and letting the write land; a caller who reads `changed 1` has been told the write happened, which it had.
+`R5` refuses the write and never the stored edge: the edges a resolved impediment still carries were written while it was live, and ADR-0017 depends on them staying.
+
+`duplicates` earns exactly one more rule, and it is `DOR10`: the ready gate fails while the item duplicates another the store holds.
+One rule reaches all three surfaces the finding named, because they all read the same verdict.
+Grooming is refused by `G1`, starting is refused because the item cannot reach `ready` to be started, and `sprint commit` is refused because `evaluateCommit` reads the ready gate.
+Its remedy is `treadle transition <id> cancelled --resolution duplicate --reason "<why>"`, which is what the `duplicate` resolution has been in the closed set for since ADR-0010.
+
+`DOR10` passes when the original is an id the store does not hold.
+A dangling edge is `H24`'s finding and its remedy is `relation remove`, and a gate rule that read the raw edge would have held the copy at `draft` for ever on a record nobody can move, which is the trap `blockersOf` documents for blockers.
+`DOR9` and `DOR10` both pass on a done or cancelled item, because the remedy each names is a move the transition table refuses from there and finished work is history under both rules.
+
+A relation kind that decides nothing is a label. This one decides one thing, and once is enough.

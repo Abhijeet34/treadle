@@ -102,7 +102,7 @@ That is error prose and a fix list, which `docs/STABILITY.md` names as not break
 
 `absent_features` is `board`.
 
-The key itself is gone: [ADR-0018](0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
+The key itself is gone: [ADR-0018](history/0018-the-board-is-a-projection.md) deleted `absent_features` from the `status` shape once the last of the four names was built, so the line above is what this change did to a field that no longer exists.
 
 ## Alternatives considered
 
@@ -144,3 +144,21 @@ It is a work-item type in the month shards instead, because everything an impedi
 A team for whom `file` then `relation add` is measured to lose impediments between the two commands, which is the `--blocks` flag above.
 A workspace whose impediment chains are deep enough that ranking the outermost one first is wrong, which would be a measurement on a real backlog.
 A second type that needs a field required at creation and a finding when it stands alone, which would be the moment to name that pattern rather than repeat it.
+
+## Folded in from ADR-0022
+
+[ADR-0022](history/0022-a-closed-sprint-is-a-record-and-four-narrow-rules.md) moved to `history/` with the surface it was written for. One of its sections decides a rule about impediments, which this record owns and which ships. They are reproduced unchanged, under the record that owns them.
+
+### `H27` reports a raised impediment, and `DOR9` refuses to raise one that holds nothing up
+
+`H27` no longer fires on a `draft` impediment.
+`file` lands an impediment in `draft`, so the finding can no longer fire between the two prescribed commands, and a CI job that runs `doctor` after each of them sees exit 0 at both points.
+
+That alone would have moved the complaint one state along, so the refusal was added where the tool can make one: `DOR9`, scoped to `impediment`, fails the ready gate while the record carries no `blocks` edge, with `treadle relation add <id> blocks <id>` as its remedy.
+Grooming is where an impediment stops being a record someone is writing and becomes one raised against work, so that is the move to refuse.
+
+This makes the pair the same one `R2` and `H25` already are: a write-time guard for what the tool is asked to do, and a load-time finding for what a hand edit or a `relation remove` left behind.
+`doctor`'s exit 7 now means the files say something no write path would have accepted, which is the only thing it should have meant.
+
+The two-command shape stays.
+ADR-0017 refused a `--blocks` flag on `file` because `relation.ts` is the one writer of the `relations` field, and that reason is untouched by this finding: what was measured is that `doctor` was wrong between the two commands, not that the two commands lose impediments.
