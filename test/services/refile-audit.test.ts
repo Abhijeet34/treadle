@@ -79,9 +79,10 @@ describe('a record removed and filed again under its own id', () => {
   })
 
   // The rule still has to catch what it is for, and the removal moves where it starts rather
-  // than switching it off: the store hands the log over sorted by instant, so a line
-  // backdated past the removal cannot be told from a genuine event of the record that left,
-  // and the audit says nothing about either. Everything after the removal is still decided.
+  // than switching it off: the store orders the log by file name first and by `at` only
+  // within one file, so scan position cannot stand in for the removal's instant. The boundary
+  // compared here is that instant, and an event dated after it and before this record was
+  // filed is still decided.
   it('still reports an event dated after the removal and before this record was filed', async () => {
     const apply = targetFor(store, 'apply')
     const between = await transition(apply, fixedClock(BETWEEN), ids, { id: 'packaging', target: 'ready', actor: ACTOR })
