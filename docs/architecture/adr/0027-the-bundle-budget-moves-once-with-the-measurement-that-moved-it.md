@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-08
 **Implements:** decision `bundle-budget`, registered by the remaining-surface design and decided by the captain
+**Overtaken in part by:** [ADR-0031](0031-the-word-was-the-whole-difference-and-a-declared-kind-earns-its-writer.md), under which the seven work-item types this record counted are six; the budget, its derivation and the unminified build all stand
 
 ## Context
 
