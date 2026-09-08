@@ -159,6 +159,35 @@ describe('a journal that names a path outside the layout', () => {
   })
 })
 
+describe('a journal named with a byte the line grammar ends a value at', () => {
+  // POSIX allows any byte but `/` and NUL in a name, and `doctor` prints a finding's file and
+  // reason as a row cell and a marked scalar, both of which end at a newline. Windows does not
+  // allow the name at all, so there is nothing to plant there.
+  const WINDOWS_NAMES = process.platform === 'win32'
+    ? 'Windows does not allow a newline in a file name, so there is no such file to plant'
+    : false
+
+  it('is escaped into the refusal and the finding rather than ending the line', { skip: WINDOWS_NAMES }, async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      await journal(workspace.root, 'a\nb', { garbage: true })
+      const applied = await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
+      assert.equal(applied.ok, false)
+      assert.equal(applied.ok ? '' : applied.error.entities[0], String.raw`.txn/a\nb.json`)
+      assert.match(applied.ok ? '' : applied.error.message, /^\.txn\/a\\nb\.json is not a transaction journal/)
+
+      const findings = await findingsAfterReadingTheLog(workspace.store)
+      assert.equal(findings.length, 1)
+      for (const text of [findings[0]?.file ?? '', findings[0]?.reason ?? '']) {
+        assert.ok(!text.includes('\n') && !text.includes('\r'), `a finding carries a delimiter: ${JSON.stringify(text)}`)
+      }
+      t.diagnostic(`the refusal names ${applied.ok ? '' : applied.error.entities[0]} on one line`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
 describe('a journal this store did write', () => {
   it('is still replayed and removed, so nothing here narrows recovery', async () => {
     const workspace = await aWorkspace()

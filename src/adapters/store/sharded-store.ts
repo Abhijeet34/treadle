@@ -168,7 +168,7 @@ function parseJournal(text: string): Journal | undefined {
     if (typeof file !== 'object' || file === null) return undefined
     const entry = file as Record<string, unknown>
     if (typeof entry['content'] !== 'string') return undefined
-    if (!writable(entry['path'], [WORKSPACE_FILE], ITEMS_DIR)) return undefined
+    if (!writable(entry['path'], ITEMS_DIR, WORKSPACE_FILE)) return undefined
   }
   for (const log of events) {
     if (typeof log !== 'object' || log === null) return undefined
@@ -177,7 +177,7 @@ function parseJournal(text: string): Journal | undefined {
     if (!Array.isArray(lines) || !Array.isArray(ids) || lines.length !== ids.length) return undefined
     if (!lines.every((line) => typeof line === 'string')) return undefined
     if (!ids.every((id) => typeof id === 'string')) return undefined
-    if (!writable(entry['path'], [], EVENTS_DIR)) return undefined
+    if (!writable(entry['path'], EVENTS_DIR)) return undefined
   }
   return raw as Journal
 }
@@ -188,13 +188,31 @@ function unreplayable(file: string): string {
 }
 
 /**
+ * A name off the filesystem as text a refusal or a finding may carry. A directory entry may
+ * hold any byte but `/` and NUL, and the agent/1 line grammar ends a value at a newline: a
+ * shard named `a<LF>b.md` took `doctor` down with `INTERNAL` at exit 1, which is the one
+ * surface that would have named the file. Escaped rather than dropped, because the point of
+ * the finding is to say which file to go and look at.
+ */
+function printable(text: string): string {
+  return text.includes('\n') || text.includes('\r')
+    ? text.replace(/\r/g, '\\r').replace(/\n/g, '\\n')
+    : text
+}
+
+/** The same, over a whole finding: both of its text fields come off the filesystem. */
+function printableFinding(finding: Finding): Finding {
+  return { ...finding, file: printable(finding.file), reason: printable(finding.reason) }
+}
+
+/**
  * The containment rule (S15) on the replay path: a journal may name the workspace record or
  * one file directly inside a directory the layout draws, and nothing else. One segment, not
  * a prefix match, because `items/../../x` starts with `items/` and leaves the root.
  */
-function writable(at: unknown, exact: readonly string[], dir: string): boolean {
+function writable(at: unknown, dir: string, alsoExactly?: string): boolean {
   if (typeof at !== 'string') return false
-  if (exact.includes(at)) return true
+  if (at === alsoExactly) return true
   const parts = at.split('/')
   return parts.length === 2 && parts[0] === dir && parts[1] !== '' && parts[1] !== '.' && parts[1] !== '..'
 }
@@ -536,7 +554,7 @@ export class ShardedStore implements Store {
       })
     }
 
-    const records: Records = { items, byId, findings, logFiles: listing.value.logs }
+    const records: Records = { items, byId, findings: findings.map(printableFinding), logFiles: listing.value.logs }
     this.#records = records
     this.#stamp = listing.value.stamp
     return storeOk(records)
@@ -722,13 +740,13 @@ export class ShardedStore implements Store {
         visit(event)
         visited += 1
         if (query.limit !== undefined && visited >= query.limit) {
-          this.#logFindings = [...findings, ...read.value.findings]
+          this.#logFindings = [...findings, ...read.value.findings].map(printableFinding)
           return storeOk(visited)
         }
       }
       findings.push(...read.value.findings)
     }
-    this.#logFindings = findings
+    this.#logFindings = findings.map(printableFinding)
     return storeOk(visited)
   }
 
@@ -1095,8 +1113,17 @@ export class ShardedStore implements Store {
     }
     for (const name of names.sort()) {
       if (!name.endsWith('.json')) continue
-      const file = `${JOURNAL_DIR}/${name}`
-      const journal = parseJournal(await readFile(path.join(dir, name), 'utf8'))
+      const file = printable(`${JOURNAL_DIR}/${name}`)
+      let text: string
+      try {
+        text = await readFile(path.join(dir, name), 'utf8')
+      } catch (error) {
+        // Named here rather than by `apply`'s errno backstop, which has no path to print for
+        // an `EISDIR` and would say only that a read failed.
+        const errno = error as NodeJS.ErrnoException
+        return storeFail('STORE_UNAVAILABLE', 'S13', `${file} could not be read: ${errno.syscall ?? 'read'} failed with ${errno.code ?? 'an error'}`, [file])
+      }
+      const journal = parseJournal(text)
       if (journal === undefined) {
         return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file])
       }
@@ -1124,7 +1151,7 @@ export class ShardedStore implements Store {
     const findings: Finding[] = []
     for (const name of names.sort()) {
       if (!name.endsWith('.json')) continue
-      const file = `${JOURNAL_DIR}/${name}`
+      const file = printable(`${JOURNAL_DIR}/${name}`)
       const text = await readFile(path.join(dir, name), 'utf8').catch(() => undefined)
       if (text !== undefined && parseJournal(text) !== undefined) continue
       findings.push({ file, line: 1, rule: 'S13', reason: unreplayable(file) })

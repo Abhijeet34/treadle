@@ -21,6 +21,34 @@ storeConformance('sharded markdown store', async () => {
   return { store: workspace.store, dispose: () => workspace.dispose() }
 })
 
+describe('a shard named with a byte the line grammar ends a value at', () => {
+  // POSIX allows any byte but `/` and NUL in a name, and the store puts a shard's name into
+  // the findings `doctor` prints as row cells. `items/a<LF>b.md` took `doctor` down with
+  // `INTERNAL` at exit 1 - the one surface that would have named the file. Windows does not
+  // allow the name, so there is nothing to plant there.
+  const WINDOWS_NAMES = process.platform === 'win32'
+    ? 'Windows does not allow a newline in a file name, so there is no such file to plant'
+    : false
+
+  it('is escaped into every finding it reaches', { skip: WINDOWS_NAMES }, async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      await writeFile(path.join(workspace.root, 'items', 'a\nb.md'), 'not a record file\n')
+      const findings = await workspace.store.findings()
+      assert.ok(findings.ok, findings.ok ? '' : findings.error.message)
+      assert.equal(findings.value.length, 1)
+      const finding = findings.value[0]
+      assert.equal(finding?.file, String.raw`items/a\nb.md`)
+      for (const text of [finding?.file ?? '', finding?.reason ?? '']) {
+        assert.ok(!text.includes('\n') && !text.includes('\r'), `a finding carries a delimiter: ${JSON.stringify(text)}`)
+      }
+      t.diagnostic(`the finding names ${finding?.file} on one line`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
 describe('the sharded store on disk', () => {
   it('files a record into the month shard of its filed_at, and nowhere else', async () => {
     const workspace = await aWorkspace()
