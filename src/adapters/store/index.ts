@@ -21,12 +21,12 @@ export {
 } from './event-log.ts'
 
 export {
+  hiddenRecordBoundary,
   parseFile,
   parseRecordSource,
   renderFile,
   renderHeader,
   renderRecord,
-  unwritableBodyLine,
   type Chunk,
   type ParsedFile,
   type ParsedRecord,

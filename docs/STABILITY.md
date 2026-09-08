@@ -86,6 +86,20 @@ Not breaking:
 
 - Adding an optional field or a new section name. Unknown fields and unknown sections are preserved verbatim and travel with the record through every mutation, so an older tool writing a newer file loses nothing it did not understand.
 
+#### What a record body can hold
+
+A section body may carry a markdown heading.
+The record boundary is a `# ` line at column 0 and a section boundary is a `## ` one, so a body line beginning with `#` is stored with one backslash in front of it: `## Findings` is written to the file as `\## Findings`.
+That is CommonMark's own escape, which means a markdown reader still renders the line as the text the record holds, and `treadle show --field desc` returns the body exactly as it was filed.
+A body line that already begins with a backslash run in front of a hash gets one more, so the escape reverses cleanly and a rewrite never accumulates them.
+The first version of this rule refused the write instead, and a refusal that names a limitation is still a limitation: 17 of 347 real backlog bodies could not be stored without altering the prose.
+
+One shape is still refused, by name, at the write: a body that would be read back as a second record.
+That is a line the grammar resynchronises on - a `<slug>: <title>` line, at column 0 or under up to three spaces and six hashes - with a record's four mandatory fields (`type`, `state`, `filed_at`, `version`) directly under it.
+Pasting another record's field block into a description is the case that reaches it.
+The write path measures this with the same function the read path resynchronises on, so the two cannot disagree, and the refusal quotes the offending line.
+A store that accepts a write it cannot read back is worse than one that says no.
+
 ## The runtime floor
 
 The declared floor is Node.js 24.15.

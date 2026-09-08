@@ -283,15 +283,35 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
-    it('refuses a record the grammar could not write back', async () => {
+    it('stores a body that carries a markdown heading, and reads it back unchanged', async () => {
+      await withStore(async (store) => {
+        const description = 'fine\n# a heading at column zero\n\n## and a section-shaped one'
+        const written = await store.apply({
+          txn: 't1', writes: [{ item: anItem({ description }) }], events: [],
+        })
+        assert.ok(written.ok, written.ok ? '' : written.error.message)
+        const read = await store.get('item-one')
+        assert.ok(read.ok, read.ok ? '' : read.error.message)
+        assert.equal(read.value?.description, description)
+      })
+    })
+
+    it('refuses a body that would be read back as a second record', async () => {
+      // The write bound and the read's resynchronisation used to be different predicates:
+      // the write bounded column 0 and the read resynchronises on a `<slug>: <title>` line
+      // above a mandatory field block, so this description was accepted and then quarantined
+      // on every read, costing the whole workspace its integrity. Both stores must refuse it.
       await withStore(async (store) => {
         const refused = await store.apply({
           txn: 't1',
-          writes: [{ item: anItem({ description: 'fine\n# a heading at column zero' }) }],
+          writes: [{ item: anItem({
+            description: 'the record I am quoting reads\n\ntype: task\nstate: draft\nfiled_at: 2026-01-01T00:00:00Z\nversion: 1',
+          }) }],
           events: [],
         })
         assert.equal(refused.ok, false)
-        assert.match(refused.ok ? '' : refused.error.message, /may not start with #/)
+        assert.equal(refused.ok ? '' : refused.error.rule, 'S1')
+        assert.match(refused.ok ? '' : refused.error.message, /read back as a second record's heading/)
       })
     })
 

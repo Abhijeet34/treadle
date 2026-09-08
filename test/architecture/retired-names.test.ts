@@ -138,6 +138,9 @@ const RETIRED: readonly Retired[] = [
   { name: 'S14', by: 'ADR-0030', spelling: /['"`]S14['"`]|\bS14\b/ },
   { name: 'delete .index and retry', by: 'ADR-0030', spelling: /delete \.?index.{0,12}retry/i },
   { name: 'the index was busy', by: 'ADR-0030', spelling: /index at \S+ was busy|index .{0,24}could not be opened/ },
+  // ADR-0003's rule 4 amendment: a heading in a record body is escaped rather than refused,
+  // so the predicate that named the refusal is gone and `hiddenRecordBoundary` replaces it.
+  { name: 'unwritableBodyLine', by: 'ADR-0003 rule 4 amendment' },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]
