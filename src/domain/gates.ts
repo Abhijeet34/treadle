@@ -64,10 +64,14 @@ export type GateContext = {
 export const DEFAULT_READY_GATE: Gate = {
   name: 'ready',
   rules: [
-    { id: 'DOR1', scope: 'all', sentence: 'The item has a title.', check: { kind: 'field_present', field: 'title' } },
-    { id: 'DOR2', scope: 'all', sentence: 'The fields the type requires at creation are present.', check: { kind: 'type_required_fields' } },
+    // DOR1 was "the item has a title" and DOR2 "the fields the type requires at creation are
+    // present". No input could fail either: the store refuses a record whose heading is not
+    // `# <slug>: <title>` (`S1`) and quarantines one missing a creation-required field
+    // (`V4`), both before any gate reads it, so the two sat in every denominator and
+    // `rules 8/8 pass` reported six rules as eight. `type_required_fields` stays a check a
+    // workspace gate may configure; the ids go the way DOR5 went and are not reused.
     { id: 'DOR3', scope: 'all', sentence: 'Nothing active is blocking the item.', check: { kind: 'no_active_blocker' } },
-    // DOR5 was "the story is estimated in points" and went with estimation. The id is not
+    // DOR5 was "the story is estimated in points" and went with estimation. No id here is
     // reused and the rest are not renumbered, for the reason DOR9 below records: a rule id
     // is a name a past refusal printed.
     { id: 'DOR4', scope: 'story', sentence: 'The story has at least one acceptance criterion.', check: { kind: 'field_non_empty_list', field: 'acceptance_criteria' } },

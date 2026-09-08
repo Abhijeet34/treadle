@@ -247,12 +247,15 @@ A rule is an id, a human sentence, a scope (`all` or one type), and one check fr
 `evaluateGate(gate, context)` evaluates the rules in scope for the item's type, in the gate's own order, and returns per rule a pass or a fail with the reason and what would satisfy it.
 The verdict passes only when every rule passes.
 
+`DOR1` and `DOR2` are gone and their ids are not reused, the way `DOR5` went with estimation.
+They read "the item has a title" and "the fields the type requires at creation are present", and no input could fail either: the store refuses a record whose heading is not `# <slug>: <title>` and quarantines one missing a creation-required field, both before a gate reads it.
+Two rules that always pass are two rules in every denominator, so `explain` reported six decided rules as `rules 8/8 pass`.
+The `type_required_fields` check stays, because a workspace gate may configure a rule that runs it.
+
 Default ready gate:
 
 | Id | Scope | Rule |
 |---|---|---|
-| `DOR1` | all | The item has a title |
-| `DOR2` | all | The fields the type requires at creation are present |
 | `DOR3` | all | Nothing active is blocking the item |
 | `DOR4` | story | The story has at least one acceptance criterion |
 | `DOR6` | bug | The bug records what was expected |

@@ -320,9 +320,9 @@ explain  acme-platform
   blocked  no
   blocks  -
   by  dana
-  rules  7/10 pass
+  rules  5/8 pass
 
-gates  3 of 10
+gates  3 of 8
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<nam…
   done  DOD4  fail     treadle set sso-saml acceptance_cr…
@@ -346,9 +346,9 @@ explain  acme-platform
   blocked  no
   blocks  -
   by  dana
-  rules  7/10 pass
+  rules  5/8 pass
 
-gates  3 of 10
+gates  3 of 8
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
@@ -372,9 +372,9 @@ explain  acme-platform
   blocked  no
   blocks  -
   by  dana
-  rules  7/10 pass
+  rules  5/8 pass
 
-gates  3 of 10
+gates  3 of 8
   GATE  RULE  VERDICT  NEED
   done  DOD3  fail     treadle set sso-saml reviewer=<name>
   done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
@@ -1108,9 +1108,9 @@ explain  acme-platform
   blocked  yes queue-drain
   blocks  -
   by  dana
-  rules  5/10 pass
+  rules  3/8 pass
 
-gates  5 of 10
+gates  5 of 8
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain re…
   ready  DOR4  fail     treadle set theme-dark acceptance…
@@ -1134,9 +1134,9 @@ explain  acme-platform
   blocked  yes queue-drain
   blocks  -
   by  dana
-  rules  5/10 pass
+  rules  3/8 pass
 
-gates  5 of 10
+gates  5 of 8
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
@@ -1160,9 +1160,9 @@ explain  acme-platform
   blocked  yes queue-drain
   blocks  -
   by  dana
-  rules  5/10 pass
+  rules  3/8 pass
 
-gates  5 of 10
+gates  5 of 8
   GATE   RULE  VERDICT  NEED
   ready  DOR3  fail     treadle transition queue-drain ready
   ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
@@ -1281,7 +1281,7 @@ config  6 of 6
   next_weights  default  pri=10, age=1, dep=5, asg=8, due…
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
-  ready_gate    default  DOR1 all field_present:title The…
+  ready_gate    default  DOR3 all no_active_blocker Nothi…
   done_gate     default  DOD1 all no_open_child Every chi…
 
 ### config @ 80
@@ -1295,7 +1295,7 @@ config  6 of 6
   next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
-  ready_gate    default  DOR1 all field_present:title The item has a title.|D…
+  ready_gate    default  DOR3 all no_active_blocker Nothing active is blockin…
   done_gate     default  DOD1 all no_open_child Every child is done or cancel…
 
 ### config @ 200
@@ -1309,6 +1309,6 @@ config  6 of 6
   next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
-  ready_gate    default  DOR1 all field_present:title The item has a title.|DOR2 all type_required_fields The fields the type requires at creation are present.|DOR3 all no_active_blocker Nothing ac…
+  ready_gate    default  DOR3 all no_active_blocker Nothing active is blocking the item.|DOR4 story field_non_empty_list:acceptance_criteria The story has at least one acceptance criterion.|DOR6 bu…
   done_gate     default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_from_assignee …
 

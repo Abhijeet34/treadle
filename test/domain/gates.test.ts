@@ -91,12 +91,31 @@ describe('the default ready gate', () => {
     assert.equal(withStory.pass, true)
   })
 
-  it('fails a type whose creation-required field was removed by a hand edit', () => {
+  // DOR1 and DOR2 were "the item has a title" and "the fields the type requires at creation
+  // are present", and no input reached them: the store refuses a record whose heading is not
+  // `# <slug>: <title>` and quarantines one missing a creation-required field, both before a
+  // gate runs. They sat in every denominator, so `rules 8/8 pass` reported six decided rules
+  // as eight.
+  it('carries no rule the store has already decided before a gate reads the item', () => {
+    const ids = DEFAULT_READY_GATE.rules.map((rule) => rule.id)
+    assert.deepEqual(ids, ['DOR3', 'DOR4', 'DOR6', 'DOR7', 'DOR8', 'DOR9', 'DOR10'])
+
     const broken = { ...item('spike') } as Record<string, unknown>
     delete broken['question']
-    const verdict = evaluateGate(DEFAULT_READY_GATE, gateContext(broken as never))
-    assert.deepEqual(failed(verdict), ['DOR2'])
-    assert.ok(verdict.rules.find((r) => r.rule === 'DOR2')?.reason?.includes('question'))
+    assert.deepEqual(failed(evaluateGate(DEFAULT_READY_GATE, gateContext(broken as never))), [])
+  })
+
+  // The check itself stays, because a workspace may configure a gate that runs it.
+  it('still runs type_required_fields where a workspace gate asks for it', () => {
+    const configured: Gate = {
+      name: 'ready',
+      rules: [{ id: 'TEAM1', scope: 'all', sentence: 'The type\'s own fields are there.', check: { kind: 'type_required_fields' } }],
+    }
+    const broken = { ...item('spike') } as Record<string, unknown>
+    delete broken['question']
+    const verdict = evaluateGate(configured, gateContext(broken as never))
+    assert.deepEqual(failed(verdict), ['TEAM1'])
+    assert.ok(verdict.rules.find((r) => r.rule === 'TEAM1')?.reason?.includes('question'))
   })
 })
 
