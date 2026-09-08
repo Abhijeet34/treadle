@@ -314,6 +314,169 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
       })
     })
 
+    // ADR-0028's third record kind, held to the same compare-and-set, the same validation and
+    // the same round trip an item and a sprint are held to, by both implementations: a dry run
+    // that approved a retrospective the real store would refuse is the failure this catches.
+    it('writes a retrospective under the same compare-and-set rule, and reads it back whole', async () => {
+      await withStore(async (store) => {
+        const chore = anItem({ id: 'split-carried', title: 'Split the carried stories' })
+        const ceremony = {
+          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+          filed_at: '2026-09-18T16:00:00Z', version: 1, sprint_id: 'sprint-31',
+          actions: ['split-carried'], well: 'The refresh shipped clean.',
+        }
+        const created = await store.apply({ txn: 't1', writes: [{ item: chore }], ceremonies: [{ ceremony }], events: [] })
+        assert.ok(created.ok, created.ok ? '' : created.error.message)
+        assert.deepEqual(created.value.writes, [{ id: 'split-carried', version: 1 }, { id: 'retro-sprint-31', version: 1 }])
+        const read = await store.ceremonies()
+        assert.deepEqual(read.ok ? read.value : 'refused', [ceremony])
+
+        const edited = { ...ceremony, badly: 'Two stories carried again.' }
+        const moved = await store.apply({ txn: 't2', writes: [], ceremonies: [{ ceremony: edited, ifVersion: 1 }], events: [] })
+        assert.ok(moved.ok, moved.ok ? '' : moved.error.message)
+        const again = await store.ceremonies()
+        assert.deepEqual(again.ok ? again.value : 'refused', [{ ...edited, version: 2 }])
+
+        const stale = await store.apply({ txn: 't3', writes: [], ceremonies: [{ ceremony: edited, ifVersion: 1 }], events: [] })
+        assert.equal(stale.ok ? '' : stale.error.rule, 'S10')
+        const invalid = await store.apply({
+          txn: 't4', writes: [],
+          ceremonies: [{ ceremony: { ...ceremony, id: 'retro-sprint-32', actions: ['split-carried', 'split-carried'] } }],
+          events: [],
+        })
+        assert.equal(invalid.ok ? '' : invalid.error.code, 'VALIDATION')
+        assert.match(invalid.ok ? '' : invalid.error.message, /actions names an item twice/)
+      })
+    })
+
+    it('refuses a removal a retrospective would be left naming, and the chore stays', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1',
+          writes: [{ item: anItem({ id: 'split-carried' }) }],
+          ceremonies: [{
+            ceremony: {
+              id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+              filed_at: '2026-09-18T16:00:00Z', version: 1, actions: ['split-carried'],
+            },
+          }],
+          events: [],
+        })
+        const refused = await store.apply({ txn: 't2', writes: [], removes: [{ id: 'split-carried', ifVersion: 1 }], events: [] })
+        assert.equal(refused.ok, false)
+        if (refused.ok) return
+        assert.equal(refused.error.code, 'CONFLICT')
+        assert.equal(refused.error.rule, 'S17')
+        assert.deepEqual(refused.error.entities, ['split-carried', 'retro-sprint-31'])
+        assert.match(refused.error.message, /^retro-sprint-31 names split-carried in its action list, written after this removal was decided; /)
+        const found = await store.get('split-carried')
+        assert.equal(found.ok && found.value?.id, 'split-carried')
+      })
+    })
+
+    it('refuses a retrospective naming an action the store does not hold, and writes nothing', async () => {
+      await withStore(async (store) => {
+        const refused = await store.apply({
+          txn: 't1', writes: [],
+          ceremonies: [{
+            ceremony: {
+              id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+              filed_at: '2026-09-18T16:00:00Z', version: 1, actions: ['never-filed'],
+            },
+          }],
+          events: [],
+        })
+        assert.equal(refused.ok, false)
+        if (refused.ok) return
+        assert.equal(refused.error.rule, 'S10')
+        assert.equal(refused.error.message, 'never-filed is not in the store, so retro-sprint-31 cannot name it in its action list; retry so the decision reads what is there now')
+        const read = await store.ceremonies()
+        assert.deepEqual(read.ok ? read.value : 'refused', [])
+      })
+    })
+
+    it('files a retrospective and the chore it names in one transaction', async () => {
+      await withStore(async (store) => {
+        // The order T4b's `ceremony retro` writes them in, and the order the check has to
+        // survive: the record is judged against the transaction rather than against the store.
+        const together = await store.apply({
+          txn: 't1',
+          writes: [{ item: anItem({ id: 'split-carried' }) }],
+          ceremonies: [{
+            ceremony: {
+              id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+              filed_at: '2026-09-18T16:00:00Z', version: 1, actions: ['split-carried'],
+            },
+          }],
+          events: [anEvent({ entity: 'retro-sprint-31', op: 'ceremony.retro' })],
+        })
+        assert.ok(together.ok, together.ok ? '' : together.error.message)
+        const read = await store.ceremonies()
+        assert.deepEqual(read.ok ? read.value.map((c) => c.actions) : 'refused', [['split-carried']])
+      })
+    })
+
+    it('refuses a retrospective under an id an item or a sprint already holds', async () => {
+      await withStore(async (store) => {
+        await store.apply({
+          txn: 't1', writes: [{ item: anItem({ id: 'clash-id' }) }],
+          sprints: [{ sprint: { id: 'sprint-one', title: 'Sprint one', state: 'open' as const, filed_at: '2026-09-01T09:00:00Z', version: 1, start: '2026-09-01', end: '2026-09-12' } }],
+          events: [],
+        })
+        for (const [id, kind] of [['clash-id', 'an item'], ['sprint-one', 'a sprint']] as const) {
+          const refused = await store.apply({
+            txn: `t-${id}`, writes: [], events: [],
+            ceremonies: [{ ceremony: { id, title: 'Retro', state: 'recorded' as const, filed_at: '2026-09-18T16:00:00Z', version: 1 } }],
+          })
+          assert.equal(refused.ok, false, `${id} was written as a ceremony over ${kind}`)
+          if (refused.ok) return
+          assert.equal(refused.error.rule, 'S3')
+          assert.equal(refused.error.message, `${id} is already ${kind} in this store, and an id names one thing; a ceremony cannot be written under it`)
+        }
+        const read = await store.ceremonies()
+        assert.deepEqual(read.ok ? read.value : 'refused', [])
+      })
+    })
+
+    it('names a chore filed in another month, because an action is an id and not a shard', async () => {
+      await withStore(async (store) => {
+        const together = await store.apply({
+          txn: 't1',
+          // The chore is filed in July and the retrospective is held in September, which is
+          // the ordinary case: a retro names work that has been open for a while.
+          writes: [{ item: anItem({ id: 'old-chore', filed_at: '2026-07-03T10:00:00Z' }) }],
+          ceremonies: [{
+            ceremony: {
+              id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+              filed_at: '2026-09-18T16:00:00Z', version: 1, actions: ['old-chore'],
+            },
+          }],
+          events: [],
+        })
+        assert.ok(together.ok, together.ok ? '' : together.error.message)
+        const refused = await store.apply({ txn: 't2', writes: [], removes: [{ id: 'old-chore', ifVersion: 1 }], events: [] })
+        assert.equal(refused.ok ? '' : refused.error.rule, 'S17', 'the action edge does not reach across shards')
+      })
+    })
+
+    it('carries an unknown field key on a retrospective through a mutation', async () => {
+      await withStore(async (store) => {
+        const base = {
+          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded' as const,
+          filed_at: '2026-09-18T16:00:00Z', version: 1,
+          extra: new Map([['facilitator', 'kim']]),
+        }
+        await store.apply({ txn: 't1', writes: [], ceremonies: [{ ceremony: base }], events: [] })
+        const moved = await store.apply({
+          txn: 't2', writes: [], events: [],
+          ceremonies: [{ ceremony: { ...base, extra: undefined, well: 'it went well' }, ifVersion: 1 }],
+        })
+        assert.ok(moved.ok, moved.ok ? '' : moved.error.message)
+        const read = await store.ceremonies()
+        assert.equal(read.ok ? read.value[0]?.extra?.get('facilitator') : undefined, 'kim')
+      })
+    })
+
     it('refuses a record the grammar could not write back', async () => {
       await withStore(async (store) => {
         const refused = await store.apply({

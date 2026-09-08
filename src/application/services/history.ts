@@ -381,9 +381,9 @@ export async function history(
   if (!view.ok) return storeRefusal('history', 'read', view.error, undefined)
   const workspace = view.value.identity.id
   const scope = request.scope
-  /** An id names an item or a sprint; the log is keyed by entity and the rows read the same. */
+  /** An id names an item, a sprint or a ceremony; the log is keyed by entity and the rows read the same. */
   const carried = (entity: string): boolean =>
-    view.value.byId.has(entity) || view.value.sprintById.has(entity)
+    view.value.byId.has(entity) || view.value.sprintById.has(entity) || view.value.ceremonyById.has(entity)
 
   const events = await store.events(
     scope.kind === 'txn' ? { txn: scope.txn } : { entity: scope.id })

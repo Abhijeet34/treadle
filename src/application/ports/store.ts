@@ -5,7 +5,7 @@
 // what lets a later implementation coordinate differently without a contract change.
 
 import type { DomainErrorCode } from '../../domain/index.ts'
-import type { Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType, WorkspaceConfig } from '../../domain/index.ts'
+import type { Ceremony, Instant, ItemId, Sprint, WorkItem, WorkItemState, WorkItemSummary, WorkItemType, WorkspaceConfig } from '../../domain/index.ts'
 
 /**
  * The domain's three codes plus the five a store can produce on its own. Widening a
@@ -136,11 +136,19 @@ export type SprintWrite = {
   readonly ifVersion?: number
 }
 
+/** One ceremony write, under the same compare-and-set rule as an item's. */
+export type CeremonyWrite = {
+  readonly ceremony: Ceremony
+  readonly ifVersion?: number
+}
+
 export type StoreTransaction = {
   readonly txn: string
   readonly writes: readonly ItemWrite[]
   /** Sprint records, which live in one file beside the shards and land in the same journal. */
   readonly sprints?: readonly SprintWrite[]
+  /** Ceremony records, month-sharded as items are and landing in the same journal. */
+  readonly ceremonies?: readonly CeremonyWrite[]
   /** Records that leave the store in this transaction; see `ItemRemoval`. */
   readonly removes?: readonly ItemRemoval[]
   /** Records the decision depended on, refused as `S10` if one moved; see `ItemRead`. */
@@ -172,7 +180,7 @@ export type Finding = {
    * of one flat set cannot tell which of the two a quarantined id was. The store derives it
    * from the file it was reading, and a finding about a file rather than a record has none.
    */
-  readonly kind?: 'item' | 'sprint'
+  readonly kind?: 'item' | 'sprint' | 'ceremony'
 }
 
 /**
@@ -252,6 +260,12 @@ export interface Store {
   eachItem(query: ItemQuery, visit: (item: WorkItem) => void): Promise<StoreResult<number>>
   /** Every sprint the store holds, in the order they were opened. There are few, so no query. */
   sprints(): Promise<StoreResult<readonly Sprint[]>>
+  /**
+   * Every ceremony record the store holds, oldest first. A retrospective is filed once a
+   * sprint, so the whole set is read as `sprints` is rather than queried; the layout is
+   * month-sharded because DR2 drew it that way and a shard is what a reviewer reads in a diff.
+   */
+  ceremonies(): Promise<StoreResult<readonly Ceremony[]>>
   events(query?: EventQuery): Promise<StoreResult<readonly StoreEvent[]>>
   /** `events` without the array, under the same contract as `eachItem`; 865 MiB of the same call. */
   eachEvent(query: EventQuery, visit: (event: StoreEvent) => void): Promise<StoreResult<number>>

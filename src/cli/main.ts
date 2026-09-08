@@ -24,6 +24,7 @@ import { RELATION_VERBS, relate, type RelationVerb } from '../application/servic
 import { removeItem } from '../application/services/removal.ts'
 import { transition } from '../application/services/lifecycle.ts'
 import { SPRINT_SET_FIELDS, closeSprint, commitItems, openSprint, reopenSprint, setSprint, sprints, uncommitItems, type SprintSetField } from '../application/services/sprints.ts'
+import { ceremonies } from '../application/services/ceremonies.ts'
 import { actorRefusal, type Actor, type Mode, type Target } from '../application/services/mutation.ts'
 import type { Store } from '../application/ports/store.ts'
 import { systemClock } from '../adapters/clock.ts'
@@ -652,6 +653,8 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   }
 
   if (command === 'sprints') return sprints(store, systemClock, operands[0])
+
+  if (command === 'ceremonies') return ceremonies(store, operands[0])
 
   if (command === 'sprint') {
     // Five verbs, each named: the read is `sprints`, so nothing here is reached by omission.

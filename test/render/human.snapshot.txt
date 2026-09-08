@@ -503,7 +503,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
 
-commands  21 of 21
+commands  22 of 22
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
@@ -518,6 +518,7 @@ commands  21 of 21
   remove      mutate  no        Take one mis-filed item o…
   sprint      mutate  no        Open a sprint, commit ite…
   sprints     read    no        List the sprints, or prin…
+  ceremonies  read    no        List the retrospectives, …
   config      mutate  no        Read every configuration …
   doctor      read    no        Report what the stored fi…
   next        read    yes       Rank what to pick up, and…
@@ -548,7 +549,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
 
-commands  21 of 21
+commands  22 of 22
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
@@ -563,6 +564,7 @@ commands  21 of 21
   remove      mutate  no        Take one mis-filed item out of the records, k…
   sprint      mutate  no        Open a sprint, commit items to it, and close …
   sprints     read    no        List the sprints, or print one with its dates…
+  ceremonies  read    no        List the retrospectives, or print one with it…
   config      mutate  no        Read every configuration key with the value i…
   doctor      read    no        Report what the stored files say that no writ…
   next        read    yes       Rank what to pick up, and print the component…
@@ -587,7 +589,7 @@ help  acme-platform
   example  treadle board # the open sprint, one section per live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
 
-commands  21 of 21
+commands  22 of 22
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
@@ -602,6 +604,7 @@ commands  21 of 21
   remove      mutate  no        Take one mis-filed item out of the records, keeping every event it earned in the log.
   sprint      mutate  no        Open a sprint, commit items to it, and close it with what carried over recorded.
   sprints     read    no        List the sprints, or print one with its dates, its committed set and what carried over.
+  ceremonies  read    no        List the retrospectives, or print one with its prose and the chores it produced.
   config      mutate  no        Read every configuration key with the value in force and its source, or set one.
   doctor      read    no        Report what the stored files say that no write path would have accepted.
   next        read    yes       Rank what to pick up, and print the components and weights that produced the order.
@@ -2015,4 +2018,71 @@ config  9 of 9
   start_requires_sprint     default  false
   ready_gate                default  DOR1 all field_present:title The item has a title.|DOR2 all type_required_fields The fields the type requires at creation are present.|DOR3 all no_active_blocke…
   done_gate                 default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_fr…
+
+### ceremonies @ 60
+ceremonies  acme-platform
+
+ceremonies  1 of 1
+  ID               FILED                 SPRINT     ACTIONS
+  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1
+    Retro sprint-31
+
+### ceremonies @ 80
+ceremonies  acme-platform
+
+ceremonies  1 of 1
+  ID               FILED                 SPRINT     ACTIONS  TITLE
+  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1        Retro sprint-31
+
+### ceremonies @ 200
+ceremonies  acme-platform
+
+ceremonies  1 of 1
+  ID               FILED                 SPRINT     ACTIONS  TITLE
+  retro-sprint-31  2026-09-18T16:00:00Z  sprint-31  1        Retro sprint-31
+
+### ceremonies-one @ 60
+ceremonies  acme-platform
+  ceremony  retro-sprint-31
+  state  recorded
+  filed  2026-09-18T16:00:00Z
+  v  1
+  sprint  sprint-31
+  actions  split-carried
+  title
+    Retro sprint-31
+  well
+    The token refresh shipped without a hotfix.
+  badly
+    Two stories carried for the third sprint running.
+
+### ceremonies-one @ 80
+ceremonies  acme-platform
+  ceremony  retro-sprint-31
+  state  recorded
+  filed  2026-09-18T16:00:00Z
+  v  1
+  sprint  sprint-31
+  actions  split-carried
+  title
+    Retro sprint-31
+  well
+    The token refresh shipped without a hotfix.
+  badly
+    Two stories carried for the third sprint running.
+
+### ceremonies-one @ 200
+ceremonies  acme-platform
+  ceremony  retro-sprint-31
+  state  recorded
+  filed  2026-09-18T16:00:00Z
+  v  1
+  sprint  sprint-31
+  actions  split-carried
+  title
+    Retro sprint-31
+  well
+    The token refresh shipped without a hotfix.
+  badly
+    Two stories carried for the third sprint running.
 

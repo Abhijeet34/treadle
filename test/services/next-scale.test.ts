@@ -53,6 +53,8 @@ function viewOf(all: readonly WorkItemSummary[]): { view: WorkspaceView; passes:
     relations: { relations },
     sprints: [],
     sprintById: new Map(),
+    ceremonies: [],
+    ceremonyById: new Map(),
   }
   return { view, passes: () => passes }
 }

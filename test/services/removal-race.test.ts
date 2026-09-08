@@ -212,6 +212,68 @@ describe('the referential rule under the orders that attack it', () => {
     assert.equal(again.ok, true, String(again.data['cause']))
   })
 
+  /** A retrospective naming one chore, written straight through the store as T4b's command will. */
+  async function aRetroNaming(store: Store, action: string): Promise<void> {
+    const written = await store.apply({
+      txn: 'txn-retro', writes: [], events: [],
+      ceremonies: [{
+        ceremony: {
+          id: 'retro-sprint-31', title: 'Retro sprint-31', state: 'recorded',
+          filed_at: '2026-09-18T16:00:00Z', version: 1, actions: [action],
+        },
+      }],
+    })
+    assert.equal(written.ok, true, written.ok ? '' : written.error.message)
+  }
+
+  // ADR-0028's fourth referrer, in both halves. `R6` is the service's guard, decided against
+  // a read taken before the lock, and it fires with the friendlier cause when the record was
+  // already there; `S17` is the store's, decided inside the lock, and it is what catches the
+  // retrospective written after the removal had passed every guard.
+  it('refuses a removal of a chore a retrospective already names, with R6 before the lock', async () => {
+    await aRetroNaming(demo.store, 'avatar-crop')
+    const refused = await removeItem(...apply(demo.store, 700), {
+      id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR,
+    })
+    assert.equal(refused.ok, false, 'a retrospective names this chore in its action list')
+    assert.equal(refused.code, 'GUARD_REFUSED')
+    assert.equal(refused.data['rule'], 'R6')
+    assert.equal(refused.data['cause'],
+      'retro-sprint-31 names avatar-crop in its action list, and a retrospective\'s actions are the record of what it produced')
+    const view = await readWorkspace(second)
+    assert.equal(view.ok && view.value.byId.has('avatar-crop'), true, 'the refused removal left the record where it was')
+  })
+
+  it('refuses the removal a retrospective was written under, with S17 inside the lock', async () => {
+    const first = gated(demo.store)
+    // Nothing names the chore when this removal is decided, so `R6` passes and the guard the
+    // refusal has to come from is the store's own.
+    const early = removeItem(...apply(first.store, 700), {
+      id: 'avatar-crop', reason: 'filed twice', confirmed: true, actor: ACTOR,
+    })
+    await first.reached
+    await aRetroNaming(second, 'avatar-crop')
+    first.release()
+    const refused = await early
+
+    assert.equal(refused.ok, false, 'a retrospective was written naming the record this removal decided against')
+    assert.equal(refused.code, 'CONFLICT')
+    assert.equal(refused.data['rule'], 'S17')
+    assert.equal(refused.data['entity'], 'avatar-crop')
+    assert.equal(refused.data['cause'],
+      'retro-sprint-31 names avatar-crop in its action list, written after this removal was decided; retry so the decision reads what is there now')
+
+    const view = await readWorkspace(second)
+    assert.equal(view.ok, true)
+    if (!view.ok) return
+    assert.equal(view.value.byId.has('avatar-crop'), true, 'the refused removal left the record where it was')
+    for (const ceremony of view.value.ceremonies) {
+      for (const action of ceremony.actions ?? []) {
+        assert.equal(view.value.byId.has(action), true, `${ceremony.id} names ${action}, which is no record`)
+      }
+    }
+  })
+
   it('lets one of two simultaneous removals of one record land, and refuses the other', async () => {
     const first = gated(demo.store)
     const early = removeItem(...apply(first.store, 700), { id: 'csv-export', reason: 'filed twice', confirmed: true, actor: ACTOR })

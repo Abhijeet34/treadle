@@ -3,7 +3,7 @@
 //
 // `treadle show $'a\nb'` printed `err INTERNAL -` with a render invariant in its cause and
 // no rule id, and so did `explain`, `history`, `remove`, `set`, `mark`, `transition`,
-// `evidence add`, `relation add`, `sprints` and five `sprint` verbs. The contract says every
+// `evidence add`, `relation add`, `sprints`, `ceremonies` and five `sprint` verbs. The contract says every
 // failure is a structured, typed, machine-readable error, and that was the one path where it
 // was not, on twelve commands at once.
 //
@@ -83,6 +83,7 @@ const LINES: readonly (readonly string[])[] = [
   ['evidence', 'add', 'a-record', 'run', 'https://example.test/1'],
   ['relation', 'add', 'a-record', 'blocks', 'other-record'],
   ['sprints', 'a-sprint'],
+  ['ceremonies', 'a-ceremony'],
   ['sprint', 'set', 'a-sprint', '--goal', 'ship it'],
   ['sprint', 'commit', 'a-sprint', 'a-record'],
   ['sprint', 'uncommit', 'a-record'],
@@ -121,7 +122,7 @@ describe('an operand naming a record is bounded before any service reads it', ()
           assert.equal(run.code, EXIT_OF.VALIDATION, `exited ${run.code}: ${run.err}`)
           assert.match(run.err, /^err VALIDATION /, run.err)
           assert.match(run.err, /^rule C1$/m, run.err)
-          assert.match(run.err, /^"cause the (?:sprint )?id in operand \d+ carries U\+[0-9A-F]{4}/m, run.err)
+          assert.match(run.err, /^"cause the (?:sprint |ceremony )?id in operand \d+ carries U\+[0-9A-F]{4}/m, run.err)
           assert.equal(run.out, '', 'a refusal wrote to stdout')
           // The operand whole, because a refusal is several lines and a line feed is how it
           // separates them: what must not appear is the caller's word, delimiter and all.
@@ -154,6 +155,11 @@ describe('an operand naming a record is bounded before any service reads it', ()
   it('leaves a legal id alone, so the guard refuses the class and not the operand', async () => {
     must(await cli(['show', 'a-record']), 'show')
     must(await cli(['sprints', 'a-sprint']), 'sprints')
+    // No command in this build files a retrospective, so the fixture holds none. A legal id
+    // that names nothing is still the guard passing: it reaches the service and comes back a
+    // NOT_FOUND about a record, not a VALIDATION about a character.
+    const ceremony = await cli(['ceremonies', 'a-ceremony'])
+    assert.equal(ceremony.code, EXIT_OF.NOT_FOUND, ceremony.err)
     // A space is legal in a scalar line and no id holds one, so it stays a NOT_FOUND about a
     // record rather than becoming a refusal about a character.
     const spaced = await cli(['show', 'a b'])

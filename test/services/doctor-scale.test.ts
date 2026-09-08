@@ -120,6 +120,7 @@ describe('doctor audits a workspace in one pass over the log', () => {
         get: (id) => base.get(id),
         summaries: (query) => base.summaries(query),
         sprints: () => base.sprints(),
+        ceremonies: () => base.ceremonies(),
         findings: () => base.findings(),
         apply: (transaction) => base.apply(transaction),
         close: () => base.close(),

@@ -6,7 +6,7 @@
 import type {
   Applied, EventQuery, Finding, ItemQuery, Store, StoreEvent, StoreIdentity, StoreResult, StoreTransaction,
 } from '../application/ports/store.ts'
-import type { Sprint, WorkItem, WorkItemSummary } from '../domain/index.ts'
+import type { Ceremony, Sprint, WorkItem, WorkItemSummary } from '../domain/index.ts'
 
 export interface OperationLog {
   store(operation: string, fields: Readonly<Record<string, unknown>>): void
@@ -64,6 +64,12 @@ export class LoggingStore implements Store {
     return result
   }
 
+  async ceremonies(): Promise<StoreResult<readonly Ceremony[]>> {
+    const result = await this.#inner.ceremonies()
+    this.#log.store('ceremonies', { n: result.ok ? result.value.length : 0 })
+    return result
+  }
+
   async events(query: EventQuery = {}): Promise<StoreResult<readonly StoreEvent[]>> {
     const result = await this.#inner.events(query)
     this.#log.store('events', { n: result.ok ? result.value.length : 0 })
@@ -79,6 +85,11 @@ export class LoggingStore implements Store {
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     for (const write of transaction.writes) this.#log.store('write', fieldsOf(write.item))
     for (const write of transaction.sprints ?? []) this.#log.store('write', { id: write.sprint.id, state: write.sprint.state })
+    // The id and the size of the list, never the prose: F10's rule is that -vvv reports a
+    // value by name and size, and a retrospective's two halves are the caller's own text.
+    for (const write of transaction.ceremonies ?? []) {
+      this.#log.store('write', { id: write.ceremony.id, actions: (write.ceremony.actions ?? []).length })
+    }
     const result = await this.#inner.apply(transaction)
     this.#log.store('apply', { txn: transaction.txn, ok: result.ok })
     return result
