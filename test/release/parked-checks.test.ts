@@ -27,25 +27,29 @@ const CONTEXT_NAME = 'release checks approved'
 
 const JOB = workflowOf(ROOT, 'release.yml')['parked-checks']
 
-// `count-<sha>` answers the total-count read, `runs-<sha>` the parked-run read, and a missing
-// file is the empty answer. The count file is consumed a line at a time, which is how a head
-// whose runs have not been created yet is reproduced without waiting on a real one.
+// `count-<sha>` is what the forge reports for that head sha over time, one line per read, the
+// last line standing once the timeline runs out. Both reads consult it and neither is
+// privileged: while it reads 0 the head has no runs at all, so the parked-run read is empty
+// too. That is the shape of the real gap, where GitHub has not yet created the runs for
+// release-please's push. `runs-<sha>` is the parked list once they exist.
 const STUB = `#!/bin/sh
 printf '%s\\n' "$*" >> "$GH_LOG"
 sha=\$(printf '%s' "$*" | sed -n 's/.*head_sha=\\([0-9a-z]*\\).*/\\1/p')
+counts="\$GH_FIXTURES/count-\$sha"
+total=0
+if [ -s "\$counts" ]; then
+  total=\$(head -n 1 "\$counts")
+  if [ "\$(wc -l < "\$counts")" -gt 1 ]; then
+    tail -n +2 "\$counts" > "\$counts.rest"
+    mv "\$counts.rest" "\$counts"
+  fi
+fi
 case "$*" in
   *"/pulls?"*) cat "\$GH_FIXTURES/pulls" 2>/dev/null ;;
-  *total_count*)
-    counts="\$GH_FIXTURES/count-\$sha"
-    if [ -s "\$counts" ]; then
-      head -n 1 "\$counts"
-      tail -n +2 "\$counts" > "\$counts.rest"
-      mv "\$counts.rest" "\$counts"
-    else
-      echo 0
-    fi
+  *total_count*) echo "\$total" ;;
+  *"/actions/runs?"*)
+    [ "\$total" = "0" ] || cat "\$GH_FIXTURES/runs-\$sha" 2>/dev/null
     ;;
-  *"/actions/runs?"*) cat "\$GH_FIXTURES/runs-\$sha" 2>/dev/null ;;
 esac
 exit 0
 `
@@ -165,7 +169,37 @@ describe('the release pull request carries its own parked state', () => {
     assert.match(statuses(result)[0] as string, /state=failure/)
   })
 
-  it('ignores a pull request that is not release-please's', async () => {
+  // The last line of `gh --jq @tsv` output has no trailing newline, which leaves `read` at
+  // exit 1 with the fields already set. Without the `|| [ -n ... ]` guard the loop drops it,
+  // and a lone parked pull request would be reported as clear.
+  it('reads a final pull request line that has no newline', async () => {
+    const result = await drive({
+      pulls: `69\t${HEAD}`,
+      [`count-${HEAD}`]: '2\n',
+      [`runs-${HEAD}`]: '111\tCI\n',
+    })
+
+    assert.match(statuses(result)[0] as string, /state=failure/)
+  })
+
+  it('answers for each release pull request on its own head', async () => {
+    const other = 'bbbb2222'
+    const result = await drive({
+      pulls: `69\t${HEAD}\n70\t${other}\n`,
+      [`count-${HEAD}`]: '2\n',
+      [`runs-${HEAD}`]: '111\tCI\n',
+      [`count-${other}`]: '8\n',
+    })
+
+    const posted = statuses(result)
+    assert.equal(posted.length, 2)
+    assert.match(posted[0] as string, new RegExp(`/statuses/${HEAD} .*state=failure`))
+    assert.match(posted[1] as string, new RegExp(`/statuses/${other} .*state=success`))
+    assert.match(result.summary, /#69 is waiting/)
+    assert.doesNotMatch(result.summary, /#70 is waiting/)
+  })
+
+  it("ignores a pull request that is not release-please's", async () => {
     const result = await drive({ pulls: '' })
 
     assert.equal(result.code, 0)
