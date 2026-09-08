@@ -11,7 +11,7 @@ Five steps, and a person is the third one.
 1. Work merges to `main` through a pull request, as always.
 2. `release-please` opens or updates a release pull request on every push to `main`. It carries the version bump and the changelog entry and nothing else.
 3. Someone reviews that pull request, approves its parked checks, and merges it. Merging is what makes `main`'s head releasable.
-   The approval is not a review approval and not an oversight: see "Why the release pull request's checks wait for a person".
+   The approval is not a review approval and not an oversight: see "What stands between the release pull request and a merge".
 4. Someone tags `main`'s head with a signed annotated tag and pushes it:
 
    ```sh
@@ -116,7 +116,13 @@ One more setting belongs in that list, and it closes a hole nothing in this tree
 Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
 The workflow's own path is already closed by construction - the `publish` job downloads the attested tarball the `artifacts` job packed one step after `npm run build` and `release-preflight`, and verifies it against `SHA256SUMS` - and `scripts/check-dist-fresh.ts` explains why a `prepack` hook cannot be the answer here.
 
-## Why the release pull request's checks wait for a person
+## What stands between the release pull request and a merge
+
+Two things, and neither was named anywhere in this tree until 2026-09-08.
+The first parks the checks so they never run.
+The second reddens them once they do.
+
+### The checks wait for a person
 
 The release pull request is opened by `github-actions[bot]`, and every workflow run on it is created and then parked rather than executed.
 
@@ -150,6 +156,23 @@ A script that approves the parked runs was weighed in ADR-0009 and rejected: 165
 
 The gate that already holds this release is a person.
 Do not spend a credential to route around one.
+
+### The release commit signs itself off
+
+Approving the checks is not the end of it, and this was only visible once they had run.
+`scripts/check-dco.sh` requires every commit in a pull request to carry a `Signed-off-by` trailer naming its author, and release-please's own commit carried none: `95c2511`, `chore(main): release 0.1.0`, authored by `github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>`, trailers `[]`.
+On the first release pull request whose checks were ever allowed to run, seven jobs went green and that one did not, so the required `checks` context went red and the pull request could not merge.
+
+`release-please-config.json` carries `signoff` for it, set to that same identity.
+release-please v17.6.0, the version the pinned action bundles, documents the key as "Text to be used as Signed-off-by in the commit".
+`scripts/check-dco.sh` accepts a GitHub App author's trailer at any address, because GitHub mints an App's commit address in a namespace that receives no mail, so the certificate names the App exactly as it does for Dependabot.
+`test/release/release-commit-signoff.test.ts` builds that commit and drives the real script over it, rather than comparing the string to itself.
+
+A sign-off is a Developer Certificate of Origin attestation, not authorship.
+It writes no `Co-authored-by` trailer and leaves the commit's author line unchanged, so it adds nobody to this repository's contributors.
+
+Each of these was hidden behind the one in front of it, and both were hidden behind a Release workflow that had stopped starting at all.
+A release path is only as fixed as its last link.
 
 ## Rolling back
 
@@ -228,7 +251,7 @@ A settings script that half-applies is worse than one that refuses, because the 
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives, and deleting a branch once its pull request merges |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
 | `.github/settings/actions-workflow-permissions.json` | A read-only default token, and permission for Actions to open a pull request. See "Why Actions may create pull requests" |
-| `.github/settings/actions-fork-pr-approval.json` | `first_time_contributors`, which is why the release pull request's checks park. See "Why the release pull request's checks wait for a person" |
+| `.github/settings/actions-fork-pr-approval.json` | `first_time_contributors`, which is why the release pull request's checks park. See "What stands between the release pull request and a merge" |
 
 The `npm-publish` environment and its required reviewer are not in that script.
 An environment that gates publication should be created deliberately by the person who owns the account, at the moment they decide to open the gate.

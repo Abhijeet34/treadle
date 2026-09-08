@@ -71,7 +71,7 @@ gh-axi api -X PUT "repos/$REPO/actions/permissions" \
 # The setting that parks the release pull request's checks. It is applied to the value it
 # already has: the point of the call is that the value is readable out of the tree and moves
 # only by editing this file, because loosening it is the obvious wrong way to unpark them.
-# docs/RELEASING.md, "Why the release pull request's checks wait for a person".
+# docs/RELEASING.md, "What stands between the release pull request and a merge".
 gh-axi api -X PUT "repos/$REPO/actions/permissions/fork-pr-contributor-approval" \
   --input .github/settings/actions-fork-pr-approval.json \
   || fail 'fork pull request approval from .github/settings/actions-fork-pr-approval.json'
