@@ -629,6 +629,20 @@ Three things a step that drives the installed binary on a Windows runner gets wr
 a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;
 and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows does not have, because `CommandNotFoundException` is not a process exit, so a check there asserts the ok line the command should have printed and not the exit code alone.
 
+## Secret scanning
+
+`.gitleaks.toml` and `.githooks/pre-push` are copies of `automation`'s canonical pair rather than this repository's own files.
+Change them by editing the originals and re-running `automation`'s `.ci/gitleaks/sync.sh <repo>`; `--check <repo>` reports drift and also answers the one question CI cannot, whether this clone's `core.hooksPath` points at the hook.
+`.github/workflows/secret-scan.yml` inlines that scan rather than calling `automation`'s shared workflow, which is what every other repository in the fleet does.
+A public repository may not use a reusable workflow that lives in a private one, and `automation` is private, so the `uses:` form failed here with zero jobs and contributed no check at all rather than saying anything.
+The inline copy still pins the sha256 of both synced files and fails on a drifted copy, which is the property calling the shared workflow was buying.
+Those two pins are hand-carried: `automation`'s `.ci/test-secret-scan.sh` keeps the shared workflow's copies current and nothing watches treadle's, so a canonical file that moves fails this job naming DRIFT in the synced file when the stale thing is the pin.
+Re-read both values with `.ci/gitleaks/sync.sh --digest config` and `--digest hook`.
+
+The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
+A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.
+A synthetic credential planted to prove the gate fires needs the charset the matching rule actually requires, not just its keyword prefix; `test/architecture/secret-scan-fixture.test.ts` carries that charset and why.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.

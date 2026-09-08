@@ -18,6 +18,7 @@ The `.nvmrc` names the version.
 git clone https://github.com/Abhijeet34/treadle.git
 cd treadle
 npm ci
+git config core.hooksPath .githooks   # arms the pre-push secret scan; see AGENTS.md "Secret scanning"
 npm run check   # tsc --noEmit under strict, then the tests, then the bundle
 ```
 
