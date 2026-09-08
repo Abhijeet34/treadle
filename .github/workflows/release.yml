@@ -54,6 +54,67 @@ jobs:
           # of this input, at the SHA pinned above.
           skip-github-release: true
 
+  # release-please opening the pull request is not the same as the pull request being able to
+  # merge, and nothing said which of those had happened. Every run on that branch is parked by
+  # the `first_time_contributors` approval policy, and a parked run attaches no check to the
+  # pull request at all: `gh pr checks 69` reported "no CI checks configured" while forty-six
+  # runs sat at `action_required`, so the only surface carrying the state was the Actions list
+  # nobody was reading. Four release pull requests waited four days that way.
+  #
+  # This job is the thing that says so, on the same push that updated the pull request. It
+  # approves nothing and stores nothing: the read-only run token, the click still a person's,
+  # exactly as docs/RELEASING.md and ADR-0009 decided.
+  parked-checks:
+    name: parked-checks
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: A release pull request whose checks are parked cannot merge
+        run: |
+          set -euo pipefail
+          # Keyed on the head sha, not the branch. A run parked on a commit the pull request
+          # has since moved past stays `action_required` for the life of the repository, so a
+          # branch-wide query would go red once and never come back; only runs on the commit
+          # the pull request currently points at can hold up its required contexts.
+          gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
+            --jq '.[] | select(.head.ref | startswith("release-please--")) | [.number, .head.sha] | @tsv' \
+            > pulls.tsv
+          parked=0
+          # `|| [ -n "${number}" ]` because a final line with no newline leaves `read` at exit
+          # 1 with the fields already set, and dropping it would make this gate pass while a
+          # pull request sat parked - the one failure a gate must not have.
+          while IFS="$(printf '\t')" read -r number sha || [ -n "${number}" ]; do
+            [ -n "${number}" ] || continue
+            runs=$(gh api \
+              "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=action_required&per_page=100" \
+              --jq '.workflow_runs[] | [.id, .name] | @tsv')
+            [ -n "${runs}" ] || continue
+            parked=$((parked + 1))
+            echo "::error::release pull request #${number} has parked checks: nothing runs on it until a person approves them"
+            {
+              echo "### Release pull request #${number} is waiting for a person"
+              echo
+              echo "Its checks are parked, so the required \`checks\` context can never report and the pull request cannot merge."
+              echo
+              while IFS="$(printf '\t')" read -r id name || [ -n "${id}" ]; do
+                echo "- \`${name}\`: \`gh api -X POST repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve\`"
+              done <<< "${runs}"
+              echo
+              echo 'Approving a run executes that branch'"'"'s workflow files, so read the diff first.'
+              echo 'docs/RELEASING.md, "What stands between the release pull request and a merge", carries the rest.'
+            } >> "$GITHUB_STEP_SUMMARY"
+          done < pulls.tsv
+          if [ "${parked}" -gt 0 ]; then
+            exit 1
+          fi
+          echo "no release pull request has parked checks"
+
   # Three platforms on the tagged tree, before anything is attached to a release and long
   # before anything is published. The release pull request already ran this matrix through
   # ci.yml, on the tree that became main's head; this run is on the tag itself, which is the

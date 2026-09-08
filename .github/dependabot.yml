@@ -38,6 +38,15 @@ updates:
       # test/architecture/supply-chain.test.ts holds it to engines.node's floor. A major here
       # ahead of that floor lets tsc accept an API absent at 24.15, which only fails later and
       # only where a test runs that line. Raising the floor is what releases this.
+      #
+      # Re-decided 2026-09-09 rather than inherited. #67 removed `node:sqlite` and with it the
+      # capability claim `engines.node` used to rest on, so the question is whether this hold
+      # went with it. It did not: the hold is about which declarations tsc reads, and ADR-0030
+      # restated the floor as a support statement in the same change. What it costs is real and
+      # is the reason to keep re-deciding it. @types/node 26 types `tty.WriteStream`'s error
+      # event, which is how the untyped `error.code` at src/cli/entry.ts:39 was found in #15;
+      # held at 24, that class of defect stays invisible. Raising the floor is a support
+      # decision about who may run treadle, not a toolchain one, so it is not taken here.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:

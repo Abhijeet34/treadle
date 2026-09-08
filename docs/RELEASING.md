@@ -149,6 +149,17 @@ gh-axi api -X POST "repos/Abhijeet34/treadle/actions/runs/<run-id>/approve"
 Measured against that same run on 2026-09-08: `completed` with conclusion `action_required` and zero jobs before the call, `in_progress` with eight jobs after it.
 Approving a run executes that branch's workflow files, so read the diff before approving, exactly as you would before merging.
 
+Knowing to make that call is the part that was missing until 2026-09-09.
+A parked run attaches no check to the pull request, so the pull request page reports nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
+Forty-six runs had concluded `action_required` by then.
+
+`.github/workflows/release.yml`'s `parked-checks` job is what says so now.
+It runs on the same push to `main` that updated the pull request, asks the API which runs on the pull request's current head commit are at `action_required`, and fails the Release run with the approve command for each one written into the step summary.
+It reports and never approves: read-only permissions, the run's own token, no stored credential, and the click stays where ADR-0009 put it.
+Keying it on the head commit rather than the branch is what makes it self-clearing, because a run parked on a commit the pull request has moved past stays `action_required` for the life of the repository.
+
+A gate nobody can see holding is indistinguishable from a gate that failed.
+
 Three other ways to unpark them, and none of them is taken here.
 Loosening `approval_policy` buys an unattended release by removing a control on every fork pull request this public repository will ever receive, which is why `.github/settings/actions-fork-pr-approval.json` records the strict value in the tree and `test/release/repo-settings.test.ts` asserts it.
 A stored token with wider rights would raise the pull request under an identity whose runs execute, and "Why Actions may create pull requests" below rules that out for the whole release design.
