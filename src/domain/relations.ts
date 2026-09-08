@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// The typed relation graph (domain model 2.3). Six kinds, each with a defined inverse.
+// The typed relation graph (domain model 2.3). Five kinds, each with a defined inverse.
 //
 // Blocked is derived here and never stored, so it cannot go stale on disk, and the raw
 // relation list is always available under its own name rather than behind the flag.
@@ -26,7 +26,6 @@ const INVERSES: Readonly<Record<RelationKind, string>> = {
   duplicates: 'duplicated_by',
   caused_by: 'causes',
   discovered_from: 'led_to',
-  split_from: 'split_into',
   relates_to: 'relates_to',
 }
 
@@ -34,21 +33,18 @@ const INVERSES: Readonly<Record<RelationKind, string>> = {
 const SYMMETRIC: ReadonlySet<RelationKind> = new Set<RelationKind>(['relates_to'])
 
 /**
- * The kinds `relation add` writes: the two that carry a rule and the one that says a caller
- * meant "see also" rather than `blocks`. The other three stay in the closed set the file
- * format reads, so a record carrying one still serves, and gain a writer with a decision
- * rather than by default; ADR-0015 carries why three and not six.
- */
-export const LINKABLE_KINDS: readonly RelationKind[] = ['blocks', 'duplicates', 'relates_to']
-
-/**
  * A caller's spelling of a kind, or `undefined`. The command line takes `relates-to` as the
  * capability contract spells it and `relates_to` as every other closed-set value here is
  * spelled, and both name the one stored kind.
+ *
+ * Every declared kind resolves here, for `add` and for `remove` alike. Three of the six
+ * could be written by a text editor and by no command, so `caused_by` and `discovered_from`
+ * gained the writer their facts deserve - "this bug was caused by that change" is what an
+ * agent holds at the moment of filing - and `split_from` went with the split feature.
  */
-export function linkableKindOf(spelling: string): RelationKind | undefined {
+export function relationKindOf(spelling: string): RelationKind | undefined {
   const kind = spelling.replaceAll('-', '_')
-  return LINKABLE_KINDS.find((linkable) => linkable === kind)
+  return RELATION_KINDS.find((declared) => declared === kind)
 }
 
 export function inverseOf(kind: RelationKind): string {

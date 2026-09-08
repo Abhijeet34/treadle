@@ -6,7 +6,6 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
 import {
-  LINKABLE_KINDS,
   MAX_RELATION_DEPTH,
   MAX_RELATION_ENTRIES,
   RELATION_KINDS,
@@ -14,7 +13,7 @@ import {
   blockersOf,
   findRelationCycle,
   inverseOf,
-  linkableKindOf,
+  relationKindOf,
   relationGraphFrom,
   relationsOf,
   removeRelation,
@@ -40,10 +39,10 @@ const states = (entries: Record<string, WorkItemState>) => (id: string) => entri
 const live = (): WorkItemState | undefined => undefined
 
 describe('the relation kinds', () => {
-  it('is exactly the six the model names', () => {
+  it('is exactly the five a command can write, split_from removed with the split', () => {
     assert.deepEqual(
       [...RELATION_KINDS],
-      ['blocks', 'duplicates', 'caused_by', 'discovered_from', 'split_from', 'relates_to'],
+      ['blocks', 'duplicates', 'caused_by', 'discovered_from', 'relates_to'],
     )
   })
 
@@ -55,7 +54,6 @@ describe('the relation kinds', () => {
         duplicates: 'duplicated_by',
         caused_by: 'causes',
         discovered_from: 'led_to',
-        split_from: 'split_into',
         relates_to: 'relates_to',
       },
     )
@@ -99,17 +97,25 @@ describe('writing a relation', () => {
   })
 })
 
+// Three of the six kinds resolved to nothing here, so `caused_by`, `discovered_from` and
+// `split_from` could be put on a record by a text editor and by no command, and `relation
+// remove` could not take one back off: a hand-written edge bound `R6` with nothing able to
+// unbind it. Every kind the file format reads is now a kind a command writes and removes.
 describe('the kinds a caller may write', () => {
-  it('is the three the capability contract names, out of the six the file format reads', () => {
-    assert.deepEqual([...LINKABLE_KINDS], ['blocks', 'duplicates', 'relates_to'])
+  it('resolves every declared kind, for add and for remove alike', () => {
+    for (const kind of RELATION_KINDS) assert.equal(relationKindOf(kind), kind, kind)
   })
 
   it('takes the contract spelling and the closed-set spelling of the symmetric kind as one kind', () => {
-    assert.equal(linkableKindOf('relates-to'), 'relates_to')
-    assert.equal(linkableKindOf('relates_to'), 'relates_to')
-    assert.equal(linkableKindOf('blocks'), 'blocks')
-    assert.equal(linkableKindOf('caused_by'), undefined)
-    assert.equal(linkableKindOf('blocked_by'), undefined)
+    assert.equal(relationKindOf('relates-to'), 'relates_to')
+    assert.equal(relationKindOf('relates_to'), 'relates_to')
+    assert.equal(relationKindOf('blocks'), 'blocks')
+    assert.equal(relationKindOf('caused-by'), 'caused_by')
+  })
+
+  it('resolves neither a derived inverse nor a kind this build no longer declares', () => {
+    assert.equal(relationKindOf('blocked_by'), undefined)
+    assert.equal(relationKindOf('split_from'), undefined)
   })
 })
 

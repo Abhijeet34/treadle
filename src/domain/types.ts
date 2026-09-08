@@ -52,8 +52,14 @@ export type AttemptOutcome = (typeof ATTEMPT_OUTCOMES)[number]
 export const GUARD_IDS = ['G1', 'G2', 'G3', 'G5', 'G6', 'G7', 'G8'] as const
 export type GuardId = (typeof GUARD_IDS)[number]
 
+/**
+ * Five kinds, each writable by `relation add` and removable by `relation remove`. `split_from`
+ * went with the split feature: it had no writer, so the only way to store one was a text
+ * editor, and a hand-written edge then bound the removal rule `R6` with no command able to
+ * unbind it. A record still carrying one is quarantined as the unknown kind it now is.
+ */
 export const RELATION_KINDS = [
-  'blocks', 'duplicates', 'caused_by', 'discovered_from', 'split_from', 'relates_to',
+  'blocks', 'duplicates', 'caused_by', 'discovered_from', 'relates_to',
 ] as const
 export type RelationKind = (typeof RELATION_KINDS)[number]
 

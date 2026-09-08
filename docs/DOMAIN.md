@@ -196,8 +196,10 @@ A due date nobody owns is a date nothing acts on, which is the whole reason the 
 
 ## Relations
 
-Six kinds, each with a defined inverse, and `relation add` writes three of them: `blocks`, `duplicates` and `relates_to`.
-The other three load and show from a record that carries one and gain a writer with a decision; [architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries why.
+Five kinds, each with a defined inverse, and `relation add` writes every one of them while `relation remove` takes every one back off.
+Three of the six kinds had no writer at all, so a `caused_by` edge reached a record only through a text editor and then bound the removal rule `R6` with no command able to unbind it.
+`caused_by` and `discovered_from` are facts an agent holds at the moment of filing and gained the writer; `split_from` went with the split feature, and a record still carrying one is quarantined as the unknown kind it now is, with `doctor` naming the file and the line.
+[architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md](architecture/adr/0015-relations-stored-once-and-the-guard-they-feed.md) carries the record of the earlier decision.
 
 | Kind | Inverse | Directional |
 |---|---|---|
@@ -205,13 +207,12 @@ The other three load and show from a record that carries one and gain a writer w
 | `duplicates` | `duplicated_by` | yes |
 | `caused_by` | `causes` | yes |
 | `discovered_from` | `led_to` | yes |
-| `split_from` | `split_into` | yes |
 | `relates_to` | `relates_to` | no, symmetric |
 
 `addRelation` refuses a self-edge (`R1`), for every directional kind an edge that would close a cycle (`R2`), a second `duplicates` edge out of an item that already duplicates one (`R4`), and a `blocks` edge whose source is already done or cancelled (`R5`).
 It takes the same `stateOf` reader `blockersOf` takes, because `R5` is the write-time half of the fact `blockersOf` applies on every read: a terminal blocker is inactive, so such an edge is written inert and the target reads `blocked no`.
 The edges a resolved impediment still carries were written while it was live, so `R5` refuses the write and never the stored edge.
-The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "split from" is not a thing the domain can mean.
+The domain model requires cycle detection on the blocking graph and the hierarchy by name; the other directional kinds get the same treatment because a cycle in "caused by" or "discovered from" is not a thing the domain can mean.
 `relates_to` is symmetric, stored once in id order, and unchecked, because a cycle in it says nothing.
 
 Writing an edge twice is idempotent: the second call returns `added: false` and the same graph.

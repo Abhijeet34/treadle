@@ -7,6 +7,7 @@
 // by hand. A cell that the rules cannot decide would be a per-command special case, and the
 // test that counts them is what proves there is none.
 
+import { RELATION_KINDS } from '../domain/index.ts'
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { CONFIG_SHAPE } from '../application/services/config.ts'
@@ -153,13 +154,17 @@ export const COMMANDS: readonly Command[] = [
     name: 'relation', shape: RELATION_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
+    // The kinds are spliced from the closed set rather than spelled here, because this line
+    // named three of them for as long as three were writable and would have gone on naming
+    // three: help is generated from this inventory, so a stale list here is what a caller reads.
     usage: [
-      'treadle relation add <id> <blocks|duplicates|relates-to> <other>',
+      `treadle relation add <id> <${RELATION_KINDS.join('|')}> <other>`,
       'treadle relation remove <id> <kind> <other>',
     ],
     examples: [
       ['treadle relation add auth-refresh blocks sso-saml', 'sso-saml cannot start until auth-refresh is done; explain shows both sides'],
       ['treadle relation add login-cta-2 duplicates login-cta', 'the first id is the copy; a copy of two things is refused'],
+      ['treadle relation add checkout-500 caused_by cart-rewrite', 'this defect came out of that change, which is a fact worth filing with it'],
       ['treadle relation add audit-log relates-to gdpr-export', 'see also, with no rule attached, so blocks stops being used for it'],
     ],
   },

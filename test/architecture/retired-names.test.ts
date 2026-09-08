@@ -141,6 +141,12 @@ const RETIRED: readonly Retired[] = [
   // ADR-0003's rule 4 amendment: a heading in a record body is escaped rather than refused,
   // so the predicate that named the refusal is gone and `hiddenRecordBoundary` replaces it.
   { name: 'unwritableBodyLine', by: 'ADR-0003 rule 4 amendment' },
+  // The truth sweep: the relation kind that had no writer and went with the split feature,
+  // and the inverse derived from it.
+  { name: 'split_from', by: 'the truth sweep, on decision-relation-kinds' },
+  { name: 'split_into', by: 'the truth sweep, on decision-relation-kinds' },
+  { name: 'LINKABLE_KINDS', by: 'the truth sweep: every declared kind is writable now' },
+  { name: 'linkableKindOf', by: 'the truth sweep, renamed relationKindOf' },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]
