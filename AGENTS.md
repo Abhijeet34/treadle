@@ -213,6 +213,9 @@ copy that has to move whenever the test does.
 | No emitted value carries a delimiter byte, and a block carries at most one free-text column, rendered last | findings F2 and F3, `test/render/conformance.test.ts` |
 | No path at or below the workspace root is followed as a symbolic link; a link is refusal `S15` | `test/store/symlink.test.ts`, ADR-0002 |
 | A lock holder that stalls past the 5 second heartbeat window has lost its lock, and the store asks the handle at every commit point; the refusal is `LOCK_LOST`/`S16` | `test/store/lock.test.ts` |
+| A `.txn/` file this store did not write, or one naming a path outside the workspace record or a directory the layout draws, refuses every write rather than crashing or being replayed; the refusal is `STORE_UNAVAILABLE`/`S13` naming the file | `test/store/journal.test.ts` |
+| A waiter refuses a lock whose holder has not changed hands past `holderTimeoutMs`, while a lock that keeps changing hands is waited out however long the whole wait runs; the refusal is `LOCK_TIMEOUT`/`S11` | `test/store/lock.test.ts` |
+| A file name carrying a newline or carriage return is escaped rather than ending the line it is printed on, in every finding and refusal that names it | `test/store/sharded-store.test.ts`, `test/store/journal.test.ts` |
 | A line the store holds and does not serve is a finding at its line, never a silent drop | `test/store/record-boundary.test.ts`, `docs/architecture/adr/README.md`'s `H` table |
 
 Two of these are worth reading before you touch them, because a grep cannot tell them from
