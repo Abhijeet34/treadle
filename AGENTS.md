@@ -637,6 +637,7 @@ Change them by editing the originals and re-running `automation`'s `.ci/gitleaks
 
 The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
 A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.
+A synthetic credential planted to prove the gate fires needs the charset the matching rule actually requires, not just its keyword prefix; `test/architecture/secret-scan-fixture.test.ts` carries that charset and why.
 
 ## Maintaining this file
 
