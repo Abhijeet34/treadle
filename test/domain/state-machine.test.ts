@@ -427,3 +427,42 @@ describe('guards', () => {
     assert.deepEqual(outcome.error.entities, ['task-1'])
   })
 })
+
+// The idempotent answer was given before an edge was chosen and every value check ran after
+// it, so a line that is `T5` or `T6` on any real edge exited 0 when the item already stood
+// in the state it asked for.
+describe('a request whose values are wrong is wrong whatever state the item is in', () => {
+  const draft = context(subject('draft'))
+
+  it('refuses a closed-set value outside its set on the idempotent request', () => {
+    const outcome = refusal(evaluateTransition(draft, {
+      target: 'draft',
+      resolution: 'bogus' as never,
+      outcome: 'bogus' as never,
+    }))
+    assert.equal(outcome.error.rule, 'T6')
+    assert.match(outcome.error.message, /bogus is not a resolution; the set is wont_do/)
+    assert.match(outcome.error.message, /bogus is not an outcome; the set is failed, yielded/)
+  })
+
+  it('refuses an override naming something that is not a guard, and one that never yields', () => {
+    const unknown = refusal(evaluateTransition(draft, { target: 'draft', overrides: ['G9' as never] }))
+    assert.equal(unknown.error.rule, 'T5')
+    assert.match(unknown.error.message, /^G9 is not a guard; the guards are G1, G2, G3, G5, G6, G7, G8$/)
+
+    const fixed = refusal(evaluateTransition(draft, { target: 'draft', overrides: ['G1'] }))
+    assert.match(fixed.error.message, /^G1 cannot be overridden; fix the item instead$/)
+  })
+
+  it('still answers already for a request whose values are right', () => {
+    assert.equal(idempotence(evaluateTransition(draft, { target: 'draft' })).state, 'draft')
+    assert.equal(
+      idempotence(evaluateTransition(context(subject('cancelled')), { target: 'cancelled', resolution: 'wont_do' })).state,
+      'cancelled',
+    )
+    assert.equal(
+      idempotence(evaluateTransition(draft, { target: 'draft', overrides: ['G2'], reason: 'retrying' })).state,
+      'draft',
+    )
+  })
+})
