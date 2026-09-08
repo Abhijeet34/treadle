@@ -518,7 +518,6 @@ export function withoutRecord(file: ParsedFile, id: string): ParsedFile {
   return { ...file, ...resolveIdentity(chunks) }
 }
 
-
 /**
  * One record's bytes back to a record, for a caller holding the source alone: the index
  * caches the canonical source rather than the columns, so `get` returns the whole item
