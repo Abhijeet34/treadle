@@ -209,6 +209,7 @@ copy that has to move whenever the test does.
 | Every line the tool prints for the reader to run, runs as printed from the state that printed it | `test/cli/runnable-lines.test.ts` |
 | Every number a document states about this tree is held to the tree; a measurement is not one of those and lives in `docs/VERIFICATION.md` with its date and load | `test/architecture/documented-numbers.test.ts` |
 | No renderer reads anything but the result object, a shape declares scalars before blocks, and a block closes its group in the human rendering | `test/render/conformance.test.ts`, `test/render/human-layout.test.ts`, ADR-0005 |
+| A text scalar in the human rendering sits on its key's line when the composed line fits the width, and keeps the indented block when it does not | `test/render/inline-scalar.test.ts` |
 | No emitted value carries a delimiter byte, and a block carries at most one free-text column, rendered last | findings F2 and F3, `test/render/conformance.test.ts` |
 | No path at or below the workspace root is followed as a symbolic link; a link is refusal `S15` | `test/store/symlink.test.ts`, ADR-0002 |
 | A lock holder that stalls past the 5 second heartbeat window has lost its lock, and the store asks the handle at every commit point; the refusal is `LOCK_LOST`/`S16` | `test/store/lock.test.ts` |
