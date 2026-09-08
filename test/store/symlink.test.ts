@@ -15,7 +15,7 @@ import { ShardedStore, openWorkspace } from '../../src/adapters/store/index.ts'
 import { allItems, aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
 /** Every path the store creates below its root, plus the one shard and one log a write makes. */
-const LINKED = ['workspace.md', 'items', 'events', '.index', 'items/2026-09.md', 'events/2026-09.jsonl'] as const
+const LINKED = ['workspace.md', 'items', 'events', '.txn', 'items/2026-09.md', 'events/2026-09.jsonl'] as const
 
 /** A snapshot of a directory tree: relative path to size, so a write into it is visible. */
 async function snapshot(root: string): Promise<string> {

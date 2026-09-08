@@ -25,7 +25,7 @@ import {
   type WorkItemType,
   type WorkspaceConfig,
 } from '../../domain/index.ts'
-import { storeFail, storeOk, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
+import { storeFail, storeOk, type Finding, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input, read from the
@@ -88,6 +88,34 @@ export function hidesContent(finding: { readonly rule: string }): boolean {
   return !SERVED_ANYWAY.has(finding.rule)
 }
 
+/** The refusal a set of findings earns, naming the first hole and counting the rest. */
+function hiddenRefusal(findings: readonly Finding[]): StoreResult<never> | undefined {
+  const hidden = findings.filter(hidesContent)
+  const first = hidden[0]
+  if (first === undefined) return undefined
+  const rest = hidden.length === 1 ? 'that finding hides a record' : `${hidden.length} findings hide records`
+  return storeFail(
+    'INTEGRITY', first.rule,
+    `${first.file} line ${first.line}: ${first.reason}; ${rest} this workspace holds, so no answer over it is whole`,
+    first.id === undefined ? [] : [first.id],
+  )
+}
+
+/**
+ * What reading the log said about the log, checked after a command has read it.
+ *
+ * The shards are parsed on every command because every answer is over the record set; the
+ * log is parsed only where a command answers from it, so a line the log could not read is
+ * found by `history`, `explain` and `doctor` rather than by every command paying for a scan
+ * of a file it never looks at. Asked here, after that read, it earns the same exit-7
+ * refusal a damaged log has always earned.
+ */
+export async function logIsWhole(store: Store): Promise<StoreResult<undefined>> {
+  const findings = await store.findings()
+  if (!findings.ok) return findings
+  return hiddenRefusal(findings.value) ?? storeOk(undefined)
+}
+
 /**
  * The one read every command builds its answer on, and therefore the one place the answer
  * is refused when it could not be whole. ADR-0003 rule 7 says damage to a record never
@@ -107,16 +135,8 @@ export async function readWorkspace(store: Store): Promise<StoreResult<Workspace
   const findings = await store.findings()
   if (!findings.ok) return findings
 
-  const hidden = findings.value.filter(hidesContent)
-  const first = hidden[0]
-  if (first !== undefined) {
-    const rest = hidden.length === 1 ? 'that finding hides a record' : `${hidden.length} findings hide records`
-    return storeFail(
-      'INTEGRITY', first.rule,
-      `${first.file} line ${first.line}: ${first.reason}; ${rest} this workspace holds, so no answer over it is whole`,
-      first.id === undefined ? [] : [first.id],
-    )
-  }
+  const refusal = hiddenRefusal(findings.value)
+  if (refusal !== undefined) return refusal
 
   return {
     ok: true,

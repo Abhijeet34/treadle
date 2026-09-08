@@ -3,8 +3,7 @@
 // measures what can be measured today and writes both renderings of the run.
 //
 // Order matters and is not incidental: the floors run first so every later figure has
-// something to subtract, corpora are generated before anything is timed, and the axis that
-// deletes the index runs last within its scale.
+// something to subtract, and corpora are generated before anything is timed.
 
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import path from 'node:path'

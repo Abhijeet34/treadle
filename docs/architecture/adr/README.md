@@ -18,6 +18,7 @@ ADR-0026 carries the next free number because workspace configuration is the fif
 ADR-0027 carries the next free number for ADR-0009's reason: it moves a number DR8 set, and the argument for moving it is the thing worth reading.
 ADR-0028 carries the next free number because the retrospective is the sixth of the absent capabilities, and because its own draft claimed ADR-0026, which workspace configuration took while it was queued.
 ADR-0029 carries the next free number because it answers the tool's statement of purpose rather than any one design record, and it is the first record here that supersedes rather than overtakes: five of the records above it designed a surface it removes whole.
+ADR-0030 carries the next free number for the same reason ADR-0027 does: it moves a decision DR2 made, and the argument for moving it is the thing worth reading.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -50,16 +51,17 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
 | [ADR-0028](0028-a-retrospective-is-a-record-of-its-own-kind.md) | The retrospective is the one ceremony that gets a record, a kind of its own in `ceremonies/YYYY-MM.md` with no lifecycle and no family around it, its actions named once on the record and held there by `S17`'s fourth referrer |
 | [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) | The sprint, the board, the retrospective and the estimate are removed because none of them records an interaction, a decision or a task; a record written before the cut keeps its retired fields through `extra` and reads unchanged |
+| [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md) | The derived index is removed and every read parses the month shards; `S14` goes with it, the journal moves to `.txn/`, the log is read only by a command that answers from it, and an errno on a path the store must read is `S13` naming the path rather than an empty answer |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
 
 A record is never rewritten when a later one overtakes part of it, because the argument it made is the thing worth reading and a rewritten record is a record of nothing.
 What is marked instead is that it was overtaken: an `**Overtaken in part by:**` line in the record's own header names the later record, and the bullet that moved says what moved and what still stands; a record overtaken more than once carries one such line per record that overtook part of it, in the order they landed.
-ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0011, ADR-0012, ADR-0014, ADR-0017, ADR-0021, ADR-0022, ADR-0024, ADR-0025 and ADR-0026 carry that line today: some reasoned from the absence of an entity, a command or a layer that has since been built, and the rest reasoned from a surface — a flag, a field, a command or an operation — that this repository has since removed. ADR-0002 and ADR-0006 carry both kinds, one line each. ADR-0005's own hook-code bullet was the first to be marked this way.
+ADR-0002, ADR-0003, ADR-0004, ADR-0005, ADR-0006, ADR-0011, ADR-0012, ADR-0014, ADR-0017, ADR-0021, ADR-0022, ADR-0024, ADR-0025, ADR-0026 and ADR-0029 carry that line today: some reasoned from the absence of an entity, a command or a layer that has since been built, and the rest reasoned from a surface, a flag, a field, a command or an operation, that this repository has since removed. ADR-0002 and ADR-0006 carry both kinds, three lines each: one from an absence since built, two from a surface this repository has since removed. ADR-0005's own hook-code bullet was the first to be marked this way.
 A record with no such line has not been overtaken, which is the claim the line exists to make checkable.
 A `**Superseded by:**` line is the stronger form of the same mark, for a record whose whole subject a later one removed rather than reshaped: the argument still reads and the surface it argued for is not in the tree.
-ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028 carry that line, all five naming ADR-0029.
+ADR-0016, ADR-0018, ADR-0022, ADR-0023 and ADR-0028 carry that line, all five naming ADR-0029, and ADR-0020 carries it naming ADR-0030.
 
 ## The store's rule ids
 
@@ -82,7 +84,6 @@ The set is closed.
 | `S11` | The lock was not acquired within the caller's bound |
 | `S12` | The stored hierarchy closes a cycle |
 | `S13` | A store file could not be created, read or written, and the filesystem said why |
-| `S14` | Two events in the store share an id |
 | `S15` | A path inside the store is a symbolic link, which the store never follows |
 | `S16` | The lock was lost while held: the holder stalled past the heartbeat window and another writer reclaimed it |
 | `S17` | A removal would leave a record naming the removed id: a child's parent or a stored relation edge |

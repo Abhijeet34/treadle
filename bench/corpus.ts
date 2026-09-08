@@ -74,7 +74,7 @@ export type Corpus = {
   /** The longest `blocks` chain the generator laid down, which is what the cycle check walks. */
   readonly longestBlocksChain: number
   readonly probeIds: { readonly get: string; readonly transition: string }
-  readonly bytes: { readonly items: number; readonly events: number; readonly index: number }
+  readonly bytes: { readonly items: number; readonly events: number }
   readonly generatedMs: number | undefined
   /** What cloning the cache entry into this run's private directory cost. Absent when the
    *  run generated its own corpus and had nothing to clone. */
@@ -488,7 +488,6 @@ async function readBackWith(
     bytes: {
       items: await directoryBytes(path.join(root, 'items')),
       events: await directoryBytes(path.join(root, 'events')),
-      index: await directoryBytes(path.join(root, '.index')),
     },
     generatedMs: generated?.ms,
     cloneMs,
@@ -585,7 +584,3 @@ async function generateWith(store: ShardedStore, spec: CorpusSpec): Promise<Gene
   return { ms: elapsed, chain }
 }
 
-/** Deletes the derived index so the next open pays DR8's first-index-build budget. */
-export async function dropIndex(root: string): Promise<void> {
-  await rm(path.join(root, '.index'), { recursive: true, force: true })
-}

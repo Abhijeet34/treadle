@@ -3,7 +3,8 @@
 **Status:** Accepted
 **Date:** 2026-09-06
 **Implements:** D1, that the files are the authority and the index is a cache, and its obligations 3 and 4, that load-time validation reports every violation and that a duplicated id across files is one of them
-**Departs from:** ADR-0002's tail rule, under which the tail re-index could record a clash; and ADR-0004's recovery from an index that disagrees with the files, which was to delete `.index/` by hand
+**Departs from:** ADR-0002's tail rule, under which the tail re-index could record a clash; and ADR-0004's recovery from an index that disagrees with the files, which was to delete the index directory by hand
+**Superseded by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the index whose partial re-index this record's whole subject is; a read parses the files, so there is no partial pass to decide anything and nothing for `doctor` to re-derive
 
 ## Context
 

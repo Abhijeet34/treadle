@@ -91,30 +91,14 @@ describe('what each read says about a hand-written event line', () => {
     await writeFile(path.join(root, LOG), log.split('\n').filter((l) => !l.includes('"cal1"')).join('\n'))
   })
 
-  it('refuses every read over a repeated event id, at exit 7 naming both files', async () => {
-    const log = await readFile(path.join(root, LOG), 'utf8')
-    const first = log.split('\n').find((l) => l.includes('"item.file"')) as string
-    const forged = first.replace('"actor":"alice"', '"actor":"mallory"').replace(/"at":"[^"]+"/, '"at":"2026-08-01T00:00:00Z"')
-    await appendFile(path.join(root, '.work', 'events', '2026-08.jsonl'), `${forged}\n`)
-
-    // Which copy is refused follows index order, and both answers are honest: the finding
-    // names the copy it refused and the file that already carries the id.
-    const history = await cli(['history', 'first-story'])
-    assert.equal(history.code, 7)
-    assert.match(history.err, /^rule S14$/m)
-    assert.match(history.err, /event \S+ at events\/2026-0[89]\.jsonl line \d+ repeats an id events\/2026-0[89]\.jsonl already carries; this copy is not served/)
-    const doctor = await cli(['doctor'])
-    assert.equal(doctor.code, 7)
-    assert.match(doctor.out, /^S14 \S+ events\/2026-0[89]\.jsonl:\d+ event \S+ at events\/2026-0[89]\.jsonl line \d+ repeats an id events\/2026-0[89]\.jsonl already carries; this copy is not served$/m)
-    await rm(path.join(root, '.work', 'events', '2026-08.jsonl'))
-  })
-
   it('doctor answers over a shard whose name carries a space, instead of exiting 1', async () => {
     const spaced = path.join(root, '.work', 'items', '2026-06 copy.md')
     await copyFile(path.join(root, SHARD), spaced)
     const doctor = await cli(['doctor'])
     assert.equal(doctor.code, 7, doctor.err)
-    assert.match(doctor.out, /^S3 first-story -:\d+ first-story is already a record in this store; the copy in items\/2026-06 copy\.md line \d+ is quarantined$/m, 'the cell is absent and the detail carries the name')
+    // The shard that sorts first is the one whose copy is served, so `2026-06 copy.md`
+    // holds the record and the September shard carries the finding.
+    assert.match(doctor.out, /^S3 first-story items\/2026-09\.md:\d+ first-story is already a record in this store; the copy in items\/2026-09\.md line \d+ is quarantined$/m)
     await rm(spaced)
   })
 })

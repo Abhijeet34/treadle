@@ -8,7 +8,9 @@
 // Its review caught five of them by reading; a sweep afterwards found the rest.
 //
 // The apparatus cut that followed it adds its own names below: the unenforced budget keys, the
-// gate status that printed them, and three dead members the same sweep found.
+// gate status that printed them, and three dead members the same sweep found. ADR-0030 adds a
+// third: the SQLite index, the five rules it owned, its directory and the paths that served it,
+// removed in favour of a plain read of the month shards.
 //
 // The proof of done that should have caught them could not. It was
 // `git grep -niE '...\bpoints\b...\bboard\b'`, and `git grep -E` treats `\b` as a literal, so
@@ -84,8 +86,6 @@ const RETIRED: readonly Retired[] = [
   { name: 'peakRssReadKb', by: 'the apparatus cut' },
   { name: 'peakRssMutationKb', by: 'the apparatus cut' },
   { name: 'indexToTextRatio', by: 'the apparatus cut' },
-  // `firstIndexBuildMs` and `reindexAfterHandEditMs` are NOT listed: the budgets that read
-  // them went, and the two measurements they read are still taken and still reported.
   // The `enforced` key on a budget row, which only ever meant `false`; every row is armed now.
   { name: 'enforced', by: 'the apparatus cut', spelling: /"enforced":/ },
   // `deps` as a commit type. It stays legitimate as a scope, which `chore(deps)` and
@@ -95,6 +95,44 @@ const RETIRED: readonly Retired[] = [
   { name: 'Diagnostics.level', by: 'the litter sweep', spelling: /\bDiagnostics\.level\b/ },
   { name: 'Generated.impediments', by: 'the litter sweep', spelling: /\bGenerated\.impediments\b/ },
   { name: 'Generated.relations', by: 'the litter sweep', spelling: /\bGenerated\.relations\b/ },
+  // ADR-0030: the SQLite index, its five rules, its directory and the paths that served it.
+  { name: 'index-cache', by: 'ADR-0030' },
+  { name: 'IndexCache', by: 'ADR-0030' },
+  { name: 'IndexBusy', by: 'ADR-0030' },
+  { name: 'IndexUnavailable', by: 'ADR-0030' },
+  { name: 'IndexedItem', by: 'ADR-0030' },
+  { name: 'IndexedSource', by: 'ADR-0030' },
+  { name: 'SummaryRow', by: 'ADR-0030' },
+  { name: 'INDEX_FORMAT', by: 'ADR-0030' },
+  { name: 'INDEX_DIR', by: 'ADR-0030' },
+  { name: 'index.sqlite', by: 'ADR-0030', spelling: /index\.sqlite/ },
+  { name: 'node:sqlite', by: 'ADR-0030', spelling: /node:sqlite|DatabaseSync/ },
+  { name: 'rederive', by: 'ADR-0030' },
+  { name: 'rowOf', by: 'ADR-0030' },
+  { name: 'forgetFingerprints', by: 'ADR-0030' },
+  { name: 'replaceRecordFile', by: 'ADR-0030' },
+  { name: 'replaceEventFile', by: 'ADR-0030' },
+  { name: 'wholePass', by: 'ADR-0030' },
+  { name: 'hierarchy_dirty', by: 'ADR-0030' },
+  { name: 'hierarchy_cycle', by: 'ADR-0030' },
+  { name: 'HIERARCHY_MOVED_CAP', by: 'ADR-0030' },
+  { name: 'dropIndex', by: 'ADR-0030' },
+  { name: 'deleteIndex', by: 'ADR-0030' },
+  // `firstIndexBuildMs` and `reindexAfterHandEditMs` went with the index they measured
+  // (ADR-0030); the budgets that read them had already gone in the apparatus cut.
+  { name: 'firstIndexBuildMs', by: 'ADR-0030' },
+  { name: 'reindexAfterHandEditMs', by: 'ADR-0030' },
+  { name: 'eventRest', by: 'ADR-0030' },
+  { name: 'eventFrom', by: 'ADR-0030' },
+  // `.index` is the directory, matched where it is a path rather than a property access:
+  // `.indexOf(` is ordinary JavaScript and appears on 20 lines this list must not fail.
+  { name: '.index', by: 'ADR-0030', spelling: /\.index[/'"`\s)]|\.index$/ },
+  // The three rules the index owned. `S11` and `S13` are still spelled by the lock and by
+  // the store's own errno refusal, so what is retired is the index's use of them and the
+  // remedy each printed, which is what these patterns match.
+  { name: 'S14', by: 'ADR-0030', spelling: /['"`]S14['"`]|\bS14\b/ },
+  { name: 'delete .index and retry', by: 'ADR-0030', spelling: /delete \.?index.{0,12}retry/i },
+  { name: 'the index was busy', by: 'ADR-0030', spelling: /index at \S+ was busy|index .{0,24}could not be opened/ },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]

@@ -34,14 +34,11 @@ export {
   type Section,
 } from './grammar.ts'
 
-export { IndexCache, type Fingerprint, type IndexedItem } from './index-cache.ts'
-
 export { decodeItem, encodeItem } from './item-codec.ts'
 
 export * from './limits.ts'
 
 export {
-  STALE_MS,
   acquireLock,
   processIsGone,
   type AcquireOptions,
@@ -57,6 +54,5 @@ export {
   WORKSPACE_FILE,
   createWorkspace,
   openWorkspace,
-  rowOf,
   type ShardedStoreOptions,
 } from './sharded-store.ts'

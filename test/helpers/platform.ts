@@ -5,13 +5,13 @@
 // None of these names a gap in the tool. Each names a filesystem or process primitive whose
 // semantics Windows does not have, in a test whose whole subject is that primitive. Measured
 // on windows-2025 in cross-platform run 34110894767: of 62 failures, 30 were a CRLF checkout
-// (now `.gitattributes`), one was a real defect (the index handle a failed open left behind),
-// and the rest were tests asserting POSIX semantics on a platform that has none.
+// (now `.gitattributes`), one was a real defect in the store's database handle, since removed
+// with the database, and the rest were tests asserting POSIX semantics on a platform that has
+// none.
 //
 // A skip is the last resort here, not the first. Where the invariant can be expressed in what
-// Windows does have, it is: `dropIndex` in `store-fixtures.ts` deletes between two opens
-// rather than under a live handle, and the path assertions compare through `node:path` rather
-// than against a literal separator.
+// Windows does have, it is: the path assertions compare through `node:path` rather than
+// against a literal separator.
 
 const WINDOWS = process.platform === 'win32'
 

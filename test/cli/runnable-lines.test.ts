@@ -527,11 +527,11 @@ describe('every line the tool prints for the reader to run is runnable as printe
   const built = new Map<string, string>()
   const collected: Collected[] = []
 
-  /** A fresh copy of a built scenario, without its index, which the next open rebuilds. */
+  /** A fresh copy of a built scenario, so one line's effects never reach another's. */
   async function copyOf(scenario: Scenario): Promise<string> {
     const source = built.get(scenario.name) as string
     const dir = await mkdtemp(path.join(await parent, 'copy-'))
-    await cp(source, dir, { recursive: true, filter: (from) => path.basename(from) !== '.index' })
+    await cp(source, dir, { recursive: true })
     return dir
   }
 

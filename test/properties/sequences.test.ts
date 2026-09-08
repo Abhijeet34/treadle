@@ -11,7 +11,7 @@
 
 import assert from 'node:assert/strict'
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, readdir, rm, stat, unlink } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
@@ -23,8 +23,6 @@ import { runCli } from '../helpers/cli-run.ts'
 
 const SEQUENCES = 40
 const COMMANDS_PER_SEQUENCE = 25
-
-const INDEX_DIR = '.index'
 
 /** Each type with the fields its own policy requires at creation, so a filing succeeds. */
 const FILINGS: readonly (readonly [string, readonly string[]])[] = [
@@ -49,16 +47,14 @@ async function aSession(): Promise<Session> {
 }
 
 /**
- * Every byte of the authoritative store, so a no-op that touched anything is visible.
- * `.index` is excluded because DR2 makes it derived and safe to delete at any moment: a
- * read that warms the cache is not a mutation, and the rebuild check below is what holds
- * the cache honest.
+ * Every byte of the store, so a no-op that touched anything is visible. There is nothing to
+ * exclude: a read derives nothing and writes nothing, so every byte under the root is a
+ * record, the log, or the lock a write took and released.
  */
 async function fingerprint(root: string): Promise<string> {
   const hash = createHash('sha256')
   const walk = async (at: string): Promise<void> => {
     for (const name of (await readdir(at)).sort()) {
-      if (name === INDEX_DIR) continue
       const full = path.join(at, name)
       if ((await stat(full)).isDirectory()) { await walk(full); continue }
       hash.update(path.relative(root, full))
@@ -203,13 +199,6 @@ describe('any sequence of legal commands leaves a store that still holds', () =>
 
         const count = await invariants(session.root, `seed ${seed}`)
         assert.equal(count, filed.length, `seed ${seed}: ${count} records for ${filed.length} filings`)
-
-        // The index is derived, so deleting it must change no answer (DR2). This is the
-        // sharpest invariant in the set: it fails if any answer was only in the cache.
-        const cache = path.join(session.root, INDEX_DIR, 'index.sqlite')
-        await unlink(cache).catch(() => undefined)
-        assert.equal(await invariants(session.root, `seed ${seed} rebuilt`), count,
-          `seed ${seed}: the store answered differently once its index was deleted`)
       } finally {
         await session.dispose()
       }
@@ -217,6 +206,6 @@ describe('any sequence of legal commands leaves a store that still holds', () =>
 
     t.diagnostic(`${SEQUENCES} sequences x ${COMMANDS_PER_SEQUENCE} commands: ${mutations} mutations, ${reads} reads, ${refusals} refusals`)
     t.diagnostic(`${repeats} transitions repeated, every one reported as a no-op`)
-    t.diagnostic('stores left unparseable: 0; quarantined records: 0; index rebuilds that changed an answer: 0')
+    t.diagnostic('stores left unparseable: 0; quarantined records: 0')
   })
 })

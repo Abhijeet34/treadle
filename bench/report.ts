@@ -80,7 +80,6 @@ export function toMarkdown(report: RunReport): string {
   push('| Fact | Value |', '|---|---|')
   push(`| Machine | ${report.machine.cpuModel}, ${report.machine.cores} cores, ${(report.machine.memoryBytes / 1024 ** 3).toFixed(0)} GB, ${report.machine.platform} ${report.machine.release} (${report.machine.arch}) |`)
   push(`| Node | ${report.machine.node} (V8 ${report.machine.v8}) |`)
-  push(`| SQLite in Node | ${report.machine.sqlite} |`)
   push(`| Declared floor | ${report.machine.declaredNodeFloor}; this runtime ${report.machine.nodeMeetsFloor ? 'meets it' : '**is below it**, so every figure here was taken under a runtime the package refuses'} |`)
   push(`| Seed | ${report.config.seed} |`)
   push('')
@@ -112,9 +111,9 @@ export function toMarkdown(report: RunReport): string {
   push('## Corpora', '')
   push('Written through the landed store, not synthesised as files. Item counts are read back from the store after generation.')
   push('')
-  push('| Items in store | Shards | Largest shard | ready matches | Records bytes | Events bytes | Index bytes | Generated |', '|---|---|---|---|---|---|---|---|')
+  push('| Items in store | Shards | Largest shard | ready matches | Records bytes | Events bytes | Generated |', '|---|---|---|---|---|---|---|')
   for (const c of report.corpora) {
-    push(`| ${c.itemsInStore} | ${c.months.length} | ${c.largestMonth}: ${c.largestMonthItems} records, ${bytes(c.largestMonthBytes)} | ${c.readyMatches} | ${bytes(c.bytes.items)} | ${bytes(c.bytes.events)} | ${bytes(c.bytes.index)} | ${c.reused ? 'reused from cache' : `${((c.generatedMs ?? 0) / 1000).toFixed(1)} s`} |`)
+    push(`| ${c.itemsInStore} | ${c.months.length} | ${c.largestMonth}: ${c.largestMonthItems} records, ${bytes(c.largestMonthBytes)} | ${c.readyMatches} | ${bytes(c.bytes.items)} | ${bytes(c.bytes.events)} | ${c.reused ? 'reused from cache' : `${((c.generatedMs ?? 0) / 1000).toFixed(1)} s`} |`)
   }
   push('')
   push('Each corpus also carries impediments and relation edges, because a corpus with none of them priced nothing that reads the relation graph and every command reads it.')
@@ -134,7 +133,6 @@ export function toMarkdown(report: RunReport): string {
     push('| Operation | n | ops | first | best | p50 | p95 | p99 | p99 rank | net p95 | in-process p95 | peak MiB | load 1m, node procs |', '|---|---|---|---|---|---|---|---|---|---|---|---|---|')
     for (const [op, m] of Object.entries(scale.operations)) push(measurementRow(op, m))
     push('')
-    push(`First index build with the index deleted: ${typeof scale.firstIndexBuildMs === 'number' ? `${scale.firstIndexBuildMs} ms` : scale.firstIndexBuildMs}. Re-index after a hand edit of the largest shard: ${typeof scale.reindexAfterHandEditMs === 'number' ? `${scale.reindexAfterHandEditMs} ms` : scale.reindexAfterHandEditMs}. Both in-process, one sample each.`)
     push(typeof scale.relationCycle === 'string'
       ? `Load-time relation check: ${scale.relationCycle}.`
       : `Load-time relation check over ${scale.relationCycle.edges} edges, one sample, in-process: ${scale.relationCycle.buildMs} ms to build the graph and ${scale.relationCycle.findMs} ms to walk it for a cycle in \`blocks\`, which found ${scale.relationCycle.cycle}. The build is paid by every command; the walk is paid by \`doctor\`.`)

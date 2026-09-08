@@ -47,7 +47,7 @@
 import { MAX_REASON, isConfigKey, isKnownField, isSafeText, type ItemId } from '../../domain/index.ts'
 import { columnsOf, errorResult, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { readWorkspace } from './context.ts'
+import { logIsWhole, readWorkspace } from './context.ts'
 import { DEFAULT_LIMIT, invocation, notFound, type CarriedFlag } from './items.ts'
 import { AUDITED_FIELDS } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
@@ -384,6 +384,9 @@ export async function history(
   const events = await store.events(
     scope.kind === 'txn' ? { txn: scope.txn } : { entity: scope.id })
   if (!events.ok) return storeRefusal('history', 'read', events.error, workspace)
+  // The rows below are the log's answer, so a line the log could not read is a hole in it.
+  const whole = await logIsWhole(store)
+  if (!whole.ok) return storeRefusal('history', 'read', whole.error, workspace)
   if (scope.kind === 'txn') {
     // A transaction exists only as the events it wrote, so nothing selected is an id this log
     // has never carried rather than a transaction that changed nothing.

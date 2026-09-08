@@ -30,6 +30,7 @@ import {
   doneVerdict,
   hasReviewStep,
   hidesContent,
+  logIsWhole,
   readWorkspace,
   wholeItem,
   readyVerdict,
@@ -358,7 +359,12 @@ export async function explain(store: Store, clock: Clock, id: ItemId): Promise<R
   // One read of this item's log serves both the entry below and the audit further down; it
   // used to be read twice for the two.
   const events = await store.events({ entity: id })
-  const log = events.ok ? events.value : []
+  if (!events.ok) return storeRefusal('explain', 'read', events.error, workspace)
+  // The entry event and the audit below are both the log's answer, so a line the log could
+  // not read is a hole in this one.
+  const readable = await logIsWhole(store)
+  if (!readable.ok) return storeRefusal('explain', 'read', readable.error, workspace)
+  const log = events.value
   const at = enteredAt(log, item.state)
   const data: Record<string, Value> = {
     item: item.id,

@@ -48,11 +48,11 @@ how a release happens, and `scripts/apply-repo-settings.sh` is the only thing th
 checked-in rulesets under `.github/`.
 Do not tag, release or publish without the captain saying so.
 
-`package.json` declares `engines.node` at the product's floor of 24.15.
-This machine may be below it; the domain core is pure and runs anyway, so an `EBADENGINE`
-warning from `npm install` here is expected and is not a defect to fix.
-`node:sqlite` also works unflagged below the floor and prints one `ExperimentalWarning` per
-process; that line in test output is expected too.
+`package.json` declares `engines.node` at the product's floor of 24.15, which is what `.nvmrc`
+pins, what the first CI leg runs, and what every figure in `docs/BENCHMARKS.md` was measured
+on. This machine may be below it; nothing the tool needs is newer than 24.0, so an
+`EBADENGINE` warning from `npm install` here is expected and is not a defect to fix. The fix,
+if the warning is unwelcome, is `nvm use` against `.nvmrc` rather than a lower floor.
 
 `npm run bench` is the measurement rig and `npm run bench:gate` is the same run with a non-zero
 exit on a regression.
@@ -82,13 +82,12 @@ generator, and neither is closed by writing more harness.
 
 Most of the suite's wall time is real processes and generated input.
 `test/store/lock.test.ts` and `test/reliability/kill.test.ts` spawn 73 child processes between
-them, `test/cli/index-contention.test.ts` spawns the published entry point against an index
-another process holds, and the fuzzer runs 500,000 mutated inputs per run, so run the suite with
-a generous `--test-timeout`.
-Driving the store API from one process serialises writers on the advisory lock and never
-contends on the index, which is exactly what hides a command dying with a raw stack trace and
-losing its write: when a concurrency bug is reported, reach for N processes each running the
-command surface, not N promises against one store.
+them, and the fuzzer runs 500,000 mutated inputs per run, so run the suite with a generous
+`--test-timeout`.
+Driving the store API from one process serialises writers on the advisory lock, which is
+exactly what hides a command dying with a raw stack trace and losing its write: when a
+concurrency bug is reported, reach for N processes each running the command surface, not N
+promises against one store.
 
 Two more gates sit beside `npm run check`, and neither is in it because both cost minutes.
 `npm run coverage` runs the suite under Node's own coverage and holds it to the table in
@@ -223,6 +222,35 @@ A remedy names the next move from where an item stands, never the destination, w
 A layout change is `TREADLE_SNAPSHOT=update node --test test/render/human-layout.test.ts` and
 then reviewing the diff, never a hand edit of `test/render/human.snapshot.txt`.
 
+No path at or below the workspace root is followed as a symbolic link: the store `lstat`s its
+layout and every shard and event file before reading or writing, and a link is refusal `S15`.
+A workspace is a committed directory and git materialises a link on checkout, so this is the
+containment claim `init` prints, held against a clone. `test/store/symlink.test.ts` is the
+property; ADR-0002 carries the decision.
+
+A lock holder that stalls past the 5 second heartbeat window has lost its lock, whether or not
+a waiter took it, and the store asks the handle at the commit point of every file it writes.
+A paused writer (`Ctrl-Z`, `SIGSTOP`, a laptop lid) resuming into its critical section was
+measured overwriting the reclaimer's write. The refusal is `LOCK_LOST`/`S16`, and
+`test/store/lock.test.ts` reproduces the pause with a real process. `apply` reads the shards
+inside the lock and nowhere earlier: every check it makes decides a refusal, and a check that
+decides a refusal may read nothing but the files as they are under that lock.
+
+The event log holds the record files' property: a line the store holds and does not serve is
+a finding at its line, never a silent drop. An instant that names no real date is `S1`, and
+`doctor` reports a state the record holds against the last event that recorded it (`H20`) and
+an event dated before its item was filed (`H23`). An event naming an item the store does not
+hold is not a finding, because a record removed by hand is a legitimate edit and the event
+reaches no read surface.
+
+The log's findings are known only once something has read the log, which is `doctor` and the
+two commands that answer from it. Every command parses the shards, because every answer is
+over the record set; a command that never opens the log does not pay to scan it, measured at
+826 ms over 100,000 lines at 10,000 records. `logIsWhole` in
+`src/application/services/context.ts` is what `history` and `explain` call after their read,
+and it earns the same exit 7 a damaged log has always earned. A read that adds an event
+surface adds that call with it.
+
 ## Where a relation lives, and what is derived from it
 
 An edge between two items is stored once, as a `## Relations` section on its source record: the blocker for `blocks`, the copy for `duplicates`, the lower id for `relates_to`.
@@ -251,35 +279,27 @@ A record boundary is a line, so it cannot be made unreformattable; it is made lo
 `damagedHeadingAt` resynchronises on a heading a hand edit reshaped, and the discriminator is a record's four mandatory field lines (`type`, `state`, `filed_at`, `version`), which is the redundancy the format already carried.
 `test/store/record-boundary.test.ts` holds the property over generated documents: every id an undamaged file served is, after damage, either still served or named by a finding.
 
-## Changing an index column, and what the index is allowed to cache
+## What a read is, and what a read is allowed to keep
 
-The index is a cache and never an authority, so its answer to a schema change is to throw the
-rows away rather than migrate them. `src/adapters/store/index-cache.ts` carries `INDEX_FORMAT`:
-bump it in the same change that adds, drops or repurposes a column, and every table is dropped
-and re-derived on the next open. An `alter table` here is the wrong instinct, and a column
-change without the bump leaves an index written by an older build serving the new code.
+A read parses the record files. There is no derived store in front of them any more:
+`src/adapters/store/sharded-store.ts` reads `workspace.md` and every month shard, decodes each
+record, and answers from what it decoded. ADR-0030 carries the measurement that removed the
+SQLite index, and the shape of the argument is worth keeping: at 347 records the index bought
+20 to 25 ms a read and charged 1,214 lines, a quarter of the store, five rules and the only
+defect that has ever bricked a workspace. If you find yourself adding a derived file, that is
+the decision to reopen with a measurement, not a patch to write.
 
-What the index caches beyond its columns is a decision with a measurement behind it, not a
-convenience. `items.source` holds each record's rendered text so a `get` is one lookup and
-never reopens a shard, which is `docs/architecture/adr/0002-storage-layout.md`'s recorded
-departure from DR2. The events table holds only the half of a line its six columns do not, and
-`eventRest`/`eventFrom` in `src/adapters/store/event-log.ts` own that split. Adding a cached
-column costs index size against the budget in `bench/budgets.json`, whose `why` strings carry
-the `dbstat` decomposition it was derived from.
+One parse serves one command. `#read` holds the parse and a stat per file - name, size and
+mtime - and reuses it only while that stat is unchanged, because `status` alone asks the store
+four questions and two stores open on one root have to see each other's writes. A file that
+moved costs the whole read again rather than that file's records, which is the simplification
+the removal buys: there is no row to replace.
 
-The load-time hierarchy cycle check (finding F8) is cached the same way, as a verdict in the
-`meta` table, and any transaction that moves an item row reports what it moved. If you add a
-path that writes item rows, it goes through `replaceRecordFile` or the verdict goes stale.
-
-A finding is cached the same way, under the fingerprint of the file it came from, and it
-refuses every read after it, so only the pass that read a file whole may record a duplicate.
-The event-file append is a partial read: it may add rows, and on a moved base or a clashing
-line it hands the file back with nothing written and the whole pass decides. Two loops of
-`set` and `show` in separate processes once recorded one false `S14` per line and locked the
-workspace until `.index/` was deleted by hand; `doctor` now opens the store with `rederive`,
-which forgets every fingerprint and keeps every row, so the fix line every integrity refusal
-prints is the recovery, and deleting `.index/` by hand is never the answer because the
-transaction journal lives there. ADR-0020 argues it.
+What is derived on every read rather than remembered: the cross-shard duplicate check (`S3`,
+where the first shard in name order serves the record and every later copy is quarantined),
+and the load-time hierarchy cycle verdict (`S12`, 10.3 ms at 10,000 records against the meta
+row, the dirty marker and the repair walk that used to carry it). Neither can go stale,
+because neither outlives the call.
 
 ## Measuring a performance change here
 
@@ -290,12 +310,12 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 `bench/budgets.json` says which budgets are armed and why the timing ones are not.
 
 A figure taken at the store seam is not a figure about a command. Every command goes through
-`readWorkspace`, which reads every item's summary fields off the index, indexes them by id,
-builds the hierarchy, and a command that acts on one record
-then reads that record with `wholeItem`; so `store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one
-of them is what a caller pays. The view holds `WorkItemSummary`, never the whole record, and
-a field a scan needs that the summary lacks is a new index column and an `INDEX_FORMAT` bump,
-never a read from the record text (ADR-0014). A4 times that read as the `workspace` operation
+`readWorkspace`, which reads every item's summary fields, indexes them by id, builds the
+hierarchy, and a command that acts on one record then reads that record with `wholeItem`; so
+`store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one of them is what a
+caller pays. The view holds `WorkItemSummary`, never the whole record, and a field a scan needs
+that the summary lacks is added to `SUMMARY_FIELDS` in `src/domain/types.ts`, never fetched per
+record (ADR-0014). A4 times that read as the `workspace` operation
 and `bench/gate.ts` weighs each memory budget over the worst of a named set rather than over
 one operation, reporting `NOT MEASURED` if any member of the set has no figure, which is what
 stopped the read budget being met by a `list` bounded at 50 rows. Adding an operation to A4
@@ -382,8 +402,6 @@ A `workflow_dispatch` only fires for a workflow that already exists on the defau
 Three quarters of what a Windows job reports is the suite asserting POSIX at it, so the rules are short.
 Compare paths through `node:path` and never against a literal `/`, and never build a regex out of a path.
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
-Where the invariant can be expressed in what Windows does have, express it: `deleteIndex` in `test/helpers/store-fixtures.ts` removes the index between two opens rather than under a live handle, because Windows will not unlink a file another handle holds.
-That last rule is a production rule too: close a `DatabaseSync` on every path out of the function that opened it, including the throwing ones, or the store cannot rebuild its own cache on Windows.
 The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF, but no longer the schemas, which this branch untracked; without it 30 tests fail there and every shard reads as an `H16`.
 
 Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:

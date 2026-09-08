@@ -29,7 +29,6 @@ import { COMMANDS } from '../../src/cli/inventory.ts'
 const WRITERS: readonly string[] = [
   'src/adapters/store/atomic.ts',
   'src/adapters/store/event-log.ts',
-  'src/adapters/store/index-cache.ts',
   'src/adapters/store/lock.ts',
   'src/adapters/store/sharded-store.ts',
   'src/adapters/workspace.ts',

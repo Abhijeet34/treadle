@@ -37,8 +37,9 @@ concurrency:
 
 jobs:
   # Two legs, and the floor is the load-bearing one. `engines.node` says >=24.15.0 because
-  # node:sqlite reaches Stability 1.2 there (DR1), and .nvmrc pins the same number, so the
-  # first leg is the product's own floor. The second is current Node on the cheapest runner:
+  # that is the Node 24 point .nvmrc pins and every recorded measurement was taken on; the
+  # capability claim it used to rest on was removed with the index. So the first leg is the
+  # product's own floor. The second is current Node on the cheapest runner:
   # nothing else tests the open upper half of that range, and a Node release nobody asked for
   # should redden a pull request here rather than a release later.
   check:

@@ -24,7 +24,7 @@ Linux, macOS and Windows, and any POSIX userland including BusyBox: the executab
 One platform limit is worth knowing before you meet it. On macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all, because the kernel puts argv and the environment on the stack V8 measures its limit against.
 No workflow produces one by accident and no code here can catch it; [docs/STABILITY.md](docs/STABILITY.md) carries the measurement and the decision to keep it rather than trade it for a launcher that fails on Windows.
 
-The published package has zero runtime dependencies, and that is a budget rather than a coincidence: the index is `node:sqlite`, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
+The published package has zero runtime dependencies, and that is a budget rather than a coincidence: a read is the record files parsed, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
 
 ## Install
 

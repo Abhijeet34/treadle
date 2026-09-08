@@ -4,6 +4,7 @@
 **Date:** 2026-09-05
 **Implements:** DR4 of the system design record, under decision D2
 **Overtaken in part by:** [ADR-0003](0003-record-format-and-migration.md) rule 7, whose correction put the finding check in the one read every command performs, so the narrow refusal this record chose is no longer what a caller meets; the CLI and `doctor` are built, so the two bullets that reasoned from their absence read as the record of a decision rather than as the state of the tree
+**Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the index this record's busy-timeout ordering and `test/cli/index-contention.test.ts` protected, so "The index is the third thing processes contend on" is a closed account rather than a live rule; the lock, the atomic write, compare-and-set and the journal still stand, and the journal's home moves from `.index/txn/` to `.txn/` because its old directory was the index's
 
 ## Context
 

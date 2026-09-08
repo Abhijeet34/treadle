@@ -428,9 +428,7 @@ async function execute(env: Environment): Promise<number> {
   }
   diagnostics.note('store', root)
 
-  // `doctor` answers from the files and never from what the index held: the refusal every
-  // other command prints names it as the fix, so it has to be the way back (ADR-0020).
-  const opened = await openWorkspace(root, command === 'doctor' ? { rederive: true } : {})
+  const opened = await openWorkspace(root)
   if (!opened.ok) {
     // A workspace file that is missing is `init`'s to write. One at a schema this build does
     // not read is not: `init` answers `already` there, so the line offered is the one that
