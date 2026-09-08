@@ -11,8 +11,9 @@ It is the project's committed home for project-intrinsic agent knowledge: build,
 
 ## What this project is, and where its rules live
 
-treadle is an agile work-management CLI whose committed markdown files are the source of
-truth. It runs as `node bin/treadle.js <command>`, or as `treadle` once linked.
+treadle is the record of the work between people and agents, over committed markdown files
+that are its source of truth; README.md's opening states what it is and is not.
+It runs as `node bin/treadle.js <command>`, or as `treadle` once linked.
 The design was written before the code, so prefer reading a doc over inferring from
 the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams),
 `docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
