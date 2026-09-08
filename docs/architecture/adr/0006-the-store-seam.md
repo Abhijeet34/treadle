@@ -5,6 +5,7 @@
 **Implements:** the store half of DR6 of the system design record
 **Overtaken in part by:** [ADR-0016](0016-sprints.md) and [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) gave two of the three absent entities their types, and the doctor this record deferred is built
 **Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `--preview` and the sprint records the seam took, leaving the overlay to back `--dry-run` alone
+**Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md) removes the SQLite index `ShardedStore` read and wrote through; it reads the shards directly, and `eachItem`/`eachEvent` iterate a parse rather than the index's own row iterator
 
 ## Context
 

@@ -8,7 +8,7 @@ This file is the map; [DOMAIN.md](DOMAIN.md) is the detail for the domain layer 
 ```text
 cli         argument parsing, the command inventory, result -> exit status
   |
-adapters    the store, the index, the clock, the id generator, the event sink, the renderers
+adapters    the store, the clock, the id generator, the event sink, the renderers
   |
 application use cases: one transaction per command
   |
@@ -32,7 +32,7 @@ A seam with one implementation is not a seam, it is an interface waiting to be d
 
 | Seam | What it does | First implementation | Second implementation |
 |---|---|---|---|
-| Store (built) | Reads records by id, state and type and events by entity, transaction and time range; applies a transaction of item writes and removals under a lock with compare-and-set | Sharded Markdown files with a SQLite index | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing |
+| Store (built) | Reads records by id, state and type and events by entity, transaction and time range; applies a transaction of item writes and removals under a lock with compare-and-set | Sharded Markdown files, parsed on every read | An overlay store: a copy-on-write layer over a base store, which is how `--dry-run` evaluates every guard without writing |
 | Renderer (built) | Turns one result object into bytes for a rendering name | The compact line format for agents | JSON, and the human rendering |
 | Clock (built) | Now, as an instant | The system clock | A fixed clock, which every golden result object runs under |
 | Id generator (built) | Mints a transaction id and an event id | A random suffix | A sequential one, so golden output and `--dry-run` diffs are stable |
@@ -58,8 +58,8 @@ The Policy seam has both implementations, and the second is data rather than a s
 
 ## Storage, in one paragraph, so the domain's shape makes sense
 
-The workspace is a directory of markdown files sharded by the calendar month an item was filed in, plus an append-only monthly event log, plus a gitignored SQLite index that is re-derived from a size, mtime and content-hash fingerprint on every command.
-The committed files are authoritative and the index is a cache whose deletion is always safe.
+The workspace is a directory of markdown files sharded by the calendar month an item was filed in, plus an append-only monthly event log.
+There is no derived store in front of them: a command parses the shards it needs and holds that parse only while a name, size and mtime stat per file says the bytes have not moved.
 That is why the domain core validates on load rather than only on write: a hand edit and a git merge both bypass a write, and the tool's job is to help with the result rather than forbid it.
 
 ## The decision records
