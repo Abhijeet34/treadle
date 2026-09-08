@@ -40,7 +40,7 @@ import { Diagnostics, type Level } from './diagnostics.ts'
 import { exitFor } from './exit.ts'
 import { commandHelp, topLevelHelp } from './help.ts'
 import { commandNamed } from './inventory.ts'
-import { operandRefusal } from './operands.ts'
+import { arityRefusal, operandRefusal } from './operands.ts'
 import { FILTER_FLAGS, parse, presentationFlags, type FilterFlag } from './parse.ts'
 import { checkRuntime } from './runtime.ts'
 
@@ -146,6 +146,14 @@ function flagValueRefusal(
       help,
     )
   }
+  // `--for` names the actor a ranking is weighted for, so it is held to the rule that names
+  // an actor anywhere else: `next --for ""` armed the assignee weight for a blank name and
+  // printed `asg 8` over it, where `--actor ""` was refused by this same sentence.
+  const forActor = flag(flags, 'for')
+  if (forActor !== undefined) {
+    const bad = actorRefusal({ id: forActor, kind: 'human' })
+    if (bad !== undefined) return validation(command ?? 'treadle', bad, help)
+  }
   for (const [name, value] of Object.entries(flags)) {
     if (BOUNDED_ELSEWHERE.has(name)) continue
     // The length bound reads a string flag and the safe-line bound reads a repeatable one
@@ -227,6 +235,29 @@ function valuesOf(flags: Readonly<Record<string, unknown>>, name: string): reado
   return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : []
 }
 
+/**
+ * A field this line assigns more than once, in the spelling the caller wrote. G1 refuses a
+ * single-valued flag written twice, and an assignment is that shape without the dashes:
+ * `set rotate assignee=kim assignee=bob` wrote `bob`, and no line of the answer said `kim`
+ * had been read and thrown away. Through `canonicalField`, so `desc=` and `description=` are
+ * the one field they name.
+ *
+ * A name carrying a delimiter is passed over rather than echoed: it is a field no record has,
+ * and `setFields` refuses it by name one layer down with the sentence that says so.
+ */
+function repeatedAssignment(assignments: readonly string[]): string | undefined {
+  const seen = new Set<string>()
+  for (const entry of assignments) {
+    const at = entry.indexOf('=')
+    if (at <= 0) continue
+    const name = canonicalField(entry.slice(0, at))
+    if (findUnsafeCharacter(name, 'line') !== undefined) continue
+    if (seen.has(name)) return shellWord(name)
+    seen.add(name)
+  }
+  return undefined
+}
+
 function fieldsOf(flags: Readonly<Record<string, unknown>>, fallback: readonly string[]): readonly string[] {
   const asked = flag(flags, 'fields')
   if (asked === undefined) return fallback
@@ -235,25 +266,35 @@ function fieldsOf(flags: Readonly<Record<string, unknown>>, fallback: readonly s
 }
 
 /**
- * The fields `file` was given, from its named flags and its `--set` pairs. One field named
- * twice with two values is a refusal rather than a quiet winner: `--parent epic-one --set
- * parent_id=story-wip` filed under story-wip and said nothing about the flag it dropped.
+ * The fields `file` was given, from its title operand, its named flags and its `--set` pairs.
+ * One field named twice with two values is a refusal rather than a quiet winner: `--parent
+ * epic-one --set parent_id=story-wip` filed under story-wip and said nothing about the flag
+ * it dropped.
+ *
+ * The title is seeded here because it arrives as an operand rather than as a flag, and that
+ * is the one field the rule did not reach: `file task "Title A" --set title="Title B"` stored
+ * `Title B`, confirmed `title Title A`, and left no event carrying either.
  */
 function setFieldsOf(
-  flags: Readonly<Record<string, unknown>>,
+  flags: Readonly<Record<string, unknown>>, title: string,
 ): { readonly fields: Readonly<Record<string, string>> } | { readonly refusal: ResultObject } {
   const fields: Record<string, string> = {}
-  const spelled = new Map<string, string>()
+  const spelled = new Map<string, { readonly by: string; readonly value: string }>([
+    ['title', { by: 'the title operand', value: title }],
+  ])
   const direct: readonly (readonly [string, string])[] = [
     ['priority', 'priority'], ['assignee', 'assignee'],
     ['desc', 'description'], ['parent', 'parent_id'],
   ]
   for (const [name, field] of direct) {
     const value = flag(flags, name)
-    if (value !== undefined) { fields[field] = value; spelled.set(field, `--${name}`) }
+    if (value !== undefined) { fields[field] = value; spelled.set(field, { by: `--${name}`, value }) }
   }
   const labels = flags['label']
-  if (Array.isArray(labels) && labels.length > 0) { fields['labels'] = labels.join(','); spelled.set('labels', '--label') }
+  if (Array.isArray(labels) && labels.length > 0) {
+    fields['labels'] = labels.join(',')
+    spelled.set('labels', { by: '--label', value: fields['labels'] })
+  }
   const sets = flags['set']
   if (Array.isArray(sets)) {
     for (const entry of sets as readonly string[]) {
@@ -262,11 +303,11 @@ function setFieldsOf(
       const name = canonicalField(entry.slice(0, at))
       const value = entry.slice(at + 1)
       const before = spelled.get(name)
-      if (before !== undefined && fields[name] !== value) {
-        return { refusal: validation('file', `${before} and --set ${entry.slice(0, at)}= both set ${name}, and a field is set once on one line`, ['treadle help file']) }
+      if (before !== undefined && before.value !== value) {
+        return { refusal: validation('file', `${before.by} and --set ${entry.slice(0, at)}= both set ${name}, and a field is set once on one line`, ['treadle help file']) }
       }
       fields[name] = value
-      spelled.set(name, `--set ${entry.slice(0, at)}=`)
+      spelled.set(name, { by: `--set ${entry.slice(0, at)}=`, value })
     }
   }
   return { fields }
@@ -345,6 +386,12 @@ async function execute(env: Environment): Promise<number> {
     return emit(env, result, presentationFlags(env.argv))
   }
   const { command, operands, flags, filterOrder } = parsed.value
+
+  // Before `--contract`, `--help` and `version`, which are the three lines that answer
+  // without reaching a dispatch arm: an operand no usage line takes is refused wherever it
+  // was written, and `treadle version extra` was one of the twelve that swallowed it.
+  const badArity = arityRefusal(command, operands)
+  if (badArity !== undefined) return emit(env, badArity, flags)
 
   if (flags['contract'] === true) {
     env.streams.out(`${contractLines().join('\n')}\n`)
@@ -564,7 +611,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     }
     if (title === undefined) return validation('file', 'file needs a title in quotes', ['treadle help file'])
     const chosen = flag(flags, 'id')
-    const given = setFieldsOf(flags)
+    const given = setFieldsOf(flags, title)
     if ('refusal' in given) return given.refusal
     return fileItem(target, systemClock, randomIds, {
       type: type as WorkItemType, title, ...(chosen === undefined ? {} : { id: chosen }),
@@ -574,7 +621,12 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
 
   if (command === 'set') {
     if (id === undefined) return validation('set', 'set needs the id of one item', ['treadle backlog'])
-    return setFields(target, systemClock, randomIds, { id, assignments: operands.slice(1), actor })
+    const assignments = operands.slice(1)
+    const twice = repeatedAssignment(assignments)
+    if (twice !== undefined) {
+      return validation('set', `${twice} is assigned more than once on this line and the last would silently replace the first`, ['treadle help set'])
+    }
+    return setFields(target, systemClock, randomIds, { id, assignments, actor })
   }
 
   if (command === 'mark') {

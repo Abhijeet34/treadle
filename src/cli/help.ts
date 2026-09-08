@@ -74,7 +74,11 @@ export function topLevelHelp(workspace: string): ResultObject {
         'treadle <command> [args]',
         'treadle help <command>',
       ],
-      about: 'Agile work management for a team and its agents, over files you commit to git.',
+      // The README's own first line, and package.json's description. It read "Agile work
+      // management" while README.md:9 says "It is not a Rally and not a Kanban board" and
+      // ADR-0029 removed the surface that phrase named, so the first sentence the tool said
+      // about itself was the one the repository spends a paragraph denying.
+      about: 'The record of the work between people and agents, over files you commit to git.',
       // The first example of each command rather than the first six of the whole table: the
       // flat form never reached past `backlog`, so the page toured three of fifteen commands
       // and adding an example to one of them pushed another command's off the page entirely.

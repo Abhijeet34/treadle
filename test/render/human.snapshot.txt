@@ -466,7 +466,7 @@ help  acme-platform
   usage  treadle <command> [args]
   usage  treadle help <command>
   about
-    Agile work management for a team and its agents,
+    The record of the work between people and agents,
     over files you commit to git.
   example  treadle init # create a workspace in .work here,
     and say what it created
@@ -510,7 +510,7 @@ help  acme-platform
   usage  treadle <command> [args]
   usage  treadle help <command>
   about
-    Agile work management for a team and its agents, over files you commit
+    The record of the work between people and agents, over files you commit
     to git.
   example  treadle init # create a workspace in .work here, and say what it
     created
@@ -553,7 +553,7 @@ help  acme-platform
   usage  treadle <command> [args]
   usage  treadle help <command>
   about
-    Agile work management for a team and its agents, over files you commit to git.
+    The record of the work between people and agents, over files you commit to git.
   example  treadle init # create a workspace in .work here, and say what it created
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells

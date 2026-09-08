@@ -76,6 +76,11 @@ const RETIRED: readonly Retired[] = [
   { name: 'H28', by: 'ADR-0029' },
   { name: 'H29', by: 'ADR-0029' },
   { name: 'I5', by: 'ADR-0029, which moved the rule to V9' },
+  // What the tool called itself. `treadle help` opened with "Agile work management for a team
+  // and its agents" while README.md's third line is "The record of the work between people and
+  // agents" and its ninth denies the category outright, so the phrase outlived the surface
+  // ADR-0029 removed by a page no test read.
+  { name: 'Agile work management', by: 'ADR-0029', spelling: /Agile work management/i },
   // The apparatus cut: the benchmark budgets that could not fail a build, and the gate
   // status that served them. PR "cut the weight from treadle's apparatus", 2026-09-08.
   { name: 'OPEN MISS', by: 'the apparatus cut', spelling: /OPEN MISS|'open miss'/ },

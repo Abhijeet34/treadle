@@ -191,6 +191,9 @@ function flagTokens(argv: readonly string[], options: OptionConfig): readonly Fl
   return out
 }
 
+/** A token no option table could carry a name for, because a short flag is never a digit. */
+const NEGATIVE_NUMBER = /^-[0-9]/
+
 /**
  * The first flag on the line the option table refuses, and why, in the tool's own words.
  * `undefined` means the line is well formed against that table.
@@ -208,6 +211,18 @@ function flagFault(
   for (const token of flagTokens(argv, options)) {
     const config = options[token.name] as { type?: string } | undefined
     if (config === undefined) {
+      // A negative number is never a flag of anything: no short letter is a digit. `config
+      // set aging_days -1` was refused as `-1 is not a flag of config`, which is a true
+      // sentence about the wrong thing - the caller wrote a value, and the sentence sent
+      // them to a flag list that could not hold one. `--` is what carries it through, and
+      // the value is then refused by the key's own rule, which is the answer they asked for.
+      if (NEGATIVE_NUMBER.test(token.raw)) {
+        return {
+          ok: false,
+          cause: `${token.raw} was read as a flag of ${scope}, and an operand beginning with a dash is written after --`,
+          fix,
+        }
+      }
       return { ok: false, cause: `${token.raw} is not a flag of ${scope}`, fix }
     }
     if (config.type === 'boolean' && token.inline) {
