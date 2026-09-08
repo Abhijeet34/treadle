@@ -16,7 +16,9 @@
 // It is not refused on load, because the line is well formed; it is reported here, because
 // `history` and `explain` answer from it. An event naming an item the store does not hold
 // is not a finding: a record removed by hand is a legitimate edit under D1, and the event
-// reaches no read surface.
+// reaches no read surface. Nor is an event that precedes an `item.remove` for the same id:
+// the record it described has left, and the one filed under that id afterwards is a
+// different record whose `filed_at` says nothing about it.
 //
 // The audit is one pass over the records and one over the log, and holds neither. It held
 // both: 50,000 decoded records and 500,000 decoded events, 1,442 MiB allocated and a
@@ -214,6 +216,22 @@ export class WorkspaceAudit {
         where: cell(event.id),
         detail: `event ${event.id} is dated ${event.at}, before the item was filed at ${item.filed_at}; no write path records a change to an item that does not exist yet`,
       })
+    }
+    // A removal ends one record's life, and the log keeps its events under the id (ADR-0024).
+    // Everything dated before it therefore belongs to the record that left, not to the one
+    // the store holds now, and comparing those with a later `filed_at` faulted the whole
+    // trail: the one migration the tool offers for a field no command writes - `remove` then
+    // `file` under the same id, which is how a type is changed - left `doctor` at exit 7 for
+    // ever, because the log is append-only and nothing could clear the findings.
+    //
+    // The store hands the log over sorted by instant, so a line backdated past the removal
+    // is indistinguishable from a genuine event of the record that left, and the audit says
+    // nothing about either rather than faulting both. What it still decides is every event
+    // dated after the removal, which is where the record the store holds now begins. The
+    // findings are dropped here rather than skipped above so the removal's own event goes
+    // with them, and nothing extra is held per event.
+    if (event.op === 'item.remove' && entry.fromLog !== undefined) {
+      entry.fromLog = entry.fromLog.filter((finding) => finding.rule !== 'H23')
     }
     if (event.op !== 'item.mark') return
     if (item.assignee === undefined || event.actor !== item.assignee) return
