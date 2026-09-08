@@ -27,7 +27,9 @@ The three codes are the ones the output contract maps to an exit status.
 ## Rule ids
 
 An error names a rule so a caller looks it up instead of parsing the sentence.
-The set is closed.
+The set is closed: every id below is one an error carries, and no other id reaches a caller.
+The interface specification's twelve output-contract requirements are also cited `(R1)` to `(R12)`, in [architecture/adr/0005-output-and-exit-code-contract.md](architecture/adr/0005-output-and-exit-code-contract.md) and in source comments.
+That is a second register under one prefix and none of it is ever emitted, so an `R` a caller reads is always a relation rule from the table below.
 
 | Id | Rule |
 |---|---|
@@ -80,6 +82,9 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `spike` | `question` | `question`, `findings` |
 | `chore` | none | none |
 | `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
+
+An epic's `outcome` is the result the epic is for, a text field on the record; it is not the `--outcome` a `release` transition records, which is `failed` or `yielded`, says how one attempt ended, and lives in the event alone.
+The two are different things under one word, and nothing but this sentence and the one in the lifecycle section tells them apart.
 
 A `story`, a `bug` and an `epic` have a review step, and no other type does.
 That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike`, a `chore` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
@@ -150,6 +155,7 @@ The item returns to the queue and the event carries `outcome`, one of `failed` o
 
 Two edges record a value from a closed set, and `T6` is the one rule over both.
 `cancel` requires a `resolution` from `wont_do`, `duplicate`, `superseded`, `cannot_reproduce`, `rejected`, and stores it on the record; `release` requires an `outcome` from `failed`, `yielded`, and stores it only in the event.
+That `outcome` is the attempt's, and it is not the epic's `outcome` field: `history` prints `outcome=failed` for the event and `set` writes `outcome=` for the epic, so a reader tells them apart by which one carries a state change.
 Every other edge refuses either.
 [architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md](architecture/adr/0010-terminal-outcomes-dates-and-reviewability.md) carries why this is not four new states.
 `evaluateTransition(context, request)` returns one of three outcomes.

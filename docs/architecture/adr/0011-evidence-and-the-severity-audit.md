@@ -143,7 +143,7 @@ ADR-0010 landed first and built three of the same audit's other proposals, so fo
 
 - **The `file` event carries the audited fields, not every field.** The audit's section 4.5 says "every field it set". The six free-text fields of `REPORTED` are excluded, because part two of the same audit is about keeping prose out of the committed files and a 5,000-character repro step in an event line is the same defect one file over.
 - **`H19` is a finding about the assignee marking their own item, and it does not refuse.** The audit names it and this build agrees: the log says who, and the person reading the pull request decides.
-- **`doctor` ships as a read command with four findings, not the whole doctor the domain model specifies.** `H10`, `H12`, `H15` and the rest need entities that do not exist yet. The four here are the ones this change created a reason for.
+- **`doctor` ships as a read command with four findings, not the whole doctor the domain model specifies.** The four here are the ones this change created a reason for. The sentence that stood here said `H10`, `H12` and `H15` needed entities that did not exist yet, and none of the three did: `H12` was built as `DOR10` and `H15` as the store's own `S1`, `S3` and `V1` to `V3`, both under numbers of their own, and `H10`, an expired hold still standing, is unbuilt while needing nothing that does not exist.
 - **The audit sequences this work after `field-edits` and `relations`.** It shipped ahead of both, because `mark` needs neither: the two fields it moves are already in the dictionary and the event it writes is the shape `transition` already uses.
 
 ## What would reopen this
