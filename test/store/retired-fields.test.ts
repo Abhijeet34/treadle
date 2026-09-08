@@ -2,16 +2,15 @@
 // A workspace written before ADR-0029 carries `sprint_id`, `points`, `hours_estimate`,
 // `timebox_hours` and `component` on its records, and this build's dictionary has none of them.
 //
-// There are three things a store can do with a field it no longer knows: drop it, quarantine
-// the record, or keep it. Only the third is acceptable here, because docs/STABILITY.md says a
-// workspace written by any released version is readable by every later one, and the mechanism
-// that keeps it was already in the tree: `decodeItem` puts a key `isKnownField` refuses into
-// `extra`, and `encodeItem` writes `extra` back out. The removal did not add that path, it
-// inherited it, which is exactly why it needs a test of its own: nothing else in the suite
-// would notice the day someone made a retired key quarantine or vanish.
+// A key this build declared retired is dropped: `decodeItem` reads it as nothing and
+// `encodeItem` never carries it forward, so it disappears from the shard on the next ordinary
+// write with no user action. A key this build has simply never seen, such as one a newer build
+// might write, is kept: it lands in `extra` on read and rides back out unchanged on write. The
+// declared `RETIRED_FIELDS` map in src/adapters/store/item-codec.ts is what separates the two,
+// and this test proves both sides of that line on the same record so they cannot be confused.
 //
 // The fixture is a shard written by hand rather than through the tool, because no command in
-// this build can produce one and the point is a file an older build wrote.
+// this build can produce one and the point is a file an older or newer build wrote.
 
 import assert from 'node:assert/strict'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
@@ -31,7 +30,10 @@ import type { Actor } from '../../src/application/services/mutation.ts'
 const NOW = '2026-09-08T09:00:00Z'
 const ACTOR: Actor = { id: 'dana', kind: 'human' }
 
-/** One item shard as the build before the cut wrote it: five retired keys and nothing else odd. */
+/**
+ * One item shard carrying both cases at once: the five keys this build retired, and one key
+ * (`squad`) it has simply never heard of, standing in for a field a newer build might write.
+ */
 const LEGACY_SHARD = `schema: 1
 
 # legacy-story: A story an older build wrote
@@ -47,6 +49,7 @@ timebox_hours: 4
 assignee: kim
 component: payments
 sprint_id: sprint-31
+squad: platform
 
 ## Description
 
@@ -87,32 +90,27 @@ describe('a record written before the fields were retired', () => {
     assert.equal(audit.data['checked'], 1)
   })
 
-  it('carries all five retired keys in extra rather than dropping them', async () => {
+  it('drops the five retired keys from extra, and keeps the one key it has never seen', async () => {
     const held = await store.get('legacy-story')
     assert.ok(held.ok && held.value !== undefined)
     assert.deepEqual(
       [...(held.value.extra ?? new Map())].sort(),
-      [
-        ['component', 'payments'],
-        ['hours_estimate', '6'],
-        ['points', '5'],
-        ['sprint_id', 'sprint-31'],
-        ['timebox_hours', '4'],
-      ],
+      [['squad', 'platform']],
+      'a retired key must not reach extra, and an unknown key must',
     )
   })
 
-  it('reports them to a reader as a count, never as fields this build could validate', async () => {
+  it('reports the unknown key to a reader as an extra count, never printing a retired key', async () => {
     const shown = await showItem(store, fixedClock(NOW), 'legacy-story')
     assert.equal(shown.ok, true)
-    assert.equal(shown.data['extra'], 5)
+    assert.equal(shown.data['extra'], 1)
     const printed = agentRenderer.render(shown)
     for (const gone of ['pts', 'sprint', 'hrs', 'component', 'timebox']) {
       assert.equal(printed.includes(`\n${gone} `), false, `show printed a retired key as ${gone}`)
     }
   })
 
-  it('writes them back unchanged on the next mutation, so the file survives a write', async () => {
+  it('drops the retired keys on the next ordinary write, and carries the unknown key forward unchanged', async () => {
     const written = await setFields(targetFor(store, 'apply'), fixedClock(NOW), sequentialIds(200), {
       id: 'legacy-story', assignments: ['reviewer=ravi'], actor: ACTOR,
     })
@@ -120,8 +118,9 @@ describe('a record written before the fields were retired', () => {
 
     const shard = await readFile(path.join(root, 'items', '2026-08.md'), 'utf8')
     for (const line of ['points: 5', 'hours_estimate: 6', 'timebox_hours: 4', 'component: payments', 'sprint_id: sprint-31']) {
-      assert.ok(shard.includes(line), `the write dropped ${JSON.stringify(line)} from the shard`)
+      assert.equal(shard.includes(line), false, `the write kept the retired line ${JSON.stringify(line)}`)
     }
+    assert.ok(shard.includes('squad: platform'), 'the write dropped an unknown key it should have carried forward')
     assert.ok(shard.includes('reviewer: ravi'), 'the write did not land')
   })
 })

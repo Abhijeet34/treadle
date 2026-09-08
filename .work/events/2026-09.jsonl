@@ -78,3 +78,4 @@
 {"id":"ebcpoxx","at":"2026-09-08T10:11:31Z","actor":"abhijeet","actor_kind":"human","entity_kind":"item","entity":"export","op":"item.set","before":{"title":"50 chars"},"after":{"title":"52 chars"},"cmd":"set","txn":"tezd07y"}
 {"id":"em1fosa","at":"2026-09-08T10:12:57Z","actor":"abhijeet","actor_kind":"human","entity_kind":"item","entity":"field-edits","op":"item.set","before":{"description":"531 chars"},"after":{"description":"420 chars"},"cmd":"set","txn":"tjlllmi"}
 {"id":"ep4bvew","at":"2026-09-08T10:12:58Z","actor":"abhijeet","actor_kind":"human","entity_kind":"item","entity":"sprints-boards","op":"item.set","before":{"acceptance_criteria":"345 chars"},"after":{"acceptance_criteria":"268 chars"},"cmd":"set","txn":"tdm3tw5"}
+{"id":"e6z1vbd","at":"2026-09-08T11:32:02Z","actor":"abhijeet","actor_kind":"human","entity_kind":"item","entity":"field-edits","op":"item.set","before":{"assignee":"-"},"after":{"assignee":"ravi"},"cmd":"set","txn":"ths316j"}
