@@ -194,6 +194,7 @@ copy that has to move whenever the test does.
 | `src/domain` imports only `src/domain` and touches no filesystem, clock, random source, process or console | `test/architecture/layering.test.ts` |
 | No value exported under `src/` without a reader elsewhere in the tree; a barrel line is not a reader, a document that names it is, and a test using it as an independent oracle is | `test/architecture/exported-surface.test.ts` |
 | A command's operands are bounded by the usage lines in `src/cli/inventory.ts`, and a new placeholder is classified in `ENTITY_OPERANDS` | `test/cli/operand-guard.test.ts` |
+| An operand past the count a command's usage lines publish is refused by rule C1, read through `operandLimit` in `src/cli/operands.ts` | `test/cli/line-truth.test.ts` |
 | Nothing under `src` starts a process, evaluates a string or reads a `hooks` setting, and only the store's five modules and `src/adapters/workspace.ts` touch the filesystem | `test/security/f1-f7-no-execution.test.ts`, `test/security/f11-adapter-write-safety.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
 | Every tracked `.ts`, `.js`, `.sh` and `.yml` carries its SPDX identifier | `test/architecture/license-header.test.ts` |
 | No root file is one a single harness loads by itself; the list of names is closed | `test/architecture/harness-instruction-files.test.ts`, ADR-0019 |
