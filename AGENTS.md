@@ -633,7 +633,11 @@ and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows
 
 `.gitleaks.toml` and `.githooks/pre-push` are copies of `automation`'s canonical pair rather than this repository's own files.
 Change them by editing the originals and re-running `automation`'s `.ci/gitleaks/sync.sh <repo>`; `--check <repo>` reports drift and also answers the one question CI cannot, whether this clone's `core.hooksPath` points at the hook.
-`.github/workflows/secret-scan.yml` calls `automation`'s shared workflow, which pins the sha256 of both files and fails the build on a copy that has drifted.
+`.github/workflows/secret-scan.yml` inlines that scan rather than calling `automation`'s shared workflow, which is what every other repository in the fleet does.
+A public repository may not use a reusable workflow that lives in a private one, and `automation` is private, so the `uses:` form failed here with zero jobs and contributed no check at all rather than saying anything.
+The inline copy still pins the sha256 of both synced files and fails on a drifted copy, which is the property calling the shared workflow was buying.
+Those two pins are hand-carried: `automation`'s `.ci/test-secret-scan.sh` keeps the shared workflow's copies current and nothing watches treadle's, so a canonical file that moves fails this job naming DRIFT in the synced file when the stale thing is the pin.
+Re-read both values with `.ci/gitleaks/sync.sh --digest config` and `--digest hook`.
 
 The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
 A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.

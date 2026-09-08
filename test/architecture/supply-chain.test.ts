@@ -22,7 +22,7 @@ import { workflowOf, type Job } from '../helpers/workflow.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BUNDLE = 'dist/treadle.js'
-const WORKFLOWS = ['ci.yml', 'cross-platform.yml', 'release.yml', 'bench.yml']
+const WORKFLOWS = ['ci.yml', 'cross-platform.yml', 'release.yml', 'bench.yml', 'secret-scan.yml']
 
 const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
   bin?: Record<string, string>
