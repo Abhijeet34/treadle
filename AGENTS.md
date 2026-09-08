@@ -629,6 +629,15 @@ Three things a step that drives the installed binary on a Windows runner gets wr
 a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;
 and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows does not have, because `CommandNotFoundException` is not a process exit, so a check there asserts the ok line the command should have printed and not the exit code alone.
 
+## Secret scanning
+
+`.gitleaks.toml` and `.githooks/pre-push` are copies of `automation`'s canonical pair rather than this repository's own files.
+Change them by editing the originals and re-running `automation`'s `.ci/gitleaks/sync.sh <repo>`; `--check <repo>` reports drift and also answers the one question CI cannot, whether this clone's `core.hooksPath` points at the hook.
+`.github/workflows/secret-scan.yml` calls `automation`'s shared workflow, which pins the sha256 of both files and fails the build on a copy that has drifted.
+
+The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
+A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.
