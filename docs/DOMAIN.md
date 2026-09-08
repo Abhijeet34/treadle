@@ -71,7 +71,11 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 
 ## Types and the required-field policy
 
-`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `chore`, `impediment`.
+`WORK_ITEM_TYPES` is closed: `epic`, `story`, `task`, `bug`, `spike`, `impediment`.
+
+`chore` folded into `task` and its name is not reused.
+No rule, gate, guard, ranking or read told one from the other: neither required a field at creation, neither owned a field, neither had a review step, and both took the same moves, so the word was the whole difference.
+A caller who wants to say maintenance writes `--label chore`, which `backlog --label` filters on.
 
 | Type | Required at creation | Fields the type owns beyond the common set |
 |---|---|---|
@@ -80,14 +84,13 @@ The model's second epic rule, that an epic enters `in_progress` when its first c
 | `task` | none | none |
 | `bug` | `severity`, `repro_steps`, `found_in` | `severity`, `repro_steps`, `expected`, `actual`, `found_in`, `fix_confirmed` |
 | `spike` | `question` | `question`, `findings` |
-| `chore` | none | none |
 | `impediment` | `severity`, `proposed_resolution` | `severity`, `proposed_resolution` |
 
 An epic's `outcome` is the result the epic is for, a text field on the record; it is not the `--outcome` a `release` transition records, which is `failed` or `yielded`, says how one attempt ended, and lives in the event alone.
 The two are different things under one word, and nothing but this sentence and the one in the lifecycle section tells them apart.
 
 A `story`, a `bug` and an `epic` have a review step, and no other type does.
-That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike`, a `chore` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
+That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
 `treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
@@ -175,7 +178,7 @@ G1, G5, G6 and G8 never do: the answer there is to fix the item.
 
 ## Hierarchy
 
-One parent per item, unlimited children, six allowed type pairs: epic to story, epic to task, epic to chore, story to task, story to bug, spike to task.
+One parent per item, unlimited children, five allowed type pairs: epic to story, epic to task, story to task, story to bug, spike to task.
 
 `setParent` refuses an unknown id (`P4`), a disallowed pair (`P1`) and an edge that closes a cycle (`P2`).
 `set <id> parent_id=<id>` and `file --parent <id>` run it before they write, so each refusal is an exit status: `P1` and `P2` are `GUARD_REFUSED`, and a parent naming no record is `NOT_FOUND` with the nearest ids beside it.

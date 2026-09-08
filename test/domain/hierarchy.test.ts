@@ -26,7 +26,7 @@ describe('allowed parent pairs', () => {
   it('is exactly the six pairs the model names', () => {
     assert.deepEqual(
       ALLOWED_PARENT_PAIRS.map((p) => `${p.parent}>${p.child}`).sort(),
-      ['epic>chore', 'epic>story', 'epic>task', 'spike>task', 'story>bug', 'story>task'],
+      ['epic>story', 'epic>task', 'spike>task', 'story>bug', 'story>task'],
     )
   })
 

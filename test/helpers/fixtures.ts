@@ -54,7 +54,6 @@ const TYPE_DEFAULTS: Record<WorkItemType, Partial<WorkItem>> = {
   task: {},
   bug: { severity: 'S2', repro_steps: 'Sign in, wait for the token to expire, reload', found_in: 'test' },
   spike: { question: 'Which ranker do we adopt' },
-  chore: {},
   impediment: { severity: 'S2', proposed_resolution: 'The platform team renews the staging certificate' },
 }
 

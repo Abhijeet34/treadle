@@ -49,8 +49,8 @@ describe('severity reaches every read surface a caller would look at', () => {
     const list = await cli(['backlog', '--type', 'bug'])
     assert.match(list.out, /^#id type state sev "title$/m)
     assert.match(list.out, /^sess-timeout bug draft S1 /m)
-    const mixed = await cli(['backlog', '--type', 'chore'])
-    assert.match(mixed.out, /^dep-bump chore ready - /m)
+    const mixed = await cli(['backlog', '--type', 'task'])
+    assert.match(mixed.out, /^dep-bump task ready - /m)
   })
 
   it('counts the open defects on status, by severity, and only the open ones', async () => {
@@ -69,7 +69,7 @@ describe('next weights severity, so an S1 and an S4 no longer rank identically',
   before(async () => {
     demo = await aDemoWorkspace()
     const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
-    // Two bugs and a chore, every one of them at priority 1, so severity is the only term
+    // Two bugs and a task, every one of them at priority 1, so severity is the only term
     // that can separate them and the score arithmetic is readable in the failure message.
     for (const [id, severity, title] of [
       ['sev-one', 'S1', 'Checkout drops the session'],
@@ -80,12 +80,12 @@ describe('next weights severity, so an S1 and an S4 no longer rank identically',
         '--set', 'repro_steps=pay twice', '--set', 'expected=one charge', '--set', 'actual=two'])
       await cli(['transition', id, 'ready'])
     }
-    await cli(['file', 'chore', 'Tidy the changelog', '--id', 'sev-none', '--priority', '1'])
+    await cli(['file', 'task', 'Tidy the changelog', '--id', 'sev-none', '--priority', '1'])
     await cli(['transition', 'sev-none', 'ready'])
   })
   after(async () => { await demo.dispose() })
 
-  it('ranks the S1 above the S4 above the chore, and prints the component that did it', async () => {
+  it('ranks the S1 above the S4 above the item with no severity, and prints the component', async () => {
     const ranked = await runCli(['next', '--limit', '40'], { cwd: demo.root })
     const rows = ranked.out.split('\n').filter((line) => /^sev-(one|four|none) /.test(line))
     assert.deepEqual(rows.map((row) => row.split(' ')[0]), ['sev-one', 'sev-four', 'sev-none'])
@@ -234,9 +234,9 @@ describe('mark and evidence answer the anti-ambiguity mode the flag matrix adver
   })
 
   it('refuses a severity on a type that does not own the field, which is rule V5', async () => {
-    const chore = await cli(['mark', 'dep-bump', '--severity', 'S1', '--reason', 'it is not a defect'])
-    assert.equal(chore.code, 2)
-    assert.match(chore.err, /severity is not a field of a chore/)
+    const task = await cli(['mark', 'dep-bump', '--severity', 'S1', '--reason', 'it is not a defect'])
+    assert.equal(task.code, 2)
+    assert.match(task.err, /severity is not a field of a task/)
     await demo.dispose()
   })
 })
@@ -435,7 +435,7 @@ describe('evidence is a bounded pointer list, and done requires one', () => {
   })
 
   it('leaves a type with no review step alone, exactly as DOD3 does', async () => {
-    await cli(['file', 'chore', 'Move the toolchain', '--id', 'toolchain'])
+    await cli(['file', 'task', 'Move the toolchain', '--id', 'toolchain'])
     for (const state of ['ready', 'in_progress']) await cli(['transition', 'toolchain', state])
     assert.equal((await cli(['transition', 'toolchain', 'done'])).code, 0)
     assert.doesNotMatch((await cli(['doctor'])).out, /H21/)

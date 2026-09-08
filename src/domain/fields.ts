@@ -59,7 +59,6 @@ const TYPE_FIELDS: Readonly<Record<WorkItemType, readonly string[]>> = {
   task: [],
   bug: ['severity', 'repro_steps', 'expected', 'actual', 'found_in', 'fix_confirmed'],
   spike: ['question', 'findings'],
-  chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
 
@@ -72,7 +71,6 @@ const REQUIRED_AT_CREATION: Readonly<Record<WorkItemType, readonly string[]>> = 
   task: [],
   bug: ['severity', 'repro_steps', 'found_in'],
   spike: ['question'],
-  chore: [],
   impediment: ['severity', 'proposed_resolution'],
 }
 

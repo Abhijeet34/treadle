@@ -173,10 +173,10 @@ describe('the default done gate', () => {
     }), { reviewStep: true })
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, pointed).pass, true)
 
-    // A chore has no review step, so the anti-attestation pair is inert for it, exactly as
+    // A task has no review step, so the anti-attestation pair is inert for it, exactly as
     // DOD3 already is.
-    const chore = gateContext(item('chore'), { reviewStep: false })
-    assert.equal(evaluateGate(DEFAULT_DONE_GATE, chore).pass, true)
+    const noReview = gateContext(item('task'), { reviewStep: false })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, noReview).pass, true)
   })
 
   it('fails an item with an open impediment', () => {
@@ -251,14 +251,14 @@ describe('validateGate, which is what makes a configured gate safe to load', () 
       name: 'ready',
       rules: [{
         id: 'WS2',
-        sentence: 'A chore records its severity.',
-        scope: 'chore',
+        sentence: 'A task records its severity.',
+        scope: 'task',
         check: { kind: 'field_present', field: 'severity' },
       }],
     }
     const error = errorOf(validateGate(gate))
     assert.equal(error.rule, 'V6')
-    assert.ok(error.message.includes('severity') && error.message.includes('chore'), error.message)
+    assert.ok(error.message.includes('severity') && error.message.includes('task'), error.message)
   })
 
   it('refuses a rule referencing a field that is not in the dictionary at all', () => {

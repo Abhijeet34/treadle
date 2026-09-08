@@ -18,10 +18,10 @@ import {
 /** The ceiling a traversal refuses at. A real backlog nests three or four deep. */
 export const MAX_HIERARCHY_DEPTH = 64
 
+/** Five pairs; the `epic > chore` pair went when `chore` folded into `task`, which epic takes. */
 export const ALLOWED_PARENT_PAIRS: readonly { readonly parent: WorkItemType; readonly child: WorkItemType }[] = [
   { parent: 'epic', child: 'story' },
   { parent: 'epic', child: 'task' },
-  { parent: 'epic', child: 'chore' },
   { parent: 'story', child: 'task' },
   { parent: 'story', child: 'bug' },
   { parent: 'spike', child: 'task' },

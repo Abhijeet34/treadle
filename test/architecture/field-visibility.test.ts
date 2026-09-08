@@ -286,7 +286,7 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
   if (!linked.ok) throw new Error(String(linked.data['cause']))
   await move('every-held', 'ready')
   await move('every-held', 'on_hold', { until: '2026-10-15T09:00:00Z' })
-  await file('chore', 'Remove OAuth 1 support', 'every-stopped', {})
+  await file('task', 'Remove OAuth 1 support', 'every-stopped', {})
   await move('every-stopped', 'cancelled', { resolution: 'superseded' })
   await file('impediment', 'Staging certificate expired', 'every-raised', {
     severity: 'S1', proposed_resolution: 'the platform team renews it from the vault',

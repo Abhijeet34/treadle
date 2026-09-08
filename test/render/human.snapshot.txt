@@ -163,7 +163,7 @@ items  6 of 6
   gdpr-export    story  ready  Export everything we hold …
   csv-export     story  ready  Export a filtered list to …
   webhook-retry  task   ready  Retry a failed webhook thr…
-  dep-bump       chore  ready  Move the toolchain to the …
+  dep-bump       task   ready  Move the toolchain to the …
   avatar-crop    task   ready  Crop an uploaded avatar to…
 
 ### backlog-absence @ 80
@@ -179,7 +179,7 @@ items  6 of 6
   gdpr-export    story  ready  Export everything we hold on one account
   csv-export     story  ready  Export a filtered list to CSV
   webhook-retry  task   ready  Retry a failed webhook three times
-  dep-bump       chore  ready  Move the toolchain to the current release
+  dep-bump       task   ready  Move the toolchain to the current release
   avatar-crop    task   ready  Crop an uploaded avatar to a square
 
 ### backlog-absence @ 200
@@ -195,7 +195,7 @@ items  6 of 6
   gdpr-export    story  ready  Export everything we hold on one account
   csv-export     story  ready  Export a filtered list to CSV
   webhook-retry  task   ready  Retry a failed webhook three times
-  dep-bump       chore  ready  Move the toolchain to the current release
+  dep-bump       task   ready  Move the toolchain to the current release
   avatar-crop    task   ready  Crop an uploaded avatar to a square
 
 ### show @ 60

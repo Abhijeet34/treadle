@@ -36,7 +36,7 @@ const STATE_MIX: readonly (readonly [WorkItemState, number])[] = [
 ]
 
 const TYPE_MIX: readonly (readonly [WorkItemType, number])[] = [
-  ['story', 0.40], ['task', 0.30], ['bug', 0.18], ['chore', 0.06], ['spike', 0.03], ['epic', 0.03],
+  ['story', 0.40], ['task', 0.36], ['bug', 0.18], ['spike', 0.03], ['epic', 0.03],
 ]
 
 const OPS = ['file', 'groom', 'start', 'comment', 'estimate', 'assign', 'submit', 'accept'] as const

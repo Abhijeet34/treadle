@@ -15,8 +15,8 @@ import { NOW, errorOf, item } from '../helpers/fixtures.ts'
 const OPTIONS = { now: NOW }
 
 describe('the closed type and state sets', () => {
-  it('carries exactly the six types the model names and impediment', () => {
-    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'chore', 'impediment'])
+  it('carries five of the six the model names, plus impediment, chore folded into task', () => {
+    assert.deepEqual([...WORK_ITEM_TYPES], ['epic', 'story', 'task', 'bug', 'spike', 'impediment'])
   })
 
   it('carries exactly the seven states the model names, and blocked is not one of them', () => {
@@ -35,7 +35,6 @@ describe('per-type required fields at creation', () => {
     task: [],
     bug: ['severity', 'repro_steps', 'found_in'],
     spike: ['question'],
-    chore: [],
     impediment: ['severity', 'proposed_resolution'],
   }
 
@@ -76,8 +75,8 @@ describe('fields a type does not own', () => {
     assert.ok(error.message.includes('severity'))
   })
 
-  it('refuses a bug field on a chore', () => {
-    assert.equal(errorOf(validateWorkItem(item('chore', { fix_confirmed: true }), OPTIONS)).rule, 'V5')
+  it('refuses a bug field on a task', () => {
+    assert.equal(errorOf(validateWorkItem(item('task', { fix_confirmed: true }), OPTIONS)).rule, 'V5')
   })
 
   it('accepts a common field on every type', () => {
