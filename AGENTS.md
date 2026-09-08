@@ -284,6 +284,10 @@ A record boundary is a line, so it cannot be made unreformattable; it is made lo
 `damagedHeadingAt` resynchronises on a heading a hand edit reshaped, and the discriminator is a record's four mandatory field lines (`type`, `state`, `filed_at`, `version`), which is the redundancy the format already carried.
 `test/store/record-boundary.test.ts` holds the property over generated documents: every id an undamaged file served is, after damage, either still served or named by a finding.
 
+The write path is bounded by that same resynchronisation, not by a rule of its own.
+`hiddenRecordBoundary` runs `damagedHeadingAt` over the rendered record and `encodeItem` refuses what it names, so a body the store would quarantine on the way back is refused on the way in; a heading in prose is escaped instead, which is rule 4 of the same record.
+A second, narrower bound on the write is how the two came apart the first time: the write checked column 0 while the read resynchronised on three spaces and six hashes, and a description quoting another record's field block was written at exit 0 and then made every command exit 7.
+
 ## What a read is, and what a read is allowed to keep
 
 A read parses the record files. There is no derived store in front of them:
