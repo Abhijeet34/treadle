@@ -384,7 +384,7 @@ Compare paths through `node:path` and never against a literal `/`, and never bui
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
 Where the invariant can be expressed in what Windows does have, express it: `deleteIndex` in `test/helpers/store-fixtures.ts` removes the index between two opens rather than under a live handle, because Windows will not unlink a file another handle holds.
 That last rule is a production rule too: close a `DatabaseSync` on every path out of the function that opened it, including the throwing ones, or the store cannot rebuild its own cache on Windows.
-The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md`, the shipped schemas and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
+The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF, but no longer the schemas, which this branch untracked; without it 30 tests fail there and every shard reads as an `H16`.
 
 Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:
 `npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
