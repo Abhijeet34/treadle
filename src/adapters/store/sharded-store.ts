@@ -15,6 +15,7 @@ import path from 'node:path'
 
 import {
   cycleAbove,
+  defaultConfig,
   findParentCycle,
   type BugSeverity,
   type Resolution,
@@ -57,6 +58,7 @@ import {
 import { IndexBusy, IndexCache, IndexUnavailable, type Fingerprint, type IndexedItem, type IndexedSource, type IndexedSprint, type SummaryRow } from './index-cache.ts'
 import { decodeItem, encodeItem } from './item-codec.ts'
 import { decodeSprint, encodeSprint } from './sprint-codec.ts'
+import { decodeWorkspace, encodeWorkspace, type WorkspaceRecord } from './workspace-codec.ts'
 import { parentMissing, stillNamed, type Referrer } from './referential.ts'
 import { MAX_EVENT_FILE_BYTES, MAX_EVENT_LINE_BYTES, MAX_FILE_BYTES } from './limits.ts'
 import { acquireLock, type AcquireOptions, type LockHandle } from './lock.ts'
@@ -222,9 +224,32 @@ export class ShardedStore implements Store {
     if (schema !== undefined) return { ok: false, error: schema }
     const record = parsed.value.records[0]
     if (record === undefined) {
+      // A file with no record at all and a file whose one record the grammar quarantined are
+      // two different edits, and saying "carries no workspace record" for both sent a caller
+      // to `treadle init`, which answers `already` and fixes nothing. The quarantine knows
+      // the line and the reason, so the refusal carries them and names the edit as the way
+      // back; `doctor` cannot be the way back here, because it opens with this same read.
+      const held = parsed.value.quarantined[0]
+      if (held !== undefined) {
+        return storeFail(
+          'INTEGRITY', held.rule,
+          `${WORKSPACE_FILE} holds one record, at line ${held.line}, and does not serve it: ${held.reason}; it is the record every command reads first, so no command can answer over this store until the file is edited`,
+          [WORKSPACE_FILE],
+        )
+      }
       return storeFail('INTEGRITY', 'S1', `${WORKSPACE_FILE} carries no workspace record`, [WORKSPACE_FILE])
     }
-    return storeOk({ id: record.id, name: record.title, path: this.#root })
+    // A configuration this build cannot read is not a refusal here. `doctor` opens with this
+    // call and is the one command that has to answer over the file that says it, so the
+    // refusal is the finding `#indexRecordFile` raises off the same decode, which
+    // `readWorkspace` turns into the `INTEGRITY` every other command gives. What identity
+    // reports meanwhile is the compiled-in default, which is what the workspace behaves as
+    // for exactly as long as no command can run.
+    const decoded = decodeWorkspace(record)
+    const config = decoded.ok ? decoded.value.config : defaultConfig()
+    const version = decoded.ok ? decoded.value.version : 0
+    const extra = decoded.ok ? decoded.value.extra.size : 0
+    return storeOk({ id: record.id, name: record.title, path: this.#root, version, config, extra })
   }
 
   async get(id: string): Promise<StoreResult<WorkItem | undefined>> {
@@ -568,7 +593,20 @@ export class ShardedStore implements Store {
       this.#parsedUnderLock.set(file, { size, mtime, parsed: parsed.value })
       return storeOk(false)
     }
-    if (file !== WORKSPACE_FILE) {
+    if (file === WORKSPACE_FILE) {
+      // The one decode `identity` performs, run again here so a configuration this build
+      // cannot read is reported rather than silently defaulted. `H14` is the finding the
+      // domain model names for a gate rule reading a field the type lacks, and a value of
+      // any other key that will not parse is `S1`, which is what a damaged record is
+      // everywhere else in this store. Both hide content, so `readWorkspace` refuses over
+      // either and names `doctor`, which is the surface that prints the row.
+      for (const record of parsed.value.records) {
+        const decoded = decodeWorkspace(record)
+        if (decoded.ok) continue
+        const rule = decoded.error.rule === 'V6' || decoded.error.rule === 'V7' ? 'H14' : 'S1'
+        findings.push({ file, line: record.line, rule, reason: decoded.error.message, id: record.id })
+      }
+    } else {
       for (const record of parsed.value.records) {
         const item = decodeItem(record)
         if (!item.ok) {
@@ -910,6 +948,39 @@ export class ShardedStore implements Store {
 
       shards.set(SPRINTS_FILE, withRecord(shard, { ...encoded.value, source, line: 0 }))
       applied.push({ id: write.sprint.id, version })
+    }
+
+    const workspace = transaction.workspace
+    if (workspace !== undefined) {
+      const shard = shards.get(WORKSPACE_FILE) ?? await this.#readShard(WORKSPACE_FILE)
+      if (!('chunks' in shard)) return shard
+      shards.set(WORKSPACE_FILE, shard)
+
+      const at = shard.chunks.findIndex((chunk) => chunk.kind === 'record')
+      const chunk = at === -1 ? undefined : shard.chunks[at]
+      if (chunk === undefined || chunk.kind !== 'record') {
+        return storeFail('INTEGRITY', 'S1', `${WORKSPACE_FILE} carries no workspace record`, [WORKSPACE_FILE])
+      }
+      const stored = decodeWorkspace(chunk.record)
+      if (!stored.ok) return stored
+      // The same compare-and-set an item and a sprint are under, read off the record's own
+      // `version` line. A workspace written before this build carries none, reads as zero,
+      // and takes version 1 on its first configured write; two `config set` calls racing
+      // therefore refuse the second with `S10` naming who moved it, rather than one of them
+      // rewriting the whole record over the other.
+      const conflict = await this.#compareAndSet(chunk.record.id, chunk.record, workspace.ifVersion)
+      if (conflict !== undefined) return conflict
+
+      const next: WorkspaceRecord = { ...stored.value, version: workspace.ifVersion + 1, config: workspace.config }
+      const encoded = encodeWorkspace(next, chunk.record)
+      const source = renderRecord(encoded)
+      const back = parseRecordSource(source, 0)
+      if (!back.ok) return storeFail('VALIDATION', 'V4', `${next.id}: the record as written would not be served back: ${back.reason}`, [next.id])
+      const served = decodeWorkspace(back.record)
+      if (!served.ok) return storeFail('VALIDATION', 'V4', `${next.id}: the record as written would not be served back: ${served.error.message}`, [next.id])
+
+      shards.set(WORKSPACE_FILE, withRecord(shard, { ...encoded, source, line: 0 }))
+      applied.push({ id: next.id, version: next.version })
     }
 
     const files = [...shards].map(([file, parsed]) => ({

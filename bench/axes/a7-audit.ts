@@ -16,7 +16,7 @@ import { readFile, readdir } from 'node:fs/promises'
 import path from 'node:path'
 
 import { hasReviewStep } from '../../src/application/services/context.ts'
-import { legalTargetsFrom, type WorkItem, type WorkItemState } from '../../src/domain/index.ts'
+import { defaultConfig, legalTargetsFrom, type WorkItem, type WorkItemState } from '../../src/domain/index.ts'
 import { random } from '../../test/helpers/store-fixtures.ts'
 import { crossCheck, dataOf, openSurface, type CrossCheck } from './surface.ts'
 import type { AxisResult } from './axis.ts'
@@ -50,7 +50,7 @@ function targetsFor(item: Tracked): readonly WorkItemState[] {
   return legalTargetsFrom({
     state: item.state,
     ...(item.heldFrom === undefined ? {} : { held_from: item.heldFrom }),
-  } as WorkItem, hasReviewStep(item.type))
+  } as WorkItem, hasReviewStep(defaultConfig(), item.type))
 }
 
 function argsFor(item: Tracked, to: WorkItemState): readonly string[] {

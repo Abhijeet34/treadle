@@ -10,6 +10,7 @@
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { BOARD_SHAPE } from '../application/services/board.ts'
+import { CONFIG_SHAPE } from '../application/services/config.ts'
 import { DOCTOR_SHAPE } from '../application/services/doctor.ts'
 import { SET_SHAPE } from '../application/services/editing.ts'
 import { HISTORY_SHAPE } from '../application/services/history.ts'
@@ -224,6 +225,26 @@ export const COMMANDS: readonly Command[] = [
     examples: [
       ['treadle sprints', 'every sprint with its dates and how much of its committed set is done'],
       ['treadle sprints sprint-31', 'one sprint: its dates, goal, tally, and what carried over when it closed'],
+    ],
+  },
+  {
+    // `effect` is `mutate` for both forms because one word covers a read and a write, and a
+    // command that can write may not under-declare it (R6). The bare read answers with
+    // `changed 0` and no transaction, which is the envelope `sprint set` gives when nothing
+    // moved; the interface specification's rule that a command word is always one or the
+    // other is departed from here and in ADR-0026, which says why.
+    name: 'config', shape: CONFIG_SHAPE, effect: 'mutate', record: 'list',
+    omits: false, pageable: false, confirm: 'none', standalone: false,
+    columns: false,
+    usage: [
+      'treadle config',
+      'treadle config set <key> <value>',
+    ],
+    examples: [
+      ['treadle config', 'every key, the value in force and whether this workspace set it or it is the built-in default'],
+      ['treadle config set wip_limits "in_progress=5, in_review=2"', 'arm G3: a sixth start into a column of five is refused, and a limit of zero means unlimited'],
+      ['treadle config set ready_gate "DOR1 all field_present:title The item has a title|DOR11 story field_present:reviewer A story names its reviewer"', 'replace the ready gate whole; a rule reading a field the type has not got is refused before the write'],
+      ['treadle config set review_step "story, bug"', 'which types pass through in_review, which is what G5 enforces'],
     ],
   },
   {

@@ -9,6 +9,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
+import { fixedClock } from '../../src/adapters/clock.ts'
 import { explain } from '../../src/application/services/insight.ts'
 import { aWorkspace, anEvent, anItem } from '../helpers/store-fixtures.ts'
 
@@ -56,7 +57,7 @@ describe('two events carrying one instant', () => {
         })],
       })
 
-      const said = await explain(workspace.store, 'item-one')
+      const said = await explain(workspace.store, fixedClock(SAME_SECOND), 'item-one')
       assert.equal(said.data['from_event'], SECOND)
       assert.equal(said.data['reason'], 'the estimate is agreed')
     } finally {

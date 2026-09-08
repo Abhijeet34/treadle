@@ -68,6 +68,7 @@ The set is closed.
 | `V5` | A field is present that this type does not own |
 | `V6` | A gate rule reads a field the scoped type does not have |
 | `V7` | A gate uses one rule id twice |
+| `V8` | A configuration value is not one its key accepts |
 
 `G8` is this implementation's number for a rule the domain model states without numbering: "an epic cannot reach done while any child is not done or cancelled".
 The model's second epic rule, that an epic enters `in_progress` when its first child starts, is an effect rather than a guard and belongs to the application layer.
@@ -308,6 +309,30 @@ Together they are the anti-attestation pair: the item was accepted by someone ot
 
 The check kinds are `field_present`, `field_is_true`, `field_non_empty_list`, `list_all_ticked`, `type_required_fields`, `estimate_set`, `no_active_blocker`, `parent_present`, `child_present`, `no_open_child`, `no_open_impediment`, `blocks_something`, `not_a_duplicate`, `reviewer_distinct_from_assignee` and `evidence_present`.
 A workspace gate composes those; there is no custom predicate, because a gate is loaded from a text file and a text file cannot carry one.
+
+## Workspace configuration
+
+The key set is closed and every key is optional; the absence of a key is the compiled-in default in the third column, so a workspace nobody has configured behaves exactly as one written before this existed.
+[architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) is the record; `treadle config` prints every key with the value in force and whether it came from the file or the default.
+
+| Key | What reads it | Default |
+|---|---|---|
+| `review_step` | guard `G5`, `DOD3` and `DOD7` | `story, bug, epic` |
+| `point_scale` | `validateWorkItem`, at write time only | `1, 2, 3, 5, 8, 13` |
+| `next_weights` | `next`'s ranking | `pri=10, age=1, dep=5, spr=8, asg=8, due=4, sev=6` |
+| `wip_limits` | guard `G3`, and doctor `H04` | `-`, meaning no column is limited |
+| `aging_days` | doctor `H03` | `0`, meaning no threshold |
+| `cycle_time_excludes_hold` | the metrics layer, which is not built | `false` |
+| `start_requires_sprint` | guard `G4` | `false` |
+| `ready_gate` | guards `G1` and `G6`, and `explain` | the default ready gate above |
+| `done_gate` | the same | the default done gate above |
+
+A limit of zero is unlimited and a threshold of zero is no threshold, which is what `TransitionContext` documented before either was configurable.
+`-` is how a list that names nothing is written, because the record grammar refuses a field line with an empty value and a workspace that reviews no type has to be tellable from one that never said so.
+
+A gate is stored as an H2 section, one rule per line, spelled `<id> <scope> <check>[:<argument>] <sentence>` with the sentence last because it is the one free-text field.
+A configured gate replaces the default gate of that name whole and reaches the same `evaluateGate`, so what `explain` prints is what `G1` and `G6` decided.
+`config set` takes the same rules on one line separated by `|`, which is the list syntax `set <field>=` already takes.
 
 ## Records, and the two security findings that land here
 

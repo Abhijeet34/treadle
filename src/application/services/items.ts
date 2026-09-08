@@ -399,7 +399,7 @@ export async function fileItem(
   }
 
   const item = draft as unknown as WorkItem
-  const valid = validateWorkItem(item, { now })
+  const valid = validateWorkItem(item, { now, pointScale: view.value.config.point_scale })
   if (!valid.ok) {
     // The line that files it with every field the type requires, so a refusal for a missing
     // field is answered once. Built from the type's own list and the dictionary's
@@ -968,7 +968,10 @@ export function notFound(
   return errorResult({
     code: 'NOT_FOUND', command, workspace, effect, entity: id,
     cause: `${id} is in no record here; this workspace holds ${held} ${held === 1 ? 'item' : 'items'}`,
-    near: nearIds([...view.byId.keys(), ...view.sprintById.keys()], id),
+    // The workspace's own id is in the near set because the log is keyed by entity and the
+    // workspace is one: `history <workspace>` is what reads a configuration change back, and
+    // a typed id that missed it had no way of learning which of three kinds it was near.
+    near: nearIds([...view.byId.keys(), ...view.sprintById.keys(), view.identity.id], id),
     fix: ['treadle backlog'],
   })
 }

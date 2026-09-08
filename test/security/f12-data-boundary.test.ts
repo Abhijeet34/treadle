@@ -66,7 +66,7 @@ describe('F12: content a person wrote is marked as data wherever it is emitted',
   it('marks the free-text column of every block any command emits', async () => {
     const results = [
       await status(demo.store, fixedClock('2026-09-04T09:30:00Z')),
-      await explain(demo.store, 'injection-probe'),
+      await explain(demo.store, fixedClock('2026-09-04T09:30:00Z'), 'injection-probe'),
       await backlog(demo.store, { filters: [], columns: ['id', 'type', 'state', 'pts', 'title'], limit: 9 }),
     ]
     let checked = 0

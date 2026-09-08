@@ -14,6 +14,8 @@ ADR-0021 carries the next free number for ADR-0014's reason: it reshapes two com
 ADR-0022 carries the next free number because it answers one audit's findings across four of the records above rather than belonging to any one of them.
 ADR-0024 carries the next free number for the same reason, over a second audit's findings and one captain decision about which of them to build.
 ADR-0025 carries the next free number because it answers a scout report's measurement of ADR-0024's own rule at the wrong layer.
+ADR-0026 carries the next free number because workspace configuration is the fifth of the absent capabilities the sprint, the impediment and the board were three of, and it fills the Policy seam DR6 named.
+ADR-0027 carries the next free number for ADR-0009's reason: it moves a number DR8 set, and the argument for moving it is the thing worth reading.
 DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the renderer seam is in ADR-0005, beside the result object it renders.
 
 | Record | Decision |
@@ -42,6 +44,8 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0023](0023-a-closed-sprints-member-set-is-frozen-with-its-tally.md) | A closed sprint's whole member set and every tally freeze together at close and are read from the record, a membership test asks whether the store holds an id rather than whether it serves it, `doctor` exits on what a finding hides, `explain` and `transition` read one table, and a line carrying a value the tool did not choose is marked |
 | [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and the label, title-word and open-sprint readers that were missing |
 | [ADR-0025](0025-the-referential-rule-lives-under-the-write-lock.md) | No transaction may leave a record naming an id the store does not hold, checked inside the lock the write already takes rather than against a read taken before it, with `H30` reporting the ones the files already carry |
+| [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md) | Workspace configuration is a closed set of optional fields and two gate sections on `workspace.md`, a configured gate replaces the default whole through the one evaluator, a configuration this build cannot read hides content, and the record is written under the same compare-and-set as every other |
+| [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
 
 Each record has a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -98,6 +102,9 @@ older build left behind, which nothing reported at all.
 
 | Id | Raised by | Finding |
 |---|---|---|
+| `H03` | `doctor` | An item has been `in_progress` for longer than the workspace's `aging_days`, which is a threshold a team set rather than a fault in the files |
+| `H04` | `doctor` | A column holds more items than the workspace's `wip_limits` allows, which `G3` refuses to add to and an override or a lowered limit produces |
+| `H14` | the store, on load | A configured gate names a rule this build cannot load, which `config set` refuses with `V6` or `V7` before the write |
 | `H16` | the store, on load | A file arrived with CRLF line endings, which DR3 rule 6 named |
 | `H17` | `status` | An overdue item is assigned to nobody |
 | `H18` | `doctor`, `explain` | A stored description is over the write bound, which the load path does not apply |

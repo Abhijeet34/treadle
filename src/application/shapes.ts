@@ -6,6 +6,7 @@
 import { ERROR_SHAPE, type ResultShape } from './result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from './services/items.ts'
 import { BOARD_SHAPE } from './services/board.ts'
+import { CONFIG_SHAPE } from './services/config.ts'
 import { DOCTOR_SHAPE } from './services/doctor.ts'
 import { HISTORY_SHAPE } from './services/history.ts'
 import { TRANSITION_SHAPE } from './services/lifecycle.ts'
@@ -21,6 +22,7 @@ import { INIT_SHAPE } from './services/workspace.ts'
 export const SHAPES: readonly ResultShape[] = [
   BACKLOG_SHAPE,
   BOARD_SHAPE,
+  CONFIG_SHAPE,
   DOCTOR_SHAPE,
   ERROR_SHAPE,
   EVIDENCE_SHAPE,

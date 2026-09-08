@@ -40,7 +40,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
-import { SPRINT_FIELDS, WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type Sprint, type WorkItem } from '../../src/domain/index.ts'
+import { CONFIG_KEYS, SPRINT_FIELDS, WORK_ITEM_TYPES, canonicalField, fieldsOf, shortField, type Sprint, type WorkItem } from '../../src/domain/index.ts'
 import { EVENT_KEYS } from '../../src/adapters/store/event-log.ts'
 import { SHAPES } from '../../src/application/shapes.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
@@ -146,6 +146,23 @@ const SPRINT_FIELD_DECISIONS: Readonly<Record<string, Decision>> = {
   points: readable('sprints:pts', 'the denominator of the points figure, frozen with `done_points` so a closed sprint does not read five done points out of a live total of three'),
   goal: readable('sprints:goal'),
   extra: readable('sprints:extra', 'the count and not the values, for the reason the item dictionary gives'),
+}
+
+/**
+ * Every key of the workspace's configuration dictionary, and the surface that prints it.
+ * `config` prints all nine as rows of one block, each with the value in force and whether
+ * this workspace set it, which is the surface the sweep below checks the shape declares.
+ */
+const CONFIG_KEY_DECISIONS: Readonly<Record<string, Decision>> = {
+  review_step: readable('config:value'),
+  point_scale: readable('config:value'),
+  next_weights: readable('config:value'),
+  wip_limits: readable('config:value'),
+  aging_days: readable('config:value'),
+  cycle_time_excludes_hold: readable('config:value'),
+  start_requires_sprint: readable('config:value'),
+  ready_gate: readable('config:value', 'the rules as the file writes them, joined by | on one row; `explain` prints each rule of the gate in force with its verdict'),
+  done_gate: readable('config:value', 'the same, and `explain` is where a rule is read against one item'),
 }
 
 /**
@@ -374,6 +391,10 @@ describe('every persisted field carries a visibility decision', () => {
     assert.deepEqual(Object.keys(SPRINT_FIELD_DECISIONS).sort(), [...SPRINT_FIELDS].sort())
   })
 
+  it('has one decision per key of the configuration dictionary, and none for a key it has not got', () => {
+    assert.deepEqual(Object.keys(CONFIG_KEY_DECISIONS).sort(), [...CONFIG_KEYS].sort())
+  })
+
   it('has one decision per key of the event log', () => {
     assert.deepEqual(
       Object.keys(EVENT_FIELDS).sort(),
@@ -383,7 +404,7 @@ describe('every persisted field carries a visibility decision', () => {
   })
 
   it('names, for every readable decision, a key its command declares', () => {
-    for (const [scope, table] of [['item', ITEM_FIELDS], ['sprint', SPRINT_FIELD_DECISIONS], ['event', EVENT_FIELDS]] as const) {
+    for (const [scope, table] of [['item', ITEM_FIELDS], ['sprint', SPRINT_FIELD_DECISIONS], ['event', EVENT_FIELDS], ['config', CONFIG_KEY_DECISIONS]] as const) {
       for (const [field, decision] of Object.entries(table)) {
         if (decision.kind !== 'readable') continue
         const [command, key] = decision.at.split(':')
@@ -448,7 +469,7 @@ describe('a real record and a real log print what the decisions claim', () => {
     const printed = new Set<string>()
     const log = await history(rig.store, { scope: { kind: 'item', id: 'every-bug' }, limit: 20 })
     assert.equal(log.ok, true)
-    const why = await explain(rig.store, 'every-bug')
+    const why = await explain(rig.store, fixedClock(NOW), 'every-bug')
     assert.equal(why.ok, true)
     // The other scope is a second reading and not a variation of the first: `transaction` and
     // the `entity=` part of `what` reach no output at all under `history <id>`, so a decision
@@ -551,7 +572,7 @@ describe('a real record and a real log print what the decisions claim', () => {
       const transactions = [...new Set(log.value.map((event) => event.txn))]
       const printed = [
         agentRenderer.render(await history(rig.store, { scope: { kind: 'item', id: entity }, limit: 200 })),
-        agentRenderer.render(await explain(rig.store, entity)),
+        agentRenderer.render(await explain(rig.store, fixedClock(NOW), entity)),
         ...await Promise.all(transactions.map(async (txn) =>
           agentRenderer.render(await history(rig.store, { scope: { kind: 'txn', txn }, limit: 200 })))),
       ].join('\n')

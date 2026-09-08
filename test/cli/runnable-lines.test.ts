@@ -239,11 +239,63 @@ async function appendEvents(dir: string, events: readonly Readonly<Record<string
   await writeFile(file, `${existing}${events.map((event) => JSON.stringify(event)).join('\n')}\n`)
 }
 
+/**
+ * Rewrites the instant of the one event that recorded an entity entering a state, so a
+ * fixture can carry an item that has been in progress for years. It is what `H03` reads and
+ * the only thing in the store that says when a state was taken.
+ */
+async function backdate(dir: string, id: string, state: string, at: string): Promise<void> {
+  const events = path.join(dir, '.work', 'events')
+  let moved = 0
+  for (const name of await readdir(events)) {
+    const full = path.join(events, name)
+    const lines = (await readFile(full, 'utf8')).trimEnd().split('\n').filter((line) => line.length > 0)
+    const rewritten = lines.map((line) => {
+      const event = JSON.parse(line) as Record<string, unknown>
+      const after = event['after'] as Record<string, unknown> | undefined
+      if (event['entity'] !== id || event['op'] !== 'item.transition' || after?.['state'] !== state) return line
+      moved += 1
+      return JSON.stringify({ ...event, at })
+    })
+    await writeFile(full, `${rewritten.join('\n')}\n`)
+  }
+  assert.equal(moved, 1, `${id} has ${moved} events entering ${state}, and the fixture backdates exactly one`)
+}
+
 async function shards(dir: string): Promise<readonly string[]> {
   return (await readdir(path.join(dir, '.work', 'items'))).filter((name) => name.endsWith('.md')).map((name) => `items/${name}`)
 }
 
 const LONG_ACTOR = 'a'.repeat(201)
+
+/**
+ * A workspace whose own record carries a configuration, so the lines a configured gate, an
+ * over-limit column and an aged item print are collected and run. Every one of them is new
+ * with the configuration: before it the tool had no key to refuse, no gate of its own to
+ * name a rule from, and no threshold for `doctor` to report against.
+ */
+async function configuredWorkspace(dir: string): Promise<void> {
+  const m = (argv: readonly string[]) => must(dir, argv)
+  await m(['init', '--name', 'configured'])
+  await m(['config', 'set', 'wip_limits', 'in_progress=1'])
+  await m(['config', 'set', 'aging_days', '1'])
+  await m(['config', 'set', 'ready_gate', 'TEAM1 all field_present:component A record names the component it changes'])
+
+  for (const id of ['wip-one', 'wip-two']) {
+    await m(['file', 'task', `Task ${id}`, '--id', id, '--set', 'component=payments'])
+    await m(['transition', id, 'ready'])
+  }
+  // Two in the column of one: the first start passes, the second is `G3` and is overridden,
+  // which is one of the two routes that leave a column over its limit.
+  await m(['transition', 'wip-one', 'in_progress'])
+  await m(['transition', 'wip-two', 'in_progress', '--override', 'G3', '--reason', 'the release needs it'])
+  // A record the configured ready gate refuses, which is where its remedy comes from.
+  await m(['file', 'task', 'Task without a component', '--id', 'no-component'])
+  // An item aged past the threshold. The record carries its state and never when it took it,
+  // so `H03` reads the log; the fixture backdates the one event that says when it was taken,
+  // because the clock a CLI run reads is the system's and cannot be moved.
+  await backdate(dir, 'wip-one', 'in_progress', '2020-01-01T09:00:00Z')
+}
 
 const SCENARIOS: readonly Scenario[] = [
   {
@@ -455,6 +507,25 @@ const SCENARIOS: readonly Scenario[] = [
     },
     provocations: [['init']],
   },
+  {
+    name: 'a workspace carrying a configured gate, a column over its limit and an aged item',
+    build: configuredWorkspace,
+    provocations: [
+      // The configured gate's own remedy, through the guard and through `explain`.
+      ['transition', 'no-component', 'ready'],
+      ['explain', 'no-component'],
+      // `H03` and `H04`, whose details each end in one line to run.
+      ['doctor'],
+      ['explain', 'wip-one'],
+      // Every refusal `config` itself raises.
+      ['config', 'set', 'nonesuch', '1'],
+      ['config', 'set', 'aging_days', 'five'],
+      ['config', 'set', 'ready_gate', 'R1 story field_present:severity A severity'],
+      ['config', 'set'],
+      ['config', 'set', 'aging_days'],
+      ['config', 'unset', 'aging_days'],
+    ],
+  },
 ]
 
 /**
@@ -491,6 +562,10 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a missing outcome answered with the release completed', /^treadle transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
   ['an override without a reason answered with the reason added', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
   ['a reopen refused for carry-over that moved on, naming both sprints', /^treadle sprints sprint-two$/],
+  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-component component=<value>$/],
+  ['a column over its configured limit answered with the board that shows it', /^treadle board --state in_progress$/],
+  ['an aged item answered with the read that says what it waits on', /^treadle explain wip-one$/],
+  ['a configuration refusal answered with the reading of every key', /^treadle config$/],
 ]
 
 type Collected = {

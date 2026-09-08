@@ -61,7 +61,7 @@ Five nested floors, each a strict superset of the one above, so a difference pri
 Subtract 2.2 ms of spawn from any wall figure to get the program's own cost.
 Type stripping costs 36.4 ms and loading the store costs 57.3 ms on top of it, so 94 ms of every cold invocation is module loading that a bundle would mostly remove.
 Both are above their own series: type stripping ran 32.6 to 33.3 ms in the runs either side of this one, which is the machine and not the code, and is why the fixed costs are taken from the best of fifty rather than the median.
-The tree now builds one, weighed in the package table of the appendix, and `npm run build` prints that count against DR8's 512,000 limit and fails rather than warns if it goes over.
+The tree now builds one, weighed in the package table of the appendix, and `npm run build` prints that count against DR8's limit, 768,000 bytes since [architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md](architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and fails rather than warns if it goes over.
 The timed children still launch from TypeScript source, so these figures and DR1's 45 ms budget on a 406 KB bundle are still not the same measurement.
 
 The floors are measured after the corpora are generated and immediately before the operations they are subtracted from, so both share their conditions.
@@ -1044,16 +1044,15 @@ What this branch leaves behind is the counting proof above, the statement of the
 ## Forward compatibility, measured
 
 `docs/STABILITY.md` makes one promise: unknown fields and unknown sections are preserved verbatim and travel with the record through every mutation, so an older tool writing a newer file loses nothing it did not understand.
-Five shapes of "written by a newer version" were driven against a build that has never seen them, each in its own workspace, through the shipped entry point.
+Four shapes of "written by a newer version" were driven against a build that has never seen them, each in its own workspace, through the shipped entry point.
 
 | What a newer version wrote | This build's answer |
 |---|---|
 | An unknown field key, `risk_tier: gold` | **Preserved.** It survives a `set`, is re-rendered after the known fields in dictionary order, and is counted by `extra` on `show` |
-| An unknown H2 section | **Preserved.** It survives a `set` and is re-attached after the sections this build knows |
+| An unknown H2 section | **Preserved.** It survives a `set` and is re-attached after the sections this build knows. `## Ready gate` and `## Done gate` are no longer in this case: [ADR-0026](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) made both a recognized surface, read by `evaluateGate` and validated on load |
 | An unknown event op, `item.escalate`, carrying an unknown field in its `after` and an unknown key of its own | **Ignored, and preserved.** `history` prints the op verbatim and counts the unknown field in `after` as `+1`, `doctor` reports the store clean, and the log is append-only so nothing rewrites it. The event's own unknown key round-trips through the index, by `eventRest` and `eventFrom` in `src/adapters/store/event-log.ts`, and is printed by nothing |
 | An unknown item type, `type: gadget` | **Refused, workspace-wide.** Every read exits 7 naming `V4` and the record; `doctor` lists one finding per bad record. The refusal hides the other records in the same workspace, which is `readWorkspace`'s stated contract rather than an accident |
 | A file at a newer schema, `schema: 2` | **Refused.** `S8` names the file, `doctor` lists it, and every read and every write over that workspace exits 7. `workspace.md` at a newer schema refuses at `S1`/`S8` with exit 6 |
-| A gate rule a workspace configured | **Ignored in silence.** There is no surface to configure one: `evaluateGate` takes a `Gate` and no adapter reads one from the workspace, so a `## Gates` section added to `workspace.md` is neither read nor reported, and is preserved because nothing rewrites that file |
 
 The promise holds where it is made, and the two refusals are the design working: a new item type or a grammar change bumps the compiled-in schema number, and `docs/STABILITY.md` already classes that as breaking with a minor bump.
 

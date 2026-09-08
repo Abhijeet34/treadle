@@ -137,9 +137,9 @@
       "source": "DR8, 1.5 MB unpacked"
     },
     "bundleBytes": {
-      "limit": 512000,
+      "limit": 768000,
       "enforced": true,
-      "source": "DR8, 500 KB bundle"
+      "source": "DR8 raised by ADR-0027, 750 KB bundle"
     }
   }
 }

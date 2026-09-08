@@ -17,6 +17,7 @@ import { setFields } from '../../src/application/services/editing.ts'
 import { backlog, fileItem, showItem } from '../../src/application/services/items.ts'
 import { DEFAULT_BOARD_COLUMNS, board } from '../../src/application/services/board.ts'
 import { history } from '../../src/application/services/history.ts'
+import { readConfig, setConfig } from '../../src/application/services/config.ts'
 import { explain, next, status } from '../../src/application/services/insight.ts'
 import { relate } from '../../src/application/services/relation.ts'
 import { closeSprint, commitItems, openSprint, sprints } from '../../src/application/services/sprints.ts'
@@ -161,7 +162,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     // record itself carries the tally alone, because `show` has no headroom against A.3.
     golden.set('show-criteria', await showItem(demo.store, clock, 'auth-refresh', 'ac'))
     golden.set('next', await next(demo.store, clock, { limit: 3 }))
-    golden.set('explain', await explain(demo.store, 'sso-saml'))
+    golden.set('explain', await explain(demo.store, clock, 'sso-saml'))
     golden.set('history', await history(demo.store, { scope: { kind: 'item', id: 'sso-saml' }, limit: 9 }))
     golden.set('help', topLevelHelp('acme-platform'))
     golden.set('help-command', commandHelp('transition', 'acme-platform') as ResultObject)
@@ -205,7 +206,7 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('relation', await relate(targetFor(demo.store, 'apply'), clock, ids, {
       verb: 'add', id: 'queue-drain', kind: 'blocks', other: 'theme-dark', actor: ACTOR,
     }))
-    golden.set('explain-blocked', await explain(demo.store, 'theme-dark'))
+    golden.set('explain-blocked', await explain(demo.store, clock, 'theme-dark'))
     golden.set('show-relations', await showItem(demo.store, clock, 'queue-drain'))
     // Over the whole workspace, since nothing is open yet: the blocked draft sorts first in
     // its column, which is the one line a board carries that a backlog does not.
@@ -242,6 +243,13 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     golden.set('sprint-close', await closeSprint(targetFor(demo.store, 'apply'), clock, ids, { sprint: 'sprint-31', actor: ACTOR }))
     golden.set('sprints', await sprints(demo.store, clock))
     golden.set('sprints-closed', await sprints(demo.store, clock, 'sprint-31'))
+    // Last of all, because a configured key changes what every read above evaluates: the
+    // write moves `wip_limits` off its default, and the read that follows it is the one
+    // artefact carrying a `source` column with both of its words in it.
+    golden.set('config-set', await setConfig(targetFor(demo.store, 'apply'), clock, ids, {
+      key: 'wip_limits', value: 'in_progress=5, in_review=2', actor: ACTOR,
+    }))
+    golden.set('config', await readConfig(demo.store))
     return new Map([...golden].map(([name, result]) => [name, atGoldenRoot(result, demo.root)]))
   } finally {
     await demo.dispose()

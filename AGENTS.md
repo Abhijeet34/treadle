@@ -208,7 +208,7 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. `doctor` raises twelve of them and
+same audit for one item off the events it already reads. `doctor` raises fourteen of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H26` came with ADR-0016,
@@ -528,8 +528,9 @@ and every surface
 that commits or reads a committed set names it through `notGroomed` in `context.ts`, rather
 than refusing it, because `file --sprint` files in `draft` by construction. ADR-0022 argues
 both. `sprint_id` is owned by `sprint commit` in `writerOf`, and `file --sprint`
-is held to the same rules. Guard `G4` stays `true`: only its sprint half exists, and arming
-half a guard would refuse every start in a workspace that runs no sprints; `board` decides it.
+is held to the same rules. Guard `G4` reads the workspace's `start_requires_sprint`, which
+is `false` by default so that a workspace running no sprints starts work as it always did;
+arming it makes the guard exactly its sprint half, which is the half that exists.
 
 ## A board stores nothing, and its columns are blocks of one shape
 
@@ -538,8 +539,11 @@ backlog's filters, columns, rows and absence clauses, and adds one column, `bloc
 from `activeBlockerIndex` in `context.ts`, which is one pass over the relation graph where
 `activeBlockers` is one pass per call. Each of the five live states is a block property of
 the one shape, in flow order, printed empty; `done` and `cancelled` are counts. Nothing is
-stored, so there is no membership for `G4` and no column limit for `G3`, and both guards
-stay disarmed; ADR-0018 argues that and every other call. The scope is the one open sprint
+stored, so `G3`'s limit and `G4`'s membership rule are read from `workspace.md` instead of
+from a board, and both guards stay disarmed until a workspace configures them; ADR-0018
+argues the projection and ADR-0026 the two keys. `G3`'s column count is scoped exactly as
+the board scopes itself, to the one open sprint or to the workspace, so a limit read off
+`board` is the limit `G3` enforces. The scope is the one open sprint
 unless `--sprint` or `--all` says otherwise, two open sprints are a `C1` refusal naming
 both, and a blocked row sorts first in its column because a column is capped at `--limit`
 and the stuck work must be inside the cap. `--limit` without `--cursor` is the inventory's

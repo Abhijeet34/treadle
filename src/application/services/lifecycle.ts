@@ -128,7 +128,11 @@ export async function transition(
   const item = whole.value
   if (item === undefined) return notFound('transition', 'mutate', workspace, view.value, request.id)
 
-  const context = transitionContextFor(view.value, item)
+  // The target the caller asked for reaches the context because `G3`'s column is the one a
+  // move goes INTO; `resume` resolves to the state the hold was taken from, which is the
+  // same resolution the transition table makes.
+  const asked = request.target === 'resume' ? item.held_from : request.target
+  const context = transitionContextFor(view.value, item, asked)
 
   if (mode === 'preview') {
     return okResult(TRANSITION_SHAPE, {
@@ -185,7 +189,7 @@ export async function transition(
   // that has one: the store validates a record with a structural instant so an expired hold
   // already on disk stays readable, which is right on load and wrong on the write that sets
   // it. Without this call `--until` in the past was accepted and stored.
-  const live = validateWorkItem(after, { now })
+  const live = validateWorkItem(after, { now, pointScale: view.value.config.point_scale })
   if (!live.ok) {
     return errorResult({
       code: 'VALIDATION', command: 'transition', workspace, effect: 'mutate',

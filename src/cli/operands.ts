@@ -36,6 +36,9 @@ const ENTITY_OPERANDS: ReadonlyMap<string, string> = new Map([
 const VALUE_OPERANDS: ReadonlySet<string> = new Set([
   'type', 'title', 'target', 'kind', 'ref', 'label', 'command', 'field=value',
   'blocks|duplicates|relates-to',
+  // `config set`'s two. The key is held to the closed set and the value to that key's own
+  // rule, both of which name the refusal better than a line bound about ids would.
+  'key', 'value',
 ])
 
 type Slot =

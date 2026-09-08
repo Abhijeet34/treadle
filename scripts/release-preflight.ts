@@ -235,7 +235,7 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
     facts,
     manifest,
     bundleBytes,
-    bundleLimit: budgets.absolute['bundleBytes']?.limit ?? 512000,
+    bundleLimit: budgets.absolute['bundleBytes']?.limit ?? 768000,
     staleAgainst: staleAgainst(root),
     publishing: values.publishing,
   })

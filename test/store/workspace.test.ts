@@ -9,6 +9,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it } from 'node:test'
 
+import { defaultConfig, withConfigKey } from '../../src/domain/index.ts'
+import { makeEvent } from '../../src/application/services/mutation.ts'
 import { openWorkspace, resolveWorkspace } from '../../src/adapters/store/index.ts'
 import { aWorkspace, anItem } from '../helpers/store-fixtures.ts'
 
@@ -52,9 +54,17 @@ describe('resolving the store', () => {
       const opened = await openWorkspace(workspace.root)
       assert.ok(opened.ok, opened.ok ? '' : opened.error.message)
       const identity = await opened.value.identity()
-      assert.deepEqual(identity.ok ? identity.value : {}, {
-        id: 'test-workspace', name: 'Test workspace', path: workspace.root,
-      })
+      // The identity carries the workspace record whole: its printed id and title, its
+      // compare-and-set token, and the configuration every consumer reads off the view. A
+      // workspace `init` just wrote has set no key, so the whole configuration is default.
+      const identified = identity.ok ? identity.value : undefined
+      assert.deepEqual(
+        identified === undefined ? {} : { id: identified.id, name: identified.name, path: identified.path },
+        { id: 'test-workspace', name: 'Test workspace', path: workspace.root },
+      )
+      assert.equal(identified?.version, 0, 'a workspace nothing has configured is at version 0')
+      assert.deepEqual(identified?.config, defaultConfig())
+      assert.deepEqual([...identified?.config.from ?? []], [], 'no key came from the file')
       await opened.value.close()
     } finally {
       await workspace.dispose()
@@ -79,6 +89,44 @@ describe('a record never moves between shards', () => {
       assert.equal(elsewhere.ok, false)
       assert.equal(elsewhere.ok ? '' : elsewhere.error.rule, 'S3')
       assert.match(elsewhere.ok ? '' : elsewhere.error.message, /already a record in items\/2026-09\.md/)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+describe('the workspace record is written under compare-and-set', () => {
+  it('refuses the second of two writes decided against the same version, naming who moved it', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const base = await workspace.store.identity()
+      assert.ok(base.ok, base.ok ? '' : base.error.message)
+      assert.equal(base.value.version, 0, 'a workspace nothing has configured is at version 0')
+
+      const write = (txn: string, days: number) => workspace.store.apply({
+        txn,
+        writes: [],
+        workspace: { config: withConfigKey(base.value.config, 'aging_days', days), ifVersion: base.value.version },
+        events: [makeEvent({
+          id: `e-${txn}`, at: '2026-09-08T09:00:00Z', actor: { id: 'dana', kind: 'human' },
+          entity: base.value.id, entityKind: 'workspace', op: 'workspace.config',
+          before: { aging_days: '0' }, after: { aging_days: String(days) }, txn, command: 'config',
+        })],
+      })
+
+      const first = await write('twrite1', 5)
+      assert.equal(first.ok, true, first.ok ? '' : first.error.message)
+
+      // The second was decided against version 0 and the record is at 1. Both wrote the whole
+      // record, so without the token the second would have dropped the first's key entirely.
+      const second = await write('twrite2', 9)
+      assert.equal(second.ok, false, 'a write decided against a stale version landed')
+      assert.equal(second.ok ? '' : second.error.rule, 'S10')
+      assert.match(second.ok ? '' : second.error.message, /is at version 1 and the write named 0; dana moved it at 2026-09-08T09:00:00Z in transaction twrite1/)
+
+      const after = await workspace.store.identity()
+      assert.equal(after.ok ? after.value.config.aging_days : -1, 5, 'the write that won is the one the record carries')
+      assert.equal(after.ok ? after.value.version : -1, 1)
     } finally {
       await workspace.dispose()
     }

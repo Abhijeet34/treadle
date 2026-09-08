@@ -503,7 +503,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
 
-commands  20 of 20
+commands  21 of 21
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, …
   file        mutate  no        File one work item of a t…
@@ -518,6 +518,7 @@ commands  20 of 20
   remove      mutate  no        Take one mis-filed item o…
   sprint      mutate  no        Open a sprint, commit ite…
   sprints     read    no        List the sprints, or prin…
+  config      mutate  no        Read every configuration …
   doctor      read    no        Report what the stored fi…
   next        read    yes       Rank what to pick up, and…
   explain     read    no        Say why one item is where…
@@ -547,7 +548,7 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
 
-commands  20 of 20
+commands  21 of 21
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it crea…
   file        mutate  no        File one work item of a type, and report the …
@@ -562,6 +563,7 @@ commands  20 of 20
   remove      mutate  no        Take one mis-filed item out of the records, k…
   sprint      mutate  no        Open a sprint, commit items to it, and close …
   sprints     read    no        List the sprints, or print one with its dates…
+  config      mutate  no        Read every configuration key with the value i…
   doctor      read    no        Report what the stored files say that no writ…
   next        read    yes       Rank what to pick up, and print the component…
   explain     read    no        Say why one item is where it is, and what eac…
@@ -585,7 +587,7 @@ help  acme-platform
   example  treadle board # the open sprint, one section per live state, blocked work first in each
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
 
-commands  20 of 20
+commands  21 of 21
   NAME        EFFECT  PAGEABLE  SUMMARY
   init        mutate  no        Create a workspace here, and say what it created and what it did not.
   file        mutate  no        File one work item of a type, and report the fields it was created with.
@@ -600,6 +602,7 @@ commands  20 of 20
   remove      mutate  no        Take one mis-filed item out of the records, keeping every event it earned in the log.
   sprint      mutate  no        Open a sprint, commit items to it, and close it with what carried over recorded.
   sprints     read    no        List the sprints, or print one with its dates, its committed set and what carried over.
+  config      mutate  no        Read every configuration key with the value in force and its source, or set one.
   doctor      read    no        Report what the stored files say that no write path would have accepted.
   next        read    yes       Rank what to pick up, and print the components and weights that produced the order.
   explain     read    no        Say why one item is where it is, and what each legal next move needs.
@@ -1940,4 +1943,76 @@ sprints  acme-platform
   goal
     Ship the token refresh
   members  avatar-crop,webhook-retry
+
+### config-set @ 60
+config  acme-platform  1 changed  txn t0911
+  key  wip_limits
+  v  0 -> 1
+  set  wip_limits - -> in_progress=5, in_review=2
+  event  e0912
+
+### config-set @ 80
+config  acme-platform  1 changed  txn t0911
+  key  wip_limits
+  v  0 -> 1
+  set  wip_limits - -> in_progress=5, in_review=2
+  event  e0912
+
+### config-set @ 200
+config  acme-platform  1 changed  txn t0911
+  key  wip_limits
+  v  0 -> 1
+  set  wip_limits - -> in_progress=5, in_review=2
+  event  e0912
+
+### config @ 60
+config  acme-platform  0 changed  txn -
+  v  1
+  store  /w/platform/.work
+
+config  9 of 9
+  KEY                       SOURCE   VALUE
+  review_step               default  story, bug, epic
+  point_scale               default  1, 2, 3, 5, 8, 13
+  next_weights              default  pri=10, age=1, dep=5…
+  wip_limits                file     in_progress=5, in_re…
+  aging_days                default  0
+  cycle_time_excludes_hold  default  false
+  start_requires_sprint     default  false
+  ready_gate                default  DOR1 all field_prese…
+  done_gate                 default  DOD1 all no_open_chi…
+
+### config @ 80
+config  acme-platform  0 changed  txn -
+  v  1
+  store  /w/platform/.work
+
+config  9 of 9
+  KEY                       SOURCE   VALUE
+  review_step               default  story, bug, epic
+  point_scale               default  1, 2, 3, 5, 8, 13
+  next_weights              default  pri=10, age=1, dep=5, spr=8, asg=8, due=…
+  wip_limits                file     in_progress=5, in_review=2
+  aging_days                default  0
+  cycle_time_excludes_hold  default  false
+  start_requires_sprint     default  false
+  ready_gate                default  DOR1 all field_present:title The item ha…
+  done_gate                 default  DOD1 all no_open_child Every child is do…
+
+### config @ 200
+config  acme-platform  0 changed  txn -
+  v  1
+  store  /w/platform/.work
+
+config  9 of 9
+  KEY                       SOURCE   VALUE
+  review_step               default  story, bug, epic
+  point_scale               default  1, 2, 3, 5, 8, 13
+  next_weights              default  pri=10, age=1, dep=5, spr=8, asg=8, due=4, sev=6
+  wip_limits                file     in_progress=5, in_review=2
+  aging_days                default  0
+  cycle_time_excludes_hold  default  false
+  start_requires_sprint     default  false
+  ready_gate                default  DOR1 all field_present:title The item has a title.|DOR2 all type_required_fields The fields the type requires at creation are present.|DOR3 all no_active_blocke…
+  done_gate                 default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_fr…
 
