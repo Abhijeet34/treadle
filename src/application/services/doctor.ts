@@ -225,24 +225,15 @@ export class WorkspaceAudit {
   readonly #logRemoved = new Map<ItemId, Instant>()
   /**
    * `H33`: whether the log's last word on an id the records did NOT supply was a filing or a
-   * removal, with the instant it was filed at. An id the store serves is never entered, so a
-   * whole workspace normally keeps nothing here at all, and what it keeps is one entry per id
-   * that has actually gone missing.
+   * removal, with the instant it was filed at. An id the store serves is never entered, so an
+   * undamaged workspace keeps nothing here at all.
    *
-   * The last word in scan order, and not the later instant, which is the one place this
-   * departs from `#logRemoved`'s rule. A record filed and removed inside one second carries
-   * two lines with the same `at`, so an instant comparison has to break the tie by guessing
-   * and gets `remove` then `file` - the migration the tool offers for a field no command
-   * writes - wrong in the silent direction. Reading the log's order gets both right for every
-   * log the tool wrote, and a hand-written line filed under an earlier month is read where the
-   * file puts it, which errs toward reporting; `H23` is what names such a line.
-   *
-   * Workspace-scoped for `#vanishedEdges`' reason and missed the same way: the removal
-   * boundary at `recorded` and `#logRemoved` covers EDGES, so a truncated shard was reported
-   * only where a lost record happened to hold one, and the records that held none went with
-   * `doctor` printing `clean checked 7 items and 11 events` at exit 0 over a log that had
-   * filed ten. `H31` cannot see it either: a record that is not served has no version to fall
-   * short of.
+   * The last word in SCAN ORDER, which is the one place this departs from `#logRemoved`'s
+   * rule. `at` is second-resolution, so a record filed and removed inside one second carries
+   * two lines with the same instant and a comparison has to break the tie by guessing; it
+   * gets `remove` then `file`, the migration the tool offers for a field no command writes,
+   * wrong in the silent direction. A hand-written line filed under an earlier month is read
+   * where the file puts it, which errs toward reporting, and `H23` is what names such a line.
    */
   readonly #logLife = new Map<ItemId, { readonly filed: Instant; alive: boolean }>()
 
@@ -470,11 +461,8 @@ export class WorkspaceAudit {
    *
    * The write path refuses this now, so what reaches here is a record closed before that
    * refusal existed, a shard a hand edit took to `done`, or a workspace whose `review_step`
-   * was widened after the fact. Nothing reported it: `H19` read the assignee the record holds
-   * NOW, which is exactly the field the launder rewrote, so it stayed silent on the laundered
-   * record and fired on the honest one instead.
-   *
-   * `explain` raises it too, because it needs only the record and its own events.
+   * was widened after the fact. `explain` raises it too, because it needs only the record and
+   * its own events.
    */
   #selfAccepted(entry: Audited): readonly DoctorFinding[] {
     const item = entry.item

@@ -43,30 +43,7 @@ export function hasReviewStep(config: WorkspaceConfig, type: WorkItemType): bool
  */
 const WORKED_IN: ReadonlySet<string> = new Set(['in_progress', 'in_review', 'on_hold'])
 
-/**
- * What the log says about who did the work on one item, folded event by event.
- *
- * DOD3 used to read `assignee` as the record holds it now, and a current value is one write
- * away from anything: measured at `31aa1ac`, the assignee reassigned the ITEM in one write and
- * accepted its own work at `guards G6 pass`, with `doctor` reporting nothing. The log is what
- * happened and no later write takes it back, so both the gate and the audit read it from here
- * rather than each folding their own and disagreeing about who did the work.
- *
- * `state` and `assignee` are folded from the `after` snapshots: `item.file` carries the fields
- * an item was created with and `item.set` and `item.transition` carry each later change, and
- * `-` is the snapshot's own marker for a field nothing set. A removal ends one record's life
- * and the log keeps its events under the id (ADR-0024), so it clears the trail: the record
- * filed under that id afterwards is a different record and inherits nobody.
- *
- * WHO RAN THE COMMANDS IS NOT IN THE TRAIL, and that is deliberate. Adding the actor who moved
- * the item into `in_review` closes one more launder - an actor that never takes the field can
- * assign the record to somebody else, carry it through review itself and accept it - and it
- * also refuses the third party who accepts work the record attributes to someone who is not
- * them, which `DOD3`'s own sentence allows and this repository's fixtures drive. A record whose
- * `assignee` names a worker who never touched it is a lie no gate can see: the files agree with
- * themselves. ADR-0033 records that residual rather than closing it by widening the rule past
- * what its sentence promises.
- */
+/** What one item's log has said so far about who held it; see `foldWorkTrail`. */
 export type WorkTrail = {
   state?: string
   assignee?: string
@@ -74,6 +51,23 @@ export type WorkTrail = {
   names?: Set<string>
 }
 
+/**
+ * Who the log says did the work on one item, folded event by event. `DOD3` read `assignee` as
+ * the record holds it NOW, and a current value is one write away from anything: the assignee
+ * reassigned the ITEM and accepted its own work at `guards G6 pass`. Both the gate and the
+ * audit read the trail from here, so the write-time guard and the load-time finding cannot
+ * disagree about who did the work.
+ *
+ * `state` and `assignee` come off the `after` snapshots - `item.file` carries the fields an
+ * item was created with and `item.set` and `item.transition` carry each later change - and
+ * `-` is the snapshot's own marker for a field nothing set. A removal clears the trail, since
+ * the log keeps a removed record's events under the id (ADR-0024) and the record filed under
+ * it afterwards inherits nobody.
+ *
+ * Who RAN the commands is deliberately not in the trail: it would refuse the third party who
+ * accepts work the record attributes to somebody else, which `DOD3`'s sentence allows.
+ * ADR-0033 argues that and names the launder it leaves open.
+ */
 export function foldWorkTrail(trail: WorkTrail, event: StoreEvent): void {
   if (event.op === 'item.remove') {
     delete trail.state
