@@ -74,9 +74,37 @@ function flag(flags: Readonly<Record<string, unknown>>, name: string): string | 
   return typeof value === 'string' ? value : undefined
 }
 
+/** The actor this line names, from the flag or the environment, or `undefined` for neither. */
+function namedActor(env: Environment, flags: Readonly<Record<string, unknown>>): string | undefined {
+  return flag(flags, 'actor') ?? env.env['TREADLE_ACTOR']
+}
+
+/**
+ * The actor a write is recorded under. The empty string is unreachable on a write: `records`
+ * below refuses a recording line that names nobody, and a read is handed this and ignores it
+ * per the inventory's own 'A' verdict for `--actor`.
+ *
+ * It used to fall back to the literal `unknown`, which is the defect: a log whose product is
+ * who-did-what stored a name nobody wrote, indistinguishable from an actor really called
+ * that, and `history` printed it as `by unknown` for ever.
+ */
 function actorOf(env: Environment, flags: Readonly<Record<string, unknown>>): Actor {
-  const named = flag(flags, 'actor') ?? env.env['TREADLE_ACTOR']
-  return { id: named ?? 'unknown', kind: env.env['TREADLE_ACTOR_KIND'] === 'agent' ? 'agent' : 'human' }
+  return {
+    id: namedActor(env, flags) ?? '',
+    kind: env.env['TREADLE_ACTOR_KIND'] === 'agent' ? 'agent' : 'human',
+  }
+}
+
+/**
+ * Whether this line will write an event, which is the only place an actor is recorded.
+ *
+ * It is not the command's declared effect alone, because `config` declares `mutate` over both
+ * a read and a write (ADR-0026): the bare read records nothing, so demanding an identity for
+ * it would refuse a read over a field it would never store.
+ */
+function records(command: string | undefined, operands: readonly string[]): boolean {
+  if (commandNamed(command ?? 'status')?.effect !== 'mutate') return false
+  return command !== 'config' || operands[0] === 'set'
 }
 
 function modeOf(flags: Readonly<Record<string, unknown>>): Mode {
@@ -436,7 +464,17 @@ async function execute(env: Environment): Promise<number> {
   // is now read back by `history`, so an unbounded identity would be unbounded output too.
   // The bound applies only where the actor is recorded: a mutating command writes it into an
   // event, while a read command accepts and ignores it, per the inventory's own 'A' verdict.
-  if (commandNamed(command ?? 'status')?.effect === 'mutate') {
+  if (records(command, operands)) {
+    // Before the shape of the actor is weighed, because a line that names nobody has no shape
+    // to weigh: `actorRefusal` would report the empty name as whitespace, which is a sentence
+    // about a value the caller never wrote.
+    if (namedActor(env, flags) === undefined) {
+      return emit(env, validation(
+        command ?? 'treadle',
+        `${command ?? 'treadle'} records who made the change, and neither TREADLE_ACTOR nor --actor names anyone; the record would carry a name nobody wrote`,
+        ['export TREADLE_ACTOR=<your-name>', 'treadle --actor <name>'],
+      ), flags)
+    }
     const badActor = actorRefusal(actorOf(env, flags))
     if (badActor !== undefined) {
       return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)

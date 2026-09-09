@@ -10,6 +10,7 @@ import {
   asInstant,
   canonicalField,
   daysOverdue,
+  isTerminal,
   placeholderOf,
   relationsOf,
   requiredAtCreation,
@@ -21,6 +22,7 @@ import {
   type AcceptanceCriterion,
   type ItemId,
   type WorkItem,
+  type WorkItemState,
   type WorkItemSummary,
   type WorkItemType,
 } from '../../domain/index.ts'
@@ -39,7 +41,7 @@ import {
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { readWorkspace, wholeItem, type WorkspaceView } from './context.ts'
+import { activeBlockerIndex, readWorkspace, wholeItem, type WorkspaceView } from './context.ts'
 import { AUDITED_FIELDS, diffOf, makeEvent, snapshotOf, type Actor, type Target } from './mutation.ts'
 import { storeRefusal, unknownCursor } from './refusal.ts'
 
@@ -55,14 +57,22 @@ const ITEM_COLUMNS: readonly ColumnSpec[] = [
   // Comma-joined and never spaced, so it is not a free-text column under F3 and can sit in
   // the same row as `title`; a label carries no space by its own slug rule.
   { name: 'labels' },
+  // The ids that hold this row up, comma-joined like `labels` and for the same reason. It
+  // carries the ids rather than a yes, because a caller who reads `yes` still has to call
+  // `explain` to learn by what, and removing that call is the whole point of the column.
+  { name: 'blocked' },
 ]
 
 /**
  * `sev` is in the default set because severity was required at creation and then printed
  * nowhere: a caller triaging defects had no read surface that carried it. It costs one `-`
  * cell on a non-bug row, which is the price of every optional column in a default set.
+ *
+ * `blocked` is in it on the same rule and for a larger cost saved. Whether an item is held up
+ * is what a caller reads a list to decide, and no list carried it: learning it meant one
+ * `explain` per row, 669 B a call against the 2 B an unblocked row pays here.
  */
-export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'sev', 'title'] as const
+export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'sev', 'blocked', 'title'] as const
 
 /** The page size every list defaults to; `next` has its own, smaller one. */
 export const DEFAULT_LIMIT = 9
@@ -198,8 +208,8 @@ export const BACKLOG_SHAPE: ResultShape = {
   command: 'backlog',
   // v3 dropped the two estimate aggregates and the `pts` and `sprint` columns with the
   // estimation and sprint surfaces; schemas/README.md is the rule that a change to a shape's
-  // properties bumps the shape.
-  version: 3,
+  // properties bumps the shape. v4 added the `blocked` column to `items`.
+  version: 4,
   effect: 'read',
   summary: 'List the items that match a filter, in one stated order.',
   properties: [
@@ -583,6 +593,38 @@ export type Filter = {
 }
 
 /**
+ * The two `--state` values that name a set of states rather than one, and the set each names.
+ *
+ * They exist so that the default scope below is an ordinary clause. A scope the caller cannot
+ * see in the `filter` line, cannot read back off the `page` line and cannot be named by
+ * `--explain-absence` is a list that silently answers a narrower question than it was asked;
+ * making it a clause means every one of those surfaces carries it with no code of its own.
+ */
+const STATE_GROUPS: Readonly<Record<string, (state: WorkItemState) => boolean>> = {
+  open: (state) => !isTerminal(state),
+  all: () => true,
+}
+
+/**
+ * The clause every list is scoped by when the caller named no state.
+ *
+ * `backlog` listed every state including `done` and `cancelled`, so an agent paid for finished
+ * work on every call: 1,257 B for 23 items of which 18 were finished, on a store this small.
+ * Finished work is what the tool holds, not what it dispatches, and it is one `--state done`
+ * or `--state all` away.
+ */
+const OPEN_SCOPE: Filter = { field: 'state', value: 'open' }
+
+/**
+ * The caller's clauses, under the default scope. A caller who named a state has scoped the
+ * list themselves, and `--state all` is how they say every state, so the default is added
+ * only where no state clause was written at all.
+ */
+export function scoped(filters: readonly Filter[]): readonly Filter[] {
+  return filters.some((filter) => filter.field === 'state') ? filters : [OPEN_SCOPE, ...filters]
+}
+
+/**
  * The value a clause is compared against, for the five clauses that compare one stored scalar
  * for equality. `label` and `title` are not among them: a label is one entry of a list and a
  * title is matched by its words, so both answer through `holds` below and print what the item
@@ -613,6 +655,10 @@ function termsOf(value: string): readonly string[] {
  * clause is the equality it always was.
  */
 function holds(item: WorkItemSummary, filter: Filter): boolean {
+  if (filter.field === 'state') {
+    const group = STATE_GROUPS[filter.value]
+    if (group !== undefined) return group(item.state)
+  }
   if (filter.field === 'label') return (item.labels ?? []).includes(filter.value)
   if (filter.field === 'title') {
     const title = item.title.toLowerCase()
@@ -638,7 +684,9 @@ function backlogOrder(a: WorkItemSummary, b: WorkItemSummary): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
-function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
+function rowFor(
+  item: WorkItemSummary, columns: readonly string[], blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+): Row {
   const row: Record<string, string | number | null> = {}
   for (const column of columns) {
     if (column === 'id') row[column] = item.id
@@ -649,6 +697,7 @@ function rowFor(item: WorkItemSummary, columns: readonly string[]): Row {
     else if (column === 'title') row[column] = item.title
     else if (column === 'sev') row[column] = item.severity ?? null
     else if (column === 'labels') row[column] = item.labels === undefined || item.labels.length === 0 ? null : item.labels.join(',')
+    else if (column === 'blocked') row[column] = blockers.get(item.id)?.join(',') ?? null
     else row[column] = null
   }
   return row
@@ -718,7 +767,10 @@ function columnRefusal(
  */
 const CLOSED_FILTERS: Readonly<Partial<Record<Filter['field'], readonly string[]>>> = {
   type: WORK_ITEM_TYPES,
-  state: WORK_ITEM_STATES,
+  // The two group values are in the set because a caller has to be able to discover them:
+  // `open` is the scope every unscoped list already runs under, and `all` is the only way
+  // back to a list that carries finished work.
+  state: [...WORK_ITEM_STATES, ...Object.keys(STATE_GROUPS)],
   resolution: RESOLUTIONS,
   priority: ['1', '2', '3', '4', '5'],
 }
@@ -747,34 +799,42 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
     ?? filterRefusal('backlog', workspace, request.filters)
   if (refused !== undefined) return refused
 
+  // Every line below reads the scoped clauses rather than the caller's own, so the scope is
+  // in the `filter` line, in the `page` line that continues this list, in `narrowest` and in
+  // the clause `--explain-absence` names, and is a fact of the answer rather than of the code.
+  const filters = scoped(request.filters)
   const line = (cursor?: string): string =>
-    invocation('backlog', [], [...listFlags(request.filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
-  const matched = view.value.items.filter((item) => matches(item, request.filters)).sort(backlogOrder)
+    invocation('backlog', [], [...listFlags(filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
+  const matched = view.value.items.filter((item) => matches(item, filters)).sort(backlogOrder)
   const from = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
   if (from < 0) return unknownCursor('backlog', workspace, request.cursor as string, request.cursor as string, line())
   const page = matched.slice(from, from + request.limit)
+  // One index over the whole graph rather than a walk per row, which is the cost
+  // `activeBlockerIndex` exists for; it is built whether or not the column was asked for,
+  // because it is one pass over the edges and the branch costs more to read than to run.
+  const blockers = activeBlockerIndex(view.value)
   const block: Block = {
     columns: columnsFor(request.columns),
     shown: page.length,
     total: matched.length,
-    rows: page.map((item) => rowFor(item, request.columns)),
+    rows: page.map((item) => rowFor(item, request.columns, blockers)),
   }
 
   const data: Record<string, Value> = {}
-  if (request.filters.length > 0) {
-    data['filter'] = request.filters.map((filter) => `${filter.field} ${filter.value}`).join(' ')
+  if (filters.length > 0) {
+    data['filter'] = filters.map((filter) => `${filter.field} ${filter.value}`).join(' ')
   }
   // A sort and an aggregate over nothing are noise; the `none` line is the answer there.
   if (page.length > 0) data['sort'] = 'priority,filed,id'
 
   if (matched.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
-    const narrowest = narrowestClause(view.value.items, request.filters)
+    const narrowest = narrowestClause(view.value.items, filters)
     if (narrowest !== undefined) data['narrowest'] = narrowest
   }
 
   if (request.explainAbsence !== undefined) {
-    Object.assign(data, absence(view.value, request.filters, request.explainAbsence))
+    Object.assign(data, absence(view.value, filters, request.explainAbsence))
   }
   const remaining = matched.length - (from + page.length)
   if (remaining > 0) {
