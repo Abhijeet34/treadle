@@ -130,7 +130,6 @@ See [Status](#status) for the line between implemented and specified-only.
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
-"Specified, not implemented" and "Partly implemented" are gone, because neither said who owned the gap, and a gap nobody owns is documentation standing in for a decision.
 `test/architecture/documented-numbers.test.ts` reads this table: a Queued row has to name an item `.work` holds in `ready` or `draft`, and a Declined row has to name a file that exists.
 
 Twelve of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
