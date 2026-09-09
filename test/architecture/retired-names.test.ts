@@ -150,10 +150,10 @@ const RETIRED: readonly Retired[] = [
   { name: 'split_from', by: 'the truth sweep, on decision-relation-kinds' },
   { name: 'split_into', by: 'the truth sweep, on decision-relation-kinds' },
   { name: 'LINKABLE_KINDS', by: 'the truth sweep: every declared kind is writable now' },
-  // The truth sweep: the field for "who asked" that no command filled and only `show` printed.
+  // ADR-0032: the field for "who asked" that no command filled and only `show` printed.
   // Matched where it names the field, because `reporter` is ordinary English in a code of
   // conduct and a security policy, and `--test-reporter` is the runtime's own flag.
-  { name: 'reporter', by: 'the truth sweep, on decision-reporter', spelling: /--reporter\b|^\s*reporter:|['"`]reporter['"`]/ },
+  { name: 'reporter', by: 'ADR-0032', spelling: /--reporter\b|^\s*reporter:|['"`]reporter['"`]/ },
   { name: 'linkableKindOf', by: 'the truth sweep, renamed relationKindOf' },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },

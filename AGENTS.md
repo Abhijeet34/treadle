@@ -38,6 +38,9 @@ the README and the process-spawning tests use.
 `npm run build` bundles that same entry file to `dist/treadle.js` and writes `schemas/` beside
 it; those two are what `bin` points at and `files` ships, and neither is committed.
 Change the entry file, not one of the two.
+A shape's version bump renames its schema file, so the build sweeps any `.json` in `schemas/`
+the generator no longer writes: without that, `files` ships the whole directory and a stale
+`backlog.v3.json` rides along, which is a schema for a version the tool does not emit.
 
 `bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way.
 `scripts/shebang.ts` refuses an `env` option or a node flag on it, and

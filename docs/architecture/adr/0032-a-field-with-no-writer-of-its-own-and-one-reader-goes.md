@@ -19,7 +19,7 @@ Every `item.file` event names the actor who filed the record, `history` prints t
 So the field was not a second source for who asked; it was an empty slot beside an answer the log already gives.
 
 That is the defect class this repository keeps finding in its own surface: a promise on the record that nothing keeps.
-A reader who sees `reporter` in `show <id> --help` or in the field dictionary reasonably concludes the tool tracks who requested the work, and it does not.
+A reader who sees `reporter` in the type-to-fields dictionary that `treadle help show` prints reasonably concludes the tool tracks who requested the work, and it does not.
 
 ## Decision
 
