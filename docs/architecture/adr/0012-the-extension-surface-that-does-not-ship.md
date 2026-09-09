@@ -5,6 +5,7 @@
 **Implements:** section 6 of the `treadle-board-outcomes-retention-b3` audit, and threat-model findings F1, F7 and F11
 **Refuses:** DR6's hook contract, and A.8 rule 3's generated adapter, for v1
 **Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `--no-input`, which the consent gate below would have read; the refusal and its argument are unchanged
+**Overtaken in part by:** [ADR-0035](0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) cuts the Markdown export, so F4 no longer waits on a layer and closes by absence beside F1, F7 and F11; the consequence below that counts twelve closed findings and names F4 as the one that remains was true on this record's date and is not now
 
 ## Context
 

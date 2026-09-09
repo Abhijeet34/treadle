@@ -28,7 +28,7 @@ Re-derive a row by running the suite it names and reading the `ℹ` line, rather
 | No network egress | 18 commands run with 14 network entry points replaced by traps: 0 attempts | Proven |
 | Coverage meets the gate | 97.54% lines and 89.81% branches against a 90/85 gate; every one of the 7 named files over its 95/90 bar | Proven |
 | A flake budget of zero | 20 of 20 consecutive full runs completed and green, 0 failures, and the same test count in all 20, which is the condition `scripts/flake.ts` fails on if it moves; 50.9 s to 84.5 s each, 1,437 s in total | Proven |
-| One regression test per closed security finding | 12 closed findings, each mapped to a named test that names the finding and carries assertions, 219 assertions passing across the 12 files in one child run; 1 open finding naming the layer it waits on | Proven |
+| One regression test per closed security finding | 13 closed findings, each mapped to a named test that names the finding and carries assertions, 235 passing across the 13 files in one child run on 2026-09-10; 0 open findings, F4 having closed by absence with [architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md](architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) | Proven |
 | Every character of a random id is equally likely | Chi-squared 23.3 to 46.2 over ten runs of 600,000 characters against a ceiling of 120 on 35 degrees of freedom; the `byte % 36` implementation this replaced scored 1,340.6 on the same test | Proven |
 | Every property can fail | 9 deliberate breakages of the product and the harness, 9 caught by the property that claims them | Proven |
 | No literal invisible code point ships | Every tracked text file scanned, 0 carrying one; the run prints the count it read, which is a figure of the tree's size and so is not transcribed here; every such character in the suites is built from its number or written as an escape | Proven |
@@ -374,7 +374,7 @@ That is the case a manifest of behaviours checked against the built binary would
 There are none here, and a file that adds one fails the check with the file named rather than passing over it, because the gate counts the declaration-shaped calls it did not read.
 
 **A test whose title the reader cannot resolve to a literal at all.**
-It is counted and printed rather than skipped, so an uncompared declaration is a number a reader can see rather than a silence. Today that number is 0.
+It is counted and printed rather than skipped, so an uncompared declaration is a number a reader can see rather than a silence. It was 0 on 2026-09-07 and is 2 on 2026-09-10, and the run itself is the authority for it rather than this line.
 
 **A branch that is not up to date with main.**
 The comparison is against the merge base, so a test main gained after the fork is not one this branch removed.
