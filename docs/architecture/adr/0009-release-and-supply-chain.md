@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** DR1's build rule and DR7's dependency budget; closes threat-model finding F13
+**Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the derived index, so the negative consequence that the bundle loads the index engine on every invocation and the "No lazy per-command imports" departure that priced it are both closed: `dist/treadle.js` imports `node:sqlite` zero times, and the "gitignored index directory" the compile-cache departure argues against is not a directory this tool writes any more; one bundle, the signed tag, the supply-chain controls and the rest of the departures stand
 
 ## Context
 

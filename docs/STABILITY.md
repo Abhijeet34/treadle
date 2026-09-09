@@ -136,7 +136,8 @@ first line of this tool runs.
 That exit 7 is worth naming, because it is the one place a caller sees this tool's
 `INTERNAL` code without the store being in the state that code otherwise reports.
 
-Measured 2026-09-07 on Node 24.11.1, with a 59-byte environment:
+Measured 2026-09-07 on Node 24.11.1, below the 24.15.0 floor `package.json` declares, with a
+59-byte environment:
 
 | Case | Result |
 |---|---|
@@ -152,6 +153,16 @@ The crash band runs from there to `ARG_MAX`, and it is about 93 KB wide.
 The empty-script case is what places the fault in the runtime's startup rather than in any code
 here, and `ulimit -s` does not move it: the geometry is measured from the top of the stack, not
 from its size.
+The band is the runtime's geometry rather than this tool's, so it moves with the runtime, and the
+table above was taken below the floor.
+Re-measured 2026-09-10, one bisection run against both runtimes on the same machine, the same
+59-byte environment and the same command line put the largest surviving single argument at
+959,639 bytes on Node 24.11.1 and 960,358 bytes on Node 24.15.0, 719 bytes apart.
+That run's own command line is longer than the table's, so its absolute bytes are not the
+table's and only the difference between the two runtimes is read from it.
+The band is the floor's too, and the table's numbers are the shape of it rather than a threshold
+to hold anything to.
+
 That mechanism is reported upstream as [nodejs/node#65936](https://github.com/nodejs/node/issues/65936), open since 2026-09-09, so the limit is tracked there rather than only carried here.
 
 ### Why no valid call reaches it
@@ -164,7 +175,7 @@ The band starts 38x above that.
 Every block inside it is a call this tool refuses on every platform; what macOS changes is the
 refusal's shape, from `err VALIDATION` at exit 2 to a `RangeError` at exit 7.
 
-Linux is not uniformly better, which is the part the earlier version of this section left out.
+Linux is not uniformly better.
 Debian 12 and Alpine both refuse any single argument over 131,072 bytes with `E2BIG` at exec,
 exit 126, before treadle runs, so the 1,000,000-byte single argument that macOS answers with a
 typed refusal below 955 KB is a kernel refusal on Linux at every size over 128 KiB.

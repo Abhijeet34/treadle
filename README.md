@@ -63,7 +63,7 @@ What is unforgeable sits one layer out: the record file is committed, and the fo
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 2,131 tests in 99 seconds on Node 24.11.1 on 2026-09-09.
+The suite ran 2,162 tests in 99 seconds on Node 24.15.0, the declared floor, on 2026-09-10.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
@@ -99,7 +99,7 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 
 ## What it does
 
-See [Status](#status) for the line between implemented and specified-only.
+See [Status](#status) for what is shipped, what is queued, and what was declined or is blocked.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
