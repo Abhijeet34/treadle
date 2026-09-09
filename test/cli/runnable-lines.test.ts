@@ -197,6 +197,14 @@ async function baseWorkspace(dir: string): Promise<void> {
   // Review-step types out of in_progress: G5 on the story, G5 and G8 on the epic.
   await story('story-wip', ['ready', 'in_progress'])
   await story('story-review', ['ready', 'in_progress', 'in_review'])
+  // A story ready to be accepted by everything except who is asking, so `DOD3`'s actor half
+  // is the only rule that fails and its remedy is the accept, run by the reviewer the record
+  // names. The criteria are ticked and the evidence is added because the line has to CLEAR
+  // the done gate when it is run, which is what makes a remedy a remedy.
+  await m(['file', 'story', 'Story to accept', '--id', 'story-accept',
+    '--set', 'acceptance_criteria=[x] one', '--assignee', 'dana', '--set', 'reviewer=kim'])
+  await m(['evidence', 'add', 'story-accept', 'pr', 'https://example.invalid/1'])
+  for (const state of ['ready', 'in_progress', 'in_review']) await m(['transition', 'story-accept', state])
   await m(['file', 'epic', 'Epic one', '--id', 'epic-one', '--set', 'outcome=tenants sign in'])
   await story('child-story', ['ready', 'in_progress'], ['--parent', 'epic-one'])
   for (const state of ['ready', 'in_progress']) await m(['transition', 'epic-one', state])
@@ -357,6 +365,9 @@ const SCENARIOS: readonly Scenario[] = [
       ['mark', 'task-plain'],
       ['mark', 'bug-cold'],
       ['mark', 'task-plain', '--priority', '4'],
+      // DOD3's actor half: dana is the assignee and is the one asking.
+      ['transition', 'story-accept', 'done'],
+      ['explain', 'story-accept'],
       ['mark', 'task-plain', '--severity', 'S9', '--reason', 'x'],
       ['mark'],
       ['evidence', 'add', 'task-plain', 'nope', 'x'],
@@ -514,6 +525,7 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a state over its configured limit answered with the list that shows it', /^treadle backlog --state in_progress$/],
   ['an aged item answered with the read that says what it waits on', /^treadle explain wip-one$/],
   ['a configuration refusal answered with the reading of every key', /^treadle config$/],
+  ['a self-accept answered with the accept the named reviewer runs', /^treadle transition story-accept done --actor kim$/],
 ]
 
 type Collected = {

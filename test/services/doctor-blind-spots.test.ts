@@ -420,6 +420,53 @@ describe('DOD3: the assignee does not accept their own work', () => {
       await work.dispose()
     }
   })
+
+  // The launder the actor half was defeated by, run as the drive ran it. The refusal printed
+  // `set <id> assignee=<name>`, the assignee ran it, and the accept then passed at
+  // `guards G6 pass` with `doctor` clean - the tool printing the bypass to the rule it had
+  // just enforced. `workedBy` is folded off the log, which that write does not reach.
+  it('refuses the accept after the assignee has reassigned the item to somebody else', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'acceptance_criteria=[x] it ships'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      for (const to of ['ready', 'in_progress', 'in_review']) {
+        assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
+      }
+      assert.equal((await work.run(
+        ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
+
+      assert.equal((await work.run(['set', 'ship-it', 'assignee=carol'])).code, 0)
+      const refused = await work.run(['transition', 'ship-it', 'done'])
+      assert.equal(refused.code, 3, 'reassigning the item used to clear the rule in one write')
+      assert.match(refused.err, /^"cause the done gate fails: DOD3$/m)
+      assert.match((await work.run(['explain', 'ship-it'])).out,
+        /^done DOD3 fail treadle transition ship-it done --actor bob$/m)
+
+      // And the reassign one write earlier, which is where the narrower reading of the log -
+      // the assignee at the instant the item entered in_review - would have been defeated.
+      assert.equal((await work.run(['file', 'story', 'ship two', '--set', 'assignee=alice'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-two', 'acceptance_criteria=[x] it ships'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-two', 'reviewer=bob'])).code, 0)
+      for (const to of ['ready', 'in_progress']) {
+        assert.equal((await work.run(['transition', 'ship-two', to])).code, 0)
+      }
+      assert.equal((await work.run(
+        ['evidence', 'add', 'ship-two', 'url', 'https://example.invalid/pr/2', 'the pr'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-two', 'assignee=carol'])).code, 0)
+      assert.equal((await work.run(['transition', 'ship-two', 'in_review'])).code, 0)
+      assert.equal((await work.run(['transition', 'ship-two', 'done'])).code, 3)
+
+      // Nothing here refuses carol, who the log says never held either record.
+      const byCarol = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'carol' } })
+      assert.equal(byCarol.code, 3, 'carol is the assignee the record names, which the field half still refuses')
+      const byBob = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
+      assert.equal(byBob.code, 0, byBob.err)
+    } finally {
+      await work.dispose()
+    }
+  })
 })
 
 describe('an undamaged workspace stays clean through all of it', () => {
