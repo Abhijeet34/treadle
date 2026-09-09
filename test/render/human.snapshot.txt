@@ -703,35 +703,31 @@ help  acme-platform
     # the field diff and the exit status the real run would
     return
 
-moves  13 of 13
-  MOVE     FROM                                       TO
-    GUARDS  REASON
-  groom    draft                                      ready
-    G1      optional
-  ungroom  ready                                      draft
-    -       required
-  start    ready
-    in_progress                        G2,G3   optional
-  submit   in_progress
-    in_review                          G5      optional
-  finish   in_progress                                done
-    G5,G6   optional
-  rework   in_review
-    in_progress                        -       required
-  accept   in_review                                  done
-    G6      optional
-  reopen   done
-    in_progress                        -       required
-  hold     draft,ready,in_progress,in_review
-    on_hold                            -       required
-  resume   on_hold
-    draft,ready,in_progress,in_review  -       optional
-  cancel   draft,ready,in_progress,in_review,on_hold
-    cancelled                          G7      required
-  release  in_progress                                ready
-    -       required
-  revive   cancelled                                  draft
-    -       required
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
 
 flags  5 of 17
   FLAG               VERDICT  NOTE
@@ -774,35 +770,31 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --dry-run # the field diff
     and the exit status the real run would return
 
-moves  13 of 13
-  MOVE     FROM                                       TO
-    GUARDS  REASON
-  groom    draft                                      ready
-    G1      optional
-  ungroom  ready                                      draft
-    -       required
-  start    ready                                      in_progress
-    G2,G3   optional
-  submit   in_progress                                in_review
-    G5      optional
-  finish   in_progress                                done
-    G5,G6   optional
-  rework   in_review                                  in_progress
-    -       required
-  accept   in_review                                  done
-    G6      optional
-  reopen   done                                       in_progress
-    -       required
-  hold     draft,ready,in_progress,in_review          on_hold
-    -       required
-  resume   on_hold
-    draft,ready,in_progress,in_review  -       optional
-  cancel   draft,ready,in_progress,in_review,on_hold  cancelled
-    G7      required
-  release  in_progress                                ready
-    -       required
-  revive   cancelled                                  draft
-    -       required
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
 
 flags  5 of 17
   FLAG               VERDICT  NOTE
@@ -831,21 +823,31 @@ help  acme-platform
   example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
 
-moves  13 of 13
-  MOVE     FROM                                       TO                                 GUARDS  REASON
-  groom    draft                                      ready                              G1      optional
-  ungroom  ready                                      draft                              -       required
-  start    ready                                      in_progress                        G2,G3   optional
-  submit   in_progress                                in_review                          G5      optional
-  finish   in_progress                                done                               G5,G6   optional
-  rework   in_review                                  in_progress                        -       required
-  accept   in_review                                  done                               G6      optional
-  reopen   done                                       in_progress                        -       required
-  hold     draft,ready,in_progress,in_review          on_hold                            -       required
-  resume   on_hold                                    draft,ready,in_progress,in_review  -       optional
-  cancel   draft,ready,in_progress,in_review,on_hold  cancelled                          G7      required
-  release  in_progress                                ready                              -       required
-  revive   cancelled                                  draft                              -       required
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
 
 flags  5 of 17
   FLAG               VERDICT  NOTE

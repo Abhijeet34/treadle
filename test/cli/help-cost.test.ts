@@ -151,11 +151,13 @@ describe('a page carries the closed sets its own caller has to spell', () => {
     const help = page('transition')
     const moves = blockOf(help, 'moves')
     assert.ok(moves !== undefined, 'help transition carries no lifecycle')
+    assert.equal(moves.rows.length, TRANSITION_TABLE.length, 'the page prints a different number of edges')
     for (const edge of TRANSITION_TABLE) {
-      const row: Row | undefined = moves.rows.find((entry) => entry['move'] === edge.name)
-      assert.ok(row !== undefined, `${edge.name} is not on the page`)
-      assert.ok(String(row['from']).split(',').includes(edge.from), `${edge.name} does not run from ${edge.from}`)
-      assert.ok(String(row['to']).split(',').includes(edge.to), `${edge.name} does not run to ${edge.to}`)
+      const row: Row | undefined = moves.rows.find(
+        (entry) => entry['move'] === edge.name && entry['from'] === edge.from && entry['to'] === edge.to,
+      )
+      assert.ok(row !== undefined, `${edge.name} from ${edge.from} to ${edge.to} is not on the page`)
+      assert.equal(row['reason'], edge.requiresReason ? 'required' : 'optional', `${edge.name} ${edge.from}`)
     }
     const said = notes(help).join(' ')
     for (const resolution of RESOLUTIONS) assert.ok(said.includes(resolution), `${resolution} is not named`)

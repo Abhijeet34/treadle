@@ -19,6 +19,7 @@ import {
   WORK_ITEM_TYPES,
   fieldsOf,
   requiredAtCreation,
+  type WorkItemState,
 } from '../domain/index.ts'
 import { columnsOf, okResult, type Block, type ResultObject, type Row } from '../application/result.ts'
 import { HELP_SHAPE } from '../application/services/meta.ts'
@@ -130,22 +131,24 @@ function typeRows(): readonly Row[] {
 const COMMON_FIELDS: readonly string[] = fieldsOf('task')
 
 /**
- * One row per edge name, with the states it runs between folded into it: `hold` is four edges
- * of one name and reads as one move a caller may ask for, which is what a caller asks.
+ * One row per edge, ordered by the state a caller is standing in, because that is the one
+ * fact they have when they read this: they name a target, not a move.
+ *
+ * Folding the four `hold` edges into one row was shorter and unreadable: `from` then held
+ * five comma-joined states, and every row of the table wrapped onto two lines in the human
+ * rendering at 100 cells. Twenty-three narrow rows cost 285 bytes more and lay out flat.
  */
 function moveRows(): readonly Row[] {
-  const names = [...new Set(TRANSITION_TABLE.map((edge) => edge.name))]
-  return names.map((name): Row => {
-    const edges = TRANSITION_TABLE.filter((edge) => edge.name === name)
-    const guards = [...new Set(edges.flatMap((edge) => edge.guards))]
-    return {
-      move: name,
-      from: [...new Set(edges.map((edge) => edge.from))].join(','),
-      to: [...new Set(edges.map((edge) => edge.to))].join(','),
-      guards: guards.length === 0 ? '-' : guards.join(','),
-      reason: edges.some((edge) => edge.requiresReason) ? 'required' : 'optional',
-    }
-  })
+  const order = (state: string): number => WORK_ITEM_STATES.indexOf(state as WorkItemState)
+  return [...TRANSITION_TABLE]
+    .sort((one, other) => order(one.from) - order(other.from) || order(one.to) - order(other.to))
+    .map((edge): Row => ({
+      from: edge.from,
+      to: edge.to,
+      move: edge.name,
+      guards: edge.guards.length === 0 ? '-' : edge.guards.join(','),
+      reason: edge.requiresReason ? 'required' : 'optional',
+    }))
 }
 
 /**

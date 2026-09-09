@@ -44,7 +44,7 @@ export const HELP_SHAPE: ResultShape = {
     {
       kind: 'block',
       key: 'moves',
-      columns: [{ name: 'move' }, { name: 'from' }, { name: 'to' }, { name: 'guards' }, { name: 'reason' }],
+      columns: [{ name: 'from' }, { name: 'to' }, { name: 'move' }, { name: 'guards' }, { name: 'reason' }],
     },
     /** A command page's exceptions: the flags it does not treat as `globals` says it does. */
     {
