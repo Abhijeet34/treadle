@@ -37,7 +37,7 @@ const STORED = { now: STRUCTURAL_NOW, storedProse: true } as const
 const FIELD_ORDER = [
   'type', 'state', 'filed_at', 'version',
   'priority', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'labels',
+  'assignee', 'reviewer', 'labels',
   'hold_reason', 'hold_until', 'held_from', 'resolution', 'due',
   'severity', 'found_in', 'fix_confirmed',
 ] as const
@@ -59,6 +59,7 @@ const RETIRED_FIELDS: ReadonlyMap<string, string | null> = new Map([
   ['hours_estimate', null],
   ['timebox_hours', null],
   ['component', null],
+  ['reporter', null],
 ])
 
 /** The H2 sections DR3 rule 4 names, in render order. */

@@ -10,7 +10,7 @@
 // and test/architecture/supply-chain.test.ts refuses the manifest that declares one.
 
 import { build } from 'esbuild'
-import { chmodSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -56,7 +56,15 @@ chmodSync(outfile, 0o755)
 
 const schemas = path.join(root, 'schemas')
 mkdirSync(schemas, { recursive: true })
-for (const [name, body] of generated()) writeFileSync(path.join(schemas, name), body)
+const written = generated()
+// A shape's version bump renames its file, and writing without sweeping left the old name in
+// place: `backlog.v3.json` and `help.v1.json` outlived their shapes here, and `files` ships
+// this directory whole, so a tarball packed after a bump carried a schema for a version the
+// tool no longer emits. Nothing tracked can detect that, because the directory is gitignored.
+for (const name of readdirSync(schemas)) {
+  if (name.endsWith('.json') && !written.has(name)) rmSync(path.join(schemas, name))
+}
+for (const [name, body] of written) writeFileSync(path.join(schemas, name), body)
 
 const bytes = statSync(outfile).size
 const over = bytes > budget.limit

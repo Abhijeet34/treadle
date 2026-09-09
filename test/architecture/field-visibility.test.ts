@@ -80,7 +80,6 @@ const ITEM_FIELDS: Readonly<Record<string, Decision>> = {
   priority: readable('show:pri'),
   parent_id: readable('show:parent'),
   assignee: readable('show:assignee'),
-  reporter: readable('show:reporter'),
   reviewer: readable('show:reviewer'),
   labels: readable('show:labels'),
   due: readable('show:due'),
@@ -267,7 +266,7 @@ async function aWorkspaceCarryingEveryField(): Promise<Rig> {
     description: 'the client drops the session when the token expires',
     acceptance_criteria: 'a 401 refreshes once|the retry carries the new token',
     priority: '2', parent_id: 'every-epic',
-    assignee: 'kim', reporter: 'ravi', reviewer: 'dana',
+    assignee: 'kim', reviewer: 'dana',
     labels: 'revenue,regression', due: '2026-09-30T09:00:00Z',
   })
   await file('bug', 'Checkout drops paid orders', 'every-bug', {

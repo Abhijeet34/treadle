@@ -271,10 +271,10 @@ async function configuredWorkspace(dir: string): Promise<void> {
   await m(['init', '--name', 'configured'])
   await m(['config', 'set', 'wip_limits', 'in_progress=1'])
   await m(['config', 'set', 'aging_days', '1'])
-  await m(['config', 'set', 'ready_gate', 'TEAM1 all field_present:reporter A record names who reported it'])
+  await m(['config', 'set', 'ready_gate', 'TEAM1 all field_present:assignee A record names who is on it'])
 
   for (const id of ['wip-one', 'wip-two']) {
-    await m(['file', 'task', `Task ${id}`, '--id', id, '--set', 'reporter=ravi'])
+    await m(['file', 'task', `Task ${id}`, '--id', id, '--set', 'assignee=ravi'])
     await m(['transition', id, 'ready'])
   }
   // Two in the column of one: the first start passes, the second is `G3` and is overridden,
@@ -282,7 +282,7 @@ async function configuredWorkspace(dir: string): Promise<void> {
   await m(['transition', 'wip-one', 'in_progress'])
   await m(['transition', 'wip-two', 'in_progress', '--override', 'G3', '--reason', 'the release needs it'])
   // A record the configured ready gate refuses, which is where its remedy comes from.
-  await m(['file', 'task', 'Task without a reporter', '--id', 'no-reporter'])
+  await m(['file', 'task', 'Task with nobody on it', '--id', 'no-assignee'])
   // An item aged past the threshold. The record carries its state and never when it took it,
   // so `H03` reads the log; the fixture backdates the one event that says when it was taken,
   // because the clock a CLI run reads is the system's and cannot be moved.
@@ -465,8 +465,8 @@ const SCENARIOS: readonly Scenario[] = [
     build: configuredWorkspace,
     provocations: [
       // The configured gate's own remedy, through the guard and through `explain`.
-      ['transition', 'no-reporter', 'ready'],
-      ['explain', 'no-reporter'],
+      ['transition', 'no-assignee', 'ready'],
+      ['explain', 'no-assignee'],
       // `H03` and `H04`, whose details each end in one line to run.
       ['doctor'],
       ['explain', 'wip-one'],
@@ -510,7 +510,7 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a missing reason answered with the caller\'s line completed', /^treadle transition task-plain cancelled --resolution wont_do --reason "<why>"$/],
   ['a missing outcome answered with the release completed', /^treadle transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
   ['an override without a reason answered with the reason added', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
-  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-reporter reporter=<value>$/],
+  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-assignee assignee=<value>$/],
   ['a state over its configured limit answered with the list that shows it', /^treadle backlog --state in_progress$/],
   ['an aged item answered with the read that says what it waits on', /^treadle explain wip-one$/],
   ['a configuration refusal answered with the reading of every key', /^treadle config$/],

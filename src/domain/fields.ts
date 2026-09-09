@@ -49,7 +49,7 @@ export const MAX_RELATION_ENTRIES = 50
 const COMMON_FIELDS = [
   'id', 'type', 'state', 'title', 'filed_at', 'version',
   'description', 'priority', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'labels', 'due', 'evidence',
+  'assignee', 'reviewer', 'labels', 'due', 'evidence',
   'relations', 'hold_reason', 'hold_until', 'held_from', 'resolution', 'extra',
 ] as const
 
@@ -185,7 +185,6 @@ const PLACEHOLDER_OF: Readonly<Record<string, string>> = {
   severity: '<S1-S4>',
   parent_id: '<id>',
   assignee: '<name>',
-  reporter: '<name>',
   reviewer: '<name>',
   due: '<instant>',
   hold_until: '<instant>',
@@ -383,7 +382,6 @@ const CHECKS: Readonly<Record<string, Check>> = {
   priority: int('priority', 1, 5),
   parent_id: slug('parent_id'),
   assignee: line('assignee', MAX_LINE),
-  reporter: line('reporter', MAX_LINE),
   reviewer: line('reviewer', MAX_LINE),
   labels: (value) => {
     if (!Array.isArray(value)) return 'labels must be a list of slugs'

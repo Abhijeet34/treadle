@@ -141,7 +141,9 @@ export const FILE_SHAPE: ResultShape = {
 export const SHOW_SHAPE: ResultShape = {
   command: 'show',
   // v2 dropped `pts`, `sprint`, `hrs`, `timebox` and `component` with the fields they printed.
-  version: 2,
+  // v3 dropped `reporter` the same way: the field it printed had no writer of its own and no
+  // other reader, so `show` was the whole of its life.
+  version: 3,
   effect: 'read',
   summary: 'Print the stored fields of one item.',
   properties: [
@@ -171,7 +173,6 @@ export const SHOW_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'hold_until', type: 'string' },
     { kind: 'scalar', key: 'held_from', type: 'string' },
     { kind: 'scalar', key: 'extra', type: 'integer' },
-    { kind: 'text', key: 'reporter' },
     { kind: 'text', key: 'reviewer' },
     { kind: 'text', key: 'hold' },
     { kind: 'text', key: 'outcome' },
@@ -325,7 +326,7 @@ export function coerce(name: string, value: string): unknown {
 /** The fields a `file` reports as set, in the field dictionary's order. */
 const REPORTED = [
   'type', 'state', 'filed_at', 'description', 'priority',
-  'parent_id', 'assignee', 'reporter', 'reviewer', 'labels', 'due',
+  'parent_id', 'assignee', 'reviewer', 'labels', 'due',
   'outcome', 'acceptance_criteria', 'severity', 'repro_steps', 'expected', 'actual',
   'found_in', 'fix_confirmed', 'question', 'findings', 'proposed_resolution',
 ] as const
@@ -527,7 +528,6 @@ export async function showItem(
   // caller to act on a value nothing here can validate. The count says the record carries
   // them, which is the part a reader of this version can act on.
   if (item.extra !== undefined && item.extra.size > 0) data['extra'] = item.extra.size
-  if (item.reporter !== undefined) data['reporter'] = item.reporter
   if (item.reviewer !== undefined) data['reviewer'] = item.reviewer
   if (item.hold_reason !== undefined) data['hold'] = item.hold_reason
   if (item.outcome !== undefined) data['outcome'] = item.outcome

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A workspace written before ADR-0029 carries `sprint_id`, `points`, `hours_estimate`,
-// `timebox_hours` and `component` on its records, and this build's dictionary has none of them.
+// `timebox_hours` and `component` on its records, and one written before ADR-0032 carries
+// `reporter`; this build's dictionary has none of them.
 //
 // A key this build declared retired is dropped: `decodeItem` reads it as nothing and
 // `encodeItem` never carries it forward, so it disappears from the shard on the next ordinary
@@ -31,7 +32,7 @@ const NOW = '2026-09-08T09:00:00Z'
 const ACTOR: Actor = { id: 'dana', kind: 'human' }
 
 /**
- * One item shard carrying both cases at once: the five keys this build retired, and one key
+ * One item shard carrying both cases at once: the six keys this build retired, and one key
  * (`squad`) it has simply never heard of, standing in for a field a newer build might write.
  */
 const LEGACY_SHARD = `schema: 1
@@ -47,6 +48,7 @@ points: 5
 hours_estimate: 6
 timebox_hours: 4
 assignee: kim
+reporter: ravi
 component: payments
 sprint_id: sprint-31
 squad: platform
@@ -90,7 +92,7 @@ describe('a record written before the fields were retired', () => {
     assert.equal(audit.data['checked'], 1)
   })
 
-  it('drops the five retired keys from extra, and keeps the one key it has never seen', async () => {
+  it('drops the six retired keys from extra, and keeps the one key it has never seen', async () => {
     const held = await store.get('legacy-story')
     assert.ok(held.ok && held.value !== undefined)
     assert.deepEqual(
@@ -105,7 +107,7 @@ describe('a record written before the fields were retired', () => {
     assert.equal(shown.ok, true)
     assert.equal(shown.data['extra'], 1)
     const printed = agentRenderer.render(shown)
-    for (const gone of ['pts', 'sprint', 'hrs', 'component', 'timebox']) {
+    for (const gone of ['pts', 'sprint', 'hrs', 'component', 'timebox', 'reporter']) {
       assert.equal(printed.includes(`\n${gone} `), false, `show printed a retired key as ${gone}`)
     }
   })
@@ -117,7 +119,7 @@ describe('a record written before the fields were retired', () => {
     assert.equal(written.ok, true, String(written.data['cause']))
 
     const shard = await readFile(path.join(root, 'items', '2026-08.md'), 'utf8')
-    for (const line of ['points: 5', 'hours_estimate: 6', 'timebox_hours: 4', 'component: payments', 'sprint_id: sprint-31']) {
+    for (const line of ['points: 5', 'hours_estimate: 6', 'timebox_hours: 4', 'component: payments', 'sprint_id: sprint-31', 'reporter: ravi']) {
       assert.equal(shard.includes(line), false, `the write kept the retired line ${JSON.stringify(line)}`)
     }
     assert.ok(shard.includes('squad: platform'), 'the write dropped an unknown key it should have carried forward')

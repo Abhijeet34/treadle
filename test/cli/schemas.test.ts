@@ -60,8 +60,13 @@ describe('every golden result object validates against the schema its shape gene
   })
 
   it('catches a result object that does not match its schema, so the validator is not a no-op', () => {
-    const schema = schemaNamed('show.v2.json')
-    const broken = { ...(golden.get('show') as ResultObject), code: 'NOT_A_CODE' }
-    assert.ok(validate(schema, broken).length > 0, 'an invalid code must be reported')
+    const show = golden.get('show') as ResultObject
+    // Named off the object's own `schema` string rather than a literal file name. A literal
+    // made this control the one thing in the suite that a shape's version bump broke, and it
+    // broke by naming no schema at all rather than by failing to catch the invalid code.
+    const [command, version] = show.schema.split('/')
+    const broken = { ...show, code: 'NOT_A_CODE' }
+    assert.ok(validate(schemaNamed(`${command}.v${version}.json`), broken).length > 0,
+      'an invalid code must be reported')
   })
 })

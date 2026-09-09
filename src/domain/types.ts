@@ -148,7 +148,6 @@ export type WorkItem = {
   readonly priority?: number
   readonly parent_id?: ItemId
   readonly assignee?: string
-  readonly reporter?: string
   readonly reviewer?: string
   readonly labels?: readonly string[]
   /** Bounded pointers at artefacts a third party can open, appended and never edited. */

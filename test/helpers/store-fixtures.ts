@@ -143,7 +143,6 @@ export class Gen {
     if (this.chance(0.6)) base['description'] = this.safeBody()
     if (this.chance(0.5)) base['priority'] = this.int(1, 5)
     if (this.chance(0.4)) base['assignee'] = this.safeLine(1, 30)
-    if (this.chance(0.3)) base['reporter'] = this.safeLine(1, 30)
     if (this.chance(0.4)) base['due'] = this.instant()
     if (this.chance(0.4)) {
       const labels = new Set<string>()

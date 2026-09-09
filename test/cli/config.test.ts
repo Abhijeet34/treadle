@@ -48,7 +48,7 @@ describe('a configured ready gate is the gate the transition enforces', () => {
 
     // One rule, with an id this build has never compiled in, over a field the story has and
     // has not set. It replaces the ready gate whole, which is what the design specifies.
-    const set = await cli(['config', 'set', 'ready_gate', 'TEAM1 story field_present:reporter A story names who reported it'])
+    const set = await cli(['config', 'set', 'ready_gate', 'TEAM1 story field_present:assignee A story names who is on it'])
     assert.equal(set.code, 0, set.err)
 
     const refused = await cli(['transition', 'token-refresh', 'ready'])
@@ -63,7 +63,7 @@ describe('a configured ready gate is the gate the transition enforces', () => {
 
     // The remedy the configured rule prints is a line that clears it, which is the rule
     // every gate remedy in this tool is held to.
-    const fixed = await cli(['set', 'token-refresh', 'reporter=ravi'])
+    const fixed = await cli(['set', 'token-refresh', 'assignee=ravi'])
     assert.equal(fixed.code, 0, fixed.err)
     const allowed = await cli(['transition', 'token-refresh', 'ready'])
     assert.equal(allowed.code, 0, allowed.err)
