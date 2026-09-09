@@ -25,6 +25,7 @@ import { EXIT_OF } from '../../src/cli/exit.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
 import { operandLimit } from '../../src/cli/operands.ts'
 import { topLevelHelp } from '../../src/cli/help.ts'
+import { TRANSITIONS, WORK_ITEM_STATES } from '../../src/domain/index.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
@@ -308,6 +309,56 @@ describe('a value this line cannot mean is refused wherever the line writes it',
     const run = await cli(['backlog', '--priority', '-1'])
     assert.equal(run.code, EXIT_OF.VALIDATION, run.err)
     assert.match(run.err, /^"cause --priority needs a value, and one starting with a dash is written --priority=-1$/m, run.err)
+  })
+})
+
+/**
+ * `transition` takes eight words as a target and the page published seven of them. The eighth
+ * is `resume`, which every gate remedy for a held blocker prints: `treadle transition <id>
+ * resume` is what `nextTowardDone` returns off `on_hold`, `runnable-lines` runs it and it
+ * exits 0. The page said "the target is a state, not the move name" over the seven states,
+ * so the one word the tool prints was the one word the contract denied. Of the thirteen move
+ * names, twelve are refused as targets and only `resume` is taken, which is what makes it an
+ * eighth target rather than move names leaking in.
+ */
+describe('the transition page publishes every word transition takes as a target', () => {
+  let root: string
+  let cli: Cli
+  before(async () => { ({ root, cli } = await aWorkspace()) })
+  after(async () => { await rm(root, { recursive: true, force: true }) })
+
+  /** The words the page names, read off the printed note as a reader reads them. */
+  async function published(): Promise<readonly string[]> {
+    const page = must(await cli(['help', 'transition', '--out', 'agent']), 'help transition')
+    const note = /^note the targets are ([^;]+);/m.exec(page.out)
+    assert.ok(note !== null, `the page names no target list:\n${page.out}`)
+    return (note[1] as string).split(', ')
+  }
+
+  /**
+   * Whether the parser takes the word as a target at all, read off the rule id rather than
+   * off the sentence: `C1` is the command layer refusing a word it cannot mean, and every
+   * word that reaches the state machine is answered by a `T` rule or by the dry run's own
+   * exit 0, however that move then fares.
+   */
+  async function taken(word: string): Promise<boolean> {
+    const run = await cli(['transition', 'a-record', word, '--dry-run', '--reason', 'probing'])
+    return !/^rule C1$/m.test(run.err)
+  }
+
+  it('names every candidate the parser takes, and nothing it refuses', async () => {
+    const candidates = [...new Set([...WORK_ITEM_STATES, ...TRANSITIONS])]
+    const targets: string[] = []
+    for (const word of candidates) if (await taken(word)) targets.push(word)
+    assert.deepEqual([...targets].sort(), [...await published()].sort(),
+      'the page and the parser disagree about which words are targets')
+  })
+
+  it('takes resume and refuses the other twelve move names, which is why resume is on the page', async () => {
+    const refused: string[] = []
+    for (const move of TRANSITIONS) if (!(await taken(move))) refused.push(move)
+    assert.deepEqual(refused, TRANSITIONS.filter((move) => move !== 'resume'))
+    assert.ok((await published()).includes('resume'), 'resume is taken and the page does not name it')
   })
 })
 

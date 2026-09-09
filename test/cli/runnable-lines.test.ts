@@ -472,6 +472,23 @@ const SCENARIOS: readonly Scenario[] = [
     provocations: [['init']],
   },
   {
+    // A truncation cuts a run of lines, so a blocker and its dependent leave together. `H32`
+    // built its remedy from the edge's target without asking whether the store still held
+    // it, and printed `explain <target>` one row under an `H33` saying no record carries
+    // that id; `explain` exits 5 on it. The log still holds both, which is what `history`
+    // reads and this scenario proves the reader is now sent to.
+    name: 'a shard truncated so both ends of one edge left the store',
+    build: async (dir) => {
+      const m = (argv: readonly string[]) => must(dir, argv)
+      await m(['init', '--name', 'truncated'])
+      await m(['file', 'task', 'The blocker', '--id', 'cut-blocker'])
+      await m(['file', 'task', 'The dependent', '--id', 'cut-dependent'])
+      await m(['relation', 'add', 'cut-blocker', 'blocks', 'cut-dependent'])
+      for (const shard of await shards(dir)) await writeFile(path.join(dir, '.work', shard), 'schema: 1\n')
+    },
+    provocations: [['doctor']],
+  },
+  {
     name: 'a workspace carrying a configured gate, a column over its limit and an aged item',
     build: configuredWorkspace,
     provocations: [
@@ -500,6 +517,7 @@ const SCENARIOS: readonly Scenario[] = [
 const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a blocker remedied by its next move rather than by done', /^treadle transition imp-draft ready$/],
   ['a held blocker remedied by resume', /^treadle transition imp-hold resume$/],
+  ['an edge whose target left with its holder answered by the log, not by explain', /^treadle history cut-dependent$/],
   ['an open child remedied by its next move', /^treadle transition child-story in_review$/],
   ['a G5 refusal naming the submit', /^treadle transition story-wip in_review$/],
   ['a G2 refusal naming the blocker\'s move and the override', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],

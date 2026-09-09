@@ -677,8 +677,10 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on
     that edge evaluated.
-  note  the target is a state, not the move name: draft,
-    ready, in_progress, in_review, done, on_hold, cancelled
+  note  the targets are draft, ready, in_progress,
+    in_review, done, on_hold, cancelled, resume; resume is
+    the one that is not a state, and it returns a held item
+    to the state the hold was taken from
   note  cancelled takes --resolution, one of wont_do,
     duplicate, superseded, cannot_reproduce, rejected; ready
     from in_progress takes --outcome, one of failed, yielded
@@ -749,8 +751,9 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on that edge
     evaluated.
-  note  the target is a state, not the move name: draft, ready, in_progress,
-    in_review, done, on_hold, cancelled
+  note  the targets are draft, ready, in_progress, in_review, done, on_hold,
+    cancelled, resume; resume is the one that is not a state, and it returns a
+    held item to the state the hold was taken from
   note  cancelled takes --resolution, one of wont_do, duplicate, superseded,
     cannot_reproduce, rejected; ready from in_progress takes --outcome, one of
     failed, yielded
@@ -813,7 +816,7 @@ help  acme-platform
   usage  treadle transition <id> ready --outcome <failed|yielded> --reason <text>
   usage  treadle transition <id> <target> --override <guard> --reason <text>
   about  Move one item to a target state, with every guard on that edge evaluated.
-  note  the target is a state, not the move name: draft, ready, in_progress, in_review, done, on_hold, cancelled
+  note  the targets are draft, ready, in_progress, in_review, done, on_hold, cancelled, resume; resume is the one that is not a state, and it returns a held item to the state the hold was taken from
   note  cancelled takes --resolution, one of wont_do, duplicate, superseded, cannot_reproduce, rejected; ready from in_progress takes --outcome, one of failed, yielded
   note  --override takes G2, G3, G7 and a reason; every other guard is fixed by fixing the item
   note  the other 12 global flags apply here as treadle help describes them
