@@ -72,3 +72,80 @@ describe('the actor kind a mutation records', () => {
     assert.equal(run.code, 0, run.err)
   })
 })
+
+// The other half of the same rule, and the one that had no refusal at all: a mutation with
+// neither variable nor flag recorded the literal `unknown`, which `history` then printed as
+// `by unknown` for ever. On a tool whose product is who-did-what that is worse than recording
+// nothing, because it looks like a fact and is an absence, and no read can tell it from an
+// actor really called that. The refusal names both lines that supply an actor, so it is
+// answered without asking anyone.
+describe('a mutation that names nobody', () => {
+  let root: string
+
+  before(async () => {
+    root = await mkdtemp(path.join(tmpdir(), 'treadle-actor-named-'))
+  })
+  after(async () => { await rm(root, { recursive: true, force: true }) })
+
+  const bare = (argv: readonly string[], env: Readonly<Record<string, string>> = {}) =>
+    runCli(argv, { cwd: root, env })
+
+  it('refuses the first write of all, so no workspace is created under nobody', async () => {
+    const init = await bare(['init'])
+    assert.equal(init.code, 2, init.out)
+    assert.match(init.err, /^"cause init records who made the change, and neither TREADLE_ACTOR nor --actor names anyone/m, init.err)
+    assert.match(init.err, /^fix export TREADLE_ACTOR=<your-name>$/m, init.err)
+    assert.match(init.err, /^fix treadle --actor <name>$/m, init.err)
+  })
+
+  it('takes either line that supplies one, and records the name it was given', async () => {
+    assert.equal((await bare(['init'], { TREADLE_ACTOR: 'kim' })).code, 0)
+    const filed = await bare(['file', 'task', 'A task', '--id', 'named-task'], { TREADLE_ACTOR: 'kim' })
+    assert.equal(filed.code, 0, filed.err)
+    const flagged = await bare(['file', 'task', 'Another', '--id', 'flagged-task', '--actor', 'ravi'])
+    assert.equal(flagged.code, 0, flagged.err)
+    const log = await bare(['history', 'flagged-task'], { TREADLE_ACTOR: 'kim' })
+    assert.match(log.out, /ravi$/m, log.out)
+  })
+
+  // A variable set to nothing names nobody exactly as an unset one does, and it is what a CI
+  // job produces from an unpopulated secret. Left as a value it earned the whitespace
+  // sentence, whose fix line named the flag and never the variable that was empty.
+  for (const [what, value] of [['empty', ''], ['blank', '   ']] as const) {
+    it(`treats an ${what} TREADLE_ACTOR as naming nobody, not as a malformed name`, async () => {
+      const run = await bare(['file', 'task', 'X', '--id', `x-${what}`], { TREADLE_ACTOR: value })
+      assert.equal(run.code, 2, run.out)
+      assert.match(run.err, /^fix export TREADLE_ACTOR=<your-name>$/m, run.err)
+    })
+  }
+
+  it('lets the flag win over an empty variable, which is the line a caller reaches for', async () => {
+    const run = await bare(['file', 'task', 'Y', '--id', 'y-flagged', '--actor', 'dana'], { TREADLE_ACTOR: '' })
+    assert.equal(run.code, 0, run.err)
+  })
+
+  // `--dry-run` reports the exit status the real run would return, so a line that could not
+  // record is refused there too rather than reporting a write that would not have landed.
+  it('refuses a dry run, which reports what the real line would do', async () => {
+    const run = await bare(['transition', 'named-task', 'ready', '--dry-run'])
+    assert.equal(run.code, 2, run.out)
+    assert.match(run.err, /^"cause transition records who made the change/m, run.err)
+  })
+
+  // `config` is one word over a read and a write (ADR-0026). The bare read records nothing, so
+  // demanding an identity for it would refuse a read over a field it would never store.
+  it('leaves the read half of config alone and refuses the write half', async () => {
+    const read = await bare(['config'])
+    assert.equal(read.code, 0, read.err)
+    const write = await bare(['config', 'set', 'review_step', 'story'])
+    assert.equal(write.code, 2, write.out)
+    assert.match(write.err, /^"cause config records who made the change/m, write.err)
+  })
+
+  it('leaves every read alone, which is what the inventory already verdicts --actor as', async () => {
+    for (const argv of [['backlog'], ['next'], ['status'], ['doctor'], ['show', 'named-task'], ['explain', 'named-task']]) {
+      const run = await bare(argv)
+      assert.notEqual(run.code, 2, `${argv[0] as string} demanded an actor for a read: ${run.err}`)
+    }
+  })
+})

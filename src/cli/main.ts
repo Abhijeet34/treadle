@@ -74,9 +74,19 @@ function flag(flags: Readonly<Record<string, unknown>>, name: string): string | 
   return typeof value === 'string' ? value : undefined
 }
 
-/** The actor this line names, from the flag or the environment, or `undefined` for neither. */
+/**
+ * The actor this line names, from the flag or the environment, or `undefined` for neither.
+ *
+ * An exported `TREADLE_ACTOR=` is neither: a variable set to nothing names nobody exactly as
+ * an unset one does, and it is what a CI job produces from an unpopulated secret. Left as a
+ * value it earned `an actor must be a name with no leading or trailing whitespace`, a sentence
+ * about a rule the caller did not break, whose fix line named the flag and never the variable
+ * that was actually empty. An explicit `--actor ""` is left a value, because there the caller
+ * wrote the flag and the flag is what the refusal already names.
+ */
 function namedActor(env: Environment, flags: Readonly<Record<string, unknown>>): string | undefined {
-  return flag(flags, 'actor') ?? env.env['TREADLE_ACTOR']
+  const exported = env.env['TREADLE_ACTOR']
+  return flag(flags, 'actor') ?? (exported === undefined || exported.trim() === '' ? undefined : exported)
 }
 
 /**
