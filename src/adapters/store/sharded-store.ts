@@ -1105,6 +1105,9 @@ export class ShardedStore implements Store {
    * The three directories are the three a transaction commits into: the workspace record at
    * the root, `items/`, and the journal itself. `events/` is appended in place and never
    * renamed, so it has no temp file to sweep.
+   *
+   * Sweeping the root also reaches `init`'s own temp files, written before any lock exists;
+   * ADR-0004 accepts that narrow exposure rather than closing it.
    */
   async #fencePreviousHolder(): Promise<void> {
     for (const dir of ['.', ITEMS_DIR, JOURNAL_DIR]) await sweepTempFiles(path.join(this.#root, dir))
