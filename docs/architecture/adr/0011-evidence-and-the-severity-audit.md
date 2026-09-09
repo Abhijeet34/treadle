@@ -4,6 +4,7 @@
 **Date:** 2026-09-05
 **Implements:** sections 3.4 and 4.5 of the `treadle-board-outcomes-retention-b3` audit
 **Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `--preview` from the flag matrix; severity, the audit and the evidence pointer stand
+**Overtaken in part by:** `H18`'s bound widened to cover a hold whose `hold_until` has passed while the item is still `on_hold`, the condition `H10` was reserved for; `H10` itself is still unbuilt and its id is still unused, so the bullet naming it below is a record of the state it was decided from
 
 ## Context
 
