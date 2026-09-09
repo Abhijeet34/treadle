@@ -15,7 +15,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 
-import { RESOLUTIONS, TRANSITION_TABLE, WORK_ITEM_STATES, WORK_ITEM_TYPES, requiredAtCreation } from '../../src/domain/index.ts'
+import { EVIDENCE_KINDS, RESOLUTIONS, TRANSITION_TABLE, WORK_ITEM_STATES, WORK_ITEM_TYPES, requiredAtCreation } from '../../src/domain/index.ts'
 import { COMMANDS, FLAG_SPECS, GLOBAL_FLAGS, verdictFor } from '../../src/cli/inventory.ts'
 import { commandHelp, topLevelHelp } from '../../src/cli/help.ts'
 import { agentRenderer } from '../../src/adapters/render/agent.ts'
@@ -167,6 +167,12 @@ describe('a page carries the closed sets its own caller has to spell', () => {
     for (const state of WORK_ITEM_STATES) assert.ok(said.includes(state), `--state does not name ${state}`)
     for (const type of WORK_ITEM_TYPES) assert.ok(said.includes(type), `--type does not name ${type}`)
     assert.ok(said.includes('open') && said.includes('all'), 'the two scope words are not named')
+  })
+
+  it('names the evidence kinds on the page that takes one, rather than in the refusal for guessing', () => {
+    const help = page('evidence')
+    const said = (help.data['usage'] as readonly string[]).join(' ')
+    for (const kind of EVIDENCE_KINDS) assert.ok(said.includes(kind), `evidence does not name ${kind}`)
   })
 
   it('carries no vocabulary on a page whose caller types none of it', () => {

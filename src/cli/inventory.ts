@@ -7,7 +7,7 @@
 // by hand. A cell that the rules cannot decide would be a per-command special case, and the
 // test that counts them is what proves there is none.
 
-import { RELATION_KINDS } from '../domain/index.ts'
+import { EVIDENCE_KINDS, RELATION_KINDS } from '../domain/index.ts'
 import { RENDERINGS } from '../adapters/render/index.ts'
 import { MAX_WIDTH, MIN_WIDTH } from '../adapters/render/human.ts'
 import { CONTRACT } from '../adapters/render/grammar.ts'
@@ -166,7 +166,10 @@ export const COMMANDS: readonly Command[] = [
     name: 'evidence', shape: EVIDENCE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle evidence add <id> <kind> <ref> [label]'],
+    // Spliced from the closed set for the reason the relation kinds are, one command down:
+    // `<kind>` named a set a caller could not see, so the seven words were learned from the
+    // refusal for guessing an eighth.
+    usage: [`treadle evidence add <id> <${EVIDENCE_KINDS.join('|')}> <ref> [label]`],
     examples: [
       ['treadle evidence add checkout-500 run 8813 "664 pass"', 'point at a run; the essay goes in the artefact, not here'],
       ['treadle evidence add checkout-500 pr https://example.test/pr/42', 'a pointer needs no label'],
