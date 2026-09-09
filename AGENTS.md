@@ -242,6 +242,7 @@ copy that has to move whenever the test does.
 | No prose a dependency wrote reaches an output surface, and the parser's option table and the help page's flag matrix are one set | `test/cli/found-by-use.test.ts` |
 | Every gate rule declares the command that remedies it, or the reason it has none | `test/domain/gate-remedies.test.ts` |
 | Every line the tool prints for the reader to run, runs as printed from the state that printed it | `test/cli/runnable-lines.test.ts` |
+| Every `STORE_UNAVAILABLE` refusal names a remedy for its own cause, and none of them is a command that reads the store that just refused | `test/cli/unavailable-fix-lines.test.ts` |
 | Every number a document states about this tree is held to the tree; a measurement is not one of those and lives in `docs/VERIFICATION.md` with its date and load | `test/architecture/documented-numbers.test.ts` |
 | No renderer reads anything but the result object, a shape declares scalars before blocks, and a block closes its group in the human rendering | `test/render/conformance.test.ts`, `test/render/human-layout.test.ts`, ADR-0005 |
 | A text scalar in the human rendering sits on its key's line when the composed line fits the width, and keeps the indented block when it does not | `test/render/inline-scalar.test.ts` |
