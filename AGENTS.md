@@ -92,6 +92,12 @@ Driving the store API from one process serialises writers on the advisory lock, 
 exactly what hides a command dying with a raw stack trace and losing its write: when a
 concurrency bug is reported, reach for N processes each running the command surface, not N
 promises against one store.
+That is how a race is found and not how one is proved: real processes reached the lost write
+under lock reclaim once in three CI runs and never in thirty local ones, while forcing the same
+interleaving in one process settled it in 120 ms and fails 20 times in 20 against the pre-fix
+tree. `test/store/reclaim-fence.test.ts` is the in-process half and says in its header why it
+is one; when the window is a known pair of lines, hold it open from inside rather than sampling
+for it.
 
 Two more gates sit beside `npm run check`, and neither is in it because both cost minutes.
 `npm run coverage` runs the suite under Node's own coverage and holds it to the table in
