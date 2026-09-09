@@ -113,6 +113,16 @@ describe('one agent shift, walked in order', () => {
     return answer
   }
 
+  /** The audit, which carries findings on an `ok` envelope and exits 7 rather than refusing. */
+  const audits = async (what: string, expect: number): Promise<Answer> => {
+    const answer = await call('doctor')
+    tally.steps += 1
+    assert.equal(answer.code, expect, `${what}: expected exit ${expect}, got ${answer.code}\n${answer.out}`)
+    assert.equal(answer.envelope[0], 'ok', `${what}: the audit answered with a refusal envelope\n${answer.out}`)
+    tally.assertions += 2
+    return answer
+  }
+
   /** The state one record holds now, read back through the surface an agent would read it on. */
   const stateOf = async (id: string): Promise<string> => {
     const answer = await call('show', id)
@@ -252,7 +262,7 @@ describe('one agent shift, walked in order', () => {
     await step('submit it', ['transition', 'twin-yes', 'in_review'], 0)
     await step('the worker accepts its own work', ['transition', 'twin-yes', 'done'], 0)
     await holds('the assigned twin reached done under one actor', 'twin-yes', 'done')
-    const audit = await step('the audit names what happened', ['doctor'], 7)
+    const audit = await audits('the audit names what happened', 7)
     assert.match(
       audit.out,
       /^H34 twin-yes state worker filed, worked and accepted this item and no other actor appears in its log/m,
@@ -275,7 +285,7 @@ describe('one agent shift, walked in order', () => {
     await step('submit it', ['transition', 'twin-no', 'in_review'], 0)
     await step('the actor that did every write accepts it', ['transition', 'twin-no', 'done'], 0)
     await holds('the unassigned record reached done under one actor', 'twin-no', 'done')
-    const audit = await step('and the audit names it too', ['doctor'], 7)
+    const audit = await audits('and the audit names it too', 7)
     assert.match(
       audit.out,
       /^H34 twin-no state worker filed, worked and accepted this item and no other actor appears in its log/m,
@@ -303,7 +313,7 @@ describe('one agent shift, walked in order', () => {
   // and nothing else: every finding is an `H34`, and every one names a story this actor took
   // the whole way. A finding of any other rule is damage the walk did not mean to leave.
   it('leaves a workspace whose only findings are the single-actor completions it earned', async () => {
-    const audit = await step('the audit', ['doctor'], 7)
+    const audit = await audits('the audit', 7)
     const found = audit.out.split('\n').filter((line) => /^H\d\d /.test(line))
     assert.ok(found.length > 0, `the shift closed items under one actor and the audit said nothing:\n${audit.out}`)
     assert.deepEqual([...new Set(found.map((line) => line.split(' ')[0]))], ['H34'],
@@ -311,7 +321,9 @@ describe('one agent shift, walked in order', () => {
     tally.assertions += 2
     const orient = await step('the orientation call', ['status'], 0)
     assert.equal(orient.scalars.get('items'), '7', `seven records should remain\n${orient.out}`)
-    assert.equal(orient.scalars.get('findings'), String(found.length))
+    // `status` counts the store's own load-time findings, which are damage; the audit's are a
+    // separate read and the shift left none of the first kind.
+    assert.equal(orient.scalars.get('findings'), '0')
     assert.ok(!orient.scalars.has('writes'), `the store reports itself unwritable\n${orient.out}`)
     tally.assertions += 3
   })
