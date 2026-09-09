@@ -91,7 +91,18 @@ describe('a guard that read a neighbour is refused when that neighbour moved bef
   async function interleave(early: (store: Store) => Promise<ResultObject>, late: (store: Store) => Promise<ResultObject>): Promise<ResultObject> {
     const held = gated(first)
     const pending = early(held.store)
-    await held.reached
+    // Raced against its own arrival rather than simply awaited. A move refused by a guard
+    // returns without ever calling `apply`, so `reached` never resolves and this file waits
+    // for ever: `node --test` is run with `--test-timeout=0` here, so nothing ends it. A gate
+    // rule that widened to cover this fixture wedged the suite for 53 minutes with no output
+    // and no failing test, which is the worst shape a suite can fail in. A fixture that stops
+    // reaching the write now says so.
+    const arrival = await Promise.race([
+      held.reached.then(() => 'reached' as const),
+      pending.then(() => 'decided' as const),
+    ])
+    assert.equal(arrival, 'reached',
+      'the early move was decided before it reached the store, so there was no write for the late one to race; fix the fixture, not this assertion')
     const landed = await late(second)
     assert.equal(landed.ok, true, String(landed.data['cause']))
     held.release()
@@ -122,11 +133,13 @@ describe('a guard that read a neighbour is refused when that neighbour moved bef
 
   it('DOD1: an accept decided against a done child is refused once the child is reopened', async () => {
     ids = sequentialIds(200)
-    await must(file(first, 'story', 'story', { acceptance_criteria: '[x] one', assignee: 'dana' }))
+    // Assigned to somebody who is not `ACTOR`, because `DOD3` refuses an accept the item's own
+    // assignee runs and this test is about `DOD1` and the read set, not about who is asking.
+    await must(file(first, 'story', 'story', { acceptance_criteria: '[x] one', assignee: 'kim' }))
     await must(file(first, 'task', 'child', { parent_id: 'story' }))
     for (const state of ['ready', 'in_progress', 'done'] as const) await must(move(first, 'child', state))
     for (const state of ['ready', 'in_progress', 'in_review'] as const) await must(move(first, 'story', state))
-    await must(setFields(target(first), clock, ids, { id: 'story', assignments: ['reviewer=kim'], actor: ACTOR }))
+    await must(setFields(target(first), clock, ids, { id: 'story', assignments: ['reviewer=ravi'], actor: ACTOR }))
     await must(addEvidence(target(first), clock, ids, { id: 'story', kind: 'run', ref: '1', actor: ACTOR }))
 
     const refused = await interleave(

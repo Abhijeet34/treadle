@@ -209,7 +209,7 @@ describe('the default done gate', () => {
   // named any reviewer with one `set` and then ran the accept, and `transition` answered
   // `guards G6 pass` at exit 0 over work nobody else had looked at.
   it('refuses DOD3 when the actor running the move is the item\'s own assignee', () => {
-    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run', ref: '8813' }] }
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
     const byReviewer = gateContext(item('task', named), { reviewStep: true, actor: 'kim' })
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, byReviewer).pass, true)
 
@@ -230,7 +230,7 @@ describe('the default done gate', () => {
   // an actor. A context without one decides on the field alone, which is what it decided
   // before the actor was read at all.
   it('decides DOD3 on the reviewer field alone when no actor is supplied', () => {
-    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run', ref: '8813' }] }
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true })).pass, true)
   })
 
