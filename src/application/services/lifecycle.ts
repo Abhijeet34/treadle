@@ -26,7 +26,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { guardReads, openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem } from './context.ts'
+import { guardReads, hasReviewStep, openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem, workedBy, type Asker } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { echoed, notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
@@ -133,7 +133,20 @@ export async function transition(
   // The actor decides `DOD3` beside the record's own `reviewer`, so it reaches the gate
   // rather than only the event: the gate read the field alone, and an assignee who wrote any
   // name into it accepted their own work with `guards G6 pass`.
-  const context = transitionContextFor(view.value, item, asked, request.actor.id)
+  //
+  // The log joins it on the one edge that reads it. `DOD3` is scoped to the review step and
+  // evaluated by `G6`, which sits on the edges into `done` alone, so every other move decides
+  // exactly what it decided before and pays for no log read; ADR-0030 carries the measurement
+  // of the one that does.
+  const trail = asked === 'done' && hasReviewStep(view.value.config, item.type)
+    ? await store.events({ entity: item.id })
+    : undefined
+  if (trail !== undefined && !trail.ok) return storeRefusal('transition', 'mutate', trail.error, workspace)
+  const asker: Asker = {
+    actor: request.actor.id,
+    ...(trail === undefined || !trail.ok ? {} : { workedBy: workedBy(trail.value) }),
+  }
+  const context = transitionContextFor(view.value, item, asked, asker)
 
   const outcome = evaluateTransition(context, {
     target: request.target,

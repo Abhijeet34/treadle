@@ -25,7 +25,7 @@ import {
   type WorkItemType,
   type WorkspaceConfig,
 } from '../../domain/index.ts'
-import { storeFail, storeOk, type Finding, type ItemRead, type Store, type StoreIdentity, type StoreResult } from '../ports/store.ts'
+import { storeFail, storeOk, type Finding, type ItemRead, type Store, type StoreEvent, type StoreIdentity, type StoreResult } from '../ports/store.ts'
 
 /**
  * Types whose work passes through review, which is guard G5's input, read from the
@@ -34,6 +34,73 @@ import { storeFail, storeOk, type Finding, type ItemRead, type Store, type Store
  */
 export function hasReviewStep(config: WorkspaceConfig, type: WorkItemType): boolean {
   return config.review_step.includes(type)
+}
+
+/**
+ * The states an item is being worked in. `on_hold` is one of them: the work is somebody's and
+ * a hold is a pause in it, so leaving it out would let an assignee hand the record over from a
+ * hold and accept it back.
+ */
+const WORKED_IN: ReadonlySet<string> = new Set(['in_progress', 'in_review', 'on_hold'])
+
+/**
+ * What the log says about who did the work on one item, folded event by event.
+ *
+ * DOD3 used to read `assignee` as the record holds it now, and a current value is one write
+ * away from anything: measured at `31aa1ac`, the assignee reassigned the ITEM in one write and
+ * accepted its own work at `guards G6 pass`, with `doctor` reporting nothing. The log is what
+ * happened and no later write takes it back, so both the gate and the audit read it from here
+ * rather than each folding their own and disagreeing about who did the work.
+ *
+ * `state` and `assignee` are folded from the `after` snapshots: `item.file` carries the fields
+ * an item was created with and `item.set` and `item.transition` carry each later change, and
+ * `-` is the snapshot's own marker for a field nothing set. A removal ends one record's life
+ * and the log keeps its events under the id (ADR-0024), so it clears the trail: the record
+ * filed under that id afterwards is a different record and inherits nobody.
+ *
+ * WHO RAN THE COMMANDS IS NOT IN THE TRAIL, and that is deliberate. Adding the actor who moved
+ * the item into `in_review` closes one more launder - an actor that never takes the field can
+ * assign the record to somebody else, carry it through review itself and accept it - and it
+ * also refuses the third party who accepts work the record attributes to someone who is not
+ * them, which `DOD3`'s own sentence allows and this repository's fixtures drive. A record whose
+ * `assignee` names a worker who never touched it is a lie no gate can see: the files agree with
+ * themselves. ADR-0030 records that residual rather than closing it by widening the rule past
+ * what its sentence promises.
+ */
+export type WorkTrail = {
+  state?: string
+  assignee?: string
+  /** Lazily created, so an item nobody was ever assigned costs one object and no set. */
+  names?: Set<string>
+}
+
+export function foldWorkTrail(trail: WorkTrail, event: StoreEvent): void {
+  if (event.op === 'item.remove') {
+    delete trail.state
+    delete trail.assignee
+    delete trail.names
+    return
+  }
+  const after = event.after
+  if (typeof after !== 'object' || after === null) return
+  const fields = after as Record<string, unknown>
+  const state = fields['state']
+  if (typeof state === 'string') trail.state = state
+  const assignee = fields['assignee']
+  if (typeof assignee === 'string') {
+    if (assignee === '-') delete trail.assignee
+    else trail.assignee = assignee
+  }
+  if (trail.assignee !== undefined && trail.state !== undefined && WORKED_IN.has(trail.state)) {
+    (trail.names ??= new Set()).add(trail.assignee)
+  }
+}
+
+/** The names one item's whole log leaves in its trail, which is DOD3's `workedBy`. */
+export function workedBy(events: readonly StoreEvent[]): readonly string[] {
+  const trail: WorkTrail = {}
+  for (const event of events) foldWorkTrail(trail, event)
+  return trail.names === undefined ? [] : [...trail.names]
 }
 
 export type WorkspaceView = {
@@ -253,12 +320,22 @@ function duplicateOf(view: WorkspaceView, item: WorkItem): GateItem | undefined 
 }
 
 /**
- * `actor` is who is asking, which DOD3 reads beside the record's own `reviewer`. It is
- * optional here and threaded from the command surface rather than read from anywhere: this
- * layer has no ambient caller, and a gate told no actor decides exactly what it decided
- * before.
+ * Who is asking, and what the log says about who did the work, which are DOD3's two inputs
+ * beside the record's own `reviewer`. Both are optional and both are threaded from the
+ * command surface rather than read from anywhere: this layer has no ambient caller, and a
+ * gate told neither decides exactly what it decided before.
+ *
+ * They travel together because one is useless without the other and because they arrive from
+ * different reads - the actor from the invocation, the trail from the event log - and a
+ * command that has one and not the other is a command whose done gate disagrees with the
+ * transition it is about to refuse.
  */
-function gateContextFor(view: WorkspaceView, item: WorkItem, actor?: string): GateContext {
+export type Asker = {
+  readonly actor?: string
+  readonly workedBy?: readonly string[]
+}
+
+function gateContextFor(view: WorkspaceView, item: WorkItem, asker: Asker = {}): GateContext {
   const original = duplicateOf(view, item)
   return {
     item,
@@ -266,7 +343,8 @@ function gateContextFor(view: WorkspaceView, item: WorkItem, actor?: string): Ga
     children: childrenGates(view, item.id),
     reviewStep: hasReviewStep(view.config, item.type),
     ...(original === undefined ? {} : { duplicateOf: original }),
-    ...(actor === undefined ? {} : { actor }),
+    ...(asker.actor === undefined ? {} : { actor: asker.actor }),
+    ...(asker.workedBy === undefined ? {} : { workedBy: asker.workedBy }),
   }
 }
 
@@ -275,12 +353,12 @@ function gateContextFor(view: WorkspaceView, item: WorkItem, actor?: string): Ga
  * another. The gate is an argument to `evaluateGate` either way, so a configured gate and
  * the default reach the one evaluator and `explain` prints exactly what `G1` decided.
  */
-export function readyVerdict(view: WorkspaceView, item: WorkItem, actor?: string, gate: Gate = view.config.ready_gate): GateVerdict {
-  return evaluateGate(gate, gateContextFor(view, item, actor))
+export function readyVerdict(view: WorkspaceView, item: WorkItem, asker?: Asker, gate: Gate = view.config.ready_gate): GateVerdict {
+  return evaluateGate(gate, gateContextFor(view, item, asker))
 }
 
-export function doneVerdict(view: WorkspaceView, item: WorkItem, actor?: string, gate: Gate = view.config.done_gate): GateVerdict {
-  return evaluateGate(gate, gateContextFor(view, item, actor))
+export function doneVerdict(view: WorkspaceView, item: WorkItem, asker?: Asker, gate: Gate = view.config.done_gate): GateVerdict {
+  return evaluateGate(gate, gateContextFor(view, item, asker))
 }
 
 function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
@@ -332,14 +410,15 @@ function columnFor(view: WorkspaceView, to: WorkItemState | undefined): Transiti
  * The facts one transition is decided against. `to` is the state the caller is asking for,
  * which only `G3` reads: the state a move is INTO is the one whose limit binds, and a
  * context built without a target carries none, which is what every non-`start` edge wants.
- * `actor` is who is running the move, which `DOD3` reads through `G6`.
+ * `asker` is who is running the move and who the log says did the work, which `DOD3` reads
+ * through `G6`.
  */
-export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState, actor?: string): TransitionContext {
+export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState, asker?: Asker): TransitionContext {
   const column = columnFor(view, to)
   return {
     item,
-    readyGate: readyVerdict(view, item, actor),
-    doneGate: doneVerdict(view, item, actor),
+    readyGate: readyVerdict(view, item, asker),
+    doneGate: doneVerdict(view, item, asker),
     blockers: gateItems(view, activeBlockers(view, item.id)),
     ...(column === undefined ? {} : { column }),
     reviewStep: hasReviewStep(view.config, item.type),

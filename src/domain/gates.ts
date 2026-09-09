@@ -67,6 +67,16 @@ export type GateContext = {
    * the field alone, exactly as it did before, rather than failing over a fact it was not told.
    */
   readonly actor?: string
+  /**
+   * DOD3: who the log says did the work, which the caller folds off the event log. The two
+   * fields as they stand are both one write away from anything, and testing the actor against
+   * the assignee the record holds NOW is what the launder walks through: the assignee took its
+   * own name off the field in one write and accepted its own work at `guards G6 pass`. A
+   * current value can be arranged and the log is what happened, so the rule asks the log who
+   * held the item while it was worked. Empty covers a log that says nothing about who held it,
+   * where the rule decides on the field alone exactly as it did before.
+   */
+  readonly workedBy?: readonly string[]
 }
 
 export const DEFAULT_READY_GATE: Gate = {
@@ -129,6 +139,29 @@ function no(reason: string, remedy?: string): Outcome {
 
 function fieldOf(item: WorkItem, name: string): unknown {
   return (item as unknown as Record<string, unknown>)[name]
+}
+
+/** A name safe to print inside a command line unquoted, which is the class an id is held to. */
+const BARE_NAME = /^[A-Za-z0-9][A-Za-z0-9._@+-]*$/
+
+/**
+ * DOD3's actor-half remedy: the accept, run by the reviewer the record already names.
+ *
+ * It was `set <id> assignee=<name>`, and that line is the defect this rule exists to close.
+ * An assignee refused for accepting its own work ran it, took its own name off the field in
+ * one write, and accepted at `guards G6 pass` with `doctor` silent - the tool printing the
+ * bypass to the rule it had just enforced. No command makes the caller a different person,
+ * which is what a human-in-the-loop rule means; the line named here is the reviewer's to run,
+ * and the log records who ran it and whether they were a person or an agent.
+ *
+ * A reviewer is a caller-written line of up to 200 characters, so it is printed only when it
+ * would be one shell word, and the placeholder stands in for anything else rather than
+ * emitting a command line that splits where the reader cannot see it.
+ */
+function handOver(item: WorkItem): string {
+  const reviewer = item.reviewer
+  const named = reviewer !== undefined && BARE_NAME.test(reviewer) ? reviewer : '<name>'
+  return `treadle transition ${item.id} done --actor ${named}`
 }
 
 function run(check: GateCheck, context: GateContext): Outcome {
@@ -244,18 +277,31 @@ function run(check: GateCheck, context: GateContext): Outcome {
     // assignee clears alone - measured, an assignee named a reviewer who never touched the
     // item and took it to done with `guards G6 pass`. The actor half is skipped when the
     // caller supplied none, so a gate evaluated with no actor decides exactly what it did.
+    //
+    // The actor half asks the log and not only the field, because the field is a value the
+    // caller can arrange: reassigning the ITEM cleared the old test in one write and the
+    // assignee accepted its own work at exit 0 with `doctor` silent. `workedBy` is who the
+    // log says held it while it was worked, which no later write can take back.
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
       const reviewer = writeCommand('reviewer', item.id, '<name>')
       if (item.reviewer === undefined) return no('no reviewer is recorded', reviewer)
       if (item.reviewer === item.assignee) return no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
-      // Reassigning is the remedy rather than "ask someone else to run it", because a remedy
-      // is a command line the caller can run from where the item stands, and no command
-      // makes the caller a different person.
-      return context.actor !== undefined && context.actor === item.assignee
+      const actor = context.actor
+      if (actor === undefined) return PASS
+      const worked = context.workedBy ?? []
+      // A remedy is a promise: run it and the rule passes. The hand-over line is only that
+      // when the named reviewer could actually run the accept, so a reviewer the log says did
+      // the work sends the caller back to the field, which is the truth about such a record -
+      // it names a reviewer and has none.
+      const remedy = worked.includes(item.reviewer) ? reviewer : handOver(item)
+      if (actor === item.assignee) {
+        return no(`${actor} is the assignee, and the assignee does not accept their own work`, remedy)
+      }
+      return worked.includes(actor)
         ? no(
-          `${context.actor} is the assignee, and the assignee does not accept their own work`,
-          writeCommand('assignee', item.id, '<name>'),
+          `the log records ${actor} as holding this item while it was worked, and the record names ${item.assignee ?? 'nobody'} now; whoever did the work does not accept it`,
+          remedy,
         )
         : PASS
     }
