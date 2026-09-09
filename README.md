@@ -63,7 +63,7 @@ What is unforgeable sits one layer out: the record file is committed, and the fo
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 2,131 tests in 99 seconds on Node 24.11.1 on 2026-09-09.
+The suite ran 2,162 tests in 99 seconds on Node 24.15.0 on 2026-09-10, which is the floor `.nvmrc` pins and `package.json` declares rather than whatever the machine had.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
@@ -99,7 +99,7 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 
 ## What it does
 
-See [Status](#status) for the line between implemented and specified-only.
+See [Status](#status) for what is shipped, what is queued, and what was declined or is blocked.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
@@ -130,7 +130,6 @@ See [Status](#status) for the line between implemented and specified-only.
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
-"Specified, not implemented" and "Partly implemented" are gone, because neither said who owned the gap, and a gap nobody owns is documentation standing in for a decision.
 `test/architecture/documented-numbers.test.ts` reads this table: a Queued row has to name an item `.work` holds in `ready` or `draft`, and a Declined row has to name a file that exists.
 
 Twelve of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
