@@ -110,7 +110,7 @@ It passes no `--provenance` flag, because trusted publishing generates provenanc
 When the name clears, opening the gate is: remove `"private": true`, register treadle's trusted publisher on npm against `Abhijeet34/treadle` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
 
 Four sentences in the tree stop being true on the same day and none of them is code, so they belong on this list rather than in a later reader's surprise:
-`README.md`'s "Nothing is published yet" and its `npm publish` refusal paragraph, `README.md`'s "Blocked on a name clearance that has not run" status row, this file's own "Nothing has been released" opening, and the quick start, which becomes `npm install -g treadle` and `treadle init` where today it is `node bin/treadle.js init` against a clone.
+`README.md`'s "Nothing is published yet" opening to its Install section, `README.md`'s "Blocked on a name clearance that has not run" status row, this file's own "Nothing has been released" opening, and the quick start, which becomes `npm install -g treadle` and `treadle init` where today it is `node bin/treadle.js init` against a clone.
 
 One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
 Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
@@ -208,7 +208,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate treadle@0.2.0 "0.2.0 corrupts the index on a hand-edited shard; use 0.2.1"
+npm deprecate treadle@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
