@@ -93,13 +93,31 @@ Those two sentences were one sentence, and it was the removal's.
 
 ## Cost
 
-The audit's per-item state grows by one small object and, for an item that was ever assigned while being worked, one `Set` of the names in its trail - typically one entry.
-`#logLife` holds one entry per id the log filed and the records did not supply, which on an undamaged workspace is empty.
-Nothing here re-reads the store or walks the log a second time: both folds ride the one event pass ADR-0021 already pays for.
+Measured on an Apple M2, in process, against one corpus per scale built through the store, with the two source trees side by side.
+Every story is filed, assigned, evidenced and carried to `in_review`, so the log holds six events per record; the accept is run by the reviewer and the submit is the control, an edge that reads no log.
 
-`transition` reads the item's own events on one edge and no other: `DOD3` is scoped to the review step and evaluated by `G6`, which sits on the edges into `done` alone.
-`explain` pays nothing at all - it already read that log for the entry event and the per-item audit, and the read moved above the gates rather than being added.
-Measured on the drive's own eight-item workspace, an accept costs one `events({entity})` scan of the log it was already going to append to.
+| scale | events | operation | before | after |
+|---|---|---|---|---|
+| 1,000 | 6,015 | accept | 40.03 ms | 70.01 ms |
+| 1,000 | 6,015 | submit (control) | 39.04 ms | 38.91 ms |
+| 1,000 | 6,015 | `doctor` | 38.94 ms | 35.36 ms |
+| 5,000 | 30,015 | accept | 152.31 ms | 310.13 ms |
+| 5,000 | 30,015 | submit (control) | 154.27 ms | 154.71 ms |
+| 5,000 | 30,015 | `doctor` | 177.62 ms | 185.27 ms |
+
+**The audit is flat and this is the number that had to be.**
+`doctor` moves 4.3% at 5,000 items, inside the run-to-run drift the bench gate budgets 35% for, and process RSS at the end of the run moves 5.9%, from 408,320 to 432,496 KiB - a whole-process reading rather than the bench rig's `doctorRssOverWorkspace` ratio, which was not re-derived here.
+Both folds ride the one event pass ADR-0021 already pays for and neither re-reads anything.
+The per-item state grows by one small object plus, for an item that was ever assigned while being worked, one `Set` holding typically one name; `#logLife` holds one entry per id the log filed and the records did not supply, which on an undamaged workspace is none.
+
+**The accept is not flat, and it is the price of the rule.**
+It doubles: +29.98 ms over 6,015 events and +157.82 ms over 30,015, which is one linear pass at about 5.2 microseconds an event, so the log is read whole.
+Extrapolated to the bench's largest corpus, 50,000 items carrying 500,000 events, one accept would carry about 2.6 s of log read.
+`explain` pays nothing at all: it already read that log for the entry event and the per-item audit, and the read moved above the gates rather than being added.
+
+The read is bounded to the one edge that spends it - `DOD3` is scoped to the review step and evaluated by `G6`, which sits on the edges into `done` alone - and an accept happens once per item in its life, against a submit and a start that are unchanged.
+It is not bounded any further, and one narrowing is left undone deliberately: `EventQuery.from` is applied per event after each month file has been read and parsed (`sharded-store.ts`, `#eachLogEvent`), so passing the item's `filed_at` would skip no I/O.
+Making it skip whole files older than the item is a change to the store adapter rather than to this rule, and it is named here as the next thing to measure rather than reached for under this one.
 
 ## Consequences
 
