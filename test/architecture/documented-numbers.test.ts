@@ -20,6 +20,7 @@ import { describe, it } from 'node:test'
 
 import { RENDERINGS } from '../../src/adapters/render/index.ts'
 import { COMMANDS } from '../../src/cli/inventory.ts'
+import { fieldsOf } from '../../src/domain/fields.ts'
 import {
   ALLOWED_PARENT_PAIRS,
   DEFAULT_DONE_GATE,
@@ -212,6 +213,20 @@ describe('the verification table counts what the suites actually drive', () => {
     assert.ok(sentence !== undefined, 'docs/VERIFICATION.md has no "the union over the <n> types" sentence')
     assert.equal(spelled(sentence, 'types'), WORK_ITEM_TYPES.length,
       `docs/VERIFICATION.md's "the union over the <n> types" sentence spells a work-item type count src/domain does not have; WORK_ITEM_TYPES declares ${WORK_ITEM_TYPES.length}`)
+  })
+
+  // The same sentence's other number, which nothing held: it ends "is <n> now", and `now`
+  // is this tree rather than the run that measured the rest of the paragraph. It read 32
+  // for as long as it took one field to leave the dictionary after ADR-0029.
+  it('counts the union of fields over those types as the dictionary carries it', () => {
+    const union = new Set(WORK_ITEM_TYPES.flatMap((type) => [...fieldsOf(type)]))
+    const sentence = read('docs/VERIFICATION.md').split('\n')
+      .find((line) => line.includes('the union over the'))
+    assert.ok(sentence !== undefined, 'docs/VERIFICATION.md has no "the union over the <n> types" sentence')
+    const said = /the union over the [a-z]+ types is (\d+) now/.exec(sentence)?.[1]
+    assert.ok(said !== undefined, 'the sentence does not end "the union over the <n> types is <n> now"')
+    assert.equal(Number(said), union.size,
+      `docs/VERIFICATION.md says the union over the types is ${said}; src/domain/fields.ts carries ${union.size}`)
   })
 })
 

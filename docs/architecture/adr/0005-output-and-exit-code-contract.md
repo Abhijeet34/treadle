@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-05
 **Implements:** DR5 of the system design record, and the renderer half of DR6
-**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the `board` command and the `--preview` mode; the result object, the three renderings and the exit table stand
+**Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the `board` command and the `--preview` mode, and cancelled and removed the `human-layouts` story with them, so the consequence that defers the bespoke layouts to it points at no item `.work` holds; the result object, the three renderings and the exit table stand
 
 ## Context
 

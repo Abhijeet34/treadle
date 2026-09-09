@@ -161,7 +161,7 @@ That is the third instance of one defect: a field captured faithfully on every w
 So this branch answered the question and then swept the whole dictionary for the same shape.
 
 **The sweep, measured.**
-The store persisted 35 work-item fields and 14 event keys at this branch's base; ADR-0029 retired three of them on 2026-09-08 and the union over the six types is 32 now.
+The store persisted 35 work-item fields and 14 event keys at this branch's base; ADR-0029 retired three of them on 2026-09-08, ADR-0032 retired `reporter` on 2026-09-09, and the union over the six types is 31 now.
 Counted against the shapes at the branch base, 18 of the 35 and 11 of the 14 reached no read surface at all: `actual`, `component`, `expected`, `extra`, `findings`, `fix_confirmed`, `found_in`, `held_from`, `hold_reason`, `hold_until`, `hours_estimate`, `labels`, `outcome`, `question`, `reporter`, `repro_steps`, `reviewer` and `timebox_hours` on the record, and `actor`, `actor_kind`, `entity_kind`, `entity`, `op`, `before`, `after`, `guards`, `outcome`, `cmd` and `txn` in the log.
 Of those 29, 24 are readable now and 5 are declared hidden with a reason.
 

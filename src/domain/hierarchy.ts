@@ -67,8 +67,8 @@ export function childrenOf(graph: HierarchyGraph, id: ItemId): readonly ItemId[]
  *
  * Every node has at most one parent, so a cycle is reachable only from a node that has one:
  * a start without a parent walks one step and stops. Taking the edge map alone is therefore
- * the same search, and it is the shape the store can read as two index columns rather than
- * as a whole graph.
+ * the same search, and it is the shape the store can build from one field per record as it
+ * reads the shards, rather than from a whole graph.
  */
 export function findParentCycle(parentOf: ReadonlyMap<ItemId, ItemId>): readonly ItemId[] | undefined {
   const settled = new Set<ItemId>()

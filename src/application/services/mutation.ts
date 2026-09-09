@@ -116,7 +116,7 @@ export function makeEvent(input: EventInput): StoreEvent {
  */
 export const AUDITED_FIELDS = [
   'type', 'state', 'filed_at', 'priority', 'parent_id',
-  'assignee', 'reporter', 'reviewer', 'labels', 'due',
+  'assignee', 'reviewer', 'labels', 'due',
   'severity', 'found_in', 'fix_confirmed',
 ] as const
 
