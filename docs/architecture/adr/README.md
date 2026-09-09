@@ -82,6 +82,9 @@ ADR-0029 removes `H26`, `H28` and `H29` with the sprint they reported on.
 ADR-0025 argues `H30`, the parent's half of `H24`: the store refuses to write a `parent_id`
 naming a record it does not hold, and this reports the ones a hand edit, a git merge or an
 older build left behind, which nothing reported at all.
+`H31` and `H32` have no record of their own and came with pull request 77, which closed four
+ways a damaged workspace read clean: both compare a record against the log rather than reading
+either alone, which is why they arrived together and why neither is a refusal.
 
 | Id | Raised by | Finding |
 |---|---|---|

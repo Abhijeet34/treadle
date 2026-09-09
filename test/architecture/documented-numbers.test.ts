@@ -552,3 +552,34 @@ describe('the README never prints a suite figure without the run it came from', 
       'the README states a suite figure without the runtime and the date it was measured on; a measurement this file cannot check has to carry its own conditions')
   })
 })
+
+describe('every document that counts the modules allowed to touch the filesystem counts the list', () => {
+  // AGENTS.md said "the store's five modules" and docs/VERIFICATION.md "the store's own six
+  // writers". Both were true until ADR-0030 removed `src/adapters/store/index-cache.ts`, and
+  // nothing read either sentence, so both survived the cut by a year of commits. The list is
+  // one array in one test, which is what makes the number checkable rather than remembered.
+  const block = /const WRITERS: readonly string\[\] = \[([\s\S]*?)\]/
+    .exec(read('test/security/f11-adapter-write-safety.test.ts'))?.[1]
+  const writers = [...(block ?? '').matchAll(/'(src\/[^']+)'/g)].map((match) => match[1] as string)
+  const store = writers.filter((file) => file.startsWith('src/adapters/store/'))
+
+  it('reads a writer list large enough to mean something', () => {
+    assert.ok(writers.length >= 4,
+      `only ${writers.length} entries parsed out of WRITERS in test/security/f11-adapter-write-safety.test.ts`)
+    assert.ok(store.length < writers.length, 'every writer is under src/adapters/store, so the two counts cannot disagree')
+  })
+
+  it('AGENTS.md spells the number of store writers', () => {
+    const line = lineWith('AGENTS.md', AGENTS, 'touch the filesystem')
+    assert.equal(spelled(line, 'writers'), store.length,
+      `AGENTS.md counts the store's writers differently from WRITERS, which names ${store.length}`)
+  })
+
+  it('docs/VERIFICATION.md spells both the whole list and the store share of it', () => {
+    const line = lineWith('docs/VERIFICATION.md', read('docs/VERIFICATION.md'), 'writes a file outside')
+    assert.equal(spelled(line, 'modules'), writers.length,
+      `docs/VERIFICATION.md counts the modules allowed to write differently from WRITERS, which names ${writers.length}`)
+    assert.equal(spelled(line, 'writers'), store.length,
+      `docs/VERIFICATION.md counts the store's writers differently from WRITERS, which names ${store.length}`)
+  })
+})

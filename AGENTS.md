@@ -193,8 +193,8 @@ write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 same audit for one item off the events it already reads. `doctor` raises thirteen of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
-event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017, and
-`H30` with ADR-0025.
+event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017,
+`H30` with ADR-0025, and `H31` and `H32` with pull request 77, which has no record of its own.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
 raises. A membership test here asks whether the store HOLDS an id, served or quarantined: a
 quarantined record still exists, so a neighbour pointing at it is not dangling. `doctor`'s exit reads
@@ -227,7 +227,7 @@ copy that has to move whenever the test does.
 | No value exported under `src/` without a reader elsewhere in the tree; a barrel line is not a reader, a document that names it is, and a test using it as an independent oracle is | `test/architecture/exported-surface.test.ts` |
 | A command's operands are bounded by the usage lines in `src/cli/inventory.ts`, and a new placeholder is classified in `ENTITY_OPERANDS` | `test/cli/operand-guard.test.ts` |
 | An operand past the count a command's usage lines publish is refused by rule C1, read through `operandLimit` in `src/cli/operands.ts` | `test/cli/line-truth.test.ts` |
-| Nothing under `src` starts a process, evaluates a string or reads a `hooks` setting, and only the store's five modules and `src/adapters/workspace.ts` touch the filesystem | `test/security/f1-f7-no-execution.test.ts`, `test/security/f11-adapter-write-safety.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
+| Nothing under `src` starts a process, evaluates a string or reads a `hooks` setting, and only the store's four writers and `src/adapters/workspace.ts` touch the filesystem | `test/security/f1-f7-no-execution.test.ts`, `test/security/f11-adapter-write-safety.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
 | Every tracked `.ts`, `.js`, `.sh` and `.yml` carries its SPDX identifier | `test/architecture/license-header.test.ts` |
 | No root file is one a single harness loads by itself; the list of names is closed | `test/architecture/harness-instruction-files.test.ts`, ADR-0019 |
 | Zero runtime dependencies, no npm lifecycle script, a committed lockfile, `npm ci` everywhere, every action pinned to a 40-character SHA | `test/architecture/supply-chain.test.ts` |
