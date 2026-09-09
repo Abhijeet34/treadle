@@ -4,6 +4,7 @@
 **Date:** 2026-09-07
 **Implements:** the captain decision `first-run-gaps-before-publish`, over findings STR-3, STR-4, STR-5, STR-6 and STR-10 of the round-six report
 **Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes the sprint, so the closed-sprint referrer below and the `sprint set` verb are gone and `I5` is now `V9`; the removal, the label and the title search stand
+**Overtaken in part by:** [ADR-0033](0033-a-current-value-can-be-arranged-and-the-log-is-what-happened.md) splits the one sentence `history` printed for an absent id in two: `note this record was removed; the log keeps every event it earned while it was here` where an `item.remove` is on record, and a sentence naming `H33` where it is not; the query-the-log-first mechanism below stands
 
 ## Context
 
