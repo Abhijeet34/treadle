@@ -64,7 +64,7 @@ const WORKED_IN: ReadonlySet<string> = new Set(['in_progress', 'in_review', 'on_
  * also refuses the third party who accepts work the record attributes to someone who is not
  * them, which `DOD3`'s own sentence allows and this repository's fixtures drive. A record whose
  * `assignee` names a worker who never touched it is a lie no gate can see: the files agree with
- * themselves. ADR-0030 records that residual rather than closing it by widening the rule past
+ * themselves. ADR-0033 records that residual rather than closing it by widening the rule past
  * what its sentence promises.
  */
 export type WorkTrail = {

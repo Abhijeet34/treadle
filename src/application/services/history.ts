@@ -325,6 +325,27 @@ function why(value: unknown): string {
 }
 
 /**
+ * Whether the log says this record was removed, which is the one thing that tells a removal
+ * from a loss. `remove` writes an `item.remove` and says out loud what went and why
+ * (ADR-0024); a record that left with a truncated shard, a deleted month file or a bad merge
+ * leaves the log holding its `item.file` and nothing after it. Both end with no record under
+ * the id, and both printed the sentence a deliberate removal earns, so the read that is
+ * supposed to be an agent's memory reported a loss as a decision somebody had made.
+ *
+ * A refile after a removal reopens the question, which is why this folds rather than
+ * searching: `remove` then `file` under one id is the migration the tool offers for a field
+ * no command writes.
+ */
+function removalRecorded(events: readonly StoreEvent[]): boolean {
+  let removed = false
+  for (const event of events) {
+    if (event.op === 'item.remove') removed = true
+    else if (event.op === 'item.file') removed = false
+  }
+  return removed
+}
+
+/**
  * The one thing the read is scoped to. A union rather than two optional fields, so "an id or
  * a transaction, never both" is a shape this service cannot be handed a violation of; the
  * line that writes both is refused in `src/cli/main.ts`, where both are in hand.
@@ -445,7 +466,9 @@ export async function history(
     ? undefined
     : scope.kind === 'txn'
       ? `${absent.size} of the records these rows name ${absent.size === 1 ? 'is' : 'are'} no longer here; the entity in each what cell names ${absent.size === 1 ? 'it' : 'them'}, and the log keeps every event ${absent.size === 1 ? 'it' : 'they'} earned`
-      : 'no record here carries this id now; these are the events it earned while it did'
+      : removalRecorded(events.value)
+        ? 'this record was removed; the log keeps every event it earned while it was here'
+        : 'no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadle doctor reports it as H33'
 
   const recorded = page
     .filter((event) => event.reason !== undefined)

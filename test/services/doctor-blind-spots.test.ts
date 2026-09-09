@@ -225,15 +225,16 @@ describe('H18: a hold is read against the clock the write path measured it by', 
   })
 })
 
-describe('H19: naming your own reviewer is the field half of a self-review', () => {
-  it('reports the assignee writing reviewer, and does not refuse over it', async () => {
+describe('H19: the assignee marking their own work is a line a reader weighs', () => {
+  it('reports the assignee writing severity, and does not refuse over it', async () => {
     const work = await aWorkspace()
     try {
-      assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      assert.equal((await work.run(['file', 'bug', 'ship it', '--set', 'assignee=alice',
+        '--set', 'severity=S3', '--set', 'found_in=production', '--set', 'repro_steps=retry'])).code, 0)
+      assert.equal((await work.run(['mark', 'ship-it', '--severity', 'S1', '--reason', 'the revenue path'])).code, 0)
 
       const found = await work.run(['doctor'])
-      assert.match(found.out, /^H19 ship-it \S+ alice changed reviewer on an item they are assigned;/m)
+      assert.match(found.out, /^H19 ship-it \S+ alice changed severity on an item they are assigned;/m)
       // An audit note over a record that serves whole, so it prints and the store is sound:
       // the move that stops a self-review is DOD3, at write time, where a refusal belongs.
       assert.equal(found.code, 0, 'H19 names who wrote a field, not content this store cannot serve')
@@ -243,12 +244,137 @@ describe('H19: naming your own reviewer is the field half of a self-review', () 
     }
   })
 
-  it('says nothing when somebody other than the assignee names the reviewer', async () => {
+  it('says nothing when somebody other than the assignee marks it', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'bug', 'ship it', '--set', 'assignee=alice',
+        '--set', 'severity=S3', '--set', 'found_in=production', '--set', 'repro_steps=retry'])).code, 0)
+      assert.equal((await work.run(
+        ['mark', 'ship-it', '--severity', 'S1', '--reason', 'the revenue path', '--actor', 'kim'])).code, 0)
+      assert.doesNotMatch((await work.run(['doctor'])).out, /^H19 /m)
+    } finally {
+      await work.dispose()
+    }
+  })
+
+  // Half of the defect this rule was widened for, and the half easiest to forget: the audit
+  // pointed at the compliant agent. `H19` fired on `item.set reviewer` by the assignee, which
+  // is what the `DOD3` refusal's own fix line tells an assignee to do, and stayed silent on the
+  // laundered record - because the launder rewrote the very field this test read. Naming your
+  // own reviewer buys nothing now that `DOD3` reads the log for who did the work, so the arm
+  // is gone and `H34` below reports the accept itself.
+  it('does not flag the assignee who named a real reviewer, which is the printed remedy', async () => {
     const work = await aWorkspace()
     try {
       assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob', '--actor', 'kim'])).code, 0)
-      assert.doesNotMatch((await work.run(['doctor'])).out, /^H19 /m)
+      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      const found = await work.run(['doctor'])
+      assert.equal(found.code, 0, found.out)
+      assert.match(found.out, /^clean /m, found.out)
+    } finally {
+      await work.dispose()
+    }
+  })
+})
+
+// The load-time twin of `DOD3`, and the second half of what "the audit points the wrong way"
+// named: a done record whose accept was run by somebody the log says held it while it was
+// worked. The write path refuses that move now, so a record carrying it was closed by a hand
+// edit, before the rule, or under a review step widened afterwards.
+describe('H34: a done record accepted by whoever did the work', () => {
+  // `review_step` is workspace configuration, so widening it turns records already closed
+  // into records that would not close now. One `config set` is the whole reproduction, and it
+  // is the case the detail's last clause names: an accept nothing refused, under a rule that
+  // did not apply to that type at the time.
+  it('reports an accept the worker ran under a review step set afterwards', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'task', 'ship it', '--set', 'assignee=alice'])).code, 0)
+      for (const to of ['ready', 'in_progress', 'done']) {
+        assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
+      }
+      assert.equal((await work.run(['doctor'])).code, 0, 'a task has no review step, so DOD3 says nothing about it')
+
+      assert.equal((await work.run(
+        ['config', 'set', 'review_step', 'story, bug, epic, task'])).code, 0)
+      const found = await work.run(['doctor'])
+      assert.match(found.out, /^H34 ship-it state the item was accepted by alice, and the log records alice as holding it while it was worked;/m)
+    } finally {
+      await work.dispose()
+    }
+  })
+
+  it('says nothing about the accept a reviewer ran, which is the honest path', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'acceptance_criteria=[x] it ships'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      for (const to of ['ready', 'in_progress', 'in_review']) {
+        assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
+      }
+      assert.equal((await work.run(
+        ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
+      const accepted = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
+      assert.equal(accepted.code, 0, accepted.err)
+
+      const found = await work.run(['doctor'])
+      assert.equal(found.code, 0, found.out)
+      assert.match(found.out, /^clean /m, found.out)
+    } finally {
+      await work.dispose()
+    }
+  })
+})
+
+// The "not lost" clause, asked of the memory an agent reads back. A shard cut mid-file turned
+// ten records into seven and no read said so: `doctor` reported `checked 7` with nothing about
+// the three, `status` reported `items 7 findings 0`, and `history` for a vanished id printed
+// the sentence a deliberate `remove` earns. The removal boundary this file already held covered
+// EDGES, which is why the one lost record that happened to hold one was reported and the two
+// that held none were not.
+describe('H33: a record the log filed, nothing removed, and no shard carries', () => {
+  it('names every record a cut shard took, and tells it from a removal', async () => {
+    const work = await aWorkspace()
+    try {
+      for (const title of ['one thing', 'two thing', 'three thing', 'four thing']) {
+        assert.equal((await work.run(['file', 'task', title])).code, 0)
+      }
+      assert.equal((await work.run(['remove', 'one-thing', '--reason', 'a duplicate', '--yes'])).code, 0)
+      assert.equal((await work.run(['doctor'])).code, 0, 'a removal through the tool leaves nothing to report')
+
+      // The cut falls on a record boundary, so every record left parses and the store reports
+      // no finding of its own: this is the shape that read clean.
+      await work.editShard((text) => text.slice(0, text.indexOf(headingOf('three-thing'))))
+
+      const found = await work.run(['doctor'])
+      assert.equal(found.code, 7, found.out)
+      assert.match(found.out, /^H33 three-thing items the log filed three-thing at \S+ and recorded no removal of it, and no record here carries that id, so the record left the store outside the tool/m)
+      assert.match(found.out, /^H33 four-thing items /m)
+      assert.doesNotMatch(found.out, /^H33 one-thing /m, 'the record remove took is not lost, and the log says so')
+
+      // The sentence a reader acts on: a loss and a removal must not read the same.
+      const lost = await work.run(['history', 'three-thing'])
+      assert.match(lost.out, /^note no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadle doctor reports it as H33$/m)
+      const removed = await work.run(['history', 'one-thing'])
+      assert.match(removed.out, /^note this record was removed; the log keeps every event it earned while it was here$/m)
+    } finally {
+      await work.dispose()
+    }
+  })
+
+  it('says nothing about an id the log filed, removed and filed again', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'task', 'one thing'])).code, 0)
+      assert.equal((await work.run(['remove', 'one-thing', '--reason', 'the wrong type', '--yes'])).code, 0)
+      assert.equal((await work.run(['file', 'story', 'one thing', '--id', 'one-thing'])).code, 0)
+      assert.equal((await work.run(['doctor'])).code, 0)
+
+      // Removed, refiled, and the refiled record then lost: the removal is older than the
+      // filing it is read against, so it settles nothing and the loss is reported.
+      await work.editShard((text) => text.slice(0, text.indexOf(headingOf('one-thing'))))
+      assert.match((await work.run(['doctor'])).out, /^H33 one-thing items /m)
     } finally {
       await work.dispose()
     }

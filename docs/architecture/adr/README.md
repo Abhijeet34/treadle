@@ -31,6 +31,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md) | The derived index is removed and every read parses the month shards; `S14` goes with it, the journal moves to `.txn/`, the log is read only by a command that answers from it, and an errno on a path the store must read is `S13` naming the path rather than an empty answer |
 | [ADR-0031](0031-the-word-was-the-whole-difference-and-a-declared-kind-earns-its-writer.md) | `chore` folds into `task` because no rule, gate, guard, ranking or read told them apart; every declared relation kind gets a writer and `split_from` is removed; `DOR1` and `DOR2` leave the default ready gate because no input could ever fail either |
 | [ADR-0032](0032-a-field-with-no-writer-of-its-own-and-one-reader-goes.md) | `reporter` is removed because no command filled it, only `show` printed it, and the `item.file` event's actor already records who asked; the key is retired in place so a stored record still serves, and `show` moves to schema version 3 |
+| [ADR-0033](0033-a-current-value-can-be-arranged-and-the-log-is-what-happened.md) | `DOD3` reads the event log for who held the item while it was worked instead of the `assignee` the record holds now, and its remedy is the accept run by the named reviewer instead of the reassign that defeated it; `H34` is that rule's load-time twin and takes over the `reviewer` arm of `H19`, and `H33` reports a record the log filed, nothing removed, and no shard carries |
 
 Most records carry a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -85,6 +86,10 @@ older build left behind, which nothing reported at all.
 `H31` and `H32` have no record of their own and came with pull request 77, which closed four
 ways a damaged workspace read clean: both compare a record against the log rather than reading
 either alone, which is why they arrived together and why neither is a refusal.
+ADR-0033 argues `H33` and `H34`, which are the same reading taken one step further: a current
+value can be arranged and the log is what happened. `H34` is `DOD3`'s load-time twin, and it
+took over from the `reviewer` arm of `H19`, which fired on the honest path and stayed silent on
+the laundered record.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -94,7 +99,7 @@ either alone, which is why they arrived together and why neither is a refusal.
 | `H16` | the store, on load | A file arrived with CRLF line endings, which DR3 rule 6 named |
 | `H17` | `status` | An overdue item is assigned to nobody |
 | `H18` | `doctor`, `explain` | A stored value is one the write bound refuses and the load path does not apply: a description over its length, or a hold whose `hold_until` has passed while the item is still `on_hold` |
-| `H19` | `doctor`, `explain` | A severity, a priority or the `reviewer` was written by the item's own assignee |
+| `H19` | `doctor`, `explain` | A severity or a priority was written by the item's own assignee |
 | `H20` | `doctor`, `explain` | A record's state, severity or priority disagrees with the last event that recorded it, so one of the two was changed outside the tool |
 | `H21` | `doctor`, `explain` | A done item whose type has a review step points at no evidence |
 | `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
@@ -104,6 +109,8 @@ either alone, which is why they arrived together and why neither is a refusal.
 | `H30` | `doctor`, `explain` | A record's `parent_id` names an item the store does not hold, so the record reads as a child of nothing |
 | `H31` | `doctor`, `explain` | The log holds fewer events for a record than the record has versions, so the log has lost lines that every write records |
 | `H32` | `doctor`, `explain` | A record and the log disagree about a relation: the record stores an edge no event recorded, which both raise, or the log records a live edge whose holder is not a record here, which only `doctor` raises because that holder is no record for `explain` to be asked about |
+| `H33` | `doctor` | The log filed a record, recorded no removal of it, and no record here carries the id, so the record left the store outside the tool; only `doctor` raises it, because a vanished record is no record for `explain` to be asked about |
+| `H34` | `doctor`, `explain` | A done record was accepted by somebody the log records as holding it while it was worked, which `DOD3` refuses at write time |
 
 ## The CLI's rule ids
 

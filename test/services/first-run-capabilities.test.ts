@@ -333,7 +333,7 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
 
   it('keeps every event the record earned, and answers history from the log alone', async () => {
     const log = must(await cli(['history', 'login-cta-2']), 'history after removal')
-    assert.match(log.out, /^note no record here carries this id now; these are the events it earned while it did$/m)
+    assert.match(log.out, /^note this record was removed; the log keeps every event it earned while it was here$/m)
     assert.match(log.out, /^\S+ human item\.remove type=task,state=draft,/m)
     assert.match(log.out, /^\S+ human item\.file type=task,state=draft,/m)
     assert.match(log.out, /^\S+ item\.remove filed twice by the same import$/m)

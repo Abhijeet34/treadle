@@ -136,7 +136,7 @@ export async function transition(
   //
   // The log joins it on the one edge that reads it. `DOD3` is scoped to the review step and
   // evaluated by `G6`, which sits on the edges into `done` alone, so every other move decides
-  // exactly what it decided before and pays for no log read; ADR-0030 carries the measurement
+  // exactly what it decided before and pays for no log read; ADR-0033 carries the measurement
   // of the one that does.
   const trail = asked === 'done' && hasReviewStep(view.value.config, item.type)
     ? await store.events({ entity: item.id })
