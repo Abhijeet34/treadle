@@ -48,7 +48,7 @@ describe('a cursor the filter no longer matches is refused, and a live one still
   it('still resumes a backlog walk from a cursor the list does hold', async () => {
     const first = await cli(['backlog', '--limit', '3'])
     assert.equal(first.code, 0, first.err)
-    const page = /^page treadle backlog --limit 3 --cursor (\S+)$/m.exec(first.out)
+    const page = /^page treadle backlog --state open --limit 3 --cursor (\S+)$/m.exec(first.out)
     assert.ok(page !== null, 'the first page named no cursor to resume from, or dropped the limit it was asked with')
     const second = await cli(['backlog', '--limit', '3', '--cursor', page[1] as string])
     assert.equal(second.code, 0, second.err)

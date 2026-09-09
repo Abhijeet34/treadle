@@ -100,7 +100,7 @@ describe('a single-valued flag written twice is refused rather than resolved', (
 
   it('keeps every repeatable flag repeating, which its own option entry is what declares', async () => {
     const both = must(await cli(['backlog', '--label', 'ux', '--label', 'qa']), 'backlog --label')
-    assert.match(both.out, /^filter label ux label qa$/m, both.out)
+    assert.match(both.out, /^filter state open label ux label qa$/m, both.out)
     assert.match(both.out, /^one-thing /m, both.out)
     const filed = must(await cli(['file', 'task', 'Two labels', '--id', 'two-labels', '--label', 'ux', '--label', 'ui']), 'file --label')
     assert.match(filed.out, /^item two-labels$/m)

@@ -61,6 +61,7 @@ const ITEM_COLUMNS: readonly ColumnSpec[] = [
   // carries the ids rather than a yes, because a caller who reads `yes` still has to call
   // `explain` to learn by what, and removing that call is the whole point of the column.
   { name: 'blocked' },
+  { name: 'age' },
 ]
 
 /**
@@ -71,8 +72,13 @@ const ITEM_COLUMNS: readonly ColumnSpec[] = [
  * `blocked` is in it on the same rule and for a larger cost saved. Whether an item is held up
  * is what a caller reads a list to decide, and no list carried it: learning it meant one
  * `explain` per row, 669 B a call against the 2 B an unblocked row pays here.
+ *
+ * `age` is the third on that rule: how long a thing has sat is what a dispatch read is for,
+ * and it was on no list at all. `explain` carries the instant one item entered its state and
+ * costs a call per row to read; this is the whole-days figure `show`'s `overdue` already takes
+ * the shape of, off `filed_at`, which the list has in hand.
  */
-export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'sev', 'blocked', 'title'] as const
+export const DEFAULT_BACKLOG_COLUMNS = ['id', 'type', 'state', 'sev', 'blocked', 'age', 'title'] as const
 
 /** The page size every list defaults to; `next` has its own, smaller one. */
 export const DEFAULT_LIMIT = 9
@@ -208,7 +214,7 @@ export const BACKLOG_SHAPE: ResultShape = {
   command: 'backlog',
   // v3 dropped the two estimate aggregates and the `pts` and `sprint` columns with the
   // estimation and sprint surfaces; schemas/README.md is the rule that a change to a shape's
-  // properties bumps the shape. v4 added the `blocked` column to `items`.
+  // properties bumps the shape. v4 added the `blocked` and `age` columns to `items`.
   version: 4,
   effect: 'read',
   summary: 'List the items that match a filter, in one stated order.',
@@ -588,7 +594,7 @@ export async function showItem(
 
 /** One filter clause, kept in the order it was written so a tie names the first (A.4). */
 export type Filter = {
-  readonly field: 'state' | 'type' | 'assignee' | 'priority' | 'resolution' | 'label' | 'title'
+  readonly field: 'state' | 'type' | 'assignee' | 'priority' | 'resolution' | 'label' | 'title' | 'blocked'
   readonly value: string
 }
 
@@ -616,12 +622,17 @@ const STATE_GROUPS: Readonly<Record<string, (state: WorkItemState) => boolean>> 
 const OPEN_SCOPE: Filter = { field: 'state', value: 'open' }
 
 /**
- * The caller's clauses, under the default scope. A caller who named a state has scoped the
- * list themselves, and `--state all` is how they say every state, so the default is added
- * only where no state clause was written at all.
+ * The caller's clauses, under the default scope. A caller who scoped the list themselves keeps
+ * their own scope, and `--state all` is how they say every state.
+ *
+ * `--resolution` counts as scoping it, because T6 lets only the cancel transition record one:
+ * a resolution is a fact about a cancelled record and nothing else, so `--resolution duplicate`
+ * under an open scope is a clause that can never hold. It answered `matched 0` with the
+ * contradiction printed on its own `filter` line, which is legible and still useless.
  */
 export function scoped(filters: readonly Filter[]): readonly Filter[] {
-  return filters.some((filter) => filter.field === 'state') ? filters : [OPEN_SCOPE, ...filters]
+  const own = filters.some((filter) => filter.field === 'state' || filter.field === 'resolution')
+  return own ? filters : [OPEN_SCOPE, ...filters]
 }
 
 /**
@@ -630,13 +641,20 @@ export function scoped(filters: readonly Filter[]): readonly Filter[] {
  * title is matched by its words, so both answer through `holds` below and print what the item
  * carries here, which is what `--explain-absence` reads back as "got".
  */
-function fieldOf(item: WorkItemSummary, field: Filter['field']): string | undefined {
+function fieldOf(
+  item: WorkItemSummary, field: Filter['field'], blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+): string | undefined {
   if (field === 'state') return item.state
   if (field === 'type') return item.type
   if (field === 'assignee') return item.assignee
   if (field === 'resolution') return item.resolution
   if (field === 'label') return item.labels === undefined || item.labels.length === 0 ? undefined : item.labels.join(',')
   if (field === 'title') return item.title
+  // Answered here rather than in `holds`, so `--blocked` is the equality clause every other
+  // closed filter is: one value, matched the same way, reported the same way as the `got` of
+  // `--explain-absence`. An item with no active blocker is `no` and never absent, because the
+  // question has an answer for every item.
+  if (field === 'blocked') return blockers.has(item.id) ? 'yes' : 'no'
   return item.priority === undefined ? undefined : String(item.priority)
 }
 
@@ -654,7 +672,9 @@ function termsOf(value: string): readonly string[] {
  * `title` is every word of the value as a substring of the case-folded title; every other
  * clause is the equality it always was.
  */
-function holds(item: WorkItemSummary, filter: Filter): boolean {
+function holds(
+  item: WorkItemSummary, filter: Filter, blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+): boolean {
   if (filter.field === 'state') {
     const group = STATE_GROUPS[filter.value]
     if (group !== undefined) return group(item.state)
@@ -668,11 +688,13 @@ function holds(item: WorkItemSummary, filter: Filter): boolean {
     // half of that rule rather than a silent answer to a search that named nothing.
     return terms.length > 0 && terms.every((word) => title.includes(word))
   }
-  return fieldOf(item, filter.field) === filter.value
+  return fieldOf(item, filter.field, blockers) === filter.value
 }
 
-export function matches(item: WorkItemSummary, filters: readonly Filter[]): boolean {
-  return filters.every((filter) => holds(item, filter))
+export function matches(
+  item: WorkItemSummary, filters: readonly Filter[], blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+): boolean {
+  return filters.every((filter) => holds(item, filter, blockers))
 }
 
 const NO_PRIORITY = 6
@@ -684,8 +706,21 @@ function backlogOrder(a: WorkItemSummary, b: WorkItemSummary): number {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
+const DAY_MS = 86_400_000
+
+/**
+ * Whole days from an instant to now, floored at nought. It is not the ranking's own age
+ * component, which caps at thirty because a score has to stop growing; a list that printed 30
+ * for a year-old item would be reporting a cap as a fact.
+ */
+function ageDays(filed: string, now: string): number {
+  const days = Math.floor((Date.parse(now) - Date.parse(filed)) / DAY_MS)
+  return Number.isFinite(days) ? Math.max(0, days) : 0
+}
+
 function rowFor(
-  item: WorkItemSummary, columns: readonly string[], blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+  item: WorkItemSummary, columns: readonly string[],
+  blockers: ReadonlyMap<ItemId, readonly ItemId[]>, now: string,
 ): Row {
   const row: Record<string, string | number | null> = {}
   for (const column of columns) {
@@ -698,6 +733,7 @@ function rowFor(
     else if (column === 'sev') row[column] = item.severity ?? null
     else if (column === 'labels') row[column] = item.labels === undefined || item.labels.length === 0 ? null : item.labels.join(',')
     else if (column === 'blocked') row[column] = blockers.get(item.id)?.join(',') ?? null
+    else if (column === 'age') row[column] = ageDays(item.filed_at, now)
     else row[column] = null
   }
   return row
@@ -773,7 +809,14 @@ const CLOSED_FILTERS: Readonly<Partial<Record<Filter['field'], readonly string[]
   state: [...WORK_ITEM_STATES, ...Object.keys(STATE_GROUPS)],
   resolution: RESOLUTIONS,
   priority: ['1', '2', '3', '4', '5'],
+  blocked: ['yes', 'no'],
 }
+
+/**
+ * The noun a closed filter's refusal names, where the field name is not one. Every field but
+ * `blocked` is already a noun, and "maybe is not a blocked" is not a sentence.
+ */
+const FILTER_NOUN: Readonly<Partial<Record<Filter['field'], string>>> = { blocked: 'blocked value' }
 
 function filterRefusal(
   command: string, workspace: string, filters: readonly Filter[],
@@ -783,14 +826,14 @@ function filterRefusal(
     if (allowed === undefined || allowed.includes(filter.value)) continue
     return errorResult({
       code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C1',
-      cause: `${filter.value} is not ${withArticle(filter.field)}; the set is ${allowed.join(', ')}`,
+      cause: `${filter.value} is not ${withArticle(FILTER_NOUN[filter.field] ?? filter.field)}; the set is ${allowed.join(', ')}`,
       fix: [`treadle help ${command}`],
     })
   }
   return undefined
 }
 
-export async function backlog(store: Store, request: BacklogRequest): Promise<ResultObject> {
+export async function backlog(store: Store, clock: Clock, request: BacklogRequest): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('backlog', 'read', view.error, undefined)
   const workspace = view.value.identity.id
@@ -805,19 +848,20 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
   const filters = scoped(request.filters)
   const line = (cursor?: string): string =>
     invocation('backlog', [], [...listFlags(filters, request.columns, DEFAULT_BACKLOG_COLUMNS, request.limit), ['cursor', cursor]])
-  const matched = view.value.items.filter((item) => matches(item, filters)).sort(backlogOrder)
+  const now = clock.now()
+  // Both directions of the question off one pass over the edges: the `--blocked` clause reads
+  // it once per item and the column reads it once per printed row. `activeBlockers` walks the
+  // whole relation list per call, which over a list is the product of the two counts.
+  const blockers = activeBlockerIndex(view.value)
+  const matched = view.value.items.filter((item) => matches(item, filters, blockers)).sort(backlogOrder)
   const from = request.cursor === undefined ? 0 : matched.findIndex((item) => item.id === request.cursor)
   if (from < 0) return unknownCursor('backlog', workspace, request.cursor as string, request.cursor as string, line())
   const page = matched.slice(from, from + request.limit)
-  // One index over the whole graph rather than a walk per row, which is the cost
-  // `activeBlockerIndex` exists for; it is built whether or not the column was asked for,
-  // because it is one pass over the edges and the branch costs more to read than to run.
-  const blockers = activeBlockerIndex(view.value)
   const block: Block = {
     columns: columnsFor(request.columns),
     shown: page.length,
     total: matched.length,
-    rows: page.map((item) => rowFor(item, request.columns, blockers)),
+    rows: page.map((item) => rowFor(item, request.columns, blockers, now)),
   }
 
   const data: Record<string, Value> = {}
@@ -829,12 +873,12 @@ export async function backlog(store: Store, request: BacklogRequest): Promise<Re
 
   if (matched.length === 0) {
     data['none'] = `searched ${view.value.items.length} matched 0`
-    const narrowest = narrowestClause(view.value.items, filters)
+    const narrowest = narrowestClause(view.value.items, filters, blockers)
     if (narrowest !== undefined) data['narrowest'] = narrowest
   }
 
   if (request.explainAbsence !== undefined) {
-    Object.assign(data, absence(view.value, filters, request.explainAbsence))
+    Object.assign(data, absence(view.value, filters, request.explainAbsence, blockers))
   }
   const remaining = matched.length - (from + page.length)
   if (remaining > 0) {
@@ -864,10 +908,13 @@ function namedByRecord(view: WorkspaceView): ReadonlyMap<ItemId, string> {
 }
 
 /** The clause whose own selectivity was lowest, so a caller learns which term to relax. */
-function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Filter[]): string | undefined {
+function narrowestClause(
+  items: readonly WorkItemSummary[], filters: readonly Filter[],
+  blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
+): string | undefined {
   let best: { readonly filter: Filter; readonly hits: number } | undefined
   for (const filter of filters) {
-    const hits = items.filter((item) => holds(item, filter)).length
+    const hits = items.filter((item) => holds(item, filter, blockers)).length
     if (best === undefined || hits < best.hits) best = { filter, hits }
   }
   return best === undefined ? undefined : `${best.filter.field} ${best.filter.value} ${best.hits}`
@@ -876,14 +923,15 @@ function narrowestClause(items: readonly WorkItemSummary[], filters: readonly Fi
 /** The first clause that excluded the id, or the store that was searched when it is nowhere. */
 export function absence(
   view: WorkspaceView, filters: readonly Filter[], id: ItemId,
+  blockers: ReadonlyMap<ItemId, readonly ItemId[]>,
 ): Readonly<Record<string, Value>> {
   const item = view.byId.get(id)
   if (item === undefined) {
     return { absent: id, clause: `unknown searched ${view.items.length}`, store: view.identity.path ?? view.identity.id }
   }
   for (const filter of filters) {
-    if (holds(item, filter)) continue
-    const got = fieldOf(item, filter.field)
+    if (holds(item, filter, blockers)) continue
+    const got = fieldOf(item, filter.field, blockers)
     return { absent: id, clause: `${filter.field} want ${filter.value} got ${got ?? '-'}` }
   }
   return { absent: id, clause: 'none; it matched every clause' }

@@ -571,7 +571,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     const columns = fieldsOf(flags, DEFAULT_BACKLOG_COLUMNS)
     const absence = flag(flags, 'explain-absence')
     const cursor = flag(flags, 'cursor')
-    return backlog(store, {
+    return backlog(store, systemClock, {
       filters: filtersOf(flags, input.filterOrder),
       columns,
       limit: positiveInt(flag(flags, 'limit'), DEFAULT_LIMIT),

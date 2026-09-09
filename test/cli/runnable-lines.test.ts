@@ -493,7 +493,7 @@ const MUST_SEE: readonly (readonly [string, RegExp])[] = [
   ['a G5 refusal naming the submit', /^treadle transition story-wip in_review$/],
   ['a G2 refusal naming the blocker\'s move and the override', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
   ['a page line carrying the filter and the limit', /^treadle backlog --state draft --limit 2 --cursor \S+$/],
-  ['a page line carrying the columns', /^treadle backlog --type task --fields id,state --limit 1 --cursor \S+$/],
+  ['a page line carrying the columns', /^treadle backlog --state open --type task --fields id,state --limit 1 --cursor \S+$/],
   ['a page line carrying --for', /^treadle next --for kim --limit 1 --cursor \S+$/],
   ['a history page carrying the limit', /^treadle history blocked-held --limit 1 --cursor \S+$/],
   ['a transaction-scoped history page keeping its transaction', /^treadle history --txn tknown1 --limit 1 --cursor \S+$/],

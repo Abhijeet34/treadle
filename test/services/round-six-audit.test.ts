@@ -182,11 +182,19 @@ describe('STR-7: the two variables that decide who every event names', () => {
     const help = must(await cli(['help', 'transition']), 'help')
     assert.match(help.out, /--actor S supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND/)
 
+    // The first thing init tells a stranger is now the refusal rather than a next step. A
+    // workspace's creation event is entry one of the record an agent later trusts, and
+    // recording it under nobody would seed every workspace with a name nobody wrote, so the
+    // line that supplies an actor is what init answers with until one is set.
     const fresh = await mkdtemp(path.join(tmpdir(), 'treadle-r6-init-'))
     try {
-      const started = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: {} })
+      const nameless = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: {} })
+      assert.equal(nameless.code, 2, nameless.out)
+      assert.match(nameless.err, /^fix export TREADLE_ACTOR=<your-name>$/m, nameless.err)
+
+      const started = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: { TREADLE_ACTOR: 'dana' } })
       assert.equal(started.code, 0, started.err)
-      assert.match(started.out, /^next export TREADLE_ACTOR=/m, started.out)
+      assert.match(started.out, /^actor dana$/m, started.out)
     } finally {
       await rm(fresh, { recursive: true, force: true })
     }
