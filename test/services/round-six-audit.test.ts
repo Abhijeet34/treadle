@@ -179,8 +179,10 @@ describe('STR-7: the two variables that decide who every event names', () => {
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
   it('names them on a help page and in the first thing init tells a stranger to do', async () => {
-    const help = must(await cli(['help', 'transition']), 'help')
-    assert.match(help.out, /--actor S supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND/)
+    // On the index, which is where a supported flag is now described: a command page prints
+    // only the flags it grades other than `S`, and `--actor` is `S` on every mutation.
+    const help = must(await cli(['help']), 'help')
+    assert.match(help.out, /^--actor mutation names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND/m)
 
     // The first thing init tells a stranger is now the refusal rather than a next step. A
     // workspace's creation event is entry one of the record an agent later trusts, and

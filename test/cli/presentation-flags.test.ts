@@ -42,6 +42,18 @@ function notesOf(command: string): ReadonlyMap<string, { readonly verdict: strin
   ]))
 }
 
+/**
+ * What the index says a flag does. A supported flag is described once there rather than on
+ * each of the eighteen pages, so this is where a claim about `--width` is now read from.
+ */
+function saysOnIndex(flag: string): string {
+  const globals = topLevelHelp('-').data['globals']
+  assert.ok(isBlock(globals), 'the index carries no globals block')
+  const row = (globals as Block).rows.find((entry) => entry['flag'] === flag)
+  assert.ok(row !== undefined, `the index does not name ${flag}`)
+  return String(row['note'])
+}
+
 describe('--width is supported, because every rendering of every command is laid out at it', () => {
   for (const command of COMMANDS) {
     it(`${command.name} declares --width supported`, () => {
@@ -68,12 +80,10 @@ describe('--width is supported, because every rendering of every command is laid
   })
 
   it('says what --width does, rather than that it does nothing', () => {
-    const note = notesOf('show').get('--width')
-    assert.equal(note?.verdict, 'S')
-    assert.ok(
-      !note.note.includes('nothing to present'),
-      `show's help says of --width: ${note.note}`,
-    )
+    const note = saysOnIndex('--width')
+    assert.ok(!note.includes('nothing to present'), `treadle help says of --width: ${note}`)
+    assert.match(note, /display cells/, `treadle help says of --width: ${note}`)
+    assert.equal(notesOf('show').get('--width'), undefined, 'show still repeats a flag it supports')
   })
 })
 
@@ -114,8 +124,6 @@ describe('a flag that takes a count refuses a value that is not one', () => {
 
 describe('no ignored flag inherits a reason that is not its own', () => {
   it('gives every accepted-and-ignored cell a note written for that flag', () => {
-    const generic = notesOf('status').get('--help')
-    assert.ok(generic !== undefined)
     for (const command of COMMANDS) {
       const notes = notesOf(command.name)
       for (const flag of GLOBAL_FLAGS) {

@@ -80,16 +80,20 @@ describe('help is generated from the inventory', () => {
     }
   })
 
-  it('gives one page per command, carrying that command\'s own verdict for every global flag', () => {
+  it('gives one page per command, carrying that command\'s own verdict wherever it is not the default', () => {
     for (const command of COMMANDS) {
       const page = commandHelp(command.name, 'w')
       assert.notEqual(page, undefined, `${command.name} has no help page`)
       const flags = page?.data['flags']
       assert.ok(isBlock(flags))
-      assert.equal(flags.rows.length, GLOBAL_FLAGS.length)
+      assert.equal(flags.total, GLOBAL_FLAGS.length, `${command.name} counts against the wrong total`)
       for (const flag of GLOBAL_FLAGS) {
         const row: Row | undefined = flags.rows.find((entry) => entry['flag'] === flag)
-        assert.equal(row?.['verdict'], verdictFor(command, flag), `${command.name} ${flag}`)
+        // A page prints a flag only where its verdict is not `S` and varies by command; an
+        // absent row is the default, which is what the index's own table states once.
+        if (row === undefined) continue
+        assert.equal(row['verdict'], verdictFor(command, flag), `${command.name} ${flag}`)
+        assert.notEqual(row['verdict'], 'S', `${command.name} prints ${flag} at its default verdict`)
       }
     }
   })
