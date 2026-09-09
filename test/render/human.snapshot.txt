@@ -1469,3 +1469,106 @@ config  6 of 6
   ready_gate    default  DOR3 all no_active_blocker Nothing active is blocking the item.|DOR4 story field_non_empty_list:acceptance_criteria The story has at least one acceptance criterion.|DOR6 bu…
   done_gate     default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_from_assignee …
 
+### status-unwritable @ 60
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
+  writes
+    .txn/stray.json is not a transaction journal this
+    store wrote, so it cannot be replayed and no write
+    can go past it; .txn holds journals and nothing
+    else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first,
+    because the store will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in …
+  gdpr-export    42     Export everything we hold on one …
+  webhook-retry  33     Retry a failed webhook three times
+
+### status-unwritable @ 80
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
+  writes
+    .txn/stray.json is not a transaction journal this store wrote, so it
+    cannot be replayed and no write can go past it; .txn holds journals and
+    nothing else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first, because the store
+    will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
+
+### status-unwritable @ 200
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
+  writes  .txn/stray.json is not a transaction journal this store wrote, so it cannot be replayed and no write can go past it; .txn holds journals and nothing else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first, because the store will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
+

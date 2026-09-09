@@ -204,6 +204,19 @@ quarantined record still exists, so a neighbour pointing at it is not dangling. 
 `SERVED_ANYWAY` prints under a `serving` line and exits 0. `status`'s `findings` count stays
 what it always was, the store's own load-time findings, and its `audit` line says so.
 
+`status` answers a second question beside that one, and they are not the same question:
+`findings` asks whether the records are damaged, and `writes` asks whether this workspace can
+be written at all.
+The second is `store.writable()`, a listing of `.txn/` and an access check on each directory a
+transaction writes, and it prints the sentence and the fix lines the next write's own refusal
+would print, so the orientation call is the place to check rather than the place that looked
+like it.
+It is 0.24 ms flat at 1,000 and at 10,000 items, against a `status` of 4.8 ms and 16.1 ms.
+The exit stays 0: the read succeeded and the records are there, and the exit table names no
+code for an answer given over a store that cannot be written.
+A held lock is deliberately not reported, because a writer working and a waiter reclaiming a
+lock that stopped heartbeating are both a store that works.
+
 Which command writes which field is `writerOf` in `src/domain/fields.ts`, and it is one
 table because two readers need it: `set` refuses a field another command owns, and a gate
 remedy names the command that owns it. `set` writes the dictionary; `mark` keeps severity and

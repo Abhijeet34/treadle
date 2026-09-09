@@ -240,5 +240,17 @@ export interface Store {
   apply(transaction: StoreTransaction): Promise<StoreResult<Applied>>
   /** Quarantined records and load-time integrity violations, in file and line order. */
   findings(): Promise<StoreResult<readonly Finding[]>>
+  /**
+   * Whether a write could be attempted at all: `ok` when nothing standing refuses every one
+   * of them, and otherwise the refusal the next `apply` would give, so a caller reports the
+   * cause and the remedy this store already has words for rather than inventing its own.
+   *
+   * It is a different question from `findings`, which asks whether the records are damaged
+   * and costs a read of all of them. This one is cheap by contract - a listing of the
+   * transient directory and a parse of what it holds - because the caller is `status`, the
+   * orientation read, and a condition worth knowing there is worth knowing for nothing.
+   * It takes no lock and re-parses no record; a store that is merely busy is writable.
+   */
+  writable(): Promise<StoreResult<undefined>>
   close(): Promise<void>
 }

@@ -50,6 +50,7 @@ node bin/treadle.js status
 
 `file` prints the id it minted on its `item` line, and that id is the title as a slug, which is why `show field-edits` reads the record back.
 `backlog` lists what is open and names the filter it used; `status` counts the workspace rather than printing a record.
+`status` also says when no write can pass, on a `writes` line with the remedy that clears it, because a store that refuses every write is the most important fact about a workspace and the count above it would otherwise read as health.
 `treadle help <command>` is the contract for one command, and `treadle help` on its own is the whole inventory.
 
 `TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.

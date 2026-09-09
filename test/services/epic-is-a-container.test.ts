@@ -112,6 +112,28 @@ describe('an epic keeps its record and loses its ceremony', () => {
     assert.equal(shown['reviewer'], undefined)
   })
 
+  it('lets an epic a past workspace left in in_review finish, so no stored record is stranded', async () => {
+    // The migration case, driven rather than hand-written so the log agrees with the record:
+    // the workspace configures the review step epics used to have, an epic reaches in_review
+    // under it, and the setting then moves to what this build compiles in. `accept` is an
+    // edge out of in_review for every type, so the record still has its exit.
+    await must(['config', 'set', 'review_step', 'story, bug, epic'])
+    await must(['file', 'epic', 'Older effort', '--id', 'older-effort', '--set', 'outcome=it lands'])
+    await must(['file', 'story', 'Its story', '--id', 'its-story', '--parent', 'older-effort',
+      '--set', 'acceptance_criteria=[x] done'])
+    await must(['transition', 'older-effort', 'ready'])
+    await must(['transition', 'older-effort', 'in_progress'])
+    await must(['transition', 'older-effort', 'in_review'])
+    await must(['config', 'set', 'review_step', 'story, bug'])
+
+    const shown = dataOf(await must(['show', 'older-effort']))
+    assert.equal(shown['state'], 'in_review')
+    // G8 and DOD1 still hold over the stranded record, so the one child is closed first.
+    await must(['transition', 'its-story', 'cancelled', '--resolution', 'wont_do', '--reason', 'not needed'])
+    const accepted = await must(['transition', 'older-effort', 'done'])
+    assert.equal(dataOf(accepted)['state'], 'in_review -> done')
+  })
+
   it('still refuses to groom an epic with no child story, which is DOR8 and stays', async () => {
     await must(['file', 'epic', 'Empty effort', '--id', 'empty-effort', '--set', 'outcome=nothing yet'])
     const refused = await cli(['transition', 'empty-effort', 'ready'])

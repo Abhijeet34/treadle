@@ -74,6 +74,12 @@ export class LoggingStore implements Store {
     return this.#inner.findings()
   }
 
+  async writable(): Promise<StoreResult<undefined>> {
+    const result = await this.#inner.writable()
+    this.#log.store('writable', { ok: result.ok, rule: result.ok ? '-' : result.error.rule })
+    return result
+  }
+
   async close(): Promise<void> {
     await this.#inner.close()
   }

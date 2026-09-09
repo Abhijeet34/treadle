@@ -6,7 +6,7 @@
 // renderer, the schema test validates every golden object against the shipped schema, and
 // the budget test measures the agent rendering of each against the interface's A.3 figures.
 
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 
@@ -217,6 +217,13 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
       key: 'wip_limits', value: 'in_progress=5, in_review=2', actor: ACTOR,
     }))
     golden.set('config', await readConfig(demo.store))
+    // After every other object, because it breaks the store: a `.txn/` file this store did
+    // not write refuses every write past it. Without it the `writes` scalar and the `fix`
+    // list `status` prints over an unwritable store reach no renderer and no schema check,
+    // which is the reason `status-overdue` above exists for `overdue` and `health`.
+    await mkdir(path.join(demo.root, '.txn'), { recursive: true })
+    await writeFile(path.join(demo.root, '.txn', 'stray.json'), '{"garbage":true}')
+    golden.set('status-unwritable', await status(demo.store, clock))
     return new Map([...golden].map(([name, result]) => [name, atGoldenRoot(result, demo.root)]))
   } finally {
     await demo.dispose()
