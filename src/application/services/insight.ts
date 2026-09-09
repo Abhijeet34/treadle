@@ -34,8 +34,6 @@ import {
   readWorkspace,
   wholeItem,
   readyVerdict,
-  workedBy,
-  type Asker,
   type WorkspaceView,
 } from './context.ts'
 import { auditImpediment, auditItem, auditParentOf, auditRelationsOf } from './doctor.ts'
@@ -335,12 +333,7 @@ function enteredAt(events: readonly StoreEvent[], state: string): Entry | undefi
   return undefined
 }
 
-/**
- * `actor` is who is asking, and it is an argument because `DOD3` reads it: an `explain` that
- * evaluated the done gate without it printed `rules 8/8 pass` over a move `transition` then
- * refused, which is the explain-versus-transition disagreement this command exists to end.
- */
-export async function explain(store: Store, clock: Clock, id: ItemId, actor?: string): Promise<ResultObject> {
+export async function explain(store: Store, clock: Clock, id: ItemId): Promise<ResultObject> {
   const view = await readWorkspace(store)
   if (!view.ok) return storeRefusal('explain', 'read', view.error, undefined)
   const workspace = view.value.identity.id
@@ -349,17 +342,14 @@ export async function explain(store: Store, clock: Clock, id: ItemId, actor?: st
   const item = whole.value
   if (item === undefined) return notFound('explain', 'read', workspace, view.value, id)
 
-  // One read of this item's log serves three things: the gates below, whose `DOD3` asks who
-  // the log says did the work, the entry event further down, and the audit after it. It was
-  // read once for the last two and is read once for all three.
+  // One read of this item's log serves the entry event further down and the audit after it.
   const events = await store.events({ entity: id })
   if (!events.ok) return storeRefusal('explain', 'read', events.error, workspace)
   const log = events.value
 
   const blockers = activeBlockers(view.value, id)
-  const asker: Asker = { ...(actor === undefined ? {} : { actor }), workedBy: workedBy(log) }
-  const ready = readyVerdict(view.value, item, asker)
-  const done = doneVerdict(view.value, item, asker)
+  const ready = readyVerdict(view.value, item)
+  const done = doneVerdict(view.value, item)
   const failing = [
     ...ready.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'ready', rule })),
     ...done.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'done', rule })),

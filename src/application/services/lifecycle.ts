@@ -26,7 +26,7 @@ import { errorResult, okResult, type ResultObject, type ResultShape, type Value 
 import type { Clock } from '../ports/clock.ts'
 import type { IdGenerator } from '../ports/ids.ts'
 import type { Store } from '../ports/store.ts'
-import { guardReads, hasReviewStep, openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem, workedBy, type Asker } from './context.ts'
+import { guardReads, openImpedimentsOf, readWorkspace, transitionContextFor, wholeItem } from './context.ts'
 import { diffOf, makeEvent, type Actor, type Target } from './mutation.ts'
 import { echoed, notFound } from './items.ts'
 import { storeRefusal } from './refusal.ts'
@@ -130,23 +130,10 @@ export async function transition(
   // move goes INTO; `resume` resolves to the state the hold was taken from, which is the
   // same resolution the transition table makes.
   const asked = request.target === 'resume' ? item.held_from : request.target
-  // The actor decides `DOD3` beside the record's own `reviewer`, so it reaches the gate
-  // rather than only the event: the gate read the field alone, and an assignee who wrote any
-  // name into it accepted their own work with `guards G6 pass`.
-  //
-  // The log joins it on the one edge that reads it. `DOD3` is scoped to the review step and
-  // evaluated by `G6`, which sits on the edges into `done` alone, so every other move decides
-  // exactly what it decided before and pays for no log read; ADR-0033 carries the measurement
-  // of the one that does.
-  const trail = asked === 'done' && hasReviewStep(view.value.config, item.type)
-    ? await store.events({ entity: item.id })
-    : undefined
-  if (trail !== undefined && !trail.ok) return storeRefusal('transition', 'mutate', trail.error, workspace)
-  const asker: Asker = {
-    actor: request.actor.id,
-    ...(trail === undefined || !trail.ok ? {} : { workedBy: workedBy(trail.value) }),
-  }
-  const context = transitionContextFor(view.value, item, asked, asker)
+  // No actor and no log reach the gate: `DOD3` decides on the record's own two fields, and
+  // the accept into `done` costs the log read it used to pay for (ADR-0034). Who ran the move
+  // is recorded on the event either way, and `H34` is what reads it back.
+  const context = transitionContextFor(view.value, item, asked)
 
   const outcome = evaluateTransition(context, {
     target: request.target,

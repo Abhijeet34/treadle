@@ -46,7 +46,7 @@ import {
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { foldWorkTrail, hasReviewStep, hidesContent, type WorkTrail } from './context.ts'
+import { hasReviewStep, hidesContent } from './context.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const DOCTOR_SHAPE: ResultShape = {
@@ -161,14 +161,17 @@ type Audited = {
    */
   enteredAt?: Instant
   /**
-   * `H34`: who the log says did the work on this record, and who took it to `done` last. The
-   * trail is folded by the same function `DOD3` reads at write time, so the guard and this
-   * finding cannot disagree about who did the work; the accept is one string, kept last-wins,
-   * because an item reopened and closed again properly is not reported for the accept that
-   * was superseded.
+   * `H34`: every actor the log names on this record. One name in it over a done record is
+   * single-actor completion, which is the whole finding, so the set is what is kept rather
+   * than a trail of who held the item when: the question is how many people the record
+   * passed through, and the answer needs no ordering.
+   *
+   * It counts events dated before a removal too, the way `events` does. An id removed and
+   * refiled inherits the old record's actors, so the count can only run high, and running
+   * high is the direction that reports nothing rather than reporting a second actor who
+   * never existed.
    */
-  trail?: WorkTrail
-  acceptedBy?: string
+  actors?: Set<string>
   /**
    * How many events in the log name this id, which is `H31`'s input. Every write bumps the
    * record's version and appends an event naming it, so the log holds at least `version`
@@ -366,18 +369,8 @@ export class WorkspaceAudit {
     if (event.op === 'item.remove' && (entry.removedAt === undefined || event.at > entry.removedAt)) {
       entry.removedAt = event.at
     }
-    // Who the log says did the work, folded into the trail `H34` is decided against and read
-    // from the same place `DOD3` reads it, so the write-time guard and the load-time finding
-    // cannot disagree about who that is.
-    foldWorkTrail(entry.trail ??= {}, event)
-    // The accept, kept as the actor of the LAST move into `done`: an item reopened and closed
-    // again properly is not reported for the accept that was superseded, which is the same
-    // narrowing `H27` took when it fired between two commands the tool itself prescribes.
-    if (event.op === 'item.transition'
-      && typeof after === 'object' && after !== null
-      && (after as Record<string, unknown>)['state'] === 'done') {
-      entry.acceptedBy = event.actor
-    }
+    // Everyone the log names on this record, which is `H34`'s whole input.
+    ;(entry.actors ??= new Set()).add(event.actor)
     // One op, one question: did the person the work is assigned to write the marker field that
     // is supposed to be somebody else's judgement of it. `item.mark` carries severity and
     // priority, which is where this started.
@@ -419,7 +412,7 @@ export class WorkspaceAudit {
         detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
       })
     }
-    findings.push(...this.#unaccounted(entry), ...this.#selfAccepted(entry), ...this.#handWrittenEdges(entry))
+    findings.push(...this.#unaccounted(entry), ...this.#singleActor(entry), ...this.#handWrittenEdges(entry))
     // The removal boundary is applied here rather than in `event`, because the removal can be
     // reached after the events it settles: the store orders the log by file name first.
     const fromLog = (entry.fromLog ?? [])
@@ -455,26 +448,27 @@ export class WorkspaceAudit {
   }
 
   /**
-   * `H34`: a done record whose accept was run by somebody the log says held it while it was
-   * worked. It is `DOD3`'s load-time twin, the pair this file already keeps for `G3` and
-   * `H04` and for `DOD7` and `H21`, and it reads the trail from the same fold the gate does.
+   * `H34`: a done record whose whole log names one actor. No write path refuses this and none
+   * should - one agent filing, working and accepting an item is a legitimate and common shape
+   * (ADR-0034) - so this is not a fault to fix but a fact about the record, and the audit is
+   * where a fact about the record belongs. What was unacceptable was the audit reporting such
+   * a record clean, which said a second pair of eyes had been over it.
    *
-   * The write path refuses this now, so what reaches here is a record closed before that
-   * refusal existed, a shard a hand edit took to `done`, or a workspace whose `review_step`
-   * was widened after the fact. `explain` raises it too, because it needs only the record and
-   * its own events.
+   * Scoped to the review step, because that setting is the workspace saying this type is meant
+   * to get a second look; a type nobody asked for review on would earn the line on every item
+   * and say nothing. `explain` raises it too, since it needs only the record and its own events.
    */
-  #selfAccepted(entry: Audited): readonly DoctorFinding[] {
+  #singleActor(entry: Audited): readonly DoctorFinding[] {
     const item = entry.item
-    const by = entry.acceptedBy
-    if (item.state !== 'done' || by === undefined) return NONE
+    const actors = entry.actors
+    if (item.state !== 'done' || actors === undefined || actors.size !== 1) return NONE
     if (!hasReviewStep(this.#context.config, item.type)) return NONE
-    if (entry.trail?.names?.has(by) !== true) return NONE
+    const [only] = actors
     return [{
       rule: 'H34',
       id: item.id,
       where: 'state',
-      detail: `the item was accepted by ${by}, and the log records ${by} as holding it while it was worked; DOD3 refuses that move, so this record was closed by a hand edit, before that rule, or under a review step set afterwards; treadle history ${item.id}`,
+      detail: `${only} filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ${item.id}`,
     }]
   }
 
