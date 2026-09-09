@@ -1125,7 +1125,10 @@ export class ShardedStore implements Store {
       }
       const journal = parseJournal(text)
       if (journal === undefined) {
-        return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file])
+        // `journal` is what tells the refusal apart from every other `S13`, which is an errno
+        // with a filesystem remedy. This one is cleared by deleting the file, and the fix
+        // line in `src/application/services/refusal.ts` reads this key to say so.
+        return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file], { journal: file })
       }
       await this.#applyJournal(journal, true, lock, journal.txn)
       await rm(path.join(dir, name), { force: true })

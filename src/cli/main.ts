@@ -18,6 +18,7 @@ import { setFields } from '../application/services/editing.ts'
 import { DEFAULT_BACKLOG_COLUMNS, DEFAULT_LIMIT, backlog, fileItem, invocation, showItem, type Filter } from '../application/services/items.ts'
 import { addEvidence, markItem } from '../application/services/marking.ts'
 import { history } from '../application/services/history.ts'
+import { unavailableFixes } from '../application/services/refusal.ts'
 import { DEFAULT_NEXT_LIMIT, explain, next, status } from '../application/services/insight.ts'
 import { RELATION_VERBS, relate, type RelationVerb } from '../application/services/relation.ts'
 import { removeItem } from '../application/services/removal.ts'
@@ -413,7 +414,8 @@ async function execute(env: Environment): Promise<number> {
   const runtime = checkRuntime(env.nodeVersion)
   if (!runtime.ok) {
     const result = errorResult({
-      code: 'STORE_UNAVAILABLE', command: 'treadle', workspace: '-', effect: 'read', cause: runtime.cause,
+      code: 'STORE_UNAVAILABLE', command: 'treadle', workspace: '-', effect: 'read',
+      cause: runtime.cause, fix: runtime.fix,
     })
     return emit(env, result, presentationFlags(env.argv))
   }
@@ -518,6 +520,7 @@ async function execute(env: Environment): Promise<number> {
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read', rule: 'S13',
       cause: `${error.message}; make it readable, or name another store with --workspace`,
+      fix: unavailableFixes({ code: 'STORE_UNAVAILABLE', rule: 'S13' }),
     }), flags)
   }
   if (root === undefined) {
@@ -532,17 +535,15 @@ async function execute(env: Environment): Promise<number> {
 
   const opened = await openWorkspace(root)
   if (!opened.ok) {
-    // A workspace file that is missing is `init`'s to write. One at a schema this build does
-    // not read is not: `init` answers `already` there, so the line offered is the one that
-    // dates the tool against the file. The other refusals carry their own instruction in the
-    // cause, and no command line stands in for it.
+    // A workspace file that is missing is `init`'s to write, and this is the only place that
+    // is true: every refusal `unavailableFixes` answers arrives after the store opened, where
+    // `init` says `already`. Everything else shares that table, so a remedy is stated once.
     //
-    // The code and not the rule decides the first of those, because a `workspace.md` the
-    // grammar quarantined also refuses under `S1` and `init` answers `already` over it: that
-    // refusal names the line to edit and there is no command that stands in for the edit,
-    // so it is one of the ones that offers nothing.
+    // The code and not the rule decides the missing case, because a `workspace.md` the grammar
+    // quarantined also refuses under `S1` and `init` answers `already` over it. That one is a
+    // damaged file, which the table sends to git rather than to a command.
     const missing = opened.error.code === 'STORE_UNAVAILABLE' && opened.error.rule === 'S1'
-    const fix = missing ? ['treadle init'] : opened.error.rule === 'S8' ? ['treadle version'] : []
+    const fix = missing ? ['treadle init'] : unavailableFixes(opened.error)
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read',
       rule: opened.error.rule, cause: opened.error.message, ...(fix.length === 0 ? {} : { fix }),

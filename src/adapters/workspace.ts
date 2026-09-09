@@ -13,6 +13,7 @@ import path from 'node:path'
 import { initResult } from '../application/services/workspace.ts'
 import { errorResult, type ResultObject } from '../application/result.ts'
 import { makeEvent, type Actor } from '../application/services/mutation.ts'
+import { unavailableFixes } from '../application/services/refusal.ts'
 import type { Clock } from '../application/ports/clock.ts'
 import type { IdGenerator } from '../application/ports/ids.ts'
 import { SCHEMA, ShardedStore, WORKSPACE_FILE, createWorkspace, openWorkspace } from './store/index.ts'
@@ -92,7 +93,7 @@ export async function initWorkspace(
     if (!(error instanceof WorkspaceUnreadable)) throw error
     return errorResult({
       code: 'STORE_UNAVAILABLE', command: 'init', workspace: '-', effect: 'mutate', rule: 'S13',
-      cause: error.message,
+      cause: error.message, fix: unavailableFixes({ code: 'STORE_UNAVAILABLE', rule: 'S13' }),
     })
   }
   if (existing) {
@@ -132,6 +133,7 @@ export async function initWorkspace(
     return errorResult({
       code: 'STORE_UNAVAILABLE', command: 'init', workspace: '-', effect: 'mutate',
       rule: created.error.rule, cause: created.error.message,
+      fix: unavailableFixes(created.error),
     })
   }
 
@@ -150,6 +152,7 @@ export async function initWorkspace(
     return errorResult({
       code: 'STORE_UNAVAILABLE', command: 'init', workspace: id, effect: 'mutate',
       rule: applied.error.rule, cause: applied.error.message,
+      fix: unavailableFixes(applied.error),
     })
   }
   return initResult({ workspace: id, path: root, actor: request.actor.id, schema: SCHEMA, txn })

@@ -33,12 +33,18 @@ export function isBelow(version: string, floor: string): boolean {
   return false
 }
 
-export type RuntimeCheck = { readonly ok: true } | { readonly ok: false; readonly cause: string }
+export type RuntimeCheck = { readonly ok: true }
+  | { readonly ok: false; readonly cause: string; readonly fix: readonly string[] }
 
 export function checkRuntime(version: string): RuntimeCheck {
   if (!isBelow(version, HARD_FLOOR)) return { ok: true }
   return {
     ok: false,
     cause: `treadle needs Node ${HARD_FLOOR} or newer and this is ${version}; the supported floor is ${DECLARED_FLOOR}`,
+    // The refusal is `STORE_UNAVAILABLE` like the store's own, and it used to be the one in
+    // that class carrying no `fix` at all. Both floors are compiled in, so the line is built
+    // from bounded values; which installer to use is the reader's, and naming one would be a
+    // line most readers cannot run.
+    fix: [`install Node ${DECLARED_FLOOR} or newer, then re-run the command`],
   }
 }
