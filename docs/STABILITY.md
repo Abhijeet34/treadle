@@ -152,6 +152,7 @@ The crash band runs from there to `ARG_MAX`, and it is about 93 KB wide.
 The empty-script case is what places the fault in the runtime's startup rather than in any code
 here, and `ulimit -s` does not move it: the geometry is measured from the top of the stack, not
 from its size.
+That mechanism is reported upstream as [nodejs/node#65936](https://github.com/nodejs/node/issues/65936), open since 2026-09-09, so the limit is tracked there rather than only carried here.
 
 ### Why no valid call reaches it
 
