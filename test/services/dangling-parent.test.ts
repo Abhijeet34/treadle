@@ -81,11 +81,15 @@ describe('a parent_id naming a record the store does not hold', () => {
     assert.match(still.out, /^H30 child-task parent_id /m, 'the finding survives an unrelated edit')
   })
 
-  it('is cleared by the line the detail names, and doctor is clean after it', async () => {
+  // The remedy clears H30 and nothing more. The parent record is still gone and the log still
+  // records its filing with no removal, which is `H33`: dropping the reference does not put
+  // the record back, and the audit that stopped saying so would be the silence this pair of
+  // rules exists to end.
+  it('is cleared by the line the detail names, and the lost parent is still reported', async () => {
     assert.equal((await cli(['set', 'child-task', 'parent_id='])).code, 0)
     const run = await cli(['doctor'])
-    assert.equal(run.code, 0, run.out)
     assert.doesNotMatch(run.out, /^H30 /m)
+    assert.match(run.out, /^H33 parent-story items the log filed parent-story at /m, run.out)
   })
 })
 

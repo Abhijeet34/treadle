@@ -46,7 +46,7 @@ import {
 import { columnsOf, okResult, type Block, type ResultObject, type ResultShape, type Row, type Value } from '../result.ts'
 import type { Clock } from '../ports/clock.ts'
 import type { Store, StoreEvent } from '../ports/store.ts'
-import { hasReviewStep, hidesContent } from './context.ts'
+import { foldWorkTrail, hasReviewStep, hidesContent, type WorkTrail } from './context.ts'
 import { storeRefusal } from './refusal.ts'
 
 export const DOCTOR_SHAPE: ResultShape = {
@@ -161,6 +161,15 @@ type Audited = {
    */
   enteredAt?: Instant
   /**
+   * `H34`: who the log says did the work on this record, and who took it to `done` last. The
+   * trail is folded by the same function `DOD3` reads at write time, so the guard and this
+   * finding cannot disagree about who did the work; the accept is one string, kept last-wins,
+   * because an item reopened and closed again properly is not reported for the accept that
+   * was superseded.
+   */
+  trail?: WorkTrail
+  acceptedBy?: string
+  /**
    * How many events in the log name this id, which is `H31`'s input. Every write bumps the
    * record's version and appends an event naming it, so the log holds at least `version`
    * events for a record the tool wrote, and one integer per item is the whole cost of
@@ -214,6 +223,19 @@ export class WorkspaceAudit {
   readonly #logEdges = new Map<ItemId, Map<string, LoggedEdge>>()
   /** The latest `item.remove` per entity, which is the boundary `#logEdges` is read against. */
   readonly #logRemoved = new Map<ItemId, Instant>()
+  /**
+   * `H33`: whether the log's last word on an id the records did NOT supply was a filing or a
+   * removal, with the instant it was filed at. An id the store serves is never entered, so an
+   * undamaged workspace keeps nothing here at all.
+   *
+   * The last word in SCAN ORDER, which is the one place this departs from `#logRemoved`'s
+   * rule. `at` is second-resolution, so a record filed and removed inside one second carries
+   * two lines with the same instant and a comparison has to break the tie by guessing; it
+   * gets `remove` then `file`, the migration the tool offers for a field no command writes,
+   * wrong in the silent direction. A hand-written line filed under an earlier month is read
+   * where the file puts it, which errs toward reporting, and `H23` is what names such a line.
+   */
+  readonly #logLife = new Map<ItemId, { readonly filed: Instant; alive: boolean }>()
 
   /**
    * The item ids the records supply are the SERVED set. `heldItems` is what the store holds
@@ -290,6 +312,15 @@ export class WorkspaceAudit {
       const removed = this.#logRemoved.get(event.entity)
       if (removed === undefined || event.at > removed) this.#logRemoved.set(event.entity, event.at)
     }
+    // Every record is read before any event is (`doctor` runs `eachItem` then `eachEvent`),
+    // so an id the store serves is known here and costs no entry.
+    if (!this.#byId.has(event.entity)) {
+      if (event.op === 'item.file') this.#logLife.set(event.entity, { filed: event.at, alive: true })
+      else if (event.op === 'item.remove') {
+        const life = this.#logLife.get(event.entity)
+        if (life !== undefined) life.alive = false
+      }
+    }
     const entry = this.#byId.get(event.entity)
     if (entry === undefined) return
     entry.events = (entry.events ?? 0) + 1
@@ -335,19 +366,33 @@ export class WorkspaceAudit {
     if (event.op === 'item.remove' && (entry.removedAt === undefined || event.at > entry.removedAt)) {
       entry.removedAt = event.at
     }
-    // Two ops, one question: did the person the work is assigned to write the field that is
-    // supposed to be somebody else's judgement of it. `item.mark` carries severity and
-    // priority, which is where this started; `item.set` carries `reviewer`, and naming your
-    // own reviewer is the field half of the same defect `DOD3` closes at write time - the
-    // gate read the name and never who wrote it. Only `reviewer` counts among `set`'s fields:
-    // an assignee editing their own item's description is the ordinary case.
-    const namedReviewer = event.op === 'item.set'
-      && typeof after === 'object' && after !== null && 'reviewer' in (after as Record<string, unknown>)
-    if (event.op !== 'item.mark' && !namedReviewer) return
+    // Who the log says did the work, folded into the trail `H34` is decided against and read
+    // from the same place `DOD3` reads it, so the write-time guard and the load-time finding
+    // cannot disagree about who that is.
+    foldWorkTrail(entry.trail ??= {}, event)
+    // The accept, kept as the actor of the LAST move into `done`: an item reopened and closed
+    // again properly is not reported for the accept that was superseded, which is the same
+    // narrowing `H27` took when it fired between two commands the tool itself prescribes.
+    if (event.op === 'item.transition'
+      && typeof after === 'object' && after !== null
+      && (after as Record<string, unknown>)['state'] === 'done') {
+      entry.acceptedBy = event.actor
+    }
+    // One op, one question: did the person the work is assigned to write the marker field that
+    // is supposed to be somebody else's judgement of it. `item.mark` carries severity and
+    // priority, which is where this started.
+    //
+    // `item.set` writing `reviewer` was here too, and it fired on the honest path and nowhere
+    // else: an assignee that named a real reviewer because the `DOD3` refusal told it to earned
+    // a finding, while the record that laundered an accept earned none, because the launder
+    // changed the very field this test reads. Naming your own reviewer is not a hazard now that
+    // `DOD3` reads the log for who did the work - no name written into that field lets the
+    // worker accept - so the arm goes and `H34` below reports the accept itself.
+    if (event.op !== 'item.mark') return
     if (item.assignee === undefined || event.actor !== item.assignee) return
-    const changed = namedReviewer
-      ? 'reviewer'
-      : typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
+    const changed = typeof after === 'object' && after !== null
+      ? Object.keys(after).join(' and ')
+      : 'a marked field'
     ;(entry.fromLog ??= []).push({
       finding: {
         rule: 'H19',
@@ -374,7 +419,7 @@ export class WorkspaceAudit {
         detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
       })
     }
-    findings.push(...this.#unaccounted(entry), ...this.#handWrittenEdges(entry))
+    findings.push(...this.#unaccounted(entry), ...this.#selfAccepted(entry), ...this.#handWrittenEdges(entry))
     // The removal boundary is applied here rather than in `event`, because the removal can be
     // reached after the events it settles: the store orders the log by file name first.
     const fromLog = (entry.fromLog ?? [])
@@ -410,6 +455,30 @@ export class WorkspaceAudit {
   }
 
   /**
+   * `H34`: a done record whose accept was run by somebody the log says held it while it was
+   * worked. It is `DOD3`'s load-time twin, the pair this file already keeps for `G3` and
+   * `H04` and for `DOD7` and `H21`, and it reads the trail from the same fold the gate does.
+   *
+   * The write path refuses this now, so what reaches here is a record closed before that
+   * refusal existed, a shard a hand edit took to `done`, or a workspace whose `review_step`
+   * was widened after the fact. `explain` raises it too, because it needs only the record and
+   * its own events.
+   */
+  #selfAccepted(entry: Audited): readonly DoctorFinding[] {
+    const item = entry.item
+    const by = entry.acceptedBy
+    if (item.state !== 'done' || by === undefined) return NONE
+    if (!hasReviewStep(this.#context.config, item.type)) return NONE
+    if (entry.trail?.names?.has(by) !== true) return NONE
+    return [{
+      rule: 'H34',
+      id: item.id,
+      where: 'state',
+      detail: `the item was accepted by ${by}, and the log records ${by} as holding it while it was worked; DOD3 refuses that move, so this record was closed by a hand edit, before that rule, or under a review step set afterwards; treadle history ${item.id}`,
+    }]
+  }
+
+  /**
    * `H32`, the direction a record can be wrong in: the record stores an edge the log never
    * recorded. `relation add` is the only writer and it refuses a cycle (`R2`), a second
    * original (`R4`) and an edge out of finished work (`R5`), so an edge with no event behind
@@ -430,6 +499,36 @@ export class WorkspaceAudit {
         where: 'relations',
         detail: `the record stores ${relation.kind} ${relation.target} and no event in the log recorded it, so it was written outside the tool, which refuses a cycle, a second original and an edge out of finished work; treadle relation remove ${entry.item.id} ${relation.kind} ${relation.target}`,
       }))
+  }
+
+  /**
+   * `H33`: the log filed a record, recorded no removal of it, and no record here carries the
+   * id. It is the "not lost" clause of the store's promise, asked of the memory an agent reads
+   * back: a shard cut mid-file, a deleted month, a bad merge or a hand edit takes records out
+   * with nothing anywhere saying so, and `doctor`, `status` and every list answered over what
+   * was left as though that were the whole of it.
+   *
+   * The one thing that makes a record's absence legitimate is an `item.remove`, which says out
+   * loud what went and why (ADR-0024). A removal after the filing therefore ends the question,
+   * and a refile after a removal opens it again.
+   *
+   * Workspace-scoped rather than per-item, exactly as `#vanishedEdges` is and for the same
+   * reason: the question is whether ANY record here carries the id, which an audit fed one
+   * record cannot answer.
+   */
+  #vanishedItems(known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
+    const findings: DoctorFinding[] = []
+    for (const [id, life] of this.#logLife) {
+      if (!life.alive || known.has(id)) continue
+      const filed = life.filed
+      findings.push({
+        rule: 'H33',
+        id: cell(id),
+        where: 'items',
+        detail: `the log filed ${id} at ${filed} and recorded no removal of it, and no record here carries that id, so the record left the store outside the tool: a truncated or deleted shard, a bad merge, or a hand edit; treadle history ${id}`,
+      })
+    }
+    return findings
   }
 
   /**
@@ -507,6 +606,7 @@ export class WorkspaceAudit {
         ...auditRelationsOf(known, entry.item),
         ...auditImpediment(entry.item),
       ]),
+      ...this.#vanishedItems(known),
       ...this.#vanishedEdges(known),
       ...this.#columnsOverLimit(),
       ...storedBlockingCycle(relationGraphFrom(this.#entries.map((entry) => entry.item))),

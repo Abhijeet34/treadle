@@ -34,6 +34,8 @@ import {
   readWorkspace,
   wholeItem,
   readyVerdict,
+  workedBy,
+  type Asker,
   type WorkspaceView,
 } from './context.ts'
 import { auditImpediment, auditItem, auditParentOf, auditRelationsOf } from './doctor.ts'
@@ -329,9 +331,17 @@ export async function explain(store: Store, clock: Clock, id: ItemId, actor?: st
   const item = whole.value
   if (item === undefined) return notFound('explain', 'read', workspace, view.value, id)
 
+  // One read of this item's log serves three things: the gates below, whose `DOD3` asks who
+  // the log says did the work, the entry event further down, and the audit after it. It was
+  // read once for the last two and is read once for all three.
+  const events = await store.events({ entity: id })
+  if (!events.ok) return storeRefusal('explain', 'read', events.error, workspace)
+  const log = events.value
+
   const blockers = activeBlockers(view.value, id)
-  const ready = readyVerdict(view.value, item, actor)
-  const done = doneVerdict(view.value, item, actor)
+  const asker: Asker = { ...(actor === undefined ? {} : { actor }), workedBy: workedBy(log) }
+  const ready = readyVerdict(view.value, item, asker)
+  const done = doneVerdict(view.value, item, asker)
   const failing = [
     ...ready.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'ready', rule })),
     ...done.rules.filter((rule) => !rule.pass).map((rule) => ({ gate: 'done', rule })),
@@ -361,15 +371,10 @@ export async function explain(store: Store, clock: Clock, id: ItemId, actor?: st
     }),
   }
 
-  // One read of this item's log serves both the entry below and the audit further down; it
-  // used to be read twice for the two.
-  const events = await store.events({ entity: id })
-  if (!events.ok) return storeRefusal('explain', 'read', events.error, workspace)
-  // The entry event and the audit below are both the log's answer, so a line the log could
-  // not read is a hole in this one.
+  // The gates, the entry event and the audit are all the log's answer, so a line the log
+  // could not read is a hole in this one.
   const readable = await logIsWhole(store)
   if (!readable.ok) return storeRefusal('explain', 'read', readable.error, workspace)
-  const log = events.value
   const at = enteredAt(log, item.state)
   const data: Record<string, Value> = {
     item: item.id,

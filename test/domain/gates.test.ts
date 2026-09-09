@@ -222,8 +222,57 @@ describe('the default done gate', () => {
     assert.deepEqual(failed(verdict), ['DOD3'])
     const rule = verdict.rules.find((r) => r.rule === 'DOD3')
     assert.equal(rule?.reason, 'dana is the assignee, and the assignee does not accept their own work')
-    assert.equal(rule?.remedy, 'treadle set task-1 assignee=<name>',
-      'the remedy is a line the caller can run, because no command makes the caller another person')
+    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor kim',
+      'the remedy is the accept run by the reviewer the record names; the reassign line it used to print is the launder below')
+  })
+
+  // The launder the actor half was defeated by, and the reason this rule reads the log at all.
+  // The actor test compared the caller against the assignee the RECORD holds, and a record is
+  // one write away from anything: the assignee ran the `set <id> assignee=` line the refusal
+  // itself printed, took its own name off the field, and accepted its own work at
+  // `guards G6 pass` with `doctor` reporting nothing. `workedBy` is who the log says held the
+  // item while it was worked, which no later write takes back.
+  it('refuses DOD3 when the log says the caller held the item, whatever the record says now', () => {
+    const laundered = {
+      assignee: 'bob', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }],
+    }
+    const byFieldAlone = gateContext(item('task', laundered), { reviewStep: true, actor: 'dana' })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, byFieldAlone).pass, true,
+      'the two fields as they stand say nothing about dana, which is what the launder walks through')
+
+    const byTheLog = gateContext(item('task', laundered), {
+      reviewStep: true, actor: 'dana', workedBy: ['dana'],
+    })
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, byTheLog)
+    assert.deepEqual(failed(verdict), ['DOD3'])
+    const rule = verdict.rules.find((r) => r.rule === 'DOD3')
+    assert.equal(rule?.reason,
+      'the log records dana as holding this item while it was worked, and the record names bob now; whoever did the work does not accept it')
+    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor kim')
+  })
+
+  // A remedy is a promise: run it and the rule passes. A reviewer the log says did the work
+  // cannot run the accept either, so the hand-over line would be a promise nothing keeps and
+  // the caller is sent back to the field, which is the truth about such a record - it names a
+  // reviewer and has none.
+  it('does not hand the accept to a reviewer the log says did the work', () => {
+    const context = gateContext(
+      item('task', { assignee: 'bob', reviewer: 'dana', evidence: [{ kind: 'run' as const, ref: '8813' }] }),
+      { reviewStep: true, actor: 'dana', workedBy: ['dana'] },
+    )
+    const rule = evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')
+    assert.equal(rule?.remedy, 'treadle set task-1 reviewer=<name>')
+  })
+
+  // A reviewer is a caller-written line of up to 200 characters and a fix line is one command
+  // a reader runs, so a name that would split into two shell words is not printed into one.
+  it('prints the placeholder rather than a reviewer name that is not one shell word', () => {
+    const context = gateContext(
+      item('task', { assignee: 'dana', reviewer: 'kim smith', evidence: [{ kind: 'run' as const, ref: '8813' }] }),
+      { reviewStep: true, actor: 'dana' },
+    )
+    const rule = evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')
+    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor <name>')
   })
 
   // A gate is evaluated by `config` and by `explain` as well as by `G6`, and only a move has

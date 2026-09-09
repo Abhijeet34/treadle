@@ -11,7 +11,8 @@
 // merge leaves its markers in the shard.
 
 import assert from 'node:assert/strict'
-import { readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, it, before, after } from 'node:test'
 
@@ -159,24 +160,26 @@ describe('the duplicated id and the newer schema refuse the list path too', () =
   })
 })
 
+// The workspace is built by the tool rather than by cutting records out of a fixture's
+// shards, which is how this read: the cut left a log that had filed thirteen records over a
+// store serving one, and `H33` reports every one of the twelve as a record that left outside
+// the tool. That is the finding doing its job, and the property under test here is the
+// singular noun, so the workspace it is read over holds one item because one was filed.
 describe('a count of one is singular', () => {
   it('on the not-found refusal and on the clean doctor line', async () => {
-    const demo = await aDemoWorkspace()
+    const root = await mkdtemp(path.join(tmpdir(), 'treadle-one-'))
     try {
-      const file = path.join(demo.root, SHARD)
-      // Keep one record in the month shard and drop the other month entirely.
-      const text = await readFile(file, 'utf8')
-      const first = text.indexOf('\n# ', text.indexOf('\n# ') + 1)
-      await writeFile(file, text.slice(0, first + 1))
-      await writeFile(path.join(demo.root, 'items', '2026-08.md'), 'schema: 1\n\n')
+      assert.equal((await runCli(['init'], { cwd: root })).code, 0)
+      const filed = await runCli(['file', 'task', 'The only record'], { cwd: root })
+      assert.equal(filed.code, 0, filed.err)
 
-      const missing = await runCli(['show', 'nothing-here'], { cwd: demo.root })
+      const missing = await runCli(['show', 'nothing-here'], { cwd: root })
       assert.match(missing.err, /this workspace holds 1 item$/m)
-      const clean = await runCli(['doctor'], { cwd: demo.root })
-      assert.equal(clean.code, 0, clean.out)
+      const clean = await runCli(['doctor'], { cwd: root })
+      assert.equal(clean.code, 0, `${clean.out}${clean.err}`)
       assert.match(clean.out, /^clean checked 1 item and \d+ events$/m)
     } finally {
-      await demo.dispose()
+      await rm(root, { recursive: true, force: true })
     }
   })
 })
