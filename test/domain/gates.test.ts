@@ -12,7 +12,7 @@ import {
   evaluateGate,
   validateGate,
 } from '../../src/domain/index.ts'
-import type { Gate } from '../../src/domain/index.ts'
+import type { Gate, WorkItem } from '../../src/domain/index.ts'
 import { errorOf, gateContext, item, neighbour, unwrap } from '../helpers/fixtures.ts'
 
 function failed(verdict: ReturnType<typeof evaluateGate>): readonly string[] {
@@ -234,13 +234,37 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true })).pass, true)
   })
 
-  // The sentence is printed by `config` and by `explain`, so it may promise neither more nor
-  // less than the check decides. It used to say the reviewer "accepted it" over a check that
-  // read two fields and no actor; the check now reads the actor, so the sentence says so.
+  // The property this holds is the one the truth sweep spent thirteen fixes establishing: a
+  // rule's prose says what the rule decides, no more and no less. `config` and `explain` both
+  // print this sentence, so a clause with no verdict behind it is a promise to a reader that
+  // nothing keeps - which is exactly the defect that produced this rule's widening. It said
+  // the reviewer "accepted it" over a check that read two fields and never the actor, and an
+  // assignee named any reviewer and closed their own work at exit 0 underneath that sentence.
+  //
+  // So each clause is asserted against a verdict the evaluator actually reaches, by moving one
+  // fact at a time off a context that passes. A sentence that gains a clause the check does
+  // not decide, or a check that stops deciding one the sentence still claims, fails here.
   it('states in DOD3 what the check decides, which is both the reviewer and the caller', () => {
     const rule = DEFAULT_DONE_GATE.rules.find((r) => r.id === 'DOD3')
     assert.equal(rule?.sentence,
       'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.')
+
+    const reviewed = { assignee: 'kim', reviewer: 'ravi', evidence: [{ kind: 'run' as const, ref: '8813' }] }
+    /** DOD3's verdict over the reviewed item, with one fact of it or of the caller moved. */
+    const dod3 = (over: Partial<WorkItem>, actor = 'dana', reviewStep = true): boolean => {
+      const context = gateContext(item('task', { ...reviewed, ...over }), { reviewStep, actor })
+      return evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')?.pass === true
+    }
+
+    assert.equal(dod3({}), true, 'the sentence describes a rule something can satisfy, or every clause below proves nothing')
+    assert.equal(dod3({ reviewer: undefined }), false, '"a reviewer ... is named" is a clause the check decides')
+    assert.equal(dod3({ reviewer: 'kim' }), false, '"other than the assignee" is a clause the check decides')
+    assert.equal(dod3({}, 'kim'), false, '"the assignee is not the one accepting" is a clause the check decides')
+    // The last clause governs the other three, so it is asserted over each of them rather than
+    // once: a type with no review step is one this rule has nothing to ask about at all.
+    for (const over of [{}, { reviewer: undefined }, { reviewer: 'kim' }] as Partial<WorkItem>[]) {
+      assert.equal(dod3(over, 'kim', false), true, '"when the type has a review step" scopes every clause before it')
+    }
   })
 })
 
