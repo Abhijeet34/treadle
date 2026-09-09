@@ -204,83 +204,13 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, other).pass, true)
   })
 
-  // The field half of the rule is above; this is the half that reads who is asking. A gate
-  // that read the reviewer field alone made the review step a field to fill in: the assignee
-  // named any reviewer with one `set` and then ran the accept, and `transition` answered
-  // `guards G6 pass` at exit 0 over work nobody else had looked at.
-  it('refuses DOD3 when the actor running the move is the item\'s own assignee', () => {
+  // Who runs the accept is not this rule's business and was for two releases. A single actor
+  // filing, working and accepting an item is a legitimate shape in an agent fleet (ADR-0034),
+  // so the gate passes it and doctor's `H34` reports it as single-actor completion instead.
+  it('passes DOD3 for the assignee running their own accept, which the audit reports instead', () => {
     const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
-    const byReviewer = gateContext(item('task', named), { reviewStep: true, actor: 'kim' })
-    assert.equal(evaluateGate(DEFAULT_DONE_GATE, byReviewer).pass, true)
-
-    const bySomeoneElse = gateContext(item('task', named), { reviewStep: true, actor: 'ravi' })
-    assert.equal(evaluateGate(DEFAULT_DONE_GATE, bySomeoneElse).pass, true,
-      'the rule asks that the assignee is not the one accepting, not that the reviewer is')
-
-    const byAssignee = gateContext(item('task', named), { reviewStep: true, actor: 'dana' })
-    const verdict = evaluateGate(DEFAULT_DONE_GATE, byAssignee)
-    assert.deepEqual(failed(verdict), ['DOD3'])
-    const rule = verdict.rules.find((r) => r.rule === 'DOD3')
-    assert.equal(rule?.reason, 'dana is the assignee, and the assignee does not accept their own work')
-    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor kim',
-      'the remedy is the accept run by the reviewer the record names; the reassign line it used to print is the launder below')
-  })
-
-  // The launder the actor half was defeated by, and the reason this rule reads the log at all.
-  // The actor test compared the caller against the assignee the RECORD holds, and a record is
-  // one write away from anything: the assignee ran the `set <id> assignee=` line the refusal
-  // itself printed, took its own name off the field, and accepted its own work at
-  // `guards G6 pass` with `doctor` reporting nothing. `workedBy` is who the log says held the
-  // item while it was worked, which no later write takes back.
-  it('refuses DOD3 when the log says the caller held the item, whatever the record says now', () => {
-    const laundered = {
-      assignee: 'bob', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }],
-    }
-    const byFieldAlone = gateContext(item('task', laundered), { reviewStep: true, actor: 'dana' })
-    assert.equal(evaluateGate(DEFAULT_DONE_GATE, byFieldAlone).pass, true,
-      'the two fields as they stand say nothing about dana, which is what the launder walks through')
-
-    const byTheLog = gateContext(item('task', laundered), {
-      reviewStep: true, actor: 'dana', workedBy: ['dana'],
-    })
-    const verdict = evaluateGate(DEFAULT_DONE_GATE, byTheLog)
-    assert.deepEqual(failed(verdict), ['DOD3'])
-    const rule = verdict.rules.find((r) => r.rule === 'DOD3')
-    assert.equal(rule?.reason,
-      'the log records dana as holding this item while it was worked, and the record names bob now; whoever did the work does not accept it')
-    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor kim')
-  })
-
-  // A remedy is a promise: run it and the rule passes. A reviewer the log says did the work
-  // cannot run the accept either, so the hand-over line would be a promise nothing keeps and
-  // the caller is sent back to the field, which is the truth about such a record - it names a
-  // reviewer and has none.
-  it('does not hand the accept to a reviewer the log says did the work', () => {
-    const context = gateContext(
-      item('task', { assignee: 'bob', reviewer: 'dana', evidence: [{ kind: 'run' as const, ref: '8813' }] }),
-      { reviewStep: true, actor: 'dana', workedBy: ['dana'] },
-    )
-    const rule = evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')
-    assert.equal(rule?.remedy, 'treadle set task-1 reviewer=<name>')
-  })
-
-  // A reviewer is a caller-written line of up to 200 characters and a fix line is one command
-  // a reader runs, so a name that would split into two shell words is not printed into one.
-  it('prints the placeholder rather than a reviewer name that is not one shell word', () => {
-    const context = gateContext(
-      item('task', { assignee: 'dana', reviewer: 'kim smith', evidence: [{ kind: 'run' as const, ref: '8813' }] }),
-      { reviewStep: true, actor: 'dana' },
-    )
-    const rule = evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')
-    assert.equal(rule?.remedy, 'treadle transition task-1 done --actor <name>')
-  })
-
-  // A gate is evaluated by `config` and by `explain` as well as by `G6`, and only a move has
-  // an actor. A context without one decides on the field alone, which is what it decided
-  // before the actor was read at all.
-  it('decides DOD3 on the reviewer field alone when no actor is supplied', () => {
-    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
-    assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true })).pass, true)
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true }))
+    assert.equal(verdict.pass, true)
   })
 
   // The property this holds is the one the truth sweep spent thirteen fixes establishing: a
@@ -293,26 +223,24 @@ describe('the default done gate', () => {
   // So each clause is asserted against a verdict the evaluator actually reaches, by moving one
   // fact at a time off a context that passes. A sentence that gains a clause the check does
   // not decide, or a check that stops deciding one the sentence still claims, fails here.
-  it('states in DOD3 what the check decides, which is both the reviewer and the caller', () => {
+  it('states in DOD3 what the check decides, which is the reviewer the record names', () => {
     const rule = DEFAULT_DONE_GATE.rules.find((r) => r.id === 'DOD3')
-    assert.equal(rule?.sentence,
-      'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.')
+    assert.equal(rule?.sentence, 'A reviewer other than the assignee is named, when the type has a review step.')
 
     const reviewed = { assignee: 'kim', reviewer: 'ravi', evidence: [{ kind: 'run' as const, ref: '8813' }] }
-    /** DOD3's verdict over the reviewed item, with one fact of it or of the caller moved. */
-    const dod3 = (over: Partial<WorkItem>, actor = 'dana', reviewStep = true): boolean => {
-      const context = gateContext(item('task', { ...reviewed, ...over }), { reviewStep, actor })
+    /** DOD3's verdict over the reviewed item, with one fact of the record moved. */
+    const dod3 = (over: Partial<WorkItem>, reviewStep = true): boolean => {
+      const context = gateContext(item('task', { ...reviewed, ...over }), { reviewStep })
       return evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')?.pass === true
     }
 
     assert.equal(dod3({}), true, 'the sentence describes a rule something can satisfy, or every clause below proves nothing')
     assert.equal(dod3({ reviewer: undefined }), false, '"a reviewer ... is named" is a clause the check decides')
     assert.equal(dod3({ reviewer: 'kim' }), false, '"other than the assignee" is a clause the check decides')
-    assert.equal(dod3({}, 'kim'), false, '"the assignee is not the one accepting" is a clause the check decides')
-    // The last clause governs the other three, so it is asserted over each of them rather than
+    // The last clause governs the other two, so it is asserted over each of them rather than
     // once: a type with no review step is one this rule has nothing to ask about at all.
     for (const over of [{}, { reviewer: undefined }, { reviewer: 'kim' }] as Partial<WorkItem>[]) {
-      assert.equal(dod3(over, 'kim', false), true, '"when the type has a review step" scopes every clause before it')
+      assert.equal(dod3(over, false), true, '"when the type has a review step" scopes every clause before it')
     }
   })
 })

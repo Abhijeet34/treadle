@@ -21,12 +21,10 @@
 // the rule id and that the refusal carried at least one `fix` line, because a refusal an
 // agent cannot act on is the failure this whole surface exists to prevent.
 //
-// TWO STEPS CHARACTERISE A GAP RATHER THAN A GUARANTEE, and both say so in their names. The
-// `DOD3` pair asserts that the actor half refuses a self-accept when an assignee is named and
-// does not when none ever was, because `workedBy` is folded from the assignee the log
-// recorded and an unassigned record leaves it empty. That is the boundary as it stands today.
-// Closing it turns these two red together, which is the point: the next change to that rule
-// is told what it moved.
+// ONE ACTOR WALKS THE WHOLE SHIFT, which is what an agent's shift is and what the audit at
+// the end reports. `DOD3` refuses nobody for running their own accept (ADR-0034), so the pair
+// below asserts that both twins close, and the closing step asserts the `H34` line each of
+// them earns: the record says a single actor did it all, rather than saying nothing.
 
 import assert from 'node:assert/strict'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -243,7 +241,7 @@ describe('one agent shift, walked in order', () => {
     tally.assertions += 2
   })
 
-  it('refuses the self-accept when an assignee is named (DOD3 actor half, armed)', async () => {
+  it('takes the self-accept when an assignee is named, and the audit reports it', async () => {
     await step('file it', ['file', 'story', 'Assigned twin', '--id', 'twin-yes',
       '--set', 'acceptance_criteria=[x] it works'], 0)
     await step('assign it to the worker', ['set', 'twin-yes', 'assignee=worker'], 0)
@@ -252,23 +250,22 @@ describe('one agent shift, walked in order', () => {
     await step('groom it', ['transition', 'twin-yes', 'ready'], 0)
     await step('start it', ['transition', 'twin-yes', 'in_progress'], 0)
     await step('submit it', ['transition', 'twin-yes', 'in_review'], 0)
-    const refused = await step('the worker accepts its own work', ['transition', 'twin-yes', 'done'], 3)
-    assert.equal(refused.scalars.get('rule'), 'G6')
-    assert.match(refused.scalars.get('cause') ?? '', /DOD3/)
-    assert.ok(
-      refused.fixes.some((line) => line === 'treadle transition twin-yes done --actor reviewer'),
-      `the refusal did not hand the accept to the reviewer it names: ${refused.fixes.join(' | ')}`,
+    await step('the worker accepts its own work', ['transition', 'twin-yes', 'done'], 0)
+    await holds('the assigned twin reached done under one actor', 'twin-yes', 'done')
+    const audit = await step('the audit names what happened', ['doctor'], 7)
+    assert.match(
+      audit.out,
+      /^H34 twin-yes state worker filed, worked and accepted this item and no other actor appears in its log/m,
+      `the audit does not report the single-actor completion:\n${audit.out}`,
     )
-    tally.assertions += 3
-    await step('the reviewer accepts it, as the refusal printed', ['transition', 'twin-yes', 'done',
-      '--actor', 'reviewer'], 0)
+    tally.assertions += 1
   })
 
-  it('does not refuse it when no assignee was ever named (DOD3 actor half, disarmed)', async () => {
-    // Characterises a gap rather than a guarantee. `workedBy` is folded from the assignee the
-    // log recorded while the item was in a worked state, so a record nothing ever assigned
-    // leaves it empty and the actor half has no name to compare the caller against. The step
-    // above and this one differ by exactly one command, `set twin-yes assignee=worker`.
+  it('takes it when no assignee was ever named, and reports that record the same way', async () => {
+    // The twin above and this one differ by exactly one command, `set twin-yes assignee=worker`,
+    // and the record now says the same thing about both. It used to say nothing about this one:
+    // the trail `H34` was decided against was folded off `assignee`, so a record nothing was
+    // ever assigned left it empty and the cheaper launder went unreported.
     await step('file it', ['file', 'story', 'Unassigned twin', '--id', 'twin-no',
       '--set', 'acceptance_criteria=[x] it works'], 0)
     await step('name a reviewer, assign nobody', ['set', 'twin-no', 'reviewer=reviewer'], 0)
@@ -278,8 +275,12 @@ describe('one agent shift, walked in order', () => {
     await step('submit it', ['transition', 'twin-no', 'in_review'], 0)
     await step('the actor that did every write accepts it', ['transition', 'twin-no', 'done'], 0)
     await holds('the unassigned record reached done under one actor', 'twin-no', 'done')
-    const audit = await step('and the audit says nothing about it', ['doctor'], 0)
-    assert.match(audit.out, /^~findings 0 0$/m, `the audit reports the launder after all:\n${audit.out}`)
+    const audit = await step('and the audit names it too', ['doctor'], 7)
+    assert.match(
+      audit.out,
+      /^H34 twin-no state worker filed, worked and accepted this item and no other actor appears in its log/m,
+      `the unassigned record is still reported clean:\n${audit.out}`,
+    )
     tally.assertions += 1
   })
 
@@ -298,13 +299,19 @@ describe('one agent shift, walked in order', () => {
     tally.assertions += 2
   })
 
-  it('leaves a workspace the audit passes and the orientation call describes', async () => {
-    const audit = await step('the audit', ['doctor'], 0)
-    assert.match(audit.out, /^~findings 0 0$/m, `the shift left findings behind:\n${audit.out}`)
-    tally.assertions += 1
+  // One agent worked this whole shift, so what the audit leaves behind is the record of that
+  // and nothing else: every finding is an `H34`, and every one names a story this actor took
+  // the whole way. A finding of any other rule is damage the walk did not mean to leave.
+  it('leaves a workspace whose only findings are the single-actor completions it earned', async () => {
+    const audit = await step('the audit', ['doctor'], 7)
+    const found = audit.out.split('\n').filter((line) => /^H\d\d /.test(line))
+    assert.ok(found.length > 0, `the shift closed items under one actor and the audit said nothing:\n${audit.out}`)
+    assert.deepEqual([...new Set(found.map((line) => line.split(' ')[0]))], ['H34'],
+      `the shift left findings of another rule behind:\n${found.join('\n')}`)
+    tally.assertions += 2
     const orient = await step('the orientation call', ['status'], 0)
     assert.equal(orient.scalars.get('items'), '7', `seven records should remain\n${orient.out}`)
-    assert.equal(orient.scalars.get('findings'), '0')
+    assert.equal(orient.scalars.get('findings'), String(found.length))
     assert.ok(!orient.scalars.has('writes'), `the store reports itself unwritable\n${orient.out}`)
     tally.assertions += 3
   })

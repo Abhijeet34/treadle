@@ -277,11 +277,11 @@ describe('H19: the assignee marking their own work is a line a reader weighs', (
   })
 })
 
-// The load-time twin of `DOD3`, and the second half of what "the audit points the wrong way"
-// named: a done record whose accept was run by somebody the log says held it while it was
-// worked. The write path refuses that move now, so a record carrying it was closed by a hand
-// edit, before the rule, or under a review step widened afterwards.
-describe('H34: a done record accepted by whoever did the work', () => {
+// What the audit says about a record one actor took the whole way. No write path refuses that
+// shape and none should - one agent filing, working and accepting an item is legitimate and
+// common in a fleet (ADR-0034) - so what was wrong was the audit calling such a record clean,
+// which told a reader a second pair of eyes had been over it.
+describe('H34: a done record whose whole log names one actor', () => {
   // `review_step` is workspace configuration, so widening it turns records already closed
   // into records that would not close now. One `config set` is the whole reproduction, and it
   // is the case the detail's last clause names: an accept nothing refused, under a rule that
@@ -298,7 +298,34 @@ describe('H34: a done record accepted by whoever did the work', () => {
       assert.equal((await work.run(
         ['config', 'set', 'review_step', 'story, bug, epic, task'])).code, 0)
       const found = await work.run(['doctor'])
-      assert.match(found.out, /^H34 ship-it state the item was accepted by alice, and the log records alice as holding it while it was worked;/m)
+      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ship-it$/m)
+    } finally {
+      await work.dispose()
+    }
+  })
+
+  // The defect this rule was rewritten for: alice named a reviewer who never touched the item
+  // and accepted it herself, and every read said the work was clean. Nothing here is refused
+  // now, and the audit is where the fact lands. The item carries no assignee at all, which is
+  // the cheap version - the trail this used to be decided against was folded off `assignee`
+  // and was empty, so the old finding could not see it.
+  it('reports the item one actor filed, worked and accepted with nobody assigned', async () => {
+    const work = await aWorkspace()
+    try {
+      assert.equal((await work.run(['file', 'story', 'ship it'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'acceptance_criteria=[x] it ships'])).code, 0)
+      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      for (const to of ['ready', 'in_progress', 'in_review']) {
+        assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
+      }
+      assert.equal((await work.run(
+        ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
+      assert.equal((await work.run(['transition', 'ship-it', 'done'])).code, 0,
+        'a single actor taking an item the whole way is a shape the write path allows')
+
+      const found = await work.run(['doctor'])
+      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ship-it$/m)
+      assert.doesNotMatch(found.out, /^clean /m)
     } finally {
       await work.dispose()
     }
@@ -381,88 +408,34 @@ describe('H33: a record the log filed, nothing removed, and no shard carries', (
   })
 })
 
-// The write-time half of the pair `H19` is the load-time half of, kept beside it because
-// neither is readable alone: `H19` names the assignee who wrote the reviewer field, and this
-// is the gate that stops that name being enough to close the work. `DOD3` read the field and
-// never the actor, so the human in the loop was a field to fill in.
-describe('DOD3: the assignee does not accept their own work', () => {
-  it('refuses the accept the assignee runs, and takes the one the reviewer runs', async () => {
+// What `DOD3` still decides, now that who runs the accept is not its business: the record
+// names a reviewer, and not the person the work is assigned to. The actor half it carried is
+// gone with ADR-0034, and `H34` above is what reports the shape it used to refuse.
+describe('DOD3: the record names a reviewer other than the assignee', () => {
+  it('takes the accept the assignee runs and reports it, having refused the record naming no reviewer', async () => {
     const work = await aWorkspace()
     try {
       assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
       assert.equal((await work.run(['set', 'ship-it', 'acceptance_criteria=[x] it ships'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
       for (const to of ['ready', 'in_progress', 'in_review']) {
         assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
       }
       assert.equal((await work.run(
         ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
 
-      // alice names a reviewer who never touched the item, and runs the accept herself.
+      // The field half, which still refuses: no reviewer is named.
       const refused = await work.run(['transition', 'ship-it', 'done'])
-      assert.equal(refused.code, 3, 'the assignee accepting their own work used to exit 0')
-      assert.match(refused.err, /^guard G6$/m)
+      assert.equal(refused.code, 3, refused.err)
       assert.match(refused.err, /^"cause the done gate fails: DOD3$/m)
-
-      // `explain` evaluates the gate the move is decided by, so the two cannot disagree: it
-      // printed a full pass over a move `transition` refused.
-      const asAlice = await work.run(['explain', 'ship-it'])
-      assert.match(asAlice.out, /^rules 7\/8 pass$/m)
-      assert.match(asAlice.out, /^done DOD3 fail /m)
-
-      const asBob = await runCli(['explain', 'ship-it'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
-      assert.match(asBob.out, /^rules 8\/8 pass$/m, 'the rule is about who is asking, and bob is not the assignee')
-
-      const accepted = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
+      // And the actor half, which does not: alice names bob and runs her own accept.
+      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
+      const accepted = await work.run(['transition', 'ship-it', 'done'])
       assert.equal(accepted.code, 0, accepted.err)
       assert.match(accepted.out, /^state in_review -> done$/m)
-    } finally {
-      await work.dispose()
-    }
-  })
 
-  // The launder the actor half was defeated by, run as the drive ran it. The refusal printed
-  // `set <id> assignee=<name>`, the assignee ran it, and the accept then passed at
-  // `guards G6 pass` with `doctor` clean - the tool printing the bypass to the rule it had
-  // just enforced. `workedBy` is folded off the log, which that write does not reach.
-  it('refuses the accept after the assignee has reassigned the item to somebody else', async () => {
-    const work = await aWorkspace()
-    try {
-      assert.equal((await work.run(['file', 'story', 'ship it', '--set', 'assignee=alice'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-it', 'acceptance_criteria=[x] it ships'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-it', 'reviewer=bob'])).code, 0)
-      for (const to of ['ready', 'in_progress', 'in_review']) {
-        assert.equal((await work.run(['transition', 'ship-it', to])).code, 0)
-      }
-      assert.equal((await work.run(
-        ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
-
-      assert.equal((await work.run(['set', 'ship-it', 'assignee=carol'])).code, 0)
-      const refused = await work.run(['transition', 'ship-it', 'done'])
-      assert.equal(refused.code, 3, 'reassigning the item used to clear the rule in one write')
-      assert.match(refused.err, /^"cause the done gate fails: DOD3$/m)
-      assert.match((await work.run(['explain', 'ship-it'])).out,
-        /^done DOD3 fail treadle transition ship-it done --actor bob$/m)
-
-      // And the reassign one write earlier, which is where the narrower reading of the log -
-      // the assignee at the instant the item entered in_review - would have been defeated.
-      assert.equal((await work.run(['file', 'story', 'ship two', '--set', 'assignee=alice'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-two', 'acceptance_criteria=[x] it ships'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-two', 'reviewer=bob'])).code, 0)
-      for (const to of ['ready', 'in_progress']) {
-        assert.equal((await work.run(['transition', 'ship-two', to])).code, 0)
-      }
-      assert.equal((await work.run(
-        ['evidence', 'add', 'ship-two', 'url', 'https://example.invalid/pr/2', 'the pr'])).code, 0)
-      assert.equal((await work.run(['set', 'ship-two', 'assignee=carol'])).code, 0)
-      assert.equal((await work.run(['transition', 'ship-two', 'in_review'])).code, 0)
-      assert.equal((await work.run(['transition', 'ship-two', 'done'])).code, 3)
-
-      // Nothing here refuses carol, who the log says never held either record.
-      const byCarol = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'carol' } })
-      assert.equal(byCarol.code, 3, 'carol is the assignee the record names, which the field half still refuses')
-      const byBob = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
-      assert.equal(byBob.code, 0, byBob.err)
+      // `explain` evaluates the gate the move is decided by, so the two cannot disagree.
+      assert.match((await work.run(['explain', 'ship-it'])).out, /^rules 8\/8 pass$/m)
+      assert.match((await work.run(['doctor'])).out, /^H34 ship-it state alice filed, worked and accepted this item /m)
     } finally {
       await work.dispose()
     }

@@ -133,8 +133,8 @@ describe('a guard that read a neighbour is refused when that neighbour moved bef
 
   it('DOD1: an accept decided against a done child is refused once the child is reopened', async () => {
     ids = sequentialIds(200)
-    // Assigned to somebody who is not `ACTOR`, because `DOD3` refuses an accept the item's own
-    // assignee runs and this test is about `DOD1` and the read set, not about who is asking.
+    // Assigned to somebody who is not `ACTOR`, so `DOD3` has a reviewer to be distinct from:
+    // this test is about `DOD1` and the read set, not about the done gate's other rules.
     await must(file(first, 'story', 'story', { acceptance_criteria: '[x] one', assignee: 'kim' }))
     await must(file(first, 'task', 'child', { parent_id: 'story' }))
     for (const state of ['ready', 'in_progress', 'done'] as const) await must(move(first, 'child', state))
