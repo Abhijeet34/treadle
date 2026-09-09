@@ -136,6 +136,25 @@ A multi-line value never appears as a bare line: it arrives as `|<key> <lines> <
 followed by exactly that many content lines. Read the count, not the newlines. That is
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
+**The `actor` on an event is declared, not verified.** It is declared by whoever ran the
+command, through `--actor` or `TREADLE_ACTOR`, and recorded as given; the tool verifies no
+identity and has no way to.
+A mutation that names nobody is refused, so no event is unattributable, and that refusal is
+what most invites the wrong reading: it makes the recorded name look checked. What is
+unforgeable sits one layer out, in the signed commit that carries the file, which `D1` makes
+authoritative. `treadle help` prints the same sentence, `docs/DOMAIN.md` argues it under
+`DOD3`, and `src/application/services/doctor.ts` carries it beside `H20`, the audit that
+notices a record disagreeing with the log that recorded its value.
+
+**A help page prints only the flags it grades other than `S`.** `treadle help` carries the
+whole global flag table once, with what each flag does and a `where` column naming the
+commands it applies to; a command page names the flags whose grade varies by command and is
+not `S`, and says how many it left out. A flag absent from a page is supported there. The
+vocabulary a caller cannot guess sits on the page that takes the word rather than in a doc:
+`help file`, `help set` and `help show` print the type-to-fields dictionary, `help transition`
+prints the edges with their guards and the closed sets `--resolution`, `--outcome` and
+`--override` take, and `help backlog` names the words its own filters accept.
+
 `backlog`'s default is open work rather than every record, expressed as an ordinary
 `--state open` clause and not as a window or a configuration key.
 Because it is a clause it appears in the `filter` line, in the `page` line, in `narrowest` and

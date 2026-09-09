@@ -106,6 +106,8 @@ A field another command owns is cleared by that command: a transition off `on_ho
 `file` reads an empty value as the field left unset, so `--set assignee=` files without one and `--set severity=` on a bug is the same `V4` as leaving it off.
 `help set` carries the rule as its last example.
 
+`treadle help file`, `treadle help set` and `treadle help show` print that table, generated from these two records rather than transcribed, so a caller who has to name a field reads the dictionary on the page that takes the name instead of learning it from a `V5` refusal one field at a time.
+
 `requiredAtCreation(type)` returns the first column and `fieldsOf(type)` returns the common set plus the second.
 `validateWorkItem(item, { now })` checks both, plus every field's own validation from the field dictionary.
 `now` is an argument because a hold expiry has to be in the future and this layer does not read a clock.
@@ -151,6 +153,7 @@ Blocked is not one of them.
 It is derived from the relation graph and shown beside the state, never in place of it.
 
 `TRANSITION_TABLE` holds twenty-three edges: the twenty-two the model draws, and `release`.
+`treadle help transition` prints them, one row per edge name with the states it runs between, the guards on it and whether it requires a reason, and names the closed sets `--resolution`, `--outcome` and `--override` take.
 
 `release` runs from `in_progress` back to `ready`, requires a reason, and evaluates no guard.
 It is the exit an attempt that ended without the work being done had nowhere to record: a hold leaves `next`, which ranks `ready` only, and a cancel leaves the queue.
@@ -287,6 +290,12 @@ A guard's `remedy` is a command line under the same rule, and `overrideCommand` 
 Reading the field alone made the review step a field to fill in, since the assignee wrote any name into it and then took their own work to `done`; the rule is the human in the loop, so it asks who is asking.
 An evaluation given no actor decides on the field alone, which is what a gate read without a caller has always done.
 Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
+
+What that actor is worth, said here because `DOD3` is the rule that spends it, is bounded and it is easy to over-read.
+The actor is declared by whoever ran the command, from `--actor` or `TREADLE_ACTOR`, and is recorded as given; the tool verifies no identity and has no way to.
+A mutation naming nobody is refused, so no event is unattributable, and that refusal is the thing most likely to be misread: it makes the recorded name look checked, and nothing checks it.
+What is unforgeable is one layer out.
+`D1` makes the committed file authoritative, so a hand edit to it is a legitimate edit and the forge's signed commit is what proves its authorship; `treadle help` says the same sentence to a caller, and `src/application/services/doctor.ts` argues it beside `H20`, the audit that notices a record disagreeing with the log that recorded the value.
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
