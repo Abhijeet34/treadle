@@ -90,8 +90,12 @@ describe('an epic keeps its record and loses its ceremony', () => {
   it('still refuses the epic done while a child is open, which is G8 and stays', async () => {
     const refused = await cli(['transition', 'ship-it', 'done'])
     assert.equal(refused.code, 3, refused.out)
+    // The children are named in the store's own read order, which is `filed_at, id`, and two
+    // records filed inside one second can carry either instant first. So the assertion is
+    // over the set G8 named and not over the order it named them in.
     const cause = String(dataOf(refused)['cause'])
-    assert.match(cause, /the epic still has open children: wire-codec, write-shard/)
+    assert.match(cause, /the epic still has open children: /)
+    for (const id of ['wire-codec', 'write-shard']) assert.match(cause, new RegExp(`\\b${id}\\b`))
   })
 
   it('closes the epic once the parts are done, with no reviewer and no evidence of its own', async () => {
