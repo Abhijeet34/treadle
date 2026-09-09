@@ -27,6 +27,16 @@ export const WORK_ITEM_STATES = [
 ] as const
 export type WorkItemState = (typeof WORK_ITEM_STATES)[number]
 
+/**
+ * Every word `transition` takes as a target. The seven states, and `resume`, which is the one
+ * target that is not a state: an item on hold has to return to the state the hold was taken
+ * from, and only the record knows which that is, so the caller names the move and the domain
+ * resolves it against `held_from`. The parser and the help page both read this list, because
+ * they spelled it independently once and the page published the seven without the eighth.
+ */
+export const TRANSITION_TARGETS = [...WORK_ITEM_STATES, 'resume'] as const
+export type TransitionTarget = (typeof TRANSITION_TARGETS)[number]
+
 /** Blocked is not a state. It is derived from the relation graph; see relations.ts. */
 export function isTerminal(state: WorkItemState | undefined): boolean {
   return state === 'done' || state === 'cancelled'

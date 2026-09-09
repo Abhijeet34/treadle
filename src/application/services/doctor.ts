@@ -551,11 +551,19 @@ export class WorkspaceAudit {
       for (const [key, edge] of edges) {
         if (!recorded(edge, removed)) continue
         const target = key.slice(key.indexOf(' ') + 1)
+        // A contiguous truncation takes the blocker and its dependent together, and then the
+        // target is gone too: `explain` refuses an id no record carries, so the line printed
+        // here would be a refusal a neighbouring `H33` on the same table has already
+        // explained. `history` is the read that still answers over a record that left, which
+        // is the only place the edge survives, so that is what the reader is sent to.
+        const survives = known.has(target as ItemId)
         findings.push({
           rule: 'H32',
           id: cell(holder),
           where: 'relations',
-          detail: `the log records ${key} held by ${holder} and no record here carries that id, so the edge went with a record deleted outside the tool and ${target} reads as though it never existed; treadle explain ${target}`,
+          detail: survives
+            ? `the log records ${key} held by ${holder} and no record here carries that id, so the edge went with a record deleted outside the tool and ${target} reads as though it never existed; treadle explain ${target}`
+            : `the log records ${key} held by ${holder} and no record here carries either id, so both records left the store outside the tool and the log is all that is left of the edge; treadle history ${target}`,
         })
       }
     }
