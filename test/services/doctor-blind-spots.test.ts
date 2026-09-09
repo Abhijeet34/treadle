@@ -124,6 +124,10 @@ describe('H32: a record and the log are held to the same set of edges', () => {
       const found = await work.run(['doctor'])
       assert.equal(found.code, 7, 'an edge no write path would have accepted is not a clean store')
       assert.match(found.out, /^H32 blocker-work relations the record stores blocks dependent-work and no event in the log recorded it,/m)
+      // The per-item half of the same audit, which is the half `explain` reads: this direction
+      // needs only the holder's own record and its own events, so both surfaces raise it.
+      assert.match((await work.run(['explain', 'blocker-work'])).out,
+        /^H32 the record stores blocks dependent-work and no event in the log recorded it,/m)
       // The two surfaces that disagreed over this edge, which is the symptom a reader saw.
       assert.match((await work.run(['show', 'dependent-work'])).out, /^blocked_by blocker-work$/m)
       assert.match((await work.run(['explain', 'dependent-work'])).out, /^blocked no$/m)
@@ -153,7 +157,13 @@ describe('H32: a record and the log are held to the same set of edges', () => {
       assert.equal(found.code, 7, 'a blocker that vanished with its edge is not a clean store')
       assert.match(found.out, /^H32 blocker-one relations the log records blocks dependent-one held by blocker-one and no record here carries that id,/m)
       // The symptom the finding exists for: nothing else anywhere says the blocker was there.
-      assert.match((await work.run(['explain', 'dependent-one'])).out, /^blocked no$/m)
+      const dependent = await work.run(['explain', 'dependent-one'])
+      assert.match(dependent.out, /^blocked no$/m)
+      // And why `doctor` alone raises this direction, which the H table says in words: the
+      // finding belongs to the holder, and the holder is no record for `explain` to be asked
+      // about, so no per-item read can reach it however the caller spells the question.
+      assert.doesNotMatch(dependent.out, /^H32 /m)
+      assert.equal((await work.run(['explain', 'blocker-one'])).code, 5, 'the holder is not a record here to explain')
     } finally {
       await work.dispose()
     }

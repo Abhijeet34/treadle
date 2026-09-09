@@ -99,7 +99,7 @@ older build left behind, which nothing reported at all.
 | `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
 | `H30` | `doctor`, `explain` | A record's `parent_id` names an item the store does not hold, so the record reads as a child of nothing |
 | `H31` | `doctor`, `explain` | The log holds fewer events for a record than the record has versions, so the log has lost lines that every write records |
-| `H32` | `doctor`, `explain` | A record and the log disagree about a relation: the record stores an edge no event recorded, or the log records a live edge whose holder is not a record here |
+| `H32` | `doctor`, `explain` | A record and the log disagree about a relation: the record stores an edge no event recorded, which both raise, or the log records a live edge whose holder is not a record here, which only `doctor` raises because that holder is no record for `explain` to be asked about |
 
 ## The CLI's rule ids
 
