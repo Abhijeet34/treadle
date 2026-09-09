@@ -17,21 +17,18 @@ See [Status](#status) for what is and is not here.
 ## Requirements
 
 Node.js 24.15 or newer.
-The floor is the oldest Node.js release line still inside its official support window at release time, and it is reviewed at every Node LTS transition rather than when something breaks.
-A release never ships with a floor on a line that reaches end of life within six months of that release date.
+[docs/STABILITY.md](docs/STABILITY.md), "The runtime floor", owns the policy that sets that number and moves it.
 
 Linux, macOS and Windows, and any POSIX userland including BusyBox: the executable opens with `#!/usr/bin/env node` and asks for nothing a userland may not have.
-One platform limit is worth knowing before you meet it. On macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all, because the kernel puts argv and the environment on the stack V8 measures its limit against.
-No workflow produces one by accident and no code here can catch it; [docs/STABILITY.md](docs/STABILITY.md) carries the measurement and the decision to keep it rather than trade it for a launcher that fails on Windows.
+One platform limit comes with that line, and no workflow produces it by accident: on macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all.
+[docs/STABILITY.md](docs/STABILITY.md), "The supported userlands, and the macOS argument-block limit", carries the measurement, why no valid call reaches it, and the decision to keep it.
 
 The published package has zero runtime dependencies, and that is a budget rather than a coincidence: a read is the record files parsed, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
 
 ## Install
 
-Nothing is published yet.
-Publication is gated on a name clearance that has not run, so `package.json` carries `"private": true` and `npm publish` refuses.
-That refusal comes from the registry client after authentication rather than from a local check, so `npm publish --dry-run` prints `+ treadle@0.1.0` and says nothing about it; [docs/RELEASING.md](docs/RELEASING.md) carries the measurement.
-The release machinery is built and has never been fired; [docs/RELEASING.md](docs/RELEASING.md) says what opens it.
+Nothing is published yet: publication is gated on a name clearance that has not run, so `package.json` carries `"private": true`.
+The release machinery is built and has never been fired; [docs/RELEASING.md](docs/RELEASING.md) says what opens it and how that refusal actually presents.
 Clone the repository to work on it.
 
 ```bash
@@ -40,19 +37,20 @@ cd treadle
 npm ci
 ```
 
-What a published install would carry is one file of executable code.
-`npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
-The budget is 768,000 bytes, recorded in `bench/budgets.json` as DR8's 768,000 bytes raised by [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and the build fails rather than warns if the bundle goes over.
-The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
-
 ## Quick start
 
 ```bash
 export TREADLE_ACTOR=your-name   # and TREADLE_ACTOR_KIND=agent when an agent runs it
 node bin/treadle.js init
 node bin/treadle.js file story "Field edits"
+node bin/treadle.js show field-edits
+node bin/treadle.js backlog
 node bin/treadle.js status
 ```
+
+`file` prints the id it minted on its `item` line, and that id is the title as a slug, which is why `show field-edits` reads the record back.
+`backlog` lists what is open and names the filter it used; `status` counts the workspace rather than printing a record.
+`treadle help <command>` is the contract for one command, and `treadle help` on its own is the whole inventory.
 
 `TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
 A command that would write an event refuses instead of recording one when neither names anyone, so no workspace ever holds an event nobody is attributable for.
@@ -77,6 +75,10 @@ npm run flake    # 20 consecutive full runs, budget zero
 ```
 
 [docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each figure is, and what is not proven.
+
+What a published install would carry is one file of executable code: `npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
+The budget is 768,000 bytes, recorded in `bench/budgets.json` as DR8's 768,000 bytes raised by [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and the build fails rather than warns if the bundle goes over.
+The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
 The domain core is a library of pure functions.
 Nothing in `src/domain` reads the filesystem, the clock, a random source, or the process, and a test enforces that rather than a comment asking for it.
@@ -125,8 +127,8 @@ See [Status](#status) for the line between implemented and specified-only.
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); never fired, because firing it needs a signed tag |
 | Published package | Blocked on a name clearance that has not run |
 
-Every row's State is one of three words, and each carries a pointer this repository holds it to.
-**Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, and **Declined** names the record that refused it with one sentence of reason.
+Every row's State is one of four words, and each carries a pointer this repository holds it to.
+**Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
 "Specified, not implemented" and "Partly implemented" are gone, because neither said who owned the gap, and a gap nobody owns is documentation standing in for a decision.
 `test/architecture/documented-numbers.test.ts` reads this table: a Queued row has to name an item `.work` holds in `ready` or `draft`, and a Declined row has to name a file that exists.
 
