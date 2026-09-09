@@ -273,7 +273,7 @@ Default done gate:
 |---|---|---|
 | `DOD1` | all | Every child is done or cancelled |
 | `DOD2` | all | No impediment is still open against the item |
-| `DOD3` | all | A reviewer other than the assignee is named, when the type has a review step |
+| `DOD3` | all | A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step |
 | `DOD4` | story | Every acceptance criterion is ticked |
 | `DOD5` | spike | The spike records its findings |
 | `DOD6` | bug | The fix is confirmed |
@@ -283,6 +283,9 @@ Default done gate:
 `nextTowardDone(state, reviewStep)` reads that move off the transition table along the edges that need no reason, and `advance(item)` prints it as a command line: `done` is reachable from two states only, and a remedy is run from wherever the blocker stands.
 A guard's `remedy` is a command line under the same rule, and `overrideCommand` prints the override line for the three guards that take one.
 `DOD7` is scoped by the review step rather than by three per-type rules, exactly as `DOD3` is, so the two answer to one setting.
+`DOD3` reads two facts and not one: the `reviewer` named on the record, and the actor running the move.
+Reading the field alone made the review step a field to fill in, since the assignee wrote any name into it and then took their own work to `done`; the rule is the human in the loop, so it asks who is asking.
+An evaluation given no actor decides on the field alone, which is what a gate read without a caller has always done.
 Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.

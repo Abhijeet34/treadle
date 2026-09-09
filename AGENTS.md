@@ -168,7 +168,7 @@ nothing else, the store's S5 section ceiling is the load bound, and a stored val
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
 `treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
-same audit for one item off the events it already reads. `doctor` raises eleven of them and
+same audit for one item off the events it already reads. `doctor` raises thirteen of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017, and

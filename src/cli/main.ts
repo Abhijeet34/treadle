@@ -627,7 +627,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   }
   if (command === 'explain') {
     if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadle backlog'])
-    return explain(store, systemClock, id)
+    return explain(store, systemClock, id, actor.id)
   }
   if (command === 'history') {
     const txn = flag(flags, 'txn')

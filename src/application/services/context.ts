@@ -81,6 +81,16 @@ const SERVED_ANYWAY: ReadonlySet<string> = new Set([
   // workspace nothing is wrong with. A `doctor` that exited 7 for either would tell a CI job
   // that a slow story is the same event as a truncated shard.
   'H03', 'H04',
+  // The audit note, by the same test. `H19` names who wrote a field on an item they are
+  // assigned; the record serves whole and nothing about the store is wrong, and ADR-0011
+  // already says of it that "it does not refuse: the log says who, and the person reading the
+  // pull request decides". The code disagreed, because every rule not listed here refuses.
+  // That mattered little while `H19` read `item.mark` alone and matters now that it reads an
+  // assignee naming their own reviewer, which is an ordinary thing to do: `doctor` would have
+  // exited 7 on a workspace with nothing wrong with it, which is the trap `H27` was narrowed
+  // to escape. The move that stops a self-review is `DOD3`, at write time, where a refusal
+  // belongs; this stays a line a reader weighs.
+  'H19',
 ])
 
 /** Takes a store `Finding` or a `doctor` one: both name a rule and the rule is the decision. */
@@ -242,7 +252,13 @@ function duplicateOf(view: WorkspaceView, item: WorkItem): GateItem | undefined 
   return edge === undefined ? undefined : gateItems(view, [edge.target])[0]
 }
 
-function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
+/**
+ * `actor` is who is asking, which DOD3 reads beside the record's own `reviewer`. It is
+ * optional here and threaded from the command surface rather than read from anywhere: this
+ * layer has no ambient caller, and a gate told no actor decides exactly what it decided
+ * before.
+ */
+function gateContextFor(view: WorkspaceView, item: WorkItem, actor?: string): GateContext {
   const original = duplicateOf(view, item)
   return {
     item,
@@ -250,6 +266,7 @@ function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
     children: childrenGates(view, item.id),
     reviewStep: hasReviewStep(view.config, item.type),
     ...(original === undefined ? {} : { duplicateOf: original }),
+    ...(actor === undefined ? {} : { actor }),
   }
 }
 
@@ -258,12 +275,12 @@ function gateContextFor(view: WorkspaceView, item: WorkItem): GateContext {
  * another. The gate is an argument to `evaluateGate` either way, so a configured gate and
  * the default reach the one evaluator and `explain` prints exactly what `G1` decided.
  */
-export function readyVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = view.config.ready_gate): GateVerdict {
-  return evaluateGate(gate, gateContextFor(view, item))
+export function readyVerdict(view: WorkspaceView, item: WorkItem, actor?: string, gate: Gate = view.config.ready_gate): GateVerdict {
+  return evaluateGate(gate, gateContextFor(view, item, actor))
 }
 
-export function doneVerdict(view: WorkspaceView, item: WorkItem, gate: Gate = view.config.done_gate): GateVerdict {
-  return evaluateGate(gate, gateContextFor(view, item))
+export function doneVerdict(view: WorkspaceView, item: WorkItem, actor?: string, gate: Gate = view.config.done_gate): GateVerdict {
+  return evaluateGate(gate, gateContextFor(view, item, actor))
 }
 
 function openChildrenOf(view: WorkspaceView, id: ItemId): readonly GateItem[] {
@@ -315,13 +332,14 @@ function columnFor(view: WorkspaceView, to: WorkItemState | undefined): Transiti
  * The facts one transition is decided against. `to` is the state the caller is asking for,
  * which only `G3` reads: the state a move is INTO is the one whose limit binds, and a
  * context built without a target carries none, which is what every non-`start` edge wants.
+ * `actor` is who is running the move, which `DOD3` reads through `G6`.
  */
-export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState): TransitionContext {
+export function transitionContextFor(view: WorkspaceView, item: WorkItem, to?: WorkItemState, actor?: string): TransitionContext {
   const column = columnFor(view, to)
   return {
     item,
-    readyGate: readyVerdict(view, item),
-    doneGate: doneVerdict(view, item),
+    readyGate: readyVerdict(view, item, actor),
+    doneGate: doneVerdict(view, item, actor),
     blockers: gateItems(view, activeBlockers(view, item.id)),
     ...(column === undefined ? {} : { column }),
     reviewStep: hasReviewStep(view.config, item.type),

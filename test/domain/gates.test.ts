@@ -12,7 +12,7 @@ import {
   evaluateGate,
   validateGate,
 } from '../../src/domain/index.ts'
-import type { Gate } from '../../src/domain/index.ts'
+import type { Gate, WorkItem } from '../../src/domain/index.ts'
 import { errorOf, gateContext, item, neighbour, unwrap } from '../helpers/fixtures.ts'
 
 function failed(verdict: ReturnType<typeof evaluateGate>): readonly string[] {
@@ -204,14 +204,67 @@ describe('the default done gate', () => {
     assert.equal(evaluateGate(DEFAULT_DONE_GATE, other).pass, true)
   })
 
-  // The sentence is printed by `config` and by `explain`, and it said the reviewer "accepted
-  // it" while the check reads two fields and never the actor of `accept`: the assignee named
-  // a reviewer with one `set` and accepted their own work at exit 0.
-  it('states in DOD3 what the check decides, which is that a reviewer is named', () => {
+  // The field half of the rule is above; this is the half that reads who is asking. A gate
+  // that read the reviewer field alone made the review step a field to fill in: the assignee
+  // named any reviewer with one `set` and then ran the accept, and `transition` answered
+  // `guards G6 pass` at exit 0 over work nobody else had looked at.
+  it('refuses DOD3 when the actor running the move is the item\'s own assignee', () => {
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
+    const byReviewer = gateContext(item('task', named), { reviewStep: true, actor: 'kim' })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, byReviewer).pass, true)
+
+    const bySomeoneElse = gateContext(item('task', named), { reviewStep: true, actor: 'ravi' })
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, bySomeoneElse).pass, true,
+      'the rule asks that the assignee is not the one accepting, not that the reviewer is')
+
+    const byAssignee = gateContext(item('task', named), { reviewStep: true, actor: 'dana' })
+    const verdict = evaluateGate(DEFAULT_DONE_GATE, byAssignee)
+    assert.deepEqual(failed(verdict), ['DOD3'])
+    const rule = verdict.rules.find((r) => r.rule === 'DOD3')
+    assert.equal(rule?.reason, 'dana is the assignee, and the assignee does not accept their own work')
+    assert.equal(rule?.remedy, 'treadle set task-1 assignee=<name>',
+      'the remedy is a line the caller can run, because no command makes the caller another person')
+  })
+
+  // A gate is evaluated by `config` and by `explain` as well as by `G6`, and only a move has
+  // an actor. A context without one decides on the field alone, which is what it decided
+  // before the actor was read at all.
+  it('decides DOD3 on the reviewer field alone when no actor is supplied', () => {
+    const named = { assignee: 'dana', reviewer: 'kim', evidence: [{ kind: 'run' as const, ref: '8813' }] }
+    assert.equal(evaluateGate(DEFAULT_DONE_GATE, gateContext(item('task', named), { reviewStep: true })).pass, true)
+  })
+
+  // The property this holds is the one the truth sweep spent thirteen fixes establishing: a
+  // rule's prose says what the rule decides, no more and no less. `config` and `explain` both
+  // print this sentence, so a clause with no verdict behind it is a promise to a reader that
+  // nothing keeps - which is exactly the defect that produced this rule's widening. It said
+  // the reviewer "accepted it" over a check that read two fields and never the actor, and an
+  // assignee named any reviewer and closed their own work at exit 0 underneath that sentence.
+  //
+  // So each clause is asserted against a verdict the evaluator actually reaches, by moving one
+  // fact at a time off a context that passes. A sentence that gains a clause the check does
+  // not decide, or a check that stops deciding one the sentence still claims, fails here.
+  it('states in DOD3 what the check decides, which is both the reviewer and the caller', () => {
     const rule = DEFAULT_DONE_GATE.rules.find((r) => r.id === 'DOD3')
-    assert.equal(rule?.sentence, 'A reviewer other than the assignee is named, when the type has a review step.')
-    assert.ok(!/accept/i.test(rule?.sentence ?? ''),
-      'no gate rule may claim an actor it does not read; DOD3 reads reviewer against assignee')
+    assert.equal(rule?.sentence,
+      'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.')
+
+    const reviewed = { assignee: 'kim', reviewer: 'ravi', evidence: [{ kind: 'run' as const, ref: '8813' }] }
+    /** DOD3's verdict over the reviewed item, with one fact of it or of the caller moved. */
+    const dod3 = (over: Partial<WorkItem>, actor = 'dana', reviewStep = true): boolean => {
+      const context = gateContext(item('task', { ...reviewed, ...over }), { reviewStep, actor })
+      return evaluateGate(DEFAULT_DONE_GATE, context).rules.find((r) => r.rule === 'DOD3')?.pass === true
+    }
+
+    assert.equal(dod3({}), true, 'the sentence describes a rule something can satisfy, or every clause below proves nothing')
+    assert.equal(dod3({ reviewer: undefined }), false, '"a reviewer ... is named" is a clause the check decides')
+    assert.equal(dod3({ reviewer: 'kim' }), false, '"other than the assignee" is a clause the check decides')
+    assert.equal(dod3({}, 'kim'), false, '"the assignee is not the one accepting" is a clause the check decides')
+    // The last clause governs the other three, so it is asserted over each of them rather than
+    // once: a type with no review step is one this rule has nothing to ask about at all.
+    for (const over of [{}, { reviewer: undefined }, { reviewer: 'kim' }] as Partial<WorkItem>[]) {
+      assert.equal(dod3(over, 'kim', false), true, '"when the type has a review step" scopes every clause before it')
+    }
   })
 })
 

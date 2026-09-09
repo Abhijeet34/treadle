@@ -24,7 +24,11 @@
 // both: 50,000 decoded records and 500,000 decoded events, 1,442 MiB allocated and a
 // 1,043,456 KiB peak against a 102,400 KiB budget, to look at each once. What it keeps per
 // item is the summary a scan reads plus the few findings decided off the whole record, and
-// what it keeps per event is nothing; ADR-0021 carries the profile.
+// what it keeps per event is a counter and, for a relation event alone, the two instants
+// that say whether its edge still stands; ADR-0021 carries the profile. No event is held,
+// and nothing kept grows with the log: the counters are one per item and the folded edges
+// one per edge the log mentions, which is the order of the relation graph the read already
+// builds.
 
 import {
   MAX_DESCRIPTION,
@@ -105,6 +109,18 @@ function renderField(item: WorkItemSummary, field: string): string {
 const NONE: readonly DoctorFinding[] = []
 
 /**
+ * Whether the log says this edge stands: it was added, the add is later than any remove of
+ * it, and later than the removal of the record that held it. Both `H32` directions ask this
+ * one question, from opposite sides.
+ */
+function recorded(edge: LoggedEdge | undefined, removedAt: Instant | undefined): boolean {
+  const added = edge?.add
+  if (added === undefined) return false
+  if (edge?.remove !== undefined && edge.remove >= added) return false
+  return removedAt === undefined || added > removedAt
+}
+
+/**
  * One item under audit: what a scan reads of it, the findings decided off its whole record
  * before the log is read, and what the log said about it once it has been.
  */
@@ -144,7 +160,25 @@ type Audited = {
    * a record carries its state and never when it took it.
    */
   enteredAt?: Instant
+  /**
+   * How many events in the log name this id, which is `H31`'s input. Every write bumps the
+   * record's version and appends an event naming it, so the log holds at least `version`
+   * events for a record the tool wrote, and one integer per item is the whole cost of
+   * knowing it. It counts every event under the id rather than only those after a removal:
+   * an id removed and refiled keeps the old record's trail, so counting the lot can only
+   * overstate, and overstating is the direction that raises no false finding.
+   */
+  events?: number
 }
+
+/**
+ * What the log last said about one edge: the latest `relation.add` and the latest
+ * `relation.remove` recorded for it. Two instants rather than a running boolean, because the
+ * store orders the log by file name and then by `at` within a file, so a line filed under
+ * another month is read out of instant order and a fold that trusted arrival order would
+ * read an add-then-remove pair backwards.
+ */
+type LoggedEdge = { add?: Instant; remove?: Instant }
 
 /**
  * What the audit needs beyond the records and the log: the workspace's own configuration,
@@ -169,6 +203,17 @@ export class WorkspaceAudit {
   readonly #heldItems: ReadonlySet<string>
   readonly #entries: Audited[] = []
   readonly #byId = new Map<ItemId, Audited>()
+  /**
+   * The edges the log recorded, per holder, for every entity the log names and not only for
+   * the ones the store serves. `H32`'s second direction is about an id with no record at
+   * all, so it cannot hang off an `Audited`: a blocker's record deleted by hand takes the
+   * `blocks` edge stored on it with it, and the item it held reads `blocked no` with nothing
+   * anywhere to say the blocker ever existed. What is kept is one entry per edge the log
+   * mentions, which is the order of the relation graph the read already builds.
+   */
+  readonly #logEdges = new Map<ItemId, Map<string, LoggedEdge>>()
+  /** The latest `item.remove` per entity, which is the boundary `#logEdges` is read against. */
+  readonly #logRemoved = new Map<ItemId, Instant>()
 
   /**
    * The item ids the records supply are the SERVED set. `heldItems` is what the store holds
@@ -192,6 +237,21 @@ export class WorkspaceAudit {
         detail: `the stored description is ${item.description.length} characters and the bound is ${MAX_DESCRIPTION}; the long form belongs in a file this record points at`,
       })
     }
+    // The same rule as the line above, on the other field the write path bounds and the load
+    // path does not: `hold_until` must be in the future when it is written and merely be an
+    // instant when it is read, because a hold already on disk stays readable as it expires.
+    // That is right on load and leaves nothing anywhere to say the hold has run out, so a
+    // parked blocker held its dependents at `blocked yes` for ever with `doctor` at exit 0.
+    // The predicate is `hold_until`'s own check in `src/domain/fields.ts`; a future narrowing
+    // of it moves both.
+    if (item.state === 'on_hold' && item.hold_until !== undefined && item.hold_until <= this.#context.now) {
+      before.push({
+        rule: 'H18',
+        id: item.id,
+        where: 'hold_until',
+        detail: `the hold ran out at ${item.hold_until} and the item is still on_hold, which no write path would set; treadle transition ${item.id} resume`,
+      })
+    }
     const after = item.state === 'done' && hasReviewStep(this.#context.config, item.type) && (item.evidence ?? []).length === 0
       ? [{
         rule: 'H21',
@@ -206,8 +266,33 @@ export class WorkspaceAudit {
   }
 
   event(event: StoreEvent): void {
+    // Folded before the early return below, because both need entities the store does not
+    // serve: an edge whose holder record has gone is exactly the case with no `Audited`.
+    if (event.op === 'item.relation.add' || event.op === 'item.relation.remove') {
+      const added = event.op === 'item.relation.add'
+      const snapshot = (added ? event.after : event.before) as Record<string, unknown> | undefined
+      const kind = snapshot?.['kind']
+      const other = snapshot?.['other']
+      if (typeof kind === 'string' && typeof other === 'string') {
+        const edges = this.#logEdges.get(event.entity) ?? new Map<string, LoggedEdge>()
+        this.#logEdges.set(event.entity, edges)
+        const key = `${kind} ${other}`
+        const seen = edges.get(key) ?? {}
+        const at = added ? seen.add : seen.remove
+        if (at === undefined || event.at > at) {
+          if (added) seen.add = event.at
+          else seen.remove = event.at
+        }
+        edges.set(key, seen)
+      }
+    }
+    if (event.op === 'item.remove') {
+      const removed = this.#logRemoved.get(event.entity)
+      if (removed === undefined || event.at > removed) this.#logRemoved.set(event.entity, event.at)
+    }
     const entry = this.#byId.get(event.entity)
     if (entry === undefined) return
+    entry.events = (entry.events ?? 0) + 1
     const item = entry.item
     const after = event.after
     if (typeof after === 'object' && after !== null) {
@@ -250,9 +335,19 @@ export class WorkspaceAudit {
     if (event.op === 'item.remove' && (entry.removedAt === undefined || event.at > entry.removedAt)) {
       entry.removedAt = event.at
     }
-    if (event.op !== 'item.mark') return
+    // Two ops, one question: did the person the work is assigned to write the field that is
+    // supposed to be somebody else's judgement of it. `item.mark` carries severity and
+    // priority, which is where this started; `item.set` carries `reviewer`, and naming your
+    // own reviewer is the field half of the same defect `DOD3` closes at write time - the
+    // gate read the name and never who wrote it. Only `reviewer` counts among `set`'s fields:
+    // an assignee editing their own item's description is the ordinary case.
+    const namedReviewer = event.op === 'item.set'
+      && typeof after === 'object' && after !== null && 'reviewer' in (after as Record<string, unknown>)
+    if (event.op !== 'item.mark' && !namedReviewer) return
     if (item.assignee === undefined || event.actor !== item.assignee) return
-    const changed = typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
+    const changed = namedReviewer
+      ? 'reviewer'
+      : typeof after === 'object' && after !== null ? Object.keys(after).join(' and ') : 'a marked field'
     ;(entry.fromLog ??= []).push({
       finding: {
         rule: 'H19',
@@ -279,12 +374,92 @@ export class WorkspaceAudit {
         detail: `${field} is ${stored} in the record and the last event to record it says ${logged}; the change was made outside the tool and has no actor`,
       })
     }
+    findings.push(...this.#unaccounted(entry), ...this.#handWrittenEdges(entry))
     // The removal boundary is applied here rather than in `event`, because the removal can be
     // reached after the events it settles: the store orders the log by file name first.
     const fromLog = (entry.fromLog ?? [])
       .filter((held) => held.at === undefined || entry.removedAt === undefined || held.at > entry.removedAt)
       .map((held) => held.finding)
     findings.push(...this.#aging(entry), ...fromLog, ...entry.after)
+    return findings
+  }
+
+  /**
+   * `H31`: the log holds fewer events for this record than the record has versions. Every
+   * write bumps the version and appends an event naming the id, so the two move together and
+   * a shortfall is the log missing lines the records still remember - a deleted month file, a
+   * truncated one, a bad merge, or a record written by hand. Nothing else in the tool notices:
+   * `doctor` counted the log's own findings, and a log that is simply GONE has no findings to
+   * report, so eight items and a deleted event log printed `clean checked 8 items and 0
+   * events` at exit 0 while `history` and `explain` answered from nothing.
+   *
+   * It is only ever raised on a shortfall. A record removed and refiled under one id keeps the
+   * old trail and restarts at version 1, so the count runs ahead of the version there, which
+   * this says nothing about.
+   */
+  #unaccounted(entry: Audited): readonly DoctorFinding[] {
+    const held = entry.events ?? 0
+    const version = entry.item.version
+    if (held >= version) return NONE
+    return [{
+      rule: 'H31',
+      id: entry.item.id,
+      where: 'version',
+      detail: `the record is at version ${version} and the log holds ${held} ${held === 1 ? 'event' : 'events'} naming it; every write records one, so the log has lost lines and no answer read from it is whole`,
+    }]
+  }
+
+  /**
+   * `H32`, the direction a record can be wrong in: the record stores an edge the log never
+   * recorded. `relation add` is the only writer and it refuses a cycle (`R2`), a second
+   * original (`R4`) and an edge out of finished work (`R5`), so an edge with no event behind
+   * it is one that reached the file past all three. The measured case is `R5`'s: a `blocks`
+   * edge written by hand onto a done record left `show` printing `blocked_by` while `explain`
+   * said `blocked no`, with `doctor` clean between them.
+   *
+   * An edge added before the id's latest removal belonged to the record that left, which is
+   * the boundary `H23` already draws.
+   */
+  #handWrittenEdges(entry: Audited): readonly DoctorFinding[] {
+    const edges = this.#logEdges.get(entry.item.id)
+    return (entry.item.relations ?? [])
+      .filter((relation) => !recorded(edges?.get(`${relation.kind} ${relation.target}`), entry.removedAt))
+      .map((relation): DoctorFinding => ({
+        rule: 'H32',
+        id: entry.item.id,
+        where: 'relations',
+        detail: `the record stores ${relation.kind} ${relation.target} and no event in the log recorded it, so it was written outside the tool, which refuses a cycle, a second original and an edge out of finished work; treadle relation remove ${entry.item.id} ${relation.kind} ${relation.target}`,
+      }))
+  }
+
+  /**
+   * `H32`, the direction the log can be wrong in, and the one no `Audited` can carry: the log
+   * records a live edge whose holder is not a record here and whose going nothing recorded.
+   * An edge is stored once, on its source, so deleting a blocker's record by hand deletes the
+   * `blocks` edge with it and every dependent silently reads `blocked no` - `next` then ranks
+   * work nobody can start. `remove` is not this: it writes an `item.remove`, and it says out
+   * loud which items it frees.
+   *
+   * Workspace-scoped rather than per-item, so it is raised by `findings` and not by `ofOne`:
+   * the question is whether ANY record here holds the id, which an audit fed one record
+   * cannot answer, and `explain` would otherwise report every other item's edges as missing.
+   */
+  #vanishedEdges(known: ReadonlySet<ItemId>): readonly DoctorFinding[] {
+    const findings: DoctorFinding[] = []
+    for (const [holder, edges] of this.#logEdges) {
+      if (known.has(holder)) continue
+      const removed = this.#logRemoved.get(holder)
+      for (const [key, edge] of edges) {
+        if (!recorded(edge, removed)) continue
+        const target = key.slice(key.indexOf(' ') + 1)
+        findings.push({
+          rule: 'H32',
+          id: cell(holder),
+          where: 'relations',
+          detail: `the log records ${key} held by ${holder} and no record here carries that id, so the edge went with a record deleted outside the tool and ${target} reads as though it never existed; treadle explain ${target}`,
+        })
+      }
+    }
     return findings
   }
 
@@ -332,6 +507,7 @@ export class WorkspaceAudit {
         ...auditRelationsOf(known, entry.item),
         ...auditImpediment(entry.item),
       ]),
+      ...this.#vanishedEdges(known),
       ...this.#columnsOverLimit(),
       ...storedBlockingCycle(relationGraphFrom(this.#entries.map((entry) => entry.item))),
     ]

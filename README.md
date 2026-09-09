@@ -114,7 +114,7 @@ See [Status](#status) for the line between implemented and specified-only.
 | Hooks, and the adapter generator | Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) An executable named in a cloned repository is the surface the threat model refuses. |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add` | Shipped: [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
 | `history --txn`, which resolves a transaction id back to the events it wrote | Shipped: #61 |
-| `doctor`: eleven findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
+| `doctor`: thirteen findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
 | Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); never fired, because firing it needs a signed tag |

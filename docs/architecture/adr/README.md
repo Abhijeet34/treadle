@@ -89,8 +89,8 @@ older build left behind, which nothing reported at all.
 | `H14` | the store, on load | A configured gate names a rule this build cannot load, which `config set` refuses with `V6` or `V7` before the write |
 | `H16` | the store, on load | A file arrived with CRLF line endings, which DR3 rule 6 named |
 | `H17` | `status` | An overdue item is assigned to nobody |
-| `H18` | `doctor`, `explain` | A stored description is over the write bound, which the load path does not apply |
-| `H19` | `doctor`, `explain` | A severity or a priority was marked by the item's own assignee |
+| `H18` | `doctor`, `explain` | A stored value is one the write bound refuses and the load path does not apply: a description over its length, or a hold whose `hold_until` has passed while the item is still `on_hold` |
+| `H19` | `doctor`, `explain` | A severity, a priority or the `reviewer` was written by the item's own assignee |
 | `H20` | `doctor`, `explain` | A record's state, severity or priority disagrees with the last event that recorded it, so one of the two was changed outside the tool |
 | `H21` | `doctor`, `explain` | A done item whose type has a review step points at no evidence |
 | `H23` | `doctor`, `explain` | An event is dated before the item it names was filed, which no write path records |
@@ -98,6 +98,8 @@ older build left behind, which nothing reported at all.
 | `H25` | `doctor` | The stored `blocks` edges close a cycle, which `relation add` refuses and a hand edit can leave |
 | `H27` | `doctor`, `explain` | An impediment past `draft` blocks nothing, so it is raised against no work |
 | `H30` | `doctor`, `explain` | A record's `parent_id` names an item the store does not hold, so the record reads as a child of nothing |
+| `H31` | `doctor`, `explain` | The log holds fewer events for a record than the record has versions, so the log has lost lines that every write records |
+| `H32` | `doctor`, `explain` | A record and the log disagree about a relation: the record stores an edge no event recorded, which both raise, or the log records a live edge whose holder is not a record here, which only `doctor` raises because that holder is no record for `explain` to be asked about |
 
 ## The CLI's rule ids
 
