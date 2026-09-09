@@ -23,7 +23,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0017](0017-an-impediment-is-a-type-that-blocks.md) | An impediment is a work-item type that blocks through the relation graph, required at creation to say what would clear it, resolved by reaching `done` with nothing unlinked |
 | [ADR-0019](0019-no-harness-specific-instruction-file.md) | No tracked file at the repository root may be one a single agent harness loads by itself, and the test that says so is kept by the guard ADR-0013 already put outside the branch |
 | [ADR-0021](0021-the-audit-holds-one-record-and-the-ranking-one-index.md) | `doctor` is fed one record and one event at a time through two streaming reads on the store seam, `next` ranks off one index over the graph, and both are gated as a ratio to the read every command performs |
-| [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and the label, title-word and open-sprint readers that were missing |
+| [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md) | A removed record leaves its shard while the append-only log keeps every event it earned, refused wherever another record would be left naming it, and three write-only reads get their reader; the record's own header says which of the three went with the sprint |
 | [ADR-0025](0025-the-referential-rule-lives-under-the-write-lock.md) | No transaction may leave a record naming an id the store does not hold, checked inside the lock the write already takes rather than against a read taken before it, with `H30` reporting the ones the files already carry |
 | [ADR-0026](0026-workspace-configuration-is-the-policy-seams-second-implementation.md) | Workspace configuration is a closed set of optional fields and two gate sections on `workspace.md`, a configured gate replaces the default whole through the one evaluator, a configuration this build cannot read hides content, and the record is written under the same compare-and-set as every other |
 | [ADR-0027](0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) | The bundle budget moves from 512,000 to 768,000 bytes, derived from the plan's landed size plus the headroom the old number carried, and the build stays unminified so a stranger's stack trace keeps its line numbers |
@@ -82,6 +82,9 @@ ADR-0029 removes `H26`, `H28` and `H29` with the sprint they reported on.
 ADR-0025 argues `H30`, the parent's half of `H24`: the store refuses to write a `parent_id`
 naming a record it does not hold, and this reports the ones a hand edit, a git merge or an
 older build left behind, which nothing reported at all.
+`H31` and `H32` have no record of their own and came with pull request 77, which closed four
+ways a damaged workspace read clean: both compare a record against the log rather than reading
+either alone, which is why they arrived together and why neither is a refusal.
 
 | Id | Raised by | Finding |
 |---|---|---|

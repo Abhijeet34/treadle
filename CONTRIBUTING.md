@@ -22,8 +22,8 @@ git config core.hooksPath .githooks   # arms the pre-push secret scan; see AGENT
 npm run check   # tsc --noEmit under strict, then the tests, then the bundle
 ```
 
-There is no build step for development.
-Node runs the TypeScript directly by stripping types, which is why `tsconfig.json` sets `erasableSyntaxOnly` and the code uses `const` objects and union types rather than enums.
+There is no build step for development: Node runs the TypeScript directly by stripping types.
+That constrains what the code may use, and `AGENTS.md`, "Build and test", carries the three rules it imposes.
 
 ## The rules that actually get changes rejected
 
