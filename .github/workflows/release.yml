@@ -61,42 +61,87 @@ jobs:
   # runs sat at `action_required`, so the only surface carrying the state was the Actions list
   # nobody was reading. Four release pull requests waited four days that way.
   #
-  # This job is the thing that says so, on the same push that updated the pull request. It
-  # approves nothing and stores nothing: the read-only run token, the click still a person's,
-  # exactly as docs/RELEASING.md and ADR-0009 decided.
+  # This job says so on the pull request itself rather than in this run's conclusion. Parking
+  # is ADR-0009's design and not a fault, so it is true on every push: as a gate on main it
+  # failed every Release run from the one that introduced it - 34277320540, 34281238907 and
+  # 34288199967 - and a red that never clears makes every other red on main unreadable. A
+  # commit status on the pull request's head fills the surface `gh pr checks` found empty,
+  # carries the same state green when the runs have been approved, and is required by no
+  # ruleset, so it reports without gating anything.
+  #
+  # It approves nothing and stores nothing: the run's own token, no stored credential, and the
+  # click stays a person's, exactly as docs/RELEASING.md and ADR-0009 decided.
   parked-checks:
     name: parked-checks
+    # After release-please, not beside it. Measured on run 34288199967: this job read the pull
+    # request one second in and answered about the head commit release-please replaced two
+    # minutes later, so a status would have landed on a commit the pull request had left.
+    needs: release-pr
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     permissions:
       actions: read
       pull-requests: read
+      # Writing the state onto the release pull request's head commit. A commit status is not
+      # an approval and cannot become one; nothing here can execute a parked run.
+      statuses: write
     env:
       GH_TOKEN: ${{ github.token }}
+      CONTEXT: release checks approved
+      SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
     steps:
-      - name: A release pull request whose checks are parked cannot merge
+      - name: Report the release pull request's parked checks on the pull request
         run: |
           set -euo pipefail
           # Keyed on the head sha, not the branch. A run parked on a commit the pull request
           # has since moved past stays `action_required` for the life of the repository, so a
-          # branch-wide query would go red once and never come back; only runs on the commit
-          # the pull request currently points at can hold up its required contexts.
+          # branch-wide query would report parked once and never come back; only runs on the
+          # commit the pull request currently points at can hold up its required contexts.
           gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
             --jq '.[] | select(.head.ref | startswith("release-please--")) | [.number, .head.sha] | @tsv' \
             > pulls.tsv
-          parked=0
           # `|| [ -n "${number}" ]` because a final line with no newline leaves `read` at exit
-          # 1 with the fields already set, and dropping it would make this gate pass while a
-          # pull request sat parked - the one failure a gate must not have.
+          # 1 with the fields already set, and dropping it would report a parked pull request
+          # as clear - the one answer this must not give.
           while IFS="$(printf '\t')" read -r number sha || [ -n "${number}" ]; do
             [ -n "${number}" ] || continue
+            # GitHub creates the runs for release-please's push asynchronously: measured on
+            # 34288199967, two seconds after the job that pushed it finished. A head still at
+            # zero after the wait is unknown, not clear, so it reports pending rather than
+            # success: only a head with runs and none parked earns success.
+            for _ in 1 2 3 4 5; do
+              total=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&per_page=1" --jq '.total_count')
+              if [ "${total}" != "0" ]; then break; fi
+              sleep 2
+            done
+            if [ "${total}" = "0" ]; then
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
+                -f state=pending \
+                -f context="${CONTEXT}" \
+                -f target_url="${SUMMARY_URL}" \
+                -f description="No runs observed on this head yet." > /dev/null
+              echo "release pull request #${number} has no observed runs yet"
+              continue
+            fi
             runs=$(gh api \
               "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=action_required&per_page=100" \
               --jq '.workflow_runs[] | [.id, .name] | @tsv')
-            [ -n "${runs}" ] || continue
-            parked=$((parked + 1))
-            echo "::error::release pull request #${number} has parked checks: nothing runs on it until a person approves them"
+            if [ -z "${runs}" ]; then
+              gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
+                -f state=success \
+                -f context="${CONTEXT}" \
+                -f target_url="${SUMMARY_URL}" \
+                -f description="No run on this commit is waiting for a person." > /dev/null
+              echo "release pull request #${number} has no parked checks"
+              continue
+            fi
+            gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
+              -f state=failure \
+              -f context="${CONTEXT}" \
+              -f target_url="${SUMMARY_URL}" \
+              -f description="Parked until a person approves them. The Release run summary has the command." > /dev/null
+            echo "::notice::release pull request #${number} has parked checks, and now says so on the pull request"
             {
               echo "### Release pull request #${number} is waiting for a person"
               echo
@@ -110,10 +155,6 @@ jobs:
               echo 'docs/RELEASING.md, "What stands between the release pull request and a merge", carries the rest.'
             } >> "$GITHUB_STEP_SUMMARY"
           done < pulls.tsv
-          if [ "${parked}" -gt 0 ]; then
-            exit 1
-          fi
-          echo "no release pull request has parked checks"
 
   # Three platforms on the tagged tree, before anything is attached to a release and long
   # before anything is published. The release pull request already ran this matrix through
