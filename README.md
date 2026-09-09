@@ -63,7 +63,7 @@ What is unforgeable sits one layer out: the record file is committed, and the fo
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 2,162 tests in 99 seconds on Node 24.15.0, the declared floor, on 2026-09-10.
+The suite ran 2,162 tests in 99 seconds on Node 24.15.0 on 2026-09-10, which is the floor `.nvmrc` pins and `package.json` declares rather than whatever the machine had.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 
