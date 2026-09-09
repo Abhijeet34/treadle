@@ -57,9 +57,14 @@ node bin/treadle.js status
 `TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
 A command that would write an event refuses instead of recording one when neither names anyone, so no workspace ever holds an event nobody is attributable for.
 
+That refusal is worth reading precisely, because it makes the recorded name look stronger than it is.
+The actor is declared by whoever ran the command and recorded as given; treadle verifies no identity and has no way to.
+What is unforgeable sits one layer out: the record file is committed, and the forge's signed commit is what proves who wrote it.
+`treadle help` says the same sentence to a caller, and `treadle doctor` reports a record that no longer agrees with the log that recorded its value.
+
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
-The suite ran 1,949 tests in 87 seconds on Node 24.11.1 on 2026-09-08.
+The suite ran 2,088 tests in 121 seconds on Node 24.11.1 on 2026-09-09.
 Most of that time is 73 real child processes across the concurrency and durability suites, and 500,000 fuzzed inputs per run.
 The seconds are a machine measurement rather than a budget, which is why they carry their date; [docs/VERIFICATION.md](docs/VERIFICATION.md) is where a figure with a claim behind it lives.
 

@@ -459,6 +459,19 @@ help  acme-platform
   about
     The record of the work between people and agents,
     over files you commit to git.
+  note  the actor on an event is declared by whoever ran the
+    command and recorded as given: treadle verifies no
+    identity, and the signed commit carrying the file is
+    what proves who wrote it
+  note  a command page names only the flags it grades other
+    than S, and only those whose grade varies by command; a
+    flag absent from a page behaves there as the where
+    column below says; all 17 are here
+  note  a command page grades a flag S supported, A accepted
+    and ignored, N another scope, X refused; the rule that
+    decides A from X is that a flag which only presents is
+    ignored where it cannot apply, and one whose absence
+    would change the answer is refused there
   example  treadle init # create a workspace in .work here,
     and say what it created
   example  treadle file story "Refresh the access token on a
@@ -495,6 +508,26 @@ commands  18 of 18
   help        read    no        Print the command invento…
   version     read    no        Print the tool version, t…
 
+globals  17 of 17
+  FLAG               WHERE              NOTE
+  --help             every              prints this page …
+  --version          none               prints the tool v…
+  --contract         every              prints the agent/…
+  --out              answers-a-record   selects the rende…
+  --quiet            every              drops the header …
+  --verbose          every              -v, -vv and -vvv …
+  --log-values       every              lets -vvv print f…
+  --ascii            every              writes the human …
+  --workspace        opens-a-workspace  names the store t…
+  --dry-run          mutation           evaluates every g…
+  --yes              asks-to-confirm    answers the confi…
+  --actor            mutation           names who the eve…
+  --width            every              lays the human re…
+  --fields           chooses-columns    replaces the defa…
+  --limit            pageable           bounds one page; …
+  --cursor           pageable           resumes from the …
+  --explain-absence  may-omit           names one entity …
+
 ### help @ 80
 help  acme-platform
   topic  treadle
@@ -504,6 +537,16 @@ help  acme-platform
   about
     The record of the work between people and agents, over files you commit
     to git.
+  note  the actor on an event is declared by whoever ran the command and
+    recorded as given: treadle verifies no identity, and the signed commit
+    carrying the file is what proves who wrote it
+  note  a command page names only the flags it grades other than S, and only
+    those whose grade varies by command; a flag absent from a page behaves there
+    as the where column below says; all 17 are here
+  note  a command page grades a flag S supported, A accepted and ignored, N
+    another scope, X refused; the rule that decides A from X is that a flag
+    which only presents is ignored where it cannot apply, and one whose absence
+    would change the answer is refused there
   example  treadle init # create a workspace in .work here, and say what it
     created
   example  treadle file story "Refresh the access token on a 401" # file a story
@@ -539,6 +582,26 @@ commands  18 of 18
   help        read    no        Print the command inventory, or one command's…
   version     read    no        Print the tool version, the store schema vers…
 
+globals  17 of 17
+  FLAG               WHERE              NOTE
+  --help             every              prints this page and runs nothing
+  --version          none               prints the tool version; treadle vers…
+  --contract         every              prints the agent/1 line grammar and t…
+  --out              answers-a-record   selects the rendering, one of human, …
+  --quiet            every              drops the header and the footer and k…
+  --verbose          every              -v, -vv and -vvv put resolution, timi…
+  --log-values       every              lets -vvv print field values, which i…
+  --ascii            every              writes the human rendering truncation…
+  --workspace        opens-a-workspace  names the store to run against, inste…
+  --dry-run          mutation           evaluates every guard and prints the …
+  --yes              asks-to-confirm    answers the confirmation; without it …
+  --actor            mutation           names who the event records; TREADLE_…
+  --width            every              lays the human rendering out at that …
+  --fields           chooses-columns    replaces the default columns, or adds…
+  --limit            pageable           bounds one page; the page line the an…
+  --cursor           pageable           resumes from the page line a previous…
+  --explain-absence  may-omit           names one entity and says which claus…
+
 ### help @ 200
 help  acme-platform
   topic  treadle
@@ -546,6 +609,11 @@ help  acme-platform
   usage  treadle <command> [args]
   usage  treadle help <command>
   about  The record of the work between people and agents, over files you commit to git.
+  note  the actor on an event is declared by whoever ran the command and recorded as given: treadle verifies no identity, and the signed commit carrying the file is what proves who wrote it
+  note  a command page names only the flags it grades other than S, and only those whose grade varies by command; a flag absent from a page behaves there as the where column below says; all 17 are
+    here
+  note  a command page grades a flag S supported, A accepted and ignored, N another scope, X refused; the rule that decides A from X is that a flag which only presents is ignored where it cannot
+    apply, and one whose absence would change the answer is refused there
   example  treadle init # create a workspace in .work here, and say what it created
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
@@ -574,6 +642,26 @@ commands  18 of 18
   help        read    no        Print the command inventory, or one command's contract, flags and examples.
   version     read    no        Print the tool version, the store schema version and the agent contract version.
 
+globals  17 of 17
+  FLAG               WHERE              NOTE
+  --help             every              prints this page and runs nothing
+  --version          none               prints the tool version; treadle version is the command form
+  --contract         every              prints the agent/1 line grammar and the exit table, and runs no command
+  --out              answers-a-record   selects the rendering, one of human, agent, json; without it a terminal gets human and a pipe gets agent
+  --quiet            every              drops the header and the footer and keeps the records; a refusal still prints whole
+  --verbose          every              -v, -vv and -vvv put resolution, timings and store operations on stderr; stdout is unchanged
+  --log-values       every              lets -vvv print field values, which it reports by name and size without it
+  --ascii            every              writes the human rendering truncation mark as three dots, not an ellipsis
+  --workspace        opens-a-workspace  names the store to run against, instead of the search upward from the working directory
+  --dry-run          mutation           evaluates every guard and prints the field diff and the exit status the real run would return, writing nothing
+  --yes              asks-to-confirm    answers the confirmation; without it such a command refuses and prints the line that carries it
+  --actor            mutation           names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused
+  --width            every              lays the human rendering out at that many display cells, clamped to 40 to 200
+  --fields           chooses-columns    replaces the default columns, or adds to them with a leading plus
+  --limit            pageable           bounds one page; the page line the answer ends with carries the cursor for the next
+  --cursor           pageable           resumes from the page line a previous call printed, with the same filters it was asked with
+  --explain-absence  may-omit           names one entity and says which clause of the filter excluded it
+
 ### help-command @ 60
 help  acme-platform
   topic  transition
@@ -589,6 +677,15 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on
     that edge evaluated.
+  note  the target is a state, not the move name: draft,
+    ready, in_progress, in_review, done, on_hold, cancelled
+  note  cancelled takes --resolution, one of wont_do,
+    duplicate, superseded, cannot_reproduce, rejected; ready
+    from in_progress takes --outcome, one of failed, yielded
+  note  --override takes G2, G3, G7 and a reason; every
+    other guard is fixed by fixing the item
+  note  the other 12 global flags apply here as treadle help
+    describes them
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
   example  treadle transition sso-saml in_review # submit
@@ -606,25 +703,39 @@ help  acme-platform
     # the field diff and the exit status the real run would
     return
 
-flags  17 of 17
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
+
+flags  5 of 17
   FLAG               VERDICT  NOTE
-  --help             S        supported: it changes what …
-  --version          N        another scope: passing it h…
-  --contract         S        supported: it prints the ag…
-  --out              S        supported: it selects the r…
-  --quiet            S        supported: it changes what …
-  --verbose          S        supported: it changes what …
-  --log-values       S        supported: it lets -vvv pri…
-  --ascii            S        supported: it writes the hu…
-  --workspace        S        supported: it changes what …
-  --dry-run          S        supported: it changes what …
   --yes              A        accepted and ignored: this …
-  --actor            S        supported: it names who the…
-  --width            S        supported: it lays the huma…
-  --fields           X        refused: ignoring it would …
-  --limit            X        refused: ignoring it would …
-  --cursor           X        refused: ignoring it would …
-  --explain-absence  X        refused: ignoring it would …
+  --fields           X        refused; it applies to the …
+  --limit            X        refused; it applies to ever…
+  --cursor           X        refused; it applies to ever…
+  --explain-absence  X        refused; it applies to the …
 
 ### help-command @ 80
 help  acme-platform
@@ -638,6 +749,14 @@ help  acme-platform
   about
     Move one item to a target state, with every guard on that edge
     evaluated.
+  note  the target is a state, not the move name: draft, ready, in_progress,
+    in_review, done, on_hold, cancelled
+  note  cancelled takes --resolution, one of wont_do, duplicate, superseded,
+    cannot_reproduce, rejected; ready from in_progress takes --outcome, one of
+    failed, yielded
+  note  --override takes G2, G3, G7 and a reason; every other guard is fixed by
+    fixing the item
+  note  the other 12 global flags apply here as treadle help describes them
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
   example  treadle transition sso-saml in_review # submit for review; a story, a
@@ -651,25 +770,39 @@ help  acme-platform
   example  treadle transition sso-saml in_progress --dry-run # the field diff
     and the exit status the real run would return
 
-flags  17 of 17
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
+
+flags  5 of 17
   FLAG               VERDICT  NOTE
-  --help             S        supported: it changes what this command does or…
-  --version          N        another scope: passing it here is a validation …
-  --contract         S        supported: it prints the agent/1 line grammar a…
-  --out              S        supported: it selects the rendering, one of hum…
-  --quiet            S        supported: it changes what this command does or…
-  --verbose          S        supported: it changes what this command does or…
-  --log-values       S        supported: it lets -vvv print field values, rep…
-  --ascii            S        supported: it writes the human rendering trunca…
-  --workspace        S        supported: it changes what this command does or…
-  --dry-run          S        supported: it changes what this command does or…
   --yes              A        accepted and ignored: this command has no confi…
-  --actor            S        supported: it names who the event records; TREA…
-  --width            S        supported: it lays the human rendering out at t…
-  --fields           X        refused: ignoring it would answer a question th…
-  --limit            X        refused: ignoring it would answer a question th…
-  --cursor           X        refused: ignoring it would answer a question th…
-  --explain-absence  X        refused: ignoring it would answer a question th…
+  --fields           X        refused; it applies to the commands whose colum…
+  --limit            X        refused; it applies to every pageable command
+  --cursor           X        refused; it applies to every pageable command
+  --explain-absence  X        refused; it applies to the commands that can om…
 
 ### help-command @ 200
 help  acme-platform
@@ -680,31 +813,49 @@ help  acme-platform
   usage  treadle transition <id> ready --outcome <failed|yielded> --reason <text>
   usage  treadle transition <id> <target> --override <guard> --reason <text>
   about  Move one item to a target state, with every guard on that edge evaluated.
+  note  the target is a state, not the move name: draft, ready, in_progress, in_review, done, on_hold, cancelled
+  note  cancelled takes --resolution, one of wont_do, duplicate, superseded, cannot_reproduce, rejected; ready from in_progress takes --outcome, one of failed, yielded
+  note  --override takes G2, G3, G7 and a reason; every other guard is fixed by fixing the item
+  note  the other 12 global flags apply here as treadle help describes them
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
   example  treadle transition sso-saml in_review # submit for review; a story, a bug and an epic have a review step and no other type does
   example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
   example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
 
-flags  17 of 17
+moves  23 of 23
+  FROM         TO           MOVE     GUARDS  REASON
+  draft        ready        groom    G1      optional
+  draft        on_hold      hold     -       required
+  draft        cancelled    cancel   G7      required
+  ready        draft        ungroom  -       required
+  ready        in_progress  start    G2,G3   optional
+  ready        on_hold      hold     -       required
+  ready        cancelled    cancel   G7      required
+  in_progress  ready        release  -       required
+  in_progress  in_review    submit   G5      optional
+  in_progress  done         finish   G5,G6   optional
+  in_progress  on_hold      hold     -       required
+  in_progress  cancelled    cancel   G7      required
+  in_review    in_progress  rework   -       required
+  in_review    done         accept   G6      optional
+  in_review    on_hold      hold     -       required
+  in_review    cancelled    cancel   G7      required
+  done         in_progress  reopen   -       required
+  on_hold      draft        resume   -       optional
+  on_hold      ready        resume   -       optional
+  on_hold      in_progress  resume   -       optional
+  on_hold      in_review    resume   -       optional
+  on_hold      cancelled    cancel   G7      required
+  cancelled    draft        revive   -       required
+
+flags  5 of 17
   FLAG               VERDICT  NOTE
-  --help             S        supported: it changes what this command does or shows
-  --version          N        another scope: passing it here is a validation error naming the correct form
-  --contract         S        supported: it prints the agent/1 line grammar and runs no command
-  --out              S        supported: it selects the rendering, one of human, agent, json
-  --quiet            S        supported: it changes what this command does or shows
-  --verbose          S        supported: it changes what this command does or shows
-  --log-values       S        supported: it lets -vvv print field values, reported by name and size without it
-  --ascii            S        supported: it writes the human rendering truncation mark as three dots, not an ellipsis
-  --workspace        S        supported: it changes what this command does or shows
-  --dry-run          S        supported: it changes what this command does or shows
   --yes              A        accepted and ignored: this command has no confirmation to answer
-  --actor            S        supported: it names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and the default is unknown
-  --width            S        supported: it lays the human rendering out at that many display cells, clamped to 40 to 200
-  --fields           X        refused: ignoring it would answer a question the caller did not ask
-  --limit            X        refused: ignoring it would answer a question the caller did not ask
-  --cursor           X        refused: ignoring it would answer a question the caller did not ask
-  --explain-absence  X        refused: ignoring it would answer a question the caller did not ask
+  --fields           X        refused; it applies to the commands whose column set the caller chooses
+  --limit            X        refused; it applies to every pageable command
+  --cursor           X        refused; it applies to every pageable command
+  --explain-absence  X        refused; it applies to the commands that can omit an entity the caller expected
 
 ### not-found @ 60
 sso-saml-typo is in no record here; this workspace holds 24

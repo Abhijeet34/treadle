@@ -11,7 +11,7 @@ import { describe, it, before, after } from 'node:test'
 
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { COMMAND_OPTIONS, GLOBAL_OPTIONS } from '../../src/cli/parse.ts'
-import { COMMANDS } from '../../src/cli/inventory.ts'
+import { COMMANDS, verdictFor, type GlobalFlag } from '../../src/cli/inventory.ts'
 import { runCli } from '../helpers/cli-run.ts'
 import { POSIX_MODES } from '../helpers/platform.ts'
 
@@ -118,8 +118,10 @@ describe('the defects found by using the tool', () => {
 
       // `--yes` was `A ... it only changes presentation, and here there is nothing to
       // present`, on a command that presents. `--width` is read by the human rendering, so
-      // it is `S`, and the note says which knob it turns.
-      assert.match(noteOf('--width'), /^--width S .*display cells/)
+      // it is `S`; a supported flag is described once on the index rather than on each page,
+      // and that is where the knob it turns is now named.
+      const index = await cli(['help'])
+      assert.match(index.out, /^--width every .*display cells/m)
       for (const flag of ['--yes']) {
         assert.match(noteOf(flag), new RegExp(`^${flag} A `), `${flag} is still accepted and ignored here`)
         assert.doesNotMatch(noteOf(flag), /presentation/, `${flag} has nothing to do with presentation`)
@@ -565,11 +567,15 @@ describe('the defects a caller found on its first walk through the tool', () => 
   })
 
   it('names --cursor in the help of every command that prints a --cursor line', async () => {
+    const index = await cli(['help'])
+    assert.match(index.out, /^--cursor pageable /m, 'treadle help does not name --cursor')
     for (const command of ['backlog', 'next', 'history']) {
       const help = await cli(['help', command])
       assert.equal(help.code, 0, help.err)
-      assert.match(help.out, /^--cursor S /m, `treadle help ${command} does not name --cursor`)
+      // The page names it in its own usage, and does not repeat the index's row for it: a
+      // pageable command supports `--cursor`, which is what the absence of a row means.
       assert.match(help.out, /--cursor </, `treadle help ${command} has no usage line for --cursor`)
+      assert.doesNotMatch(help.out, /^--cursor /m, `treadle help ${command} repeats a flag it supports`)
     }
   })
 
@@ -675,25 +681,37 @@ describe('help names every flag the parser accepts', () => {
 
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: demo.root })
 
-  it('names each global flag on every command page, so none is found only by guessing', async () => {
+  it('names each global flag on the index, and on a page wherever that page grades it below S', async () => {
     // `--contract`, `--ascii`, `--no-color` and `--log-values` were accepted by the global
     // option table and named by no help page at all. `--contract` was the worst of the four:
     // it prints the line grammar an agent reads before it can parse any other output, and
     // AGENTS.md, a contributing file rather than a surface the tool exposes, was its only home.
+    //
+    // The table that fixed that then printed on all eighteen pages. The rule now is that the
+    // index names every flag once and a page names the ones it treats differently, so this
+    // asks both questions rather than one.
+    const index = await cli(['help'])
+    assert.equal(index.code, 0, index.err)
     const missing: string[] = []
+    for (const flag of Object.keys(GLOBAL_OPTIONS)) {
+      if (!new RegExp(`^--${flag} \\S+ `, 'm').test(index.out)) missing.push(`treadle help --${flag}`)
+    }
     for (const command of COMMANDS) {
       const help = await cli(['help', command.name])
       assert.equal(help.code, 0, help.err)
       for (const flag of Object.keys(GLOBAL_OPTIONS)) {
-        if (!new RegExp(`^--${flag} [SANX] `, 'm').test(help.out)) missing.push(`${command.name} --${flag}`)
+        const verdict = verdictFor(command, `--${flag}` as GlobalFlag)
+        const named = new RegExp(`^--${flag} [ANX] `, 'm').test(help.out)
+        const varies = new Set(COMMANDS.map((other) => verdictFor(other, `--${flag}` as GlobalFlag))).size > 1
+        if (verdict !== 'S' && varies && !named) missing.push(`${command.name} --${flag}`)
       }
     }
     assert.deepEqual(missing, [], `help does not name: ${missing.join(', ')}`)
   })
 
-  it('states what --out accepts on the page, not only inside the refusal for guessing wrong', async () => {
-    const help = await cli(['help', 'backlog'])
-    assert.match(help.out, /^--out S .*human, agent, json/m)
+  it('states what --out accepts where it is described, not only inside the refusal for guessing wrong', async () => {
+    const help = await cli(['help'])
+    assert.match(help.out, /^--out \S+ .*human, agent, json/m)
   })
 
   it('refuses a colour flag by name, rather than accepting a spelling of nothing', async () => {
