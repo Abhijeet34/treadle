@@ -572,7 +572,9 @@ describe('every line the tool prints for the reader to run is runnable as printe
     const silent = collected.filter((entry) => entry.lines.length === 0).map((entry) => entry.provocation.join(' '))
     assert.deepEqual(silent, [], 'a provocation that printed no line to run is not provoking anything')
     const distinct = new Set(collected.flatMap((entry) => entry.lines))
-    assert.ok(distinct.size >= 90, `only ${distinct.size} distinct lines were collected`)
+    // 90 until `DOD3` stopped refusing on who is asking: the hand-over line it printed, and
+    // the `story-accept` record that was built only to provoke it, went with the rule.
+    assert.ok(distinct.size >= 89, `only ${distinct.size} distinct lines were collected`)
   })
 
   it('reaches every shape the audit found refused as printed', () => {

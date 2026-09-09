@@ -279,11 +279,10 @@ part, which is why it exists beside a suite that already covers every command: t
 were found by hand after thirteen merges had each passed the whole pipeline individually, and
 none of them was a part being wrong. It advances one store step by step, so each step reads
 what its predecessor wrote, and it prints its step, assertion and call counts as a
-`t.diagnostic` rather than reporting a bare green. Two of its steps characterise `DOD3`'s
-actor half rather than guarantee it, and their names say so: the rule refuses a self-accept
-when an assignee is named and does not when none ever was, because `workedBy` folds the
-assignee the log recorded and an unassigned record leaves it empty. Changing that rule turns
-both red together, which is the point. Before trusting a change to this file, run it against a
+`t.diagnostic` rather than reporting a bare green. One actor walks its whole shift, which is what an
+agent's shift is: `DOD3` refuses nobody for running their own accept (ADR-0034), so the two
+twin steps assert that both close and the closing step asserts the `H34` line each of them
+earns. A workspace of single-actor work exits 7 on `doctor`, and saying so is the point. Before trusting a change to this file, run it against a
 mutated tree the way `Proving a property rather than a case` prescribes; four mutations, one
 per behaviour it claims, are what proved this one can fail.
 

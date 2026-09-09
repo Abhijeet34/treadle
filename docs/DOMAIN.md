@@ -291,15 +291,14 @@ Default done gate:
 `nextTowardDone(state, reviewStep)` reads that move off the transition table along the edges that need no reason, and `advance(item)` prints it as a command line: `done` is reachable from two states only, and a remedy is run from wherever the blocker stands.
 A guard's `remedy` is a command line under the same rule, and `overrideCommand` prints the override line for the three guards that take one.
 `DOD7` is scoped by the review step rather than by three per-type rules, exactly as `DOD3` is, so the two answer to one setting.
-`DOD3` reads three facts and not one: the `reviewer` named on the record, the actor running the move, and who the event log says held the item while it was worked.
-Reading the field alone made the review step a field to fill in, since the assignee wrote any name into it and then took their own work to `done`; the rule is the human in the loop, so it asks who is asking.
-Reading the actor against the `assignee` the record holds NOW was defeated the same way, in one write: the assignee reassigned the ITEM and accepted at `guards G6 pass`.
-A current value can be arranged and the log is what happened, so the caller supplies `workedBy`, folded from the item's own events, and ADR-0033 argues the reading and names the residual it leaves.
-Its remedy is the accept run by the reviewer the record names, and not the reassign, which was the line that defeated it.
-An evaluation given no actor decides on the field alone, and one given no trail decides on the fields alone, which is what a gate read without a caller has always done.
-Together they are the anti-attestation pair: the item was accepted by someone other than its maker, and the record points at something a third party can open.
+`DOD3` reads the record's own two fields and nothing else: a `reviewer` is named, and it is not the `assignee`.
+It read who was running the move as well, through two builds, and ADR-0034 removes that: a single actor filing, working and accepting an item is a legitimate and common shape in an agent fleet, so the accept is not refused over it.
+`doctor` reports such a record as `H34`, single-actor completion, which is the fact rather than a fault.
+The rule that remains is worth what it costs: a record naming no reviewer, or naming its own assignee as the reviewer, is refused before it reaches `done`.
+What it cannot see is a `reviewer` naming somebody who never looked at the work, which is a lie the files agree with and which no gate reading those files can catch.
+Together `DOD3` and `DOD7` are the anti-attestation pair: the record names a reviewer other than its maker, and points at something a third party can open.
 
-What that actor is worth, said here because `DOD3` is the rule that spends it, is bounded and it is easy to over-read.
+What the recorded actor is worth, said here because `H34` is the finding that reads it back, is bounded and it is easy to over-read.
 The actor is declared by whoever ran the command, from `--actor` or `TREADLE_ACTOR`, and is recorded as given; the tool verifies no identity and has no way to.
 A mutation naming nobody is refused, so no event is unattributable, and that refusal is the thing most likely to be misread: it makes the recorded name look checked, and nothing checks it.
 What is unforgeable is one layer out.
