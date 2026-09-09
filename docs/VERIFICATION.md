@@ -95,14 +95,14 @@ The overall gate is 90% lines and 85% branches; the named files are held to 95% 
 | `src/adapters/workspace.ts` | path resolution: the workspace walk | 95% lines, 90% branches | met |
 | `src/adapters/target.ts` | path resolution: the store seam target | 95% lines, 90% branches | met |
 | `src/adapters/store/lock.ts` | lock | 95% lines, 90% branches | met |
-| all files | | 90% lines, 85% branches | 97.07 to 97.66 lines, 89.08 to 89.69 branches across three runs on this branch |
+| all files | | 90% lines, 85% branches | 97.07 to 97.66 lines, 89.08 to 89.69 branches across three runs on pull request 6 |
 
 The overall figures are ranges rather than points, because they move between runs and a single decimal would be spuriously precise.
 The concurrency and durability suites are real processes: how many trials leave a lock file for the next writer to reclaim, how many journalled transactions a kill leaves to be replayed, and how many compare-and-set attempts 24 writers need are all decided by the scheduler, so each run takes a slightly different set of branches through `lock.ts` and the store.
 What is asserted is the gate, which every run met, not the decimal.
 A count that measures a claim is kept here; a count that measures only the size of the tree is not, because it rots into a false statement on the next commit.
 
-The gate has been seen red: before the tests in this branch, `src/adapters/workspace.ts` sat at 80.17% lines and 65.22% branches and `src/adapters/store/lock.ts` at 88.37% branches, and `npm run coverage` named all three misses with their numbers and exited non-zero.
+The gate has been seen red: before the tests pull request 6 added, `src/adapters/workspace.ts` sat at 80.17% lines and 65.22% branches and `src/adapters/store/lock.ts` at 88.37% branches, and `npm run coverage` named all three misses with their numbers and exited non-zero.
 Writing those tests is what found the crash below.
 
 ## Flake
@@ -115,14 +115,14 @@ The count itself is deliberately not repeated here, because the paragraph above 
 That command is the number's only authority, and it is one line to run.
 What the gate asserts is zero failures and a count that does not move within a run set, which is the part a later commit cannot make false.
 Individual runs ranged from 49.8 s to 88.6 s, which is a 1.78x spread on a shared machine and is the reason the fuzzer's time bound is generous rather than tight.
-The figure before this branch was 626 s over 20 runs of a smaller suite on an idle machine, ranging 27.1 s to 34.4 s; what both runs assert is the budget of zero failures and a test count that does not move, never the seconds.
+The figure before pull request 6 was 626 s over 20 runs of a smaller suite on an idle machine, ranging 27.1 s to 34.4 s; what both runs assert is the budget of zero failures and a test count that does not move, never the seconds.
 
-One flake was found and fixed during this work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.
+One flake was found and fixed in that same work, in a test written during it: the fuzzer's per-input time budget of 250 ms was measuring the machine rather than the code, and a 12-byte input crossed it on a loaded run.
 Catastrophic backtracking is an orders-of-magnitude event, so the budget is now 2 s and the real claim is carried by the star-height scan, which is deterministic.
 
 A tight timing bound in a test is a machine measurement wearing a correctness costume.
 
-## The three defects this branch closed, red then green
+## The three defects pull request 13 closed, red then green
 
 Each was found by driving the built command surface, and each was reproduced against the tree before the fix.
 The transcripts are the two scripts under the task's scratch directory; the numbers below are what they printed.
@@ -160,11 +160,11 @@ Question 15 of the benchmark's question-coverage axis, "who changed X", scored `
 
 That is the third instance of one defect: a field captured faithfully on every write and shown by no command.
 `severity` was required at creation and printed nowhere, a severity change was recorded in no event, and the actor is on every event line and reached no command.
-So this branch answered the question and then swept the whole dictionary for the same shape.
+So pull request 13 answered the question and then swept the whole dictionary for the same shape.
 
 **The sweep, measured.**
-The store persisted 35 work-item fields and 14 event keys at this branch's base; ADR-0029 retired three of them on 2026-09-08, ADR-0032 retired `reporter` on 2026-09-09, and the union over the six types is 31 now.
-Counted against the shapes at the branch base, 18 of the 35 and 11 of the 14 reached no read surface at all: `actual`, `component`, `expected`, `extra`, `findings`, `fix_confirmed`, `found_in`, `held_from`, `hold_reason`, `hold_until`, `hours_estimate`, `labels`, `outcome`, `question`, `reporter`, `repro_steps`, `reviewer` and `timebox_hours` on the record, and `actor`, `actor_kind`, `entity_kind`, `entity`, `op`, `before`, `after`, `guards`, `outcome`, `cmd` and `txn` in the log.
+The store persisted 35 work-item fields and 14 event keys at pull request 13's base; ADR-0029 retired three of them on 2026-09-08, ADR-0032 retired `reporter` on 2026-09-09, and the union over the six types is 31 now.
+Counted against the shapes at pull request 13's base, 18 of the 35 and 11 of the 14 reached no read surface at all: `actual`, `component`, `expected`, `extra`, `findings`, `fix_confirmed`, `found_in`, `held_from`, `hold_reason`, `hold_until`, `hours_estimate`, `labels`, `outcome`, `question`, `reporter`, `repro_steps`, `reviewer` and `timebox_hours` on the record, and `actor`, `actor_kind`, `entity_kind`, `entity`, `op`, `before`, `after`, `guards`, `outcome`, `cmd` and `txn` in the log.
 Of those 29, 24 are readable now and 5 are declared hidden with a reason.
 
 **Question 15's answer, as it prints.**
@@ -196,11 +196,11 @@ The decision per field is in `test/architecture/field-visibility.test.ts` rather
 Every persisted field has a line naming the result key that carries it or the reason it stays hidden, and a field with neither fails by name.
 
 **Red before green.**
-Three trees, each the branch tip with one part of the fix removed.
+Three trees, each pull request 13's tip with one part of the fix removed.
 Back out `show`'s field additions and the gate says `item hours_estimate claims show:hrs, and the show shape declares no hrs`.
 Keep the shape and remove only the assignments and it says `hours_estimate claims show:hrs and no record printed hrs`, so declaring a surface that never prints the field is not a way through.
 Remove the `by` column and the gate states question 15 as a failing assertion: `event actor claims history:by, and the history shape declares no by`.
-The three CLI cases in `test/cli/found-by-use.test.ts` fail at the branch base too: `history` exits 2 as an unknown command, `explain` prints no `by`, and a 201-character actor is accepted.
+The three CLI cases in `test/cli/found-by-use.test.ts` fail at pull request 13's base too: `history` exits 2 as an unknown command, `explain` prints no `by`, and a 201-character actor is accepted.
 
 **What it costs, in bytes.**
 The A.3 budgets are unchanged and every budgeted artefact is inside its own.
@@ -208,17 +208,17 @@ The golden `show` is a story carrying none of the new fields and is 273 B agains
 `history` is a new command and A.3 carries no figure for it: the golden is 280 B, gated here at 380 B, which is the 75 percent fill A.3 gave `backlog` (717 of 960) and `next` (380 of 510).
 
 The finding A.3 does not cover is that one budget for `show` is measured on one record type.
-The same workspace, read with the branch base and then with the tip: a bug goes 263 B to 604 B, a spike 121 B to 336 B, an epic 119 B to 172 B, an item on hold 129 B to 218 B, and a cancelled chore, the type ADR-0031 later folded into `task`, stays at 142 B.
+The same workspace, read with pull request 13's base and then with its tip: a bug goes 263 B to 604 B, a spike 121 B to 336 B, an epic 119 B to 172 B, an item on hold 129 B to 218 B, and a cancelled chore, the type ADR-0031 later folded into `task`, stays at 142 B.
 A bug is the expensive record because a bug has six more stored fields than a task, three of them prose, and the reason its `show` looked cheap was that those fields were not printed.
 That is a budget for the budget owner to state per type, not a set of required fields to hide so a story's figure holds.
 
 A field a caller can set and cannot read back is a field the tool cannot answer for.
 
-## The defect this work found
+## The defect pull request 6 found
 
 Writing the coverage gate exposed two reachable filesystem-failure paths on the same class.
 `treadle init` where `.work` is already a file, and `treadle file` into a shard directory with its write bit off.
-At the base this branch rebases onto, PR #4's command-boundary backstop already turns both into a structured envelope with no stack trace.
+At the base pull request 6 rebases onto, pull request 4's command-boundary backstop already turns both into a structured envelope with no stack trace.
 
 ```text
 err INTERNAL -
@@ -241,7 +241,7 @@ rule S13
 
 A return type that says it reports failures has to report them.
 
-## The unreadable store that read as empty, red then green
+## The unreadable store that read as empty, closed by pull request 67, red then green
 
 The read path swallowed every errno the filesystem gave it, and a store nothing could open
 answered as a store holding nothing. Driven through the built bundle on a workspace holding
@@ -296,7 +296,7 @@ against the sources before this change.
 
 A store that cannot be read says so. It does not answer.
 
-## The gate that demanded a field nothing could set
+## The gate that demanded a field nothing could set, closed by pull request 24
 
 Two defects on the field surface, both found by driving the built bundle and both invisible to every suite.
 
@@ -333,7 +333,7 @@ A remedy is built from the blocker's own legal targets, `nextTowardDone` in `src
 
 A line the reader is told to run is verified by running it, from where the reader stands.
 
-## The revert a green suite could not see
+## The revert a green suite could not see, and the check pull request 29 grew from it
 
 Pull request 28 landed the acceptance-criteria readback and the `what` column convention.
 Pull request 29 was rebased onto it, four service files conflicted, and the resolution took the pre-rebase file whole, deleting 28's code and 28's tests together.
@@ -382,12 +382,6 @@ The comparison is against the merge base, so a test main gained after the fork i
 
 ## Running it
 
-```bash
-npm run check      # tsc --noEmit under strict, the whole suite, then the bundle
-npm run coverage   # the suite under coverage, held to the per-file gate
-npm run flake      # 20 consecutive full runs, budget zero
-npm run flake -- 5 # a shorter local check
-npm run tests-kept # no test main has disappears from this branch undeclared
-```
-
-`TREADLE_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.
+The README's Quick start carries the gate commands and what each one runs.
+Two forms belong to this file's subject rather than to that block: `npm run flake -- 5` is a shorter local check than the 20-run default, and `TREADLE_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.
+`npm run tests-kept` is the third, and CONTRIBUTING.md carries it beside the trailer that declares a removal.

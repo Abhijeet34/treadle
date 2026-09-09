@@ -18,8 +18,9 @@ The design was written before the code, so prefer reading a doc over inferring f
 the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams),
 `docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
 name), `docs/STABILITY.md` (what counts as a breaking change), `docs/PROVENANCE.md`
-(clean-room process). `README.md`'s Status table says what is Shipped, Queued, Declined or
-Removed, each with the record that holds it.
+(clean-room process). `README.md`'s Status table is the one statement of
+what is built and what is not, each row naming the record or the `.work` item that holds
+it, and the paragraph under it defines its vocabulary.
 `docs/architecture/adr/` holds one record per built decision, with the store's closed set of
 `S` rule ids in its `README.md`; each record ends with what it departs from in the design that
 preceded it.
@@ -235,6 +236,7 @@ copy that has to move whenever the test does.
 | A pull request may not remove a test the merge base has, without a `Removes-test: <exact title>` trailer | `scripts/check-tests-kept.ts`, `test/architecture/tests-kept.test.ts`, ADR-0013 |
 | Every commit is signed off and follows Conventional Commits, with the trailer's name matching the author's | `test/architecture/dco.test.ts` |
 | A new command is a shape, an inventory line, a `COMMAND_OPTIONS` entry, a `dispatch` arm and a row in both security tables | `test/cli/inventory.test.ts`, `test/security/no-egress.test.ts`, `test/security/f1-no-execution-at-runtime.test.ts` |
+| A field the dictionary gains carries a line naming the result key that prints it or the reason it stays hidden, and moves the union count `docs/VERIFICATION.md` states | `test/architecture/field-visibility.test.ts`, `test/architecture/documented-numbers.test.ts` |
 | Every rule id a literal in `src/domain` or `src/application` spells has a published row, in both directions | `test/architecture/documented-numbers.test.ts` |
 | No prose a dependency wrote reaches an output surface, and the parser's option table and the help page's flag matrix are one set | `test/cli/found-by-use.test.ts` |
 | Every gate rule declares the command that remedies it, or the reason it has none | `test/domain/gate-remedies.test.ts` |
