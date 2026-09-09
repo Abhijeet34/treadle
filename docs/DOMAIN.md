@@ -93,6 +93,9 @@ The two are different things under one word, and nothing but this sentence and t
 A `story` and a `bug` have a review step, and no other type does.
 That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those two and straight to `done` for an `epic`, a `task`, a `spike` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
 An epic is out of that set because a container has no reviewer and no artefact to accept: what is reviewed is each child, and `G8` is what holds the epic to the children being finished.
+A workspace that wants its epics reviewed sets `review_step` and gets `in_review` back for them.
+`next` still ranks no epic under that setting, and that is not an oversight: the review step is a policy a workspace chooses, and a container not being the thing to pick up is a fact about the type.
+`treadle next --explain-absence <epic>` says so in as many words, and the children are what the ranking hands back instead.
 `treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.

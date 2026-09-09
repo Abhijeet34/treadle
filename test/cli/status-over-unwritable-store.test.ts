@@ -4,8 +4,8 @@
 // memory was lying, which is the class this project spent two days removing, and the old fix
 // lines pointed at `status` precisely because it looked like the place to check.
 //
-// So each cause is provoked here, three of them, and each is asserted twice: the write is
-// really refused with the rule and the fix line PR #83 gave it, and `status` names the same
+// So each cause is provoked here and each is asserted twice: the write is really refused
+// with the rule and the fix line PR #83 gave it, and `status` names the same
 // condition with the same remedy while still answering the question it was asked. The pairing
 // is the point. A test that only read `status` would pass over a condition that had stopped
 // refusing writes, and one that only ran the write would not notice `status` going quiet.
@@ -48,7 +48,10 @@ describe('status names a store no write can pass, and still answers', () => {
 
   afterEach(async () => {
     for (const dir of made.splice(0)) {
-      await chmod(path.join(dir, '.work', 'items'), 0o700).catch(() => undefined)
+      // A case that fails mid-way leaves a mode this removal cannot descend through.
+      for (const tightened of ['items', '.txn']) {
+        await chmod(path.join(dir, '.work', tightened), 0o700).catch(() => undefined)
+      }
       await rm(dir, { recursive: true, force: true })
     }
   })
@@ -116,6 +119,32 @@ describe('status names a store no write can pass, and still answers', () => {
     assert.deepEqual(data['fix'], [
       'make the path named in cause readable and writable by this user, and check its filesystem for space',
     ])
+  })
+
+  it('names a .txn directory it cannot list, and one it can list and cannot write', { skip: POSIX_MODES }, async () => {
+    // Found by attacking the first version of this check, which swallowed every readdir
+    // failure as "there is no journal directory". A `.txn/` that is there and unreadable
+    // refuses every write on the same permission, and said nothing here.
+    const unlistable = await workspace()
+    const one = cliIn(unlistable.dir)
+    await mkdir(path.join(unlistable.store, '.txn'), { recursive: true })
+    await chmod(path.join(unlistable.store, '.txn'), 0o000)
+    assert.equal((await one(['file', 'task', 'Another task'])).code, 6)
+    const listed = await one(['status'])
+    assert.equal(listed.code, 0)
+    assert.match(String(dataOf(listed)['writes']), /^\.txn could not be read/)
+    await chmod(path.join(unlistable.store, '.txn'), 0o700)
+
+    // The other half: listable, so the scan finds no stray journal, and still unwritable.
+    const unwritable = await workspace()
+    const two = cliIn(unwritable.dir)
+    await mkdir(path.join(unwritable.store, '.txn'), { recursive: true })
+    await chmod(path.join(unwritable.store, '.txn'), 0o500)
+    assert.equal((await two(['file', 'task', 'Another task'])).code, 6)
+    const checked = await two(['status'])
+    assert.equal(checked.code, 0)
+    assert.match(String(dataOf(checked)['writes']), /^\.txn cannot be written by this user/)
+    await chmod(path.join(unwritable.store, '.txn'), 0o700)
   })
 
   it('says nothing about writes over a store a write can pass', async () => {

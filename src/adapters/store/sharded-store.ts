@@ -1177,8 +1177,18 @@ export class ShardedStore implements Store {
     const layout = await this.#checkLayout()
     if (layout !== undefined) return layout
     const dir = path.join(this.#root, JOURNAL_DIR)
-    const names = await readdir(dir).catch(() => [] as string[])
-    for (const name of names.sort()) {
+    let names: readonly string[]
+    try {
+      names = await readdir(dir)
+    } catch (error) {
+      const errno = error as NodeJS.ErrnoException
+      // An absent `.txn/` is the ordinary state: `apply` creates it under the root, which the
+      // access loop below covers. Any other errno is a directory that is there and cannot be
+      // listed, and the write that has to put a journal in it fails on the same permission.
+      if (errno.code === 'ENOENT') return this.#writableDirs([])
+      return storeFail('STORE_UNAVAILABLE', 'S13', `${JOURNAL_DIR} could not be read: ${errno.syscall ?? 'read'} failed with ${errno.code}`, [JOURNAL_DIR])
+    }
+    for (const name of [...names].sort()) {
       if (!name.endsWith('.json')) continue
       const file = printable(`${JOURNAL_DIR}/${name}`)
       let text: string
@@ -1192,10 +1202,17 @@ export class ShardedStore implements Store {
         return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file], { journal: file })
       }
     }
-    // Every transaction writes in all three: the lock and the journal at the root, the shard
-    // under `items/`, the log line under `events/`. A missing one is not judged here, because
-    // the layout check above already answered for it.
-    for (const relative of ['.', ITEMS_DIR, EVENTS_DIR]) {
+    return this.#writableDirs([JOURNAL_DIR])
+  }
+
+  /**
+   * The directories a transaction writes in, checked for the permission it needs: the lock at
+   * the root, the shard under `items/`, the log line under `events/`, and the journal under
+   * `.txn/` when that directory is already there. A missing one is not judged here, because
+   * `#checkLayout` and the read every command performs answer for it first.
+   */
+  async #writableDirs(also: readonly string[]): Promise<StoreResult<undefined>> {
+    for (const relative of ['.', ITEMS_DIR, EVENTS_DIR, ...also]) {
       try {
         await access(path.join(this.#root, relative), constants.W_OK | constants.X_OK)
       } catch (error) {
