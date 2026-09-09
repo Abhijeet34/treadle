@@ -29,8 +29,8 @@ import { storeFail, storeOk, type Finding, type ItemRead, type Store, type Store
 
 /**
  * Types whose work passes through review, which is guard G5's input, read from the
- * workspace's `review_step` key. The compiled-in default is `story, bug, epic`, so a
- * workspace that has never been configured answers exactly as it did before this was data.
+ * workspace's `review_step` key. The compiled-in default is `story, bug`; a workspace that
+ * wants its epics reviewed configures `review_step` to say so.
  */
 export function hasReviewStep(config: WorkspaceConfig, type: WorkItemType): boolean {
   return config.review_step.includes(type)

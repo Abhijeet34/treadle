@@ -204,6 +204,11 @@ function scored(
  * What to pick up is what can be started. A ready item with an active blocker is refused
  * by G2 at `start`, so ranking it first sends the caller into a refusal; it is left out and
  * `--explain-absence` names the blockers.
+ *
+ * An epic is left out for the same reason read one step earlier: it is a container, and the
+ * thing to pick up is one of its children. This had no type handling at all, so a ready epic
+ * outranked the story beneath it whenever the two tied and the dispatch read pointed an agent
+ * at a record with no work in it.
  */
 export function rank(
   view: WorkspaceView, now: string, weights: Weights, forActor: string | undefined,
@@ -213,7 +218,7 @@ export function rank(
   const blockers = activeBlockerIndex(view)
   const blocking = blockedByThisIndex(view)
   return view.items
-    .filter((item) => item.state === 'ready' && !blockers.has(item.id))
+    .filter((item) => item.state === 'ready' && item.type !== 'epic' && !blockers.has(item.id))
     .map((item) => scored(item, now, weights, forActor, blocking.get(item.id)?.length ?? 0))
     .sort((a, b) => (a.score === b.score ? (a.item.id < b.item.id ? -1 : 1) : b.score - a.score))
 }
@@ -267,6 +272,11 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
     if (item === undefined) {
       data['clause'] = `unknown searched ${view.value.items.length}`
       data['store'] = view.value.identity.path ?? workspace
+    } else if (item.type === 'epic') {
+      // Ahead of the state clause, because this one holds in every state the epic can be in
+      // and `state want ready got draft` would send a caller to groom a record that would
+      // still never be ranked.
+      data['clause'] = 'type epic; a container is never the thing to pick up, its children are'
     } else if (item.state !== 'ready') {
       data['clause'] = `state want ready got ${item.state}`
     } else if (activeBlockers(view.value, id).length > 0) {

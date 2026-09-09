@@ -134,7 +134,7 @@ export const COMMANDS: readonly Command[] = [
     ],
     examples: [
       ['treadle transition sso-saml in_progress', 'start work; refused if a guard on that edge fails'],
-      ['treadle transition sso-saml in_review', 'submit for review; a story, a bug and an epic have a review step and no other type does'],
+      ['treadle transition sso-saml in_review', 'submit for review; a story and a bug have a review step and no other type does'],
       ['treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
       ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
       ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
@@ -219,7 +219,7 @@ export const COMMANDS: readonly Command[] = [
       ['treadle config', 'every key, the value in force and whether this workspace set it or it is the built-in default'],
       ['treadle config set wip_limits "in_progress=5, in_review=2"', 'arm G3: a sixth start into a column of five is refused, and a limit of zero means unlimited'],
       ['treadle config set ready_gate "DOR1 all field_present:title The item has a title|DOR11 story field_present:reviewer A story names its reviewer"', 'replace the ready gate whole; a rule reading a field the type has not got is refused before the write'],
-      ['treadle config set review_step "story, bug"', 'which types pass through in_review, which is what G5 enforces'],
+      ['treadle config set review_step "story"', 'which types pass through in_review, which is what G5 enforces; the default is story, bug'],
     ],
   },
   {
