@@ -176,11 +176,8 @@ Every block inside it is a call this tool refuses on every platform; what macOS 
 refusal's shape, from `err VALIDATION` at exit 2 to a `RangeError` at exit 7.
 
 Linux is not uniformly better.
-Debian 12 and Alpine both refuse any single argument over 131,072 bytes with `E2BIG` at exec,
-exit 126, before treadle runs, so the 1,000,000-byte single argument that macOS answers with a
-typed refusal below 955 KB is a kernel refusal on Linux at every size over 128 KiB.
-What Linux does carry better is the total: 23 arguments of 90,000 characters, 2,070,023 bytes,
-answered typed on both images, and a 24th was `E2BIG`.
+Linux refuses a large single argument at exec, before treadle runs, so the typed refusal macOS
+gives is not available there.
 CI run 34106349134 answered behind 4,140,820 bytes of argv and 4,142,278 bytes of environment
 on a runner with a raised stack rlimit; under the default 8 MiB stack the Linux total is 2 MiB.
 Windows caps a whole command line at 32,767 characters, far below the band.
