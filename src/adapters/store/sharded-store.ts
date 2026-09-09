@@ -398,12 +398,9 @@ export class ShardedStore implements Store {
     })
     if (!lock.ok) return lock
     try {
+      await this.#fencePreviousHolder()
       const recovered = await this.#recoverJournals(lock.value)
       if (!recovered.ok) return recovered
-      await sweepTempFiles(path.join(this.#root, ITEMS_DIR))
-      // A writer killed between the journal's exclusive create and its rename leaves a temp
-      // file the sweep over `items/` never reached, and nothing else here ever removes one.
-      await sweepTempFiles(path.join(this.#root, JOURNAL_DIR))
       // The read is taken here and nowhere earlier. Every check below decides a refusal -
       // the read set, the cross-shard id, the referential rule - and a check that decides a
       // refusal may not read anything but the files as they are under this lock.
@@ -1092,6 +1089,25 @@ export class ShardedStore implements Store {
       const missing = log.lines.filter((_, at) => !already.has(log.ids[at] as string))
       if (missing.length > 0) await appendAndSync(full, missing.join(''), () => this.#assertHeld(lock, txn, !recovering))
     }
+  }
+
+  /**
+   * The second half of a reclaim, and the first thing this holder does with the lock.
+   *
+   * `#assertHeld` cannot close the window it guards: a writer descheduled between the answer
+   * and its rename commits over the reclaimer's work, which is a version bump lost. Removing
+   * the temp files standing at the moment the lock changes hands closes it, because a rename
+   * whose source is gone fails instead of landing. The ordering is the whole argument, so it
+   * holds both ways: a temp file this sweep removed was created before it, hence before this
+   * holder read anything, and a rename that beat the sweep landed before the read below took
+   * the files - so no write reaches disk unseen and none of this holder's writes is reverted.
+   *
+   * The three directories are the three a transaction commits into: the workspace record at
+   * the root, `items/`, and the journal itself. `events/` is appended in place and never
+   * renamed, so it has no temp file to sweep.
+   */
+  async #fencePreviousHolder(): Promise<void> {
+    for (const dir of ['.', ITEMS_DIR, JOURNAL_DIR]) await sweepTempFiles(path.join(this.#root, dir), 0)
   }
 
   /**

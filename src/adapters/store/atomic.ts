@@ -53,6 +53,12 @@ export function openExclusive(target: string, mode: number): Promise<FileHandle>
  * `beforeCommit` runs after the fsync and before the rename, which is the commit. The
  * store asks the lock there: the fsync is milliseconds and the rename microseconds, so a
  * check ahead of the whole write left a window a paused holder was measured landing in.
+ *
+ * A check cannot close that window on its own, however narrow it is - a writer descheduled
+ * between the answer and the rename commits over whatever landed while it was away. What
+ * closes it is the next lock holder sweeping this temp file (`sweepTempFiles`), which turns
+ * the rename into an `ENOENT`; the guard is asked once more on that failure so the caller
+ * hears why the write was refused rather than the errno the fence raised on the way.
  */
 export async function writeFileAtomic(
   target: string, contents: string, beforeCommit?: () => Promise<void>,
@@ -69,7 +75,12 @@ export async function writeFileAtomic(
   }
   try {
     if (beforeCommit !== undefined) await beforeCommit()
-    await rename(temp, target)
+    try {
+      await rename(temp, target)
+    } catch (error) {
+      if (beforeCommit !== undefined) await beforeCommit()
+      throw error
+    }
   } catch (error) {
     await unlink(temp).catch(() => undefined)
     throw error
@@ -104,7 +115,15 @@ export async function appendAndSync(
   }
 }
 
-/** DR4: the next lock holder removes a temp file a crashed writer left behind. */
+/**
+ * DR4: the next lock holder removes a temp file a crashed writer left behind.
+ *
+ * `olderThanMs` of 0 removes every one of them, which is what a holder that has just taken
+ * the lock asks for and why the age is a parameter at all. Only a lock holder writes a temp
+ * file under the store, so one standing when the lock changes hands belongs to a holder that
+ * never committed: a crashed writer, or a descheduled one still carrying a stale rename.
+ * Age cannot tell those apart, and sparing the fresh ones is what left the rename live.
+ */
 export async function sweepTempFiles(dir: string, olderThanMs = TEMP_SWEEP_MS): Promise<number> {
   let removed = 0
   let names: string[]
@@ -118,10 +137,9 @@ export async function sweepTempFiles(dir: string, olderThanMs = TEMP_SWEEP_MS): 
     if (!isTempName(name)) continue
     const full = path.join(dir, name)
     try {
-      if ((await stat(full)).mtimeMs < cutoff) {
-        await unlink(full)
-        removed += 1
-      }
+      if (olderThanMs > 0 && (await stat(full)).mtimeMs >= cutoff) continue
+      await unlink(full)
+      removed += 1
     } catch {
       continue
     }
