@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // The map from threat-model finding to regression test, held as a test rather than as a
-// paragraph. Twelve of the thirteen findings are closed; each closed one names the file that
-// would catch its return. This asserts that file exists, then runs every named file in
-// one child `node --test` process and asserts the runner's own summary reports a zero exit
-// and a positive pass count. The one that is open names the layer it is waiting on
-// instead.
+// paragraph. All thirteen findings are closed; each names the file that would catch its
+// return. This asserts that file exists, then runs every named file in one child
+// `node --test` process and asserts the runner's own summary reports a zero exit and a
+// positive pass count. A finding that is not closed names the layer it is waiting on
+// instead, which is the shape F4 carried until ADR-0035 cut the export it waited on.
 //
-// Three of the twelve closed by having their surface removed rather than guarded, so they
+// Four of the thirteen closed by having their surface removed rather than guarded, so they
 // name the decision record that removed it as well as the test that keeps it removed: a
 // reader who trips one of those tests needs the argument, not just the assertion.
 //
@@ -41,7 +41,7 @@ const FINDINGS: readonly Finding[] = [
   { id: 'F1', title: 'a committed workspace file names a hook executable, run with no consent gate', test: 'security/f1-no-execution-at-runtime.test.ts', record: 'docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md' },
   { id: 'F2', title: 'a multi-line description forges lines in the agent output stream', test: 'security/f2-newline-forging.test.ts' },
   { id: 'F3', title: 'a column appended after a space-bearing one corrupts the row split', test: 'security/f3-column-split.test.ts' },
-  { id: 'F4', title: 'CSV export is quoted but not formula-guarded', waitingOn: 'export, which is specified and not built' },
+  { id: 'F4', title: 'CSV export is quoted but not formula-guarded', test: 'render/conformance.test.ts', record: 'docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md' },
   { id: 'F5', title: 'bidi rejection lists five code points and lets the isolates and marks through', test: 'store/security-f5.test.ts' },
   { id: 'F6', title: 'prototype pollution through the field-key grammar and the event log', test: 'store/security-f6.test.ts' },
   { id: 'F7', title: 'the hook path has no anti-traversal and no argv-not-shell rule', test: 'security/f1-f7-no-execution.test.ts', record: 'docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md' },
@@ -108,6 +108,7 @@ describe('every one of the thirteen findings is accounted for, open or closed', 
   it('holds for all 13', (t) => {
     assert.equal(FINDINGS.length, 13)
     assert.equal(new Set(FINDINGS.map((f) => f.id)).size, 13, 'a finding id appears twice')
+    assert.equal(CLOSED.length + OPEN.length, FINDINGS.length, 'a finding is neither closed nor open')
     for (const finding of OPEN) {
       assert.ok((finding.waitingOn ?? '').length > 0, `${finding.id} is neither closed nor waiting on anything`)
     }

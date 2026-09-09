@@ -55,6 +55,17 @@ describe('the renderer seam', () => {
       'the fourth renderer must not be a shipped rendering')
   })
 
+  // Threat-model finding F4, CSV export quoted but not formula-guarded, closed by absence
+  // rather than by a guard: ADR-0029 declined CSV and ADR-0035 cut the Markdown export that
+  // was left. This is what keeps that absence, so the finding names a test and not a layer.
+  it('ships no rendering a spreadsheet opens, which is how F4 stays closed', () => {
+    assert.deepEqual([...RENDERINGS], ['human', 'agent', 'json'])
+    for (const format of ['csv', 'tsv', 'md', 'markdown', 'xlsx']) {
+      assert.equal((RENDERINGS as readonly string[]).includes(format), false,
+        `${format} is a shipped rendering; a result rendered into a spreadsheet document reopens F4 and needs its formula guard`)
+    }
+  })
+
   it('renders every golden object through every renderer, the fourth included', (t) => {
     assert.ok(golden.size >= 12, `only ${golden.size} golden objects`)
     let rendered = 0

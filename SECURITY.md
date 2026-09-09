@@ -65,10 +65,10 @@ Out of scope:
 ## What is already known
 
 The project's threat model raised thirteen findings against the design before any code existed.
-Twelve are closed, each naming a regression test that was shown to fail before it passed, and `test/security/findings.test.ts` is the register that holds a finding to one.
-Three of the twelve closed by having their surface removed rather than guarded, which [docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) argues: the hook contract, the path rule that came with it, and the adapter generator.
-The one that remains open is F4, CSV formula injection, which lands with export and is not built.
-Reporting it is welcome and will be answered with that.
+All of them are closed, each naming a regression test that was shown to fail before it passed, and `test/security/findings.test.ts` is the register that holds a finding to one.
+Four closed by having their surface removed rather than guarded: the hook contract, the path rule that came with it and the adapter generator, which [docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) argues, and F4, CSV formula injection, which closed with the Markdown export it was waiting on rather than with a guard.
+[docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) is that decision: no rendering the tool ships and no command it holds writes a file for another program to open, so there is no formula to guard.
+An export that carries an attacker's content into a formula stays in scope above, because the day one is built the guard is built with it, and a report against it is welcome.
 
 ## The supply-chain controls this project holds itself to
 

@@ -458,8 +458,10 @@ argued rather than assumed.
 
 `test/security/findings.test.ts` is the register of the threat model's thirteen findings and
 the place to change one's state: a finding is closed by naming a regression test, and one
-closed by having its surface removed names the decision record too. Twelve are closed and F4,
-CSV formula injection, waits on export.
+closed by having its surface removed names the decision record too. All thirteen are closed.
+Four of them closed by removed surface: F1, F7 and F11 under ADR-0012, and F4, CSV formula
+injection, under ADR-0035, which cut the Markdown export F4 had been waiting on. Nothing is
+open, so a change here adds a finding rather than closing one.
 
 ## CI runner platforms
 

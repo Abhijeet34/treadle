@@ -514,17 +514,37 @@ describe("the README's Status table points at something this tree holds", () => 
       `${bare.length - rows.length} Status rows carry a State that is not one of Shipped, Queued, Declined or Blocked`)
   })
 
+  /** The `.work` id a Queued row backticks, refusing a row that names none. */
+  const idOn = (row: { area: string, rest: string }): string => {
+    const named = /`([a-z0-9][a-z0-9-]*)`/.exec(row.rest)?.[1]
+    assert.ok(named !== undefined, `the Queued row "${row.area}" backticks no .work item id`)
+    return named
+  }
+
   it('names, on every Queued row, an item .work holds in ready or draft', () => {
-    const queued = rows.filter((row) => row.state === 'Queued')
-    assert.ok(queued.length > 0, 'no Status row is Queued, so this assertion proves nothing')
-    for (const row of queued) {
-      const named = /`([a-z0-9][a-z0-9-]*)`/.exec(row.rest)?.[1]
-      assert.ok(named !== undefined, `the Queued row "${row.area}" backticks no .work item id`)
+    for (const row of rows.filter((candidate) => candidate.state === 'Queued')) {
+      const named = idOn(row)
       const state = stateOf.get(named)
       assert.ok(state !== undefined, `the Queued row "${row.area}" names ${named}, which .work does not hold`)
       assert.ok(['ready', 'draft'].includes(state),
         `the Queued row "${row.area}" names ${named}, which .work holds in ${state}; a queued gap is one somebody can pick up`)
     }
+  })
+
+  // The vacuity guard used to be that some row is Queued, so the loop above proved something.
+  // ADR-0035 cut the last two queued items, and a table with no Queued row is now a true
+  // state of the tree rather than the emptied assertion that guard was watching for. The set
+  // equality is what replaces it, and it holds over an empty table because it reads both
+  // sides: it also catches the direction the loop never could, an item .work holds in ready
+  // or draft that no row names, which is a gap somebody could pick up and the README does
+  // not admit to.
+  it('has a Queued row for every item .work holds in ready or draft, and no other', () => {
+    const named = rows.filter((row) => row.state === 'Queued').map((row) => idOn(row))
+    const open = [...stateOf.entries()]
+      .filter(([, state]) => state === 'ready' || state === 'draft')
+      .map(([id]) => id)
+    assert.deepEqual([...named].sort(), [...open].sort(),
+      "the Status table's Queued rows and the items .work holds in ready or draft are different sets; add the row or move the item")
   })
 
   it('names, on every Declined and Removed row, a record file that exists', () => {

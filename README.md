@@ -99,7 +99,7 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 
 ## What it does
 
-See [Status](#status) for what is shipped, what is queued, and what was declined or is blocked.
+See [Status](#status) for what is shipped, and what was declined or is blocked.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
 - **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
@@ -116,8 +116,8 @@ See [Status](#status) for what is shipped, what is queued, and what was declined
 | Store: month shards, event log, lock, compare-and-set, transactions, workspace configuration | Shipped: [ADR-0002](docs/architecture/adr/0002-storage-layout.md) to [ADR-0006](docs/architecture/adr/0006-the-store-seam.md), [ADR-0026](docs/architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) |
 | Store: `migrate` | Declined [ADR-0003](docs/architecture/adr/0003-record-format-and-migration.md) No schema 2 exists, and `S9` names the reason on the day one does. |
 | Commands: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence add`, `relation add`, `relation remove`, `remove`, `config`, `config set`, `doctor`, `next`, `explain`, `history`, `status`, `help`, `version` | Shipped |
-| Commands: `gate` | Queued `gate-command` |
-| Renderings: `--out md` | Queued `export` |
+| Commands: `gate` | Declined [ADR-0035](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) One verdict and no record, over a question `explain` already answers with the failing rules of both gates. |
+| Renderings: `--out md` | Declined [ADR-0035](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) The records are already committed Markdown, so a second one renders a command's result for a person rather than for an agent. |
 | Renderings: `csv` | Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) Threat-model finding F4 closes by absence, since the formula guard has nothing to guard. |
 | Hooks, and the adapter generator | Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) An executable named in a cloned repository is the surface the threat model refuses. |
 | Impediments: a type with `severity` and `proposed_resolution` required, blocking work through `relation add` | Shipped: [ADR-0017](docs/architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) |
@@ -130,31 +130,30 @@ See [Status](#status) for what is shipped, what is queued, and what was declined
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
-`test/architecture/documented-numbers.test.ts` reads this table: a Queued row has to name an item `.work` holds in `ready` or `draft`, and a Declined row has to name a file that exists.
+`test/architecture/documented-numbers.test.ts` reads this table: the Queued rows and the items `.work` holds in `ready` or `draft` are one set in both directions, so an item somebody could pick up cannot sit here unnamed, and a Declined row has to name a file that exists.
+No row is Queued today, because [ADR-0035](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) cut the last two.
 
-Twelve of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
+Thirteen of the thirteen findings in the project's threat model are closed, each naming a regression test that was shown to fail before it passed.
 In the store: incomplete rejection of bidi and invisible characters, prototype pollution through the record field-key grammar and the event log, missing ceilings on file size, event count and traversal depth, and a predictable temp-file name without an exclusive create.
 In the output contract: a multi-line description forging lines in the agent stream, a column appended after a space-bearing one corrupting the row split, record content reaching a verbose log, and the data-versus-instruction boundary being legible to a parser but not to a model.
 In the supply chain: the three unstated controls, which are now `ignore-scripts=true` in a committed `.npmrc`, a committed lockfile that every workflow installs with `npm ci`, and an SBOM with build provenance on the release path.
-Three closed by having their surface removed rather than guarded: the hook contract that would have executed a program named in a cloned repository, the path rule that came with it, and the adapter generator that does not exist, all argued in [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md).
-The one that remains is CSV formula injection, which lands with export.
+Four closed by having their surface removed rather than guarded: the hook contract that would have executed a program named in a cloned repository, the path rule that came with it, and the adapter generator that does not exist, all argued in [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md); and CSV formula injection, which has no formula to guard now that [ADR-0035](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) has cut the Markdown export it was waiting on.
 
 ## treadle's own backlog
 
-`.work/` is a treadle workspace holding this project's remaining work, filed with the tool itself.
+`.work/` is a treadle workspace holding this project's work, filed with the tool itself.
 It is the proof that the tool can manage its own backlog, and it is readable and reviewable as markdown without running anything:
 
 ```bash
 treadle status                                  # where the project stands
 treadle next                                    # what to pick up, and why that order
-treadle explain export                          # why one item is still in draft
-treadle backlog --state ready --explain-absence export
+treadle backlog --state all                     # every record, not only the open ones
+treadle history gate-command                    # the log still answers for a removed record
 ```
 
-Eight items, of which six are `done`, one is `ready` and one is `draft`.
-The one in `draft` is a story with no acceptance criteria, which is `DOR4` refusing it rather than a gap in the list, and `treadle explain export` names that rule.
+Six items, and every one of them is `done`, so `treadle backlog` prints an empty open list rather than a queue.
 The six that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped.
-Seven more left the workspace through `treadle remove`, which takes a record out of its shard and keeps every event it earned, so `treadle history <id>` still answers for each of them with the actor and the reason.
+Nine more left the workspace through `treadle remove`, which takes a record out of its shard and keeps every event it earned, so `treadle history <id>` still answers for each of them with the actor and the reason.
 
 ## Documentation
 

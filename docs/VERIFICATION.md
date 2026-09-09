@@ -65,14 +65,12 @@ Re-derive a row by running the suite it names and reading the `ℹ` line, rather
 No figure here is a performance measurement, and the fuzzing budget is a ceiling rather than a benchmark.
 A separate branch owns that work.
 
-**The one open threat-model finding.**
-F4, CSV formula injection, waits on export, which is not built.
-`test/security/findings.test.ts` asserts that it names the layer it waits on rather than silently disappearing from the list.
-
 **What a closed-by-absence finding proves, and what it does not.**
-F1, F7 and F11 closed by removing their surface rather than by guarding it, which [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) argues.
-Their tests prove that nothing under `src/` starts a process, evaluates a string, reads a hook setting or writes a file outside the five modules `WRITERS` in `test/security/f11-adapter-write-safety.test.ts` names: the store's four writers and the workspace resolver.
-They do not prove that a hook contract would be safe if one were built, and they are not evidence about a release that has never fired: F13's third control, provenance at publish, is asserted over the workflow and the preflight script rather than over a publish that happened.
+F1, F7 and F11 closed by removing their surface rather than by guarding it, which [architecture/adr/0012-the-extension-surface-that-does-not-ship.md](architecture/adr/0012-the-extension-surface-that-does-not-ship.md) argues, and F4 closed the same way when [architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md](architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) cut the Markdown export it had been waiting on.
+The first three name tests proving that nothing under `src/` starts a process, evaluates a string, reads a hook setting or writes a file outside the five modules `WRITERS` in `test/security/f11-adapter-write-safety.test.ts` names: the store's four writers and the workspace resolver.
+F4 names `test/render/conformance.test.ts`, which holds the shipped rendering set to the three `RENDERINGS` declares, none of them a format a spreadsheet opens.
+None of the four proves that the removed surface would be safe if it were built: a guarded export and a gated hook contract are both open questions this tree answers by not having either.
+They are also not evidence about a release that has never fired: F13's third control, provenance at publish, is asserted over the workflow and the preflight script rather than over a publish that happened.
 
 **Coverage-guided fuzzing.**
 The fuzzer here is mutation-based over a committed corpus.
