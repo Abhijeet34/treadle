@@ -1107,7 +1107,7 @@ export class ShardedStore implements Store {
    * renamed, so it has no temp file to sweep.
    */
   async #fencePreviousHolder(): Promise<void> {
-    for (const dir of ['.', ITEMS_DIR, JOURNAL_DIR]) await sweepTempFiles(path.join(this.#root, dir), 0)
+    for (const dir of ['.', ITEMS_DIR, JOURNAL_DIR]) await sweepTempFiles(path.join(this.#root, dir))
   }
 
   /**

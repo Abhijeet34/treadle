@@ -20,9 +20,6 @@ import path from 'node:path'
 const FILE_MODE = 0o644
 export const DIR_MODE = 0o755
 
-/** The window a crashed writer's temp file survives before the next lock holder sweeps it. */
-const TEMP_SWEEP_MS = 60 * 60 * 1000
-
 const TEMP_MARK = '.tmp.'
 
 export function isTempName(name: string): boolean {
@@ -116,15 +113,16 @@ export async function appendAndSync(
 }
 
 /**
- * DR4: the next lock holder removes a temp file a crashed writer left behind.
+ * DR4: the next lock holder removes the temp files a previous one left behind.
  *
- * `olderThanMs` of 0 removes every one of them, which is what a holder that has just taken
- * the lock asks for and why the age is a parameter at all. Only a lock holder writes a temp
- * file under the store, so one standing when the lock changes hands belongs to a holder that
- * never committed: a crashed writer, or a descheduled one still carrying a stale rename.
- * Age cannot tell those apart, and sparing the fresh ones is what left the rename live.
+ * Every one of them, whatever its age. Only a lock holder writes a temp file under the
+ * store, so one standing when the lock changes hands belongs to a holder that never
+ * committed: a writer that crashed, or one descheduled inside `writeFileAtomic` still
+ * carrying a rename that would commit over the reclaimer's work. Age cannot tell those two
+ * apart, and the hour this used to spare a fresh temp file for is what left that rename able
+ * to land.
  */
-export async function sweepTempFiles(dir: string, olderThanMs = TEMP_SWEEP_MS): Promise<number> {
+export async function sweepTempFiles(dir: string): Promise<number> {
   let removed = 0
   let names: string[]
   try {
@@ -132,13 +130,10 @@ export async function sweepTempFiles(dir: string, olderThanMs = TEMP_SWEEP_MS): 
   } catch {
     return 0
   }
-  const cutoff = Date.now() - olderThanMs
   for (const name of names) {
     if (!isTempName(name)) continue
-    const full = path.join(dir, name)
     try {
-      if (olderThanMs > 0 && (await stat(full)).mtimeMs >= cutoff) continue
-      await unlink(full)
+      await unlink(path.join(dir, name))
       removed += 1
     } catch {
       continue
