@@ -73,12 +73,13 @@ next  3 of 3
 
 ### backlog @ 60
 backlog  acme-platform
+  filter  state open
   sort  priority,filed,id
-  more  15
-  page  treadle backlog --fields id,type,state,title
-    --cursor queue-drain
+  more  13
+  page  treadle backlog --state open --fields
+    id,type,state,title --cursor queue-drain
 
-items  9 of 24
+items  9 of 22
   ID            TYPE   STATE        TITLE
   sso-saml      story  in_progress  SAML login for enterp…
   log-redact    task   in_progress  Redact tokens from re…
@@ -92,11 +93,13 @@ items  9 of 24
 
 ### backlog @ 80
 backlog  acme-platform
+  filter  state open
   sort  priority,filed,id
-  more  15
-  page  treadle backlog --fields id,type,state,title --cursor queue-drain
+  more  13
+  page  treadle backlog --state open --fields id,type,state,title --cursor
+    queue-drain
 
-items  9 of 24
+items  9 of 22
   ID            TYPE   STATE        TITLE
   sso-saml      story  in_progress  SAML login for enterprise tenants
   log-redact    task   in_progress  Redact tokens from request logs
@@ -110,11 +113,12 @@ items  9 of 24
 
 ### backlog @ 200
 backlog  acme-platform
+  filter  state open
   sort  priority,filed,id
-  more  15
-  page  treadle backlog --fields id,type,state,title --cursor queue-drain
+  more  13
+  page  treadle backlog --state open --fields id,type,state,title --cursor queue-drain
 
-items  9 of 24
+items  9 of 22
   ID            TYPE   STATE        TITLE
   sso-saml      story  in_progress  SAML login for enterprise tenants
   log-redact    task   in_progress  Redact tokens from request logs
@@ -461,8 +465,9 @@ help  acme-platform
     401" # file a story in draft
   example  treadle show auth-refresh --field desc # the
     description whole, rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to
-    pick up
+  example  treadle backlog # open work: the list is scoped
+    to what is not done or cancelled, and the filter line
+    says so
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
   example  treadle set checkout-500 expected="both orders
@@ -505,7 +510,8 @@ help  acme-platform
     in draft
   example  treadle show auth-refresh --field desc # the description whole,
     rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to pick up
+  example  treadle backlog # open work: the list is scoped to what is not done
+    or cancelled, and the filter line says so
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
   example  treadle set checkout-500 expected="both orders are listed"
@@ -543,7 +549,7 @@ help  acme-platform
   example  treadle init # create a workspace in .work here, and say what it created
   example  treadle file story "Refresh the access token on a 401" # file a story in draft
   example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
-  example  treadle backlog --state ready # what is ready to pick up
+  example  treadle backlog # open work: the list is scoped to what is not done or cancelled, and the filter line says so
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
   example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 

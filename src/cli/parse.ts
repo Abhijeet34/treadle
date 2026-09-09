@@ -75,6 +75,12 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
     // `b` alone; and an item carries a list, so "carrying both" is the question to ask of it.
     label: { type: 'string', multiple: true },
     title: { type: 'string' },
+    // A value rather than a bare switch, so it is the equality clause every filter beside it
+    // is: the page line prints `--blocked yes` and the line runs as printed, and
+    // `--explain-absence` names it with a `got` like any other. A bare `--blocked` would need
+    // one special case where the clause is built and a second where the page line is written.
+    // `--blocked no` is the other half of the question, which is what can be started now.
+    blocked: { type: 'string' },
   },
   transition: {
     reason: { type: 'string' },
@@ -106,9 +112,9 @@ export const COMMAND_OPTIONS: Readonly<Record<string, OptionConfig>> = {
  * Filter flags, in the order they were written, so a tie names the first one (A.4). `label`
  * and `title` are appended rather than placed, because this order is what a line that names
  * no flag falls back to and moving an existing entry would change which clause an existing
- * caller's `narrowest` and `--explain-absence` lines name.
+ * caller's `narrowest` and `--explain-absence` lines name. `blocked` is appended on that rule.
  */
-export const FILTER_FLAGS = ['state', 'type', 'assignee', 'priority', 'resolution', 'label', 'title'] as const
+export const FILTER_FLAGS = ['state', 'type', 'assignee', 'priority', 'resolution', 'label', 'title', 'blocked'] as const
 export type FilterFlag = (typeof FILTER_FLAGS)[number]
 
 export type Parsed = {

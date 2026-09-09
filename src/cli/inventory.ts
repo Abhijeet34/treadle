@@ -89,10 +89,13 @@ export const COMMANDS: readonly Command[] = [
     columns: true,
     usage: [
       'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
-      'treadle backlog [--priority <1-5>] [--label <slug>] [--title <words>]',
+      'treadle backlog [--priority <1-5>] [--label <slug>] [--title <words>] [--blocked <yes|no>]',
       'treadle backlog [--fields <list>] [--limit <n>] [--cursor <id>]',
     ],
     examples: [
+      ['treadle backlog', 'open work: the list is scoped to what is not done or cancelled, and the filter line says so'],
+      ['treadle backlog --state all', 'every state, finished work included; --state done and --state cancelled are the narrower reads'],
+      ['treadle backlog --blocked no', 'what nothing is holding up, which is what can be started now'],
       ['treadle backlog --state ready', 'what is ready to pick up'],
       ['treadle backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched'],
       ['treadle backlog --label ux --label ui --state ready --fields +labels', 'every clause has to hold, --label included, so this is ready work carrying both labels, with the whole list as a column'],

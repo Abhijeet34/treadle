@@ -158,7 +158,7 @@ describe('streams and renderings, end to end', () => {
     const loud = await runCli(['backlog', '--limit', '3'], { cwd })
     const quiet = await runCli(['backlog', '--limit', '3', '--quiet'], { cwd })
     assert.equal(quiet.code, loud.code)
-    assert.equal(quiet.out.startsWith('~items 3 24\n#id'), true, quiet.out)
+    assert.equal(quiet.out.startsWith('~items 3 22\n#id'), true, quiet.out)
     assert.equal(quiet.out.includes('sort priority'), false, 'a header line survived --quiet')
     assert.equal(quiet.out.split('\n').length < loud.out.split('\n').length, true)
   })

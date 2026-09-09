@@ -15,7 +15,8 @@ import type { ResultObject } from '../../src/application/result.ts'
 import { backlog } from '../../src/application/services/items.ts'
 import { agentRenderer, orderColumns } from '../../src/adapters/render/agent.ts'
 import { RenderInvariant } from '../../src/adapters/render/grammar.ts'
-import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
+import { fixedClock } from '../../src/adapters/clock.ts'
+import { aDemoWorkspace, NOW, type Demo } from '../helpers/cli-fixtures.ts'
 
 /** The row grammar exactly as a consumer would implement it from the contract. */
 function parseRows(rendered: string): readonly Readonly<Record<string, string>>[] {
@@ -52,7 +53,7 @@ describe('F3: a column appended after a space-bearing one cannot corrupt the spl
   })
 
   it('refuses a column set naming two free-text columns, and names both', async () => {
-    const result = await backlog(demo.store, {
+    const result = await backlog(demo.store, fixedClock(NOW), {
       filters: [], limit: 9,
       columns: ['id', 'type', 'state', 'pts', 'title', 'assignee'],
     })
@@ -64,7 +65,7 @@ describe('F3: a column appended after a space-bearing one cannot corrupt the spl
   })
 
   it('places the one free-text column last whatever order it was asked for', async () => {
-    const result = await backlog(demo.store, {
+    const result = await backlog(demo.store, fixedClock(NOW), {
       filters: [{ field: 'state', value: 'ready' }], limit: 9,
       columns: ['id', 'title', 'state', 'pri'],
     })

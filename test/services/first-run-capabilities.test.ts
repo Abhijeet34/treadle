@@ -55,7 +55,7 @@ describe('STR-4: a label that is written is a label that can be read back', () =
 
   it('filters the backlog to the items carrying one label', async () => {
     const listed = must(await cli(['backlog', '--label', 'frontend']), 'backlog --label')
-    assert.match(listed.out, /^filter label frontend$/m, 'the clause is named back')
+    assert.match(listed.out, /^filter state open label frontend$/m, 'the clause is named back')
     assert.match(listed.out, /^login-cta /m)
     assert.doesNotMatch(listed.out, /^queue-drain /m)
     assert.doesNotMatch(listed.out, /^docs-quickstart /m)
@@ -63,9 +63,9 @@ describe('STR-4: a label that is written is a label that can be read back', () =
 
   it('prints the whole list as a column, comma joined, and a dash where there is none', async () => {
     const listed = must(await cli(['backlog', '--fields', '+labels']), 'backlog --fields +labels')
-    assert.match(listed.out, /^#id type state sev labels "title$/m)
-    assert.match(listed.out, /^login-cta task draft - frontend,ux Move the sign-in call to action$/m)
-    assert.match(listed.out, /^docs-quickstart task draft - - Write the quickstart page$/m)
+    assert.match(listed.out, /^#id type state sev blocked age labels "title$/m)
+    assert.match(listed.out, /^login-cta task draft - - \d+ frontend,ux Move the sign-in call to action$/m)
+    assert.match(listed.out, /^docs-quickstart task draft - - \d+ - Write the quickstart page$/m)
   })
 
   it('takes labels beside title, because a label carries no space and is not a free-text column', async () => {
@@ -82,7 +82,7 @@ describe('STR-4: a label that is written is a label that can be read back', () =
 
   it('composes with every other filter as one conjunction, and names the narrowest clause', async () => {
     const none = must(await cli(['backlog', '--label', 'frontend', '--type', 'bug']), 'two clauses')
-    assert.match(none.out, /^filter label frontend type bug$/m)
+    assert.match(none.out, /^filter state open label frontend type bug$/m)
     assert.match(none.out, /^none searched 3 matched 0$/m)
     assert.match(none.out, /^narrowest (label frontend 1|type bug 0)$/m)
   })
@@ -106,7 +106,7 @@ describe('STR-4: a label that is written is a label that can be read back', () =
   it('repeats, and every label named has to hold, which is what file --label already does', async () => {
     must(await cli(['set', 'login-cta', 'labels=frontend,ux,qa']), 'set labels')
     const both = must(await cli(['backlog', '--label', 'frontend', '--label', 'qa']), 'two labels')
-    assert.match(both.out, /^filter label frontend label qa$/m)
+    assert.match(both.out, /^filter state open label frontend label qa$/m)
     assert.match(both.out, /^login-cta /m)
     assert.match(both.out, /^~items 1 1$/m)
     const neither = must(await cli(['backlog', '--label', 'frontend', '--label', 'backend']), 'no item carries both')
@@ -116,7 +116,7 @@ describe('STR-4: a label that is written is a label that can be read back', () =
 
   it('carries every clause into the page line that continues the list', async () => {
     const paged = must(await cli(['backlog', '--label', 'frontend', '--label', 'ux', '--limit', '1']), 'paged')
-    assert.match(paged.out, /^filter label frontend label ux$/m)
+    assert.match(paged.out, /^filter state open label frontend label ux$/m)
   })
 
   it('answers an empty label with a list rather than a refusal, as every other filter does', async () => {
@@ -236,7 +236,7 @@ describe('STR-3: the backlog searches titles by their words', () => {
 
   it('is one conjunction with every other clause, and the filter line names both', async () => {
     const found = must(await cli(['backlog', '--title', 'the', '--type', 'bug']), 'two clauses')
-    assert.match(found.out, /^filter title the type bug$/m)
+    assert.match(found.out, /^filter state open title the type bug$/m)
     assert.match(found.out, /^checkout-500 /m)
     assert.doesNotMatch(found.out, /^auth-refresh /m)
   })

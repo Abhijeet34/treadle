@@ -47,7 +47,7 @@ describe('a cancel records why the item stopped, and revive clears it', () => {
   })
 
   it('counts the stopped work by resolution without reading one line of prose', async () => {
-    const listed = await backlog(demo.store, {
+    const listed = await backlog(demo.store, CLOCK, {
       filters: [{ field: 'state', value: 'cancelled' }, { field: 'resolution', value: 'duplicate' }],
       columns: ['id', 'type', 'state'], limit: 9,
     })

@@ -136,6 +136,16 @@ A multi-line value never appears as a bare line: it arrives as `|<key> <lines> <
 followed by exactly that many content lines. Read the count, not the newlines. That is
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
+`backlog`'s default is open work rather than every record, expressed as an ordinary
+`--state open` clause and not as a window or a configuration key.
+Because it is a clause it appears in the `filter` line, in the `page` line, in `narrowest` and
+in what `--explain-absence` names, so a reader can always see which list they were served;
+`--state all` is the whole set and `--state done` the narrower read.
+A clause the caller writes replaces it, and `--resolution` counts as one, because T6 lets only
+the cancel transition record a resolution.
+An assertion that expects a done or cancelled record in an unfiltered list is the thing that
+breaks here, and `scoped` in `src/application/services/items.ts` is the one place the rule lives.
+
 A `page` line is a cursor to follow, not an offset, and it carries every flag the page was
 asked with: the filters, `--fields`, `--limit` and `--for`, so the page it names is a
 continuation of the one that printed it. It did not, and an agent following the cursor the

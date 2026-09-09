@@ -71,7 +71,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   after(async () => { await demo.dispose() })
 
   it('says how many were searched, how many matched, and which clause was narrowest', async () => {
-    const result = await backlog(demo.store, {
+    const result = await backlog(demo.store, CLOCK, {
       filters: [{ field: 'state', value: 'ready' }, { field: 'assignee', value: 'kim' }],
       columns: ['id', 'type', 'state', 'title'], limit: 9,
     })
@@ -80,7 +80,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   })
 
   it('names the first clause that excluded an id the caller expected', async () => {
-    const result = await backlog(demo.store, {
+    const result = await backlog(demo.store, CLOCK, {
       filters: [{ field: 'state', value: 'ready' }],
       columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'sso-saml',
     })
@@ -89,7 +89,7 @@ describe('an empty result and an absence are answered rather than left silent', 
   })
 
   it('names the store it searched when the id is nowhere in it', async () => {
-    const result = await backlog(demo.store, {
+    const result = await backlog(demo.store, CLOCK, {
       filters: [], columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'no-such-item',
     })
     assert.equal(result.data['absent'], 'no-such-item')

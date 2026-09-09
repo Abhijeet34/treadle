@@ -31,7 +31,7 @@ describe('a closed-set backlog filter outside its set refuses rather than answer
     assert.equal(state.code, 2)
     assert.match(state.err, /^rule C1$/m)
     assert.match(state.err,
-      /^"cause banana is not a state; the set is draft, ready, in_progress, in_review, done, on_hold, cancelled$/m)
+      /^"cause banana is not a state; the set is draft, ready, in_progress, in_review, done, on_hold, cancelled, open, all$/m)
 
     const priority = await cli(['backlog', '--priority', '9'])
     assert.equal(priority.code, 2)

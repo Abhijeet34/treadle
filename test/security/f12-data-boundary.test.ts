@@ -54,7 +54,7 @@ describe('F12: content a person wrote is marked as data wherever it is emitted',
   })
 
   it('marks the column, not each row, so a block costs one byte to declare', async () => {
-    const list = await backlog(demo.store, {
+    const list = await backlog(demo.store, fixedClock('2026-09-04T09:30:00Z'), {
       filters: [{ field: 'state', value: 'draft' }], columns: ['id', 'type', 'state', 'pri', 'title'], limit: 20,
     })
     const rendered = agentRenderer.render(list)
@@ -67,7 +67,7 @@ describe('F12: content a person wrote is marked as data wherever it is emitted',
     const results = [
       await status(demo.store, fixedClock('2026-09-04T09:30:00Z')),
       await explain(demo.store, fixedClock('2026-09-04T09:30:00Z'), 'injection-probe'),
-      await backlog(demo.store, { filters: [], columns: ['id', 'type', 'state', 'pri', 'title'], limit: 9 }),
+      await backlog(demo.store, fixedClock('2026-09-04T09:30:00Z'), { filters: [], columns: ['id', 'type', 'state', 'pri', 'title'], limit: 9 }),
     ]
     let checked = 0
     for (const result of results) {

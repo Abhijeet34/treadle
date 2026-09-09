@@ -196,7 +196,7 @@ describe('no flag of any command answers a delimiter with an internal error', ()
     // refused by the parser and has to be written inline, which is one token and one flag.
     const spelled = await cli(['backlog', '--title=--title'])
     assert.equal(spelled.code, 0, spelled.err)
-    assert.match(spelled.out, /^filter title --title$/m, spelled.out)
+    assert.match(spelled.out, /^filter state open title --title$/m, spelled.out)
     const dashed = await cli(['backlog', '--title', '--state'])
     assert.equal(dashed.code, EXIT_OF.VALIDATION, dashed.err)
     assert.match(dashed.err, /^"cause --title needs a value, and one starting with a dash/m, dashed.err)

@@ -144,14 +144,14 @@ export async function goldenResults(): Promise<ReadonlyMap<string, ResultObject>
     const ids = sequentialIds(900)
     const golden = new Map<string, ResultObject>()
     golden.set('status', await status(demo.store, clock))
-    golden.set('backlog', await backlog(demo.store, {
+    golden.set('backlog', await backlog(demo.store, clock, {
       filters: [], columns: ['id', 'type', 'state', 'title'], limit: 9,
     }))
-    golden.set('backlog-empty', await backlog(demo.store, {
+    golden.set('backlog-empty', await backlog(demo.store, clock, {
       filters: [{ field: 'state', value: 'ready' }, { field: 'assignee', value: 'kim' }],
       columns: ['id', 'type', 'state', 'title'], limit: 9,
     }))
-    golden.set('backlog-absence', await backlog(demo.store, {
+    golden.set('backlog-absence', await backlog(demo.store, clock, {
       filters: [{ field: 'state', value: 'ready' }],
       columns: ['id', 'type', 'state', 'title'], limit: 9, explainAbsence: 'sso-saml',
     }))

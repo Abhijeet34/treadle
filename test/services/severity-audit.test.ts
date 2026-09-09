@@ -47,10 +47,10 @@ describe('severity reaches every read surface a caller would look at', () => {
 
   it('carries a sev column in the default backlog, and one dash for an item with none', async () => {
     const list = await cli(['backlog', '--type', 'bug'])
-    assert.match(list.out, /^#id type state sev "title$/m)
-    assert.match(list.out, /^sess-timeout bug draft S1 /m)
+    assert.match(list.out, /^#id type state sev blocked age "title$/m)
+    assert.match(list.out, /^sess-timeout bug draft S1 - \d+ /m)
     const mixed = await cli(['backlog', '--type', 'task'])
-    assert.match(mixed.out, /^dep-bump task ready - /m)
+    assert.match(mixed.out, /^dep-bump task ready - - \d+ /m)
   })
 
   it('counts the open defects on status, by severity, and only the open ones', async () => {
