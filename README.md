@@ -55,7 +55,7 @@ node bin/treadle.js status
 ```
 
 `TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
-Neither is required and nothing prompts for one, so a workspace run without either has `unknown` against every event, which `treadle history <id>` then reads back for as long as the log lives.
+A command that would write an event refuses instead of recording one when neither names anyone, so no workspace ever holds an event nobody is attributable for.
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
