@@ -211,11 +211,9 @@ export function commandHelp(name: string, workspace: string): ResultObject | und
   if (command === undefined) return undefined
   const vocabulary = command.vocabulary ?? []
   const exceptions = GLOBAL_FLAGS
-    .map((flag): Row => {
-      const verdict = verdictFor(command, flag)
-      return { flag, verdict, note: noteFor(flag, verdict) }
-    })
-    .filter((row) => row.verdict !== 'S' && varies(row.flag))
+    .map((flag) => ({ flag, verdict: verdictFor(command, flag) }))
+    .filter((entry) => entry.verdict !== 'S' && varies(entry.flag))
+    .map((entry): Row => ({ ...entry, note: noteFor(entry.flag, entry.verdict) }))
   return okResult(HELP_SHAPE, {
     workspace,
     data: {
