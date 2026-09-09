@@ -11,7 +11,7 @@
 // records it bought 20 to 25 ms a read for a quarter of the store's lines, five rules and
 // the only defect that has ever bricked a workspace.
 
-import { lstat, mkdir, readFile, readdir, readlink, rm, stat } from 'node:fs/promises'
+import { access, constants, lstat, mkdir, readFile, readdir, readlink, rm, stat } from 'node:fs/promises'
 import path from 'node:path'
 
 import {
@@ -168,7 +168,7 @@ function parseJournal(text: string): Journal | undefined {
     if (typeof file !== 'object' || file === null) return undefined
     const entry = file as Record<string, unknown>
     if (typeof entry['content'] !== 'string') return undefined
-    if (!writable(entry['path'], ITEMS_DIR, WORKSPACE_FILE)) return undefined
+    if (!contained(entry['path'], ITEMS_DIR, WORKSPACE_FILE)) return undefined
   }
   for (const log of events) {
     if (typeof log !== 'object' || log === null) return undefined
@@ -177,7 +177,7 @@ function parseJournal(text: string): Journal | undefined {
     if (!Array.isArray(lines) || !Array.isArray(ids) || lines.length !== ids.length) return undefined
     if (!lines.every((line) => typeof line === 'string')) return undefined
     if (!ids.every((id) => typeof id === 'string')) return undefined
-    if (!writable(entry['path'], EVENTS_DIR)) return undefined
+    if (!contained(entry['path'], EVENTS_DIR)) return undefined
   }
   return raw as Journal
 }
@@ -210,7 +210,7 @@ function printableFinding(finding: Finding): Finding {
  * one file directly inside a directory the layout draws, and nothing else. One segment, not
  * a prefix match, because `items/../../x` starts with `items/` and leaves the root.
  */
-function writable(at: unknown, dir: string, alsoExactly?: string): boolean {
+function contained(at: unknown, dir: string, alsoExactly?: string): boolean {
   if (typeof at !== 'string') return false
   if (at === alsoExactly) return true
   const parts = at.split('/')
@@ -1160,6 +1160,71 @@ export class ShardedStore implements Store {
       findings.push({ file, line: 1, rule: 'S13', reason: unreplayable(file) })
     }
     return findings
+  }
+
+  /**
+   * The two things standing under this root that refuse every write, judged without the lock
+   * and without a record parse: a `.txn/` file the next holder cannot replay, and a directory
+   * a transaction has to write that this user may not.
+   *
+   * The refusals are the ones `#recoverJournals` and `apply`'s errno backstop give, built
+   * here rather than restated, so `status` prints the sentence and the fix line the write
+   * itself would print. What it deliberately does not judge is the lock: a held lock is a
+   * writer working, and a lock that stopped heartbeating is reclaimed by the next waiter, so
+   * naming one here would report honest contention as a broken store.
+   */
+  async writable(): Promise<StoreResult<undefined>> {
+    const layout = await this.#checkLayout()
+    if (layout !== undefined) return layout
+    const dir = path.join(this.#root, JOURNAL_DIR)
+    let names: readonly string[]
+    try {
+      names = await readdir(dir)
+    } catch (error) {
+      const errno = error as NodeJS.ErrnoException
+      // An absent `.txn/` is the ordinary state: `apply` creates it under the root, which the
+      // access loop below covers. Any other errno is a directory that is there and cannot be
+      // listed, and the write that has to put a journal in it fails on the same permission.
+      if (errno.code === 'ENOENT') return this.#writableDirs([])
+      return storeFail('STORE_UNAVAILABLE', 'S13', `${JOURNAL_DIR} could not be read: ${errno.syscall ?? 'read'} failed with ${errno.code}`, [JOURNAL_DIR])
+    }
+    for (const name of [...names].sort()) {
+      if (!name.endsWith('.json')) continue
+      const file = printable(`${JOURNAL_DIR}/${name}`)
+      let text: string
+      try {
+        text = await readFile(path.join(dir, name), 'utf8')
+      } catch (error) {
+        const errno = error as NodeJS.ErrnoException
+        return storeFail('STORE_UNAVAILABLE', 'S13', `${file} could not be read: ${errno.syscall ?? 'read'} failed with ${errno.code ?? 'an error'}`, [file])
+      }
+      if (parseJournal(text) === undefined) {
+        return storeFail('STORE_UNAVAILABLE', 'S13', unreplayable(file), [file], { journal: file })
+      }
+    }
+    return this.#writableDirs([JOURNAL_DIR])
+  }
+
+  /**
+   * The directories a transaction writes in, checked for the permission it needs: the lock at
+   * the root, the shard under `items/`, the log line under `events/`, and the journal under
+   * `.txn/` when that directory is already there. A missing one is not judged here, because
+   * `#checkLayout` and the read every command performs answer for it first.
+   */
+  async #writableDirs(also: readonly string[]): Promise<StoreResult<undefined>> {
+    for (const relative of ['.', ITEMS_DIR, EVENTS_DIR, ...also]) {
+      try {
+        await access(path.join(this.#root, relative), constants.W_OK | constants.X_OK)
+      } catch (error) {
+        const errno = error as NodeJS.ErrnoException
+        return storeFail(
+          'STORE_UNAVAILABLE', 'S13',
+          `${relative === '.' ? 'the workspace directory' : relative} cannot be written by this user: access failed with ${errno.code ?? 'an error'}`,
+          [relative],
+        )
+      }
+    }
+    return storeOk(undefined)
   }
 }
 

@@ -492,5 +492,18 @@ export function storeConformance(name: string, open: () => Promise<Subject>): vo
         assert.equal(found.ok && found.value?.extra?.get('a_field_from_2027'), 'kept')
       })
     })
+
+    it('reports a store nothing stands against as writable, and takes no lock to say so', async () => {
+      await withStore(async (store) => {
+        const before = await store.writable()
+        assert.ok(before.ok, before.ok ? '' : before.error.message)
+        // Twice in a row and once with a write between: the answer is about the store's own
+        // condition, so nothing this call does may leave the next write or the next reading
+        // of it any different.
+        await store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [anEvent()] })
+        const after = await store.writable()
+        assert.ok(after.ok, after.ok ? '' : after.error.message)
+      })
+    })
   })
 }

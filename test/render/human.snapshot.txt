@@ -689,8 +689,8 @@ help  acme-platform
   example  treadle transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
   example  treadle transition sso-saml in_review # submit
-    for review; a story, a bug and an epic have a review
-    step and no other type does
+    for review; a story and a bug have a review step and no
+    other type does
   example  treadle transition sso-saml cancelled
     --resolution rejected --reason "the reviewer refused it
     outright" # stop the item and say which of the five
@@ -759,8 +759,8 @@ help  acme-platform
   note  the other 12 global flags apply here as treadle help describes them
   example  treadle transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
-  example  treadle transition sso-saml in_review # submit for review; a story, a
-    bug and an epic have a review step and no other type does
+  example  treadle transition sso-saml in_review # submit for review; a story
+    and a bug have a review step and no other type does
   example  treadle transition sso-saml cancelled --resolution rejected --reason
     "the reviewer refused it outright" # stop the item and say which of the five
     reasons it stopped for
@@ -818,7 +818,7 @@ help  acme-platform
   note  --override takes G2, G3, G7 and a reason; every other guard is fixed by fixing the item
   note  the other 12 global flags apply here as treadle help describes them
   example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
-  example  treadle transition sso-saml in_review # submit for review; a story, a bug and an epic have a review step and no other type does
+  example  treadle transition sso-saml in_review # submit for review; a story and a bug have a review step and no other type does
   example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
   example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
   example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
@@ -1434,7 +1434,7 @@ config  acme-platform  0 changed  txn -
 
 config  6 of 6
   KEY           SOURCE   VALUE
-  review_step   default  story, bug, epic
+  review_step   default  story, bug
   next_weights  default  pri=10, age=1, dep=5, asg=8, due…
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
@@ -1448,7 +1448,7 @@ config  acme-platform  0 changed  txn -
 
 config  6 of 6
   KEY           SOURCE   VALUE
-  review_step   default  story, bug, epic
+  review_step   default  story, bug
   next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
@@ -1462,10 +1462,113 @@ config  acme-platform  0 changed  txn -
 
 config  6 of 6
   KEY           SOURCE   VALUE
-  review_step   default  story, bug, epic
+  review_step   default  story, bug
   next_weights  default  pri=10, age=1, dep=5, asg=8, due=4, sev=6
   wip_limits    file     in_progress=5, in_review=2
   aging_days    default  0
   ready_gate    default  DOR3 all no_active_blocker Nothing active is blocking the item.|DOR4 story field_non_empty_list:acceptance_criteria The story has at least one acceptance criterion.|DOR6 bu…
   done_gate     default  DOD1 all no_open_child Every child is done or cancelled.|DOD2 all no_open_impediment No impediment is still open against the item.|DOD3 all reviewer_distinct_from_assignee …
+
+### status-unwritable @ 60
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record
+    against the event log
+  writes
+    .txn/stray.json is not a transaction journal this
+    store wrote, so it cannot be replayed and no write
+    can go past it; .txn holds journals and nothing
+    else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first,
+    because the store will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in …
+  gdpr-export    42     Export everything we hold on one …
+  webhook-retry  33     Retry a failed webhook three times
+
+### status-unwritable @ 80
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
+  writes
+    .txn/stray.json is not a transaction journal this store wrote, so it
+    cannot be replayed and no write can go past it; .txn holds journals and
+    nothing else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first, because the store
+    will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
+
+### status-unwritable @ 200
+status  acme-platform
+  store  /w/platform/.work
+  items  26
+  findings  0
+  overdue  1
+  defects  S1 1 S2 1 S3 1
+  audit  not run here; treadle doctor reads every record against the event log
+  writes  .txn/stray.json is not a transaction journal this store wrote, so it cannot be replayed and no write can go past it; .txn holds journals and nothing else, and deleting the file clears this
+  fix  delete the .txn file named in cause; read it first, because the store will not discard it on a guess
+
+states  7 of 7
+  STATE        N
+  cancelled    1
+  done         1
+  draft        13
+  in_progress  4
+  in_review    1
+  on_hold      1
+  ready        5
+
+health  1 of 1
+  RULE  ITEM        SAW
+  H17   key-rotate  2026-08-28T09:00:00Z
+
+next  3 of 3
+  ID             SCORE  TITLE
+  flaky-e2e      69     Checkout suite fails, one run in five
+  gdpr-export    42     Export everything we hold on one account
+  webhook-retry  33     Retry a failed webhook three times
 

@@ -119,6 +119,7 @@ describe('doctor audits a workspace in one pass over the log', () => {
         identity: () => base.identity(),
         get: (id) => base.get(id),
         findings: () => base.findings(),
+        writable: () => base.writable(),
         apply: (transaction) => base.apply(transaction),
         close: () => base.close(),
         summaries: (query) => { calls.summaries += 1; return base.summaries(query) },

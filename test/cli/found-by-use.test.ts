@@ -634,12 +634,13 @@ describe('what the tool says about itself', () => {
     assert.match(refused.err, /^guard G5$/m)
   })
 
-  it('names the three types that have a review step, before a refusal has to teach it', async () => {
-    // The review-step set is `story`, `bug` and `epic`, and it appeared in no help page, no
+  it('names the two types that have a review step, before a refusal has to teach it', async () => {
+    // The review-step set is `story` and `bug`, and it appeared in no help page, no
     // `--contract` line and no README sentence: a cold agent learned it by being refused.
+    // `epic` left the set when the epic lost its review step, which is why this reads two.
     const help = await cli(['help', 'transition'])
     assert.equal(help.code, 0, help.err)
-    assert.match(help.out, /^example treadle transition .*a story, a bug and an epic have a review step/m)
+    assert.match(help.out, /^example treadle transition .*a story and a bug have a review step/m)
   })
 
   it('declares a NOT_FOUND from a mutating command a mutation, not a read', async () => {

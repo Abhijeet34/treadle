@@ -36,7 +36,7 @@ That is a second register under one prefix and none of it is ever emitted, so an
 | `G1` | The ready gate passes |
 | `G2` | The item is not blocked |
 | `G3` | The target state's work-in-progress limit is not exceeded |
-| `G5` | The type's review step decides whether `submit` or `finish` is the legal exit from `in_progress`; `story`, `bug` and `epic` have one |
+| `G5` | The type's review step decides whether `submit` or `finish` is the legal exit from `in_progress`; `story` and `bug` have one |
 | `G6` | The done gate passes |
 | `G7` | Nothing active is blocked by this one |
 | `G8` | An epic reaches `done` only once every child is done or cancelled |
@@ -67,7 +67,8 @@ That is a second register under one prefix and none of it is ever emitted, so an
 | `V9` | An id names one thing, and this one already names another record or another kind of thing |
 
 `G8` is this implementation's number for a rule the domain model states without numbering: "an epic cannot reach done while any child is not done or cancelled".
-The model's second epic rule, that an epic enters `in_progress` when its first child starts, is an effect rather than a guard and belongs to the application layer.
+The model's second rule for an epic, that it enters `in_progress` when its first child starts, is not implemented and is not going to be: a state derived from the children is the tool computing about the work rather than recording it, which is the test that removed the sprint, the board, the estimate and the retrospective.
+An epic is moved by whoever moves it, and the log records who did.
 
 ## Types and the required-field policy
 
@@ -89,8 +90,12 @@ A caller who wants to say maintenance writes `--label chore`, which `backlog --l
 An epic's `outcome` is the result the epic is for, a text field on the record; it is not the `--outcome` a `release` transition records, which is `failed` or `yielded`, says how one attempt ended, and lives in the event alone.
 The two are different things under one word, and nothing but this sentence and the one in the lifecycle section tells them apart.
 
-A `story`, a `bug` and an `epic` have a review step, and no other type does.
-That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those three and straight to `done` for a `task`, a `spike` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
+A `story` and a `bug` have a review step, and no other type does.
+That one setting decides `G5`, which is why `in_progress` exits through `in_review` for those two and straight to `done` for an `epic`, a `task`, a `spike` and an `impediment`, and it also scopes `DOD3` and `DOD7`.
+An epic is out of that set because a container has no reviewer and no artefact to accept: what is reviewed is each child, and `G8` is what holds the epic to the children being finished.
+A workspace that wants its epics reviewed sets `review_step` and gets `in_review` back for them.
+`next` still ranks no epic under that setting, and that is not an oversight: the review step is a policy a workspace chooses, and a container not being the thing to pick up is a fact about the type.
+`treadle next --explain-absence <epic>` says so in as many words, and the children are what the ranking hands back instead.
 `treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
@@ -312,7 +317,7 @@ The key set is closed and every key is optional; the absence of a key is the com
 
 | Key | What reads it | Default |
 |---|---|---|
-| `review_step` | guard `G5`, `DOD3` and `DOD7` | `story, bug, epic` |
+| `review_step` | guard `G5`, `DOD3` and `DOD7` | `story, bug` |
 | `next_weights` | `next`'s ranking | `pri=10, age=1, dep=5, asg=8, due=4, sev=6` |
 | `wip_limits` | guard `G3`, and doctor `H04` | `-`, meaning no state is limited |
 | `aging_days` | doctor `H03` | `0`, meaning no threshold |

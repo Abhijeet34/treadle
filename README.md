@@ -50,6 +50,7 @@ node bin/treadle.js status
 
 `file` prints the id it minted on its `item` line, and that id is the title as a slug, which is why `show field-edits` reads the record back.
 `backlog` lists what is open and names the filter it used; `status` counts the workspace rather than printing a record.
+`status` also says when no write can pass, on a `writes` line with the remedy that clears it, because a store that refuses every write is the most important fact about a workspace and the count above it would otherwise read as health.
 `treadle help <command>` is the contract for one command, and `treadle help` on its own is the whole inventory.
 
 `TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
@@ -101,7 +102,7 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 See [Status](#status) for the line between implemented and specified-only.
 
 - **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
-- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story, a bug and an epic pass through `in_review` on the way to `done`; a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
+- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
 - **The human in the loop, as configuration.** `config` sets what `ready` and `done` mean for this workspace, which types pass through review, how much may sit in `in_review` at once, and what `next` weighs. An agent cannot skip a gate a person set, and a refusal names the rule and prints the line that clears it.
 - **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change. A mutation hands back the transaction id it wrote under, and `treadle history --txn <txn>` spends it: an agent auditing the command it just ran reads every record that one command moved, rather than one item at a time.
 - **Finding work, and unfiling it.** `backlog --title <words>` searches titles by their words, `--label <slug>` filters on a label and `--fields +labels` prints the list, and `remove` takes a mis-filed record out of its shard while the append-only log keeps every event it earned, so `history <id>` still answers after it. A removal is refused wherever another record would be left naming it: [ADR-0024](docs/architecture/adr/0024-a-record-leaves-the-store-and-the-log-keeps-it.md).

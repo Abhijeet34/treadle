@@ -40,7 +40,7 @@ import {
 } from './context.ts'
 import { auditImpediment, auditItem, auditParentOf, auditRelationsOf } from './doctor.ts'
 import { invocation, notFound } from './items.ts'
-import { storeRefusal, unknownCursor } from './refusal.ts'
+import { storeRefusal, unavailableFixes, unknownCursor } from './refusal.ts'
 
 // The weights and their default are the workspace's own configuration and live in
 // `src/domain/config.ts`; they are re-exported here because `rank` and `scoreOf` are this
@@ -135,8 +135,9 @@ export const EXPLAIN_SHAPE: ResultShape = {
 export const STATUS_SHAPE: ResultShape = {
   command: 'status',
   // v3 dropped `points`, `not_ready`, the `sprints` block and the `pts` column of `next`,
-  // with estimation and the sprint surface.
-  version: 3,
+  // with estimation and the sprint surface. v4 added `writes` and `fix`, as late as the
+  // renderer's blocks-last rule allows and after every scalar already declared.
+  version: 4,
   effect: 'read',
   summary: 'Orient a caller in the workspace in one call.',
   properties: [
@@ -147,6 +148,13 @@ export const STATUS_SHAPE: ResultShape = {
     { kind: 'scalar', key: 'defects', type: 'string' },
     // Which set `findings` counts, and which command counts the other one.
     { kind: 'scalar', key: 'audit', type: 'string' },
+    // Why no write can pass, and the remedy that clears it, both absent over a store a write
+    // can pass. `writes` is `text` for the reason the refusal's `cause` is: it names a file
+    // off the filesystem, which is content a third party wrote, and it is `whole` because a
+    // condition cut at 64 cells is a condition a reader cannot act on. `fix` carries the
+    // refusal's own lines, which never splice a caller's text into themselves (A.6).
+    { kind: 'text', key: 'writes', whole: true },
+    { kind: 'list', key: 'fix' },
     { kind: 'block', key: 'states', columns: [{ name: 'state' }, { name: 'n' }] },
     { kind: 'block', key: 'health', columns: [{ name: 'rule' }, { name: 'item' }, { name: 'saw' }] },
     {
@@ -204,6 +212,11 @@ function scored(
  * What to pick up is what can be started. A ready item with an active blocker is refused
  * by G2 at `start`, so ranking it first sends the caller into a refusal; it is left out and
  * `--explain-absence` names the blockers.
+ *
+ * An epic is left out for the same reason read one step earlier: it is a container, and the
+ * thing to pick up is one of its children. This had no type handling at all, so a ready epic
+ * outranked the story beneath it whenever the two tied and the dispatch read pointed an agent
+ * at a record with no work in it.
  */
 export function rank(
   view: WorkspaceView, now: string, weights: Weights, forActor: string | undefined,
@@ -213,7 +226,7 @@ export function rank(
   const blockers = activeBlockerIndex(view)
   const blocking = blockedByThisIndex(view)
   return view.items
-    .filter((item) => item.state === 'ready' && !blockers.has(item.id))
+    .filter((item) => item.state === 'ready' && item.type !== 'epic' && !blockers.has(item.id))
     .map((item) => scored(item, now, weights, forActor, blocking.get(item.id)?.length ?? 0))
     .sort((a, b) => (a.score === b.score ? (a.item.id < b.item.id ? -1 : 1) : b.score - a.score))
 }
@@ -267,6 +280,11 @@ export async function next(store: Store, clock: Clock, request: NextRequest): Pr
     if (item === undefined) {
       data['clause'] = `unknown searched ${view.value.items.length}`
       data['store'] = view.value.identity.path ?? workspace
+    } else if (item.type === 'epic') {
+      // Ahead of the state clause, because this one holds in every state the epic can be in
+      // and `state want ready got draft` would send a caller to groom a record that would
+      // still never be ranked.
+      data['clause'] = 'type epic; a container is never the thing to pick up, its children are'
     } else if (item.state !== 'ready') {
       data['clause'] = `state want ready got ${item.state}`
     } else if (activeBlockers(view.value, id).length > 0) {
@@ -423,6 +441,14 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
   if (!view.ok) return storeRefusal('status', 'read', view.error, undefined)
   const workspace = view.value.identity.id
   const findings = await store.findings()
+  // The orientation call is where an agent asks what the state of this workspace is, and if
+  // no write can pass that is the most important fact about it: this printed `items 7
+  // findings 0` over a store that refused every write, and the fix lines of that refusal
+  // pointed here, at the one command that could not see it. It costs a listing of `.txn/`
+  // and an access check per directory a transaction writes, which is the same order as the
+  // plain shard read; the audit that would decide whether the records are damaged is still
+  // `doctor`'s and is still not run here.
+  const writable = await store.writable()
 
   const counts = new Map<string, number>()
   for (const item of view.value.items) counts.set(item.state, (counts.get(item.state) ?? 0) + 1)
@@ -463,6 +489,11 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // against 479 at 50,000 items (bench/budgets.json), so the orientation call stays the
       // cheap one and says what it did not do. `H20` is one of the rules that make that gap.
       audit: 'not run here; treadle doctor reads every record against the event log',
+      // The exit stays 0. The read genuinely succeeded and the records genuinely are there,
+      // so exiting as though it failed would be its own lie and would break every caller
+      // using this as a health check; the exit table names no code for an answer given over
+      // a store that cannot be written, and the condition belongs in the output.
+      ...(writable.ok ? {} : { writes: writable.error.message, fix: unavailableFixes(writable.error) }),
       states: {
         columns: columnsOf(STATUS_SHAPE, 'states'),
         shown: states.length,

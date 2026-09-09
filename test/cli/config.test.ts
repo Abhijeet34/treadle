@@ -198,13 +198,13 @@ describe('config reads every key with the value in force and where it came from'
   it('reports default before a write and file after it, for the one key that moved', async () => {
     const first = await cli(['config'])
     assert.equal(first.code, 0, first.err)
-    assert.match(first.out, /^review_step default story, bug, epic$/m)
+    assert.match(first.out, /^review_step default story, bug$/m)
     assert.match(first.out, /^aging_days default 0$/m)
 
     assert.equal((await cli(['config', 'set', 'aging_days', '5'])).code, 0)
     const second = await cli(['config'])
     assert.match(second.out, /^aging_days file 5$/m)
-    assert.match(second.out, /^review_step default story, bug, epic$/m, 'a key nothing set stays the default')
+    assert.match(second.out, /^review_step default story, bug$/m, 'a key nothing set stays the default')
   })
 
   it('refuses a key outside the closed set with C1, naming the set', async () => {

@@ -124,6 +124,14 @@ export class OverlayStore implements Store {
     return this.#base.findings()
   }
 
+  /**
+   * The base store's answer, because this layer's whole subject is the write it is standing
+   * in for: a dry run over a store that refuses every write is a dry run of a refusal.
+   */
+  async writable(): Promise<StoreResult<undefined>> {
+    return this.#base.writable()
+  }
+
   async apply(transaction: StoreTransaction): Promise<StoreResult<Applied>> {
     const staged = new Map<string, WorkItem>()
     const applied: AppliedWrite[] = []

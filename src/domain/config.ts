@@ -89,7 +89,10 @@ const NO_KEYS: ReadonlySet<ConfigKey> = new Set()
  */
 export function defaultConfig(): WorkspaceConfig {
   return {
-    review_step: ['story', 'bug', 'epic'],
+    // `epic` was here and came out: a container has no reviewer and no artefact to accept,
+    // so the review step it carried put an epic through `in_review` and refused it at `done`
+    // for a `DOD3` reviewer and `DOD7` evidence its children had already earned themselves.
+    review_step: ['story', 'bug'],
     next_weights: DEFAULT_WEIGHTS,
     wip_limits: new Map(),
     aging_days: 0,
