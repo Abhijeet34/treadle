@@ -8,6 +8,9 @@
 // test that counts them is what proves there is none.
 
 import { RELATION_KINDS } from '../domain/index.ts'
+import { RENDERINGS } from '../adapters/render/index.ts'
+import { MAX_WIDTH, MIN_WIDTH } from '../adapters/render/human.ts'
+import { CONTRACT } from '../adapters/render/grammar.ts'
 import type { Effect, ResultShape } from '../application/result.ts'
 import { BACKLOG_SHAPE, FILE_SHAPE, SHOW_SHAPE } from '../application/services/items.ts'
 import { CONFIG_SHAPE } from '../application/services/config.ts'
@@ -26,6 +29,20 @@ import { INIT_SHAPE } from '../application/services/workspace.ts'
 export type RecordShape = 'list' | 'record' | 'none'
 export type Confirmation = 'none' | 'moderate' | 'severe'
 
+/**
+ * A closed set a caller of this command has to spell exactly and can guess none of. Each is
+ * generated from the domain on the page whose caller types the word, and on no other page:
+ * which fields a type takes was learned only from a wrong-field refusal, and the edges and
+ * the two values they record only from `explain`, one item at a time.
+ */
+export type Vocabulary =
+  /** Which fields each type owns, and which it refuses to be created without. */
+  | 'fields'
+  /** The edges, the guards on each, and the closed-set value two of them record. */
+  | 'lifecycle'
+  /** The closed sets a filter value is drawn from. */
+  | 'filters'
+
 export type Command = {
   readonly name: string
   readonly shape: ResultShape
@@ -42,6 +59,8 @@ export type Command = {
   readonly columns: boolean
   readonly usage: readonly string[]
   readonly examples: readonly (readonly [string, string])[]
+  /** The closed sets this command's own line takes a word from. */
+  readonly vocabulary?: readonly Vocabulary[]
   /**
    * Exit statuses that carry a verdict rather than a failure, each with its meaning. Every
    * command exits by the one table in `exit.ts`; only a command whose answer is itself a
@@ -61,7 +80,7 @@ export const COMMANDS: readonly Command[] = [
   {
     name: 'file', shape: FILE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
+    columns: false, vocabulary: ['fields'],
     usage: [
       'treadle file <type> <title> [--id <slug>] [--priority <1-5>] [--assignee <name>]',
       'treadle file <type> <title> [--desc <text>] [--label <name>] [--parent <id>]',
@@ -76,7 +95,7 @@ export const COMMANDS: readonly Command[] = [
   {
     name: 'show', shape: SHOW_SHAPE, effect: 'read', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
+    columns: false, vocabulary: ['fields'],
     usage: ['treadle show <id> [--field <name>]'],
     examples: [
       ['treadle show auth-refresh --field desc', 'the description whole, rather than cut at 64 cells'],
@@ -86,7 +105,7 @@ export const COMMANDS: readonly Command[] = [
   {
     name: 'backlog', shape: BACKLOG_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
-    columns: true,
+    columns: true, vocabulary: ['filters'],
     usage: [
       'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
       'treadle backlog [--priority <1-5>] [--label <slug>] [--title <words>] [--blocked <yes|no>]',
@@ -106,7 +125,7 @@ export const COMMANDS: readonly Command[] = [
   {
     name: 'transition', shape: TRANSITION_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
+    columns: false, vocabulary: ['lifecycle'],
     usage: [
       'treadle transition <id> <target> [--reason <text>] [--until <instant>]',
       'treadle transition <id> cancelled --resolution <r> --reason <text>',
@@ -124,7 +143,7 @@ export const COMMANDS: readonly Command[] = [
   {
     name: 'set', shape: SET_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
-    columns: false,
+    columns: false, vocabulary: ['fields'],
     usage: ['treadle set <id> <field>=<value> [<field>=<value> ...]'],
     examples: [
       ['treadle set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
@@ -281,42 +300,129 @@ export const GLOBAL_FLAGS = [
 ] as const
 export type GlobalFlag = (typeof GLOBAL_FLAGS)[number]
 
+/**
+ * One flag's whole column of the matrix, as the pair that decides every cell of it: the
+ * commands it is supported on, and the verdict it earns on the rest. `scope` is that
+ * predicate in words and `does` is what the flag does, and both live here rather than in
+ * `help.ts` because they are what lets seventeen rows printed once reconstruct all
+ * 306 cells: a command page prints its exceptions, and a flag absent from that page is
+ * supported there.
+ *
+ * A flag supported on every command never reaches `otherwise` and carries `S` in it, so the
+ * field needs no absent case and the table needs no second shape.
+ */
+export type FlagSpec = {
+  readonly applies: (command: Command) => boolean
+  readonly otherwise: Verdict
+  /**
+   * `applies` as one word, for the column the index prints it in. A cell before the last of a
+   * row carries no space by the row grammar, and the phrase below costs the index 770 bytes
+   * of "it applies to" where a token costs 240.
+   */
+  readonly where: string
+  /** The same predicate as a phrase, read after "it applies to" by a page refusing the flag. */
+  readonly scope: string
+  readonly does: string
+}
+
+const EVERY_COMMAND = 'every command'
+const anywhere = (): boolean => true
+
+export const FLAG_SPECS: Readonly<Record<GlobalFlag, FlagSpec>> = {
+  '--help': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: 'prints this page and runs nothing',
+  },
+  '--version': {
+    applies: () => false, otherwise: 'N', where: 'none', scope: 'no command, because it is a program-level flag',
+    does: 'prints the tool version; treadle version is the command form',
+  },
+  // `--contract` replaces the command's output with the line grammar, exactly as `--help`
+  // replaces it with the help page, so it is supported wherever `--help` is. It was the
+  // worst of the four flags this table did not carry: it is what an agent reads before it
+  // can parse anything else, and AGENTS.md, a contributing file, was its only home.
+  '--contract': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: `prints the ${CONTRACT} line grammar and the exit table, and runs no command`,
+  },
+  '--out': {
+    applies: (command) => command.record !== 'none', otherwise: 'N',
+    where: 'answers-a-record', scope: 'every command that answers with a record or a list',
+    does: `selects the rendering, one of ${RENDERINGS.join(', ')}; without it a terminal gets human and a pipe gets agent`,
+  },
+  '--quiet': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: 'drops the header and the footer and keeps the records; a refusal still prints whole',
+  },
+  '--verbose': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: '-v, -vv and -vvv put resolution, timings and store operations on stderr; stdout is unchanged',
+  },
+  // `--log-values` is not presentation. `-vvv` reports every field by name and size, and
+  // this is the opt-in that puts the values themselves on stderr, where a CI job and an
+  // agent transcript keep them; a caller cannot weigh that disclosure against an unnamed flag.
+  '--log-values': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: 'lets -vvv print field values, which it reports by name and size without it',
+  },
+  // `--ascii` reaches the human rendering's truncation mark and nothing else, so it is
+  // supported rather than ignored: the answer is the same, the bytes are not.
+  '--ascii': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: 'writes the human rendering truncation mark as three dots, not an ellipsis',
+  },
+  '--workspace': {
+    applies: (command) => !command.standalone, otherwise: 'N',
+    where: 'opens-a-workspace', scope: 'every command that opens a workspace',
+    does: 'names the store to run against, instead of the search upward from the working directory',
+  },
+  '--dry-run': {
+    applies: (command) => command.effect === 'mutate', otherwise: 'A', where: 'mutation', scope: 'every mutation',
+    does: 'evaluates every guard and prints the field diff and the exit status the real run would return, writing nothing',
+  },
+  '--yes': {
+    applies: (command) => command.confirm !== 'none', otherwise: 'A',
+    where: 'asks-to-confirm', scope: 'the mutations that ask for a confirmation',
+    does: 'answers the confirmation; without it such a command refuses and prints the line that carries it',
+  },
+  '--actor': {
+    applies: (command) => command.effect === 'mutate', otherwise: 'A', where: 'mutation', scope: 'every mutation',
+    does: 'names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused',
+  },
+  // The human rendering lays every line of every command out at this width and refuses to
+  // exceed it (interface B.4), so it is supported wherever a command answers at all. It was
+  // `A` here while `emit` passed it to the renderer on every call, which told a caller the
+  // one knob the rendering has does nothing.
+  '--width': {
+    applies: anywhere, otherwise: 'S', where: 'every', scope: EVERY_COMMAND,
+    does: `lays the human rendering out at that many display cells, clamped to ${MIN_WIDTH} to ${MAX_WIDTH}`,
+  },
+  '--fields': {
+    applies: (command) => command.columns, otherwise: 'X',
+    where: 'chooses-columns', scope: 'the commands whose column set the caller chooses',
+    does: 'replaces the default columns, or adds to them with a leading plus',
+  },
+  '--limit': {
+    applies: (command) => command.pageable, otherwise: 'X', where: 'pageable', scope: 'every pageable command',
+    does: 'bounds one page; the page line the answer ends with carries the cursor for the next',
+  },
+  // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
+  // the tool prints itself in every `page` line, and `treadle version --cursor x` was
+  // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.
+  '--cursor': {
+    applies: (command) => command.pageable, otherwise: 'X', where: 'pageable', scope: 'every pageable command',
+    does: 'resumes from the page line a previous call printed, with the same filters it was asked with',
+  },
+  '--explain-absence': {
+    applies: (command) => command.omits, otherwise: 'X',
+    where: 'may-omit', scope: 'the commands that can omit an entity the caller expected',
+    does: 'names one entity and says which clause of the filter excluded it',
+  },
+}
+
 export function verdictFor(command: Command, flag: GlobalFlag): Verdict {
-  switch (flag) {
-    case '--help': return 'S'
-    case '--version': return 'N'
-    case '--out': return command.record === 'none' ? 'N' : 'S'
-    case '--quiet': return 'S'
-    case '--verbose': return 'S'
-    // `--contract` replaces the command's output with the line grammar, exactly as `--help`
-    // replaces it with the help page, so it is supported wherever `--help` is. It was the
-    // worst of the four flags this table did not carry: it is what an agent reads before it
-    // can parse anything else, and AGENTS.md, a contributing file, was its only home.
-    case '--contract': return 'S'
-    // `--log-values` is not presentation. `-vvv` reports every field by name and size, and
-    // this is the opt-in that puts the values themselves on stderr, where a CI job and an
-    // agent transcript keep them; a caller cannot weigh that disclosure against an unnamed flag.
-    case '--log-values': return 'S'
-    // `--ascii` reaches the human rendering's truncation mark and nothing else, so it is
-    // supported rather than ignored: the answer is the same, the bytes are not.
-    case '--ascii': return 'S'
-    // The human rendering lays every line of every command out at this width and refuses to
-    // exceed it (interface B.4), so it is supported wherever a command answers at all. It was
-    // `A` here while `emit` passed it to the renderer on every call, which told a caller the
-    // one knob the rendering has does nothing.
-    case '--width': return 'S'
-    case '--workspace': return command.standalone ? 'N' : 'S'
-    case '--dry-run': return command.effect === 'mutate' ? 'S' : 'A'
-    case '--yes': return command.confirm === 'none' ? 'A' : 'S'
-    case '--actor': return command.effect === 'mutate' ? 'S' : 'A'
-    case '--fields': return command.columns ? 'S' : 'X'
-    case '--limit': return command.pageable ? 'S' : 'X'
-    // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
-    // the tool prints itself in every `page` line, and `treadle version --cursor x` was
-    // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.
-    case '--cursor': return command.pageable ? 'S' : 'X'
-    case '--explain-absence': return command.omits ? 'S' : 'X'
-  }
+  const spec = FLAG_SPECS[flag]
+  return spec.applies(command) ? 'S' : spec.otherwise
 }
 
 export type MatrixCell = {
