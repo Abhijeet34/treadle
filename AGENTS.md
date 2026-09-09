@@ -255,6 +255,7 @@ copy that has to move whenever the test does.
 | No prose a dependency wrote reaches an output surface, and the parser's option table and the help page's flag matrix are one set | `test/cli/found-by-use.test.ts` |
 | Every gate rule declares the command that remedies it, or the reason it has none | `test/domain/gate-remedies.test.ts` |
 | Every line the tool prints for the reader to run, runs as printed from the state that printed it | `test/cli/runnable-lines.test.ts` |
+| One agent's shift runs in order over one store - file, groom, block, hold, submit, reject, fix, accept, remove - and the record is asserted at every point the agent has to decide what to do next | `test/cli/shift-walk.test.ts` |
 | Every `STORE_UNAVAILABLE` refusal names a remedy for its own cause, and none of them is a command that reads the store that just refused | `test/cli/unavailable-fix-lines.test.ts` |
 | Every number a document states about this tree is held to the tree; a measurement is not one of those and lives in `docs/VERIFICATION.md` with its date and load | `test/architecture/documented-numbers.test.ts` |
 | No renderer reads anything but the result object, a shape declares scalars before blocks, and a block closes its group in the human rendering | `test/render/conformance.test.ts`, `test/render/human-layout.test.ts`, ADR-0005 |
@@ -266,6 +267,19 @@ copy that has to move whenever the test does.
 | A waiter refuses a lock whose holder has not changed hands past `holderTimeoutMs`, while a lock that keeps changing hands is waited out however long the whole wait runs; the refusal is `LOCK_TIMEOUT`/`S11` | `test/store/lock.test.ts` |
 | A file name carrying a newline or carriage return is escaped rather than ending the line it is printed on, in every finding and refusal that names it | `test/store/sharded-store.test.ts`, `test/store/journal.test.ts` |
 | A line the store holds and does not serve is a finding at its line, never a silent drop | `test/store/record-boundary.test.ts`, `docs/architecture/adr/README.md`'s `H` table |
+
+`test/cli/shift-walk.test.ts` is the only one of these that proves a SEQUENCE rather than a
+part, which is why it exists beside a suite that already covers every command: three defects
+were found by hand after thirteen merges had each passed the whole pipeline individually, and
+none of them was a part being wrong. It advances one store step by step, so each step reads
+what its predecessor wrote, and it prints its step, assertion and call counts as a
+`t.diagnostic` rather than reporting a bare green. Two of its steps characterise `DOD3`'s
+actor half rather than guarantee it, and their names say so: the rule refuses a self-accept
+when an assignee is named and does not when none ever was, because `workedBy` folds the
+assignee the log recorded and an unassigned record leaves it empty. Changing that rule turns
+both red together, which is the point. Before trusting a change to this file, run it against a
+mutated tree the way `Proving a property rather than a case` prescribes; four mutations, one
+per behaviour it claims, are what proved this one can fail.
 
 Two of these are worth reading before you touch them, because a grep cannot tell them from
 dead code. `scoreOf` in `src/application/services/insight.ts` is reachable from no `src` file
