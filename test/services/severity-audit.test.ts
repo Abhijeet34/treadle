@@ -352,9 +352,8 @@ describe('evidence is a bounded pointer list, and done requires one', () => {
 
   /**
    * A bug, because its type has a review step and every other done rule is satisfiable here.
-   * It is assigned to ravi and not to `dana`, who is the actor these runs use: `DOD3` refuses
-   * an accept the item's own assignee runs, and every case below is about `DOD7` and the
-   * evidence list rather than about who is asking.
+   * It is assigned to ravi and reviewed by somebody else, so `DOD3` is satisfied and every
+   * case below is about `DOD7` and the evidence list alone.
    */
   const aReviewedBug = async (id: string): Promise<void> => {
     await cli(['file', 'bug', 'Retry loses the idempotency key', '--id', id, '--priority', '2',

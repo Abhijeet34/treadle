@@ -3,6 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-09-09
 **Implements:** defects E1 and E2 of the end-to-end drive against `31aa1ac`, both reproduced before this record was written
+**Overtaken in part by:** [ADR-0034](0034-the-reviewer-guard-stops-policing-and-starts-recording.md), which removes `DOD3`'s actor half, the `workedBy` fold that fed it and the hand-over remedy it printed, so the consequence "an agent that did the work cannot close it" no longer holds; `H33`, the `H19` narrowing and the reading that a current value can be arranged all stand, and `H34` still reads the log rather than the record, now to report single-actor completion rather than to refuse it
 
 ## Context
 

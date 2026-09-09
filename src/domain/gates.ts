@@ -59,24 +59,6 @@ export type GateContext = {
    * must not hold the copy at draft forever on a record nobody can move.
    */
   readonly duplicateOf?: GateItem
-  /**
-   * DOD3: who is asking. The reviewer field says who was named and this says who is moving
-   * the item, and the rule needs both: naming a reviewer is a field a caller writes, so an
-   * assignee who writes any name into it passed a gate that reads only that field. Absent
-   * means the caller supplied no actor, which no command surface does; the rule then reads
-   * the field alone, exactly as it did before, rather than failing over a fact it was not told.
-   */
-  readonly actor?: string
-  /**
-   * DOD3: who the log says did the work, which the caller folds off the event log. The two
-   * fields as they stand are both one write away from anything, and testing the actor against
-   * the assignee the record holds NOW is what the launder walks through: the assignee took its
-   * own name off the field in one write and accepted its own work at `guards G6 pass`. A
-   * current value can be arranged and the log is what happened, so the rule asks the log who
-   * held the item while it was worked. Empty covers a log that says nothing about who held it,
-   * where the rule decides on the field alone exactly as it did before.
-   */
-  readonly workedBy?: readonly string[]
 }
 
 export const DEFAULT_READY_GATE: Gate = {
@@ -109,12 +91,12 @@ export const DEFAULT_DONE_GATE: Gate = {
   rules: [
     { id: 'DOD1', scope: 'all', sentence: 'Every child is done or cancelled.', check: { kind: 'no_open_child' } },
     { id: 'DOD2', scope: 'all', sentence: 'No impediment is still open against the item.', check: { kind: 'no_open_impediment' } },
-    // The sentence promises exactly what the check decides, which is why it names both the
-    // reviewer and the caller: the rule read `reviewer` against `assignee` and never the
-    // actor, so an assignee wrote any name into the field and then accepted their own work
-    // at exit 0. A rule's sentence is printed by `config` and `explain`, so widening the
-    // check widens the sentence in the same edit.
-    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
+    // The sentence promises exactly what the check decides, and the check reads the record's
+    // own two fields. Who RUNS the accept was read here and is not any more: ADR-0034 decides
+    // that a single actor filing, working and accepting an item is a legitimate shape rather
+    // than a fault, and `H34` reports it. A rule's sentence is printed by `config` and
+    // `explain`, so narrowing the check narrows the sentence in the same edit.
+    { id: 'DOD3', scope: 'all', sentence: 'A reviewer other than the assignee is named, when the type has a review step.', check: { kind: 'reviewer_distinct_from_assignee' } },
     { id: 'DOD4', scope: 'story', sentence: 'Every acceptance criterion is ticked.', check: { kind: 'list_all_ticked', field: 'acceptance_criteria' } },
     { id: 'DOD5', scope: 'spike', sentence: 'The spike records its findings.', check: { kind: 'field_present', field: 'findings' } },
     { id: 'DOD6', scope: 'bug', sentence: 'The fix is confirmed.', check: { kind: 'field_is_true', field: 'fix_confirmed' } },
@@ -139,29 +121,6 @@ function no(reason: string, remedy?: string): Outcome {
 
 function fieldOf(item: WorkItem, name: string): unknown {
   return (item as unknown as Record<string, unknown>)[name]
-}
-
-/** A name safe to print inside a command line unquoted, which is the class an id is held to. */
-const BARE_NAME = /^[A-Za-z0-9][A-Za-z0-9._@+-]*$/
-
-/**
- * DOD3's actor-half remedy: the accept, run by the reviewer the record already names.
- *
- * It was `set <id> assignee=<name>`, and that line is the defect this rule exists to close.
- * An assignee refused for accepting its own work ran it, took its own name off the field in
- * one write, and accepted at `guards G6 pass` with `doctor` silent - the tool printing the
- * bypass to the rule it had just enforced. No command makes the caller a different person,
- * which is what a human-in-the-loop rule means; the line named here is the reviewer's to run,
- * and the log records who ran it and whether they were a person or an agent.
- *
- * A reviewer is a caller-written line of up to 200 characters, so it is printed only when it
- * would be one shell word, and the placeholder stands in for anything else rather than
- * emitting a command line that splits where the reader cannot see it.
- */
-function handOver(item: WorkItem): string {
-  const reviewer = item.reviewer
-  const named = reviewer !== undefined && BARE_NAME.test(reviewer) ? reviewer : '<name>'
-  return `treadle transition ${item.id} done --actor ${named}`
 }
 
 function run(check: GateCheck, context: GateContext): Outcome {
@@ -271,38 +230,17 @@ function run(check: GateCheck, context: GateContext): Outcome {
           `treadle transition ${item.id} cancelled --resolution duplicate --reason "<why>"`,
         )
     }
-    // Two facts, one rule, because they are one promise: the work was reviewed by somebody
-    // other than the person who did it. The field half is a name on the record and the actor
-    // half is who is running the move, and a gate that reads only the first is a gate an
-    // assignee clears alone - measured, an assignee named a reviewer who never touched the
-    // item and took it to done with `guards G6 pass`. The actor half is skipped when the
-    // caller supplied none, so a gate evaluated with no actor decides exactly what it did.
-    //
-    // The actor half asks the log and not only the field, because the field is a value the
-    // caller can arrange: reassigning the ITEM cleared the old test in one write and the
-    // assignee accepted its own work at exit 0 with `doctor` silent. `workedBy` is who the
-    // log says held it while it was worked, which no later write can take back.
+    // One promise, on the record's own two fields: the work was reviewed by somebody other
+    // than the person who did it. Who is RUNNING the accept was read here as well, and is
+    // not any more - one actor filing, working and accepting an item is a legitimate and
+    // common shape in an agent fleet, so the audit reports it as single-actor completion
+    // (`H34`) rather than the write path refusing it. ADR-0034 argues that.
     case 'reviewer_distinct_from_assignee': {
       if (!context.reviewStep) return PASS
       const reviewer = writeCommand('reviewer', item.id, '<name>')
       if (item.reviewer === undefined) return no('no reviewer is recorded', reviewer)
-      if (item.reviewer === item.assignee) return no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
-      const actor = context.actor
-      if (actor === undefined) return PASS
-      const worked = context.workedBy ?? []
-      // A remedy is a promise: run it and the rule passes. The hand-over line is only that
-      // when the named reviewer could actually run the accept, so a reviewer the log says did
-      // the work sends the caller back to the field, which is the truth about such a record -
-      // it names a reviewer and has none.
-      const remedy = worked.includes(item.reviewer) ? reviewer : handOver(item)
-      if (actor === item.assignee) {
-        return no(`${actor} is the assignee, and the assignee does not accept their own work`, remedy)
-      }
-      return worked.includes(actor)
-        ? no(
-          `the log records ${actor} as holding this item while it was worked, and the record names ${item.assignee ?? 'nobody'} now; whoever did the work does not accept it`,
-          remedy,
-        )
+      return item.reviewer === item.assignee
+        ? no(`the reviewer ${item.reviewer} is also the assignee`, reviewer)
         : PASS
     }
     // Scoped by the review step rather than by three per-type rules, the same way DOD3 is:

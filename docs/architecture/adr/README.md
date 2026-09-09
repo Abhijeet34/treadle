@@ -32,6 +32,7 @@ DR6 names six seams, so its number is shared: ADR-0006 is the store seam and the
 | [ADR-0031](0031-the-word-was-the-whole-difference-and-a-declared-kind-earns-its-writer.md) | `chore` folds into `task` because no rule, gate, guard, ranking or read told them apart; every declared relation kind gets a writer and `split_from` is removed; `DOR1` and `DOR2` leave the default ready gate because no input could ever fail either |
 | [ADR-0032](0032-a-field-with-no-writer-of-its-own-and-one-reader-goes.md) | `reporter` is removed because no command filled it, only `show` printed it, and the `item.file` event's actor already records who asked; the key is retired in place so a stored record still serves, and `show` moves to schema version 3 |
 | [ADR-0033](0033-a-current-value-can-be-arranged-and-the-log-is-what-happened.md) | `DOD3` reads the event log for who held the item while it was worked instead of the `assignee` the record holds now, and its remedy is the accept run by the named reviewer instead of the reassign that defeated it; `H34` is that rule's load-time twin and takes over the `reviewer` arm of `H19`, and `H33` reports a record the log filed, nothing removed, and no shard carries |
+| [ADR-0034](0034-the-reviewer-guard-stops-policing-and-starts-recording.md) | `DOD3` stops refusing on who is running the accept, because one actor filing, working and accepting an item is a legitimate shape in an agent fleet; `H34` reports that record as single-actor completion instead, and the change is 172 fewer lines of `src` than the enforcement it replaces |
 
 Most records carry a "Departures from the design record" section.
 The design was written before the code and got most of it right; the places where building it changed the answer are the places worth reading.
@@ -87,9 +88,10 @@ older build left behind, which nothing reported at all.
 ways a damaged workspace read clean: both compare a record against the log rather than reading
 either alone, which is why they arrived together and why neither is a refusal.
 ADR-0033 argues `H33` and `H34`, which are the same reading taken one step further: a current
-value can be arranged and the log is what happened. `H34` is `DOD3`'s load-time twin, and it
-took over from the `reviewer` arm of `H19`, which fired on the honest path and stayed silent on
-the laundered record.
+value can be arranged and the log is what happened. `H34` took over from the `reviewer` arm of
+`H19`, which fired on the honest path and stayed silent on the laundered record. ADR-0034 then
+turned `H34` from a refusal's twin into a record of its own: `DOD3` no longer reads who runs the
+accept, and what the audit reports is that one actor did the whole of it.
 
 | Id | Raised by | Finding |
 |---|---|---|
@@ -110,7 +112,7 @@ the laundered record.
 | `H31` | `doctor`, `explain` | The log holds fewer events for a record than the record has versions, so the log has lost lines that every write records |
 | `H32` | `doctor`, `explain` | A record and the log disagree about a relation: the record stores an edge no event recorded, which both raise, or the log records a live edge whose holder is not a record here, which only `doctor` raises because that holder is no record for `explain` to be asked about |
 | `H33` | `doctor` | The log filed a record, recorded no removal of it, and no record here carries the id, so the record left the store outside the tool; only `doctor` raises it, because a vanished record is no record for `explain` to be asked about |
-| `H34` | `doctor`, `explain` | A done record was accepted by somebody the log records as holding it while it was worked, which `DOD3` refuses at write time |
+| `H34` | `doctor`, `explain` | A done record whose whole event log names one actor, which no write path refuses: the work was filed, worked and accepted by the same person or agent |
 
 ## The CLI's rule ids
 

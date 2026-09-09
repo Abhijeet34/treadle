@@ -202,7 +202,8 @@ the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017,
 `H30` with ADR-0025, `H31` and `H32` with pull request 77, which has no record of its own,
-and ADR-0033 argues `H33` and `H34` with the log-over-the-fields rule they share.
+and ADR-0033 argues `H33` and `H34` with the log-over-the-fields rule they shared, until
+ADR-0034 narrows `H34` to the log alone.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
 raises. A membership test here asks whether the store HOLDS an id, served or quarantined: a
 quarantined record still exists, so a neighbour pointing at it is not dangling. `doctor`'s exit reads
@@ -279,11 +280,10 @@ part, which is why it exists beside a suite that already covers every command: t
 were found by hand after thirteen merges had each passed the whole pipeline individually, and
 none of them was a part being wrong. It advances one store step by step, so each step reads
 what its predecessor wrote, and it prints its step, assertion and call counts as a
-`t.diagnostic` rather than reporting a bare green. Two of its steps characterise `DOD3`'s
-actor half rather than guarantee it, and their names say so: the rule refuses a self-accept
-when an assignee is named and does not when none ever was, because `workedBy` folds the
-assignee the log recorded and an unassigned record leaves it empty. Changing that rule turns
-both red together, which is the point. Before trusting a change to this file, run it against a
+`t.diagnostic` rather than reporting a bare green. One actor walks its whole shift, which is what an
+agent's shift is: `DOD3` refuses nobody for running their own accept (ADR-0034), so the two
+twin steps assert that both close and the closing step asserts the `H34` line each of them
+earns. A workspace of single-actor work exits 7 on `doctor`, and saying so is the point. Before trusting a change to this file, run it against a
 mutated tree the way `Proving a property rather than a case` prescribes; four mutations, one
 per behaviour it claims, are what proved this one can fail.
 
