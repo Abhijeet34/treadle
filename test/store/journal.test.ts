@@ -227,7 +227,14 @@ describe('a journal this store did write', () => {
     }
   })
 
-  it('leaves a file the sweep is younger than alone rather than guessing', async () => {
+  /**
+   * This read the other way until a descheduled writer was shown committing over a
+   * reclaimer's work: a fresh temp file was left alone on the reading that it might belong
+   * to a writer still using it. It cannot. Only the lock holder writes a temp file under
+   * this root, so one standing when the lock changes hands belongs to a holder that never
+   * committed, and sparing it is what left that writer's rename able to land.
+   */
+  it('removes a temp file however fresh, because only a holder that never committed leaves one', async () => {
     const workspace = await aWorkspace()
     try {
       await mkdir(path.join(workspace.root, '.txn'), { recursive: true })
@@ -235,7 +242,7 @@ describe('a journal this store did write', () => {
       await writeFile(fresh, '{}')
       const applied = await workspace.store.apply({ txn: 't1', writes: [{ item: anItem() }], events: [] })
       assert.ok(applied.ok, applied.ok ? '' : applied.error.message)
-      assert.equal((await readFile(fresh, 'utf8')), '{}')
+      await assert.rejects(() => readFile(fresh, 'utf8'), { code: 'ENOENT' }, 'a temp file survived the holder that took the lock after it')
     } finally {
       await workspace.dispose()
     }
