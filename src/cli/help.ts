@@ -15,6 +15,7 @@ import {
   RESOLUTIONS,
   TRANSITION_TABLE,
   OVERRIDABLE_GUARDS,
+  TRANSITION_TARGETS,
   WORK_ITEM_STATES,
   WORK_ITEM_TYPES,
   fieldsOf,
@@ -160,7 +161,10 @@ const VOCABULARY_NOTE: Readonly<Record<Vocabulary, () => readonly string[]>> = {
   // repeats an example on the same page is the duplication this file exists to remove.
   fields: () => [`every type also carries ${COMMON_FIELDS.join(', ')}`],
   lifecycle: () => [
-    `the target is a state, not the move name: ${WORK_ITEM_STATES.join(', ')}`,
+    // Every target the parser takes, `resume` included. The page published the seven states
+    // under "not the move name" while `transition <id> resume` was accepted and printed as a
+    // remedy, so a reader who believed the page lost a call on the one word that works.
+    `the targets are ${TRANSITION_TARGETS.join(', ')}; resume is the one that is not a state, and it returns a held item to the state the hold was taken from`,
     `cancelled takes --resolution, one of ${RESOLUTIONS.join(', ')}; ready from in_progress takes --outcome, one of ${ATTEMPT_OUTCOMES.join(', ')}`,
     `--override takes ${OVERRIDABLE_GUARDS.join(', ')} and a reason; every other guard is fixed by fixing the item`,
   ],

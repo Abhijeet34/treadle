@@ -9,7 +9,7 @@
 import path from 'node:path'
 
 import type { AttemptOutcome, Resolution, WorkItemState, WorkItemType } from '../domain/index.ts'
-import { MAX_LINE, WORK_ITEM_STATES, WORK_ITEM_TYPES, asInstant, canonicalField, findUnsafeCharacter, shellWord, type GuardId } from '../domain/index.ts'
+import { MAX_LINE, TRANSITION_TARGETS, WORK_ITEM_TYPES, asInstant, canonicalField, findUnsafeCharacter, shellWord, type GuardId } from '../domain/index.ts'
 import { errorResult, okResult, type ResultObject } from '../application/result.ts'
 import { VERSION_SHAPE } from '../application/services/meta.ts'
 import { readConfig, setConfig } from '../application/services/config.ts'
@@ -747,8 +747,8 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     if (id === undefined || targetState === undefined) {
       return validation('transition', 'transition needs an id and a target state', ['treadle help transition'])
     }
-    if (targetState !== 'resume' && !(WORK_ITEM_STATES as readonly string[]).includes(targetState)) {
-      return validation('transition', `${targetState} is not a state; the targets are ${WORK_ITEM_STATES.join(', ')} and resume`, ['treadle help transition'])
+    if (!(TRANSITION_TARGETS as readonly string[]).includes(targetState)) {
+      return validation('transition', `${targetState} is not a target; the targets are ${TRANSITION_TARGETS.join(', ')}`, ['treadle help transition'])
     }
     const reason = flag(flags, 'reason')
     const until = flag(flags, 'until')
