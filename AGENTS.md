@@ -202,7 +202,8 @@ the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
 event-log integrity work, ADR-0015 argues `H24` and `H25`, `H27` came with ADR-0017,
 `H30` with ADR-0025, `H31` and `H32` with pull request 77, which has no record of its own,
-and ADR-0033 argues `H33` and `H34` with the log-over-the-fields rule they share.
+and ADR-0033 argues `H33` and `H34` with the log-over-the-fields rule they shared, until
+ADR-0034 narrows `H34` to the log alone.
 `test/architecture/documented-numbers.test.ts` holds that table to what `doctor` actually
 raises. A membership test here asks whether the store HOLDS an id, served or quarantined: a
 quarantined record still exists, so a neighbour pointing at it is not dangling. `doctor`'s exit reads

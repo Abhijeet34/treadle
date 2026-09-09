@@ -281,7 +281,7 @@ Default done gate:
 |---|---|---|
 | `DOD1` | all | Every child is done or cancelled |
 | `DOD2` | all | No impediment is still open against the item |
-| `DOD3` | all | A reviewer other than the assignee is named, and the assignee is not the one accepting, when the type has a review step |
+| `DOD3` | all | A reviewer other than the assignee is named, when the type has a review step |
 | `DOD4` | story | Every acceptance criterion is ticked |
 | `DOD5` | spike | The spike records its findings |
 | `DOD6` | bug | The fix is confirmed |
