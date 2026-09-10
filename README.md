@@ -27,10 +27,9 @@ The package has zero runtime dependencies, and that is a budget rather than a co
 
 ## Install
 
-No package is on the registry, and the one release that exists carries no assets.
-`v0.1.0` is on the forge because the machinery has been fired: the cross-platform install checks refused for want of an actor, the `artifacts` job skipped behind them, and nothing was built to attach.
+No package is on the registry, and none of the three releases cut so far carries any assets.
 Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run.
-[docs/RELEASING.md](docs/RELEASING.md) says what opens that gate, and what a release says when it published nothing.
+[docs/RELEASING.md](docs/RELEASING.md) says why each release came up empty, what opens the publish gate, and what a release says when it published nothing.
 Clone the repository to work on it.
 
 ```bash
@@ -127,7 +126,7 @@ See [Status](#status) for what is shipped, and what was declined or is blocked.
 | `doctor`: fifteen findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
-| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); fired once, on `v0.1.0`, which carries no assets because the install checks refused for want of an actor and `artifacts` skipped behind them |
+| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); fired three times, on `v0.1.0` through `v0.1.2`, none of which carries assets ([docs/RELEASING.md](docs/RELEASING.md)) |
 | Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run |
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
