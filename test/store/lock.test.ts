@@ -23,16 +23,31 @@ import { POSIX_SIGNALS } from '../helpers/platform.ts'
 
 const run = promisify(execFile)
 const WRITER = fileURLToPath(new URL('./fixtures/writer.ts', import.meta.url))
+const UNDER_EPERM = fileURLToPath(new URL('./fixtures/eperm.ts', import.meta.url))
 
 const WRITERS = 24
 const HOLDERS = 12
 const HOLD_MS = 300
 
-type Reported = { ok: boolean; version?: number; attempts?: number; code?: string; waited?: number }
+type Reported = { ok: boolean; version?: number; attempts?: number; code?: string; rule?: string; waited?: number }
 
 async function writer(root: string, id: string): Promise<Reported> {
   const { stdout } = await run(process.execPath, [WRITER, 'write', root, id], { encoding: 'utf8' })
   return JSON.parse(stdout) as Reported
+}
+
+/** One acquisition in a child process whose exclusive create answers EPERM; `eperm-open.ts`
+ *  says what each situation models. */
+async function underEperm(root: string, situation: string): Promise<Reported> {
+  const { stdout } = await run(process.execPath, [UNDER_EPERM, path.join(root, '.lock')], {
+    encoding: 'utf8', env: { ...process.env, TREADLE_EPERM: situation },
+  })
+  return JSON.parse(stdout) as Reported
+}
+
+/** Nothing the acquisition wrote may outlive it, the writability probe's own file included. */
+async function leftBehind(root: string): Promise<string[]> {
+  return (await readdir(root)).filter((n) => n.includes('.tmp.') || n === '.lock')
 }
 
 describe(`${WRITERS} separate processes writing one record`, () => {
@@ -247,6 +262,45 @@ describe('a holder that dies never wedges the store', () => {
       assert.equal(second.ok, false)
       assert.match(second.ok ? '' : second.error.message, new RegExp(`held by pid ${process.pid}`))
       await held.value.release()
+    } finally {
+      await workspace.dispose()
+    }
+  })
+})
+
+// EPERM is where POSIX and Windows disagree about the same situation, so these two are the
+// whole of the guard: one says a lock being released is waited out, the other says a directory
+// that will never hold a lock is refused. Both run on every platform, because the errno is
+// injected at the call site rather than waited for on a runner.
+describe('an exclusive create refused with EPERM', () => {
+  it('waits out a lock file whose holder is letting it go', async (t) => {
+    const workspace = await aWorkspace()
+    try {
+      const reported = await underEperm(workspace.root, 'pending:12')
+      assert.ok(reported.ok, `a lock being released was read as an unusable store: ${JSON.stringify(reported)}`)
+      assert.ok(
+        (reported.waited ?? 0) >= 60,
+        `acquired after ${reported.waited} ms, which is fewer than twelve retries: the EPERMs were not met`,
+      )
+      assert.deepEqual(await leftBehind(workspace.root), [])
+      t.diagnostic(`twelve EPERMs on the lock path were waited out in ${reported.waited} ms`)
+    } finally {
+      await workspace.dispose()
+    }
+  })
+
+  it('refuses a directory that will accept no file at all, rather than waiting on nothing', async () => {
+    const workspace = await aWorkspace()
+    try {
+      const reported = await underEperm(workspace.root, 'refusing')
+      assert.equal(reported.ok, false, 'an unwritable store was waited on')
+      assert.equal(reported.code, 'STORE_UNAVAILABLE')
+      assert.equal(reported.rule, 'S11')
+      assert.ok(
+        (reported.waited ?? 0) < 4_000,
+        `refused after ${reported.waited} ms, which is the caller's bound rather than a decision`,
+      )
+      assert.deepEqual(await leftBehind(workspace.root), [])
     } finally {
       await workspace.dispose()
     }
