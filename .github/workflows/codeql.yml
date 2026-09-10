@@ -6,7 +6,7 @@
 # a weekly pass is the cadence its yield supports.
 #
 # PR #66 moved it into cross-platform.yml to get that cadence, and that is the one place it
-# could not go. release.yml calls cross-platform.yml with `uses:` on the signed tag, a called
+# could not go. release.yml calls cross-platform.yml with `uses:` on main's head, a called
 # workflow may not request a permission its caller does not hold, and GitHub validates that
 # request before any `if` is evaluated - so the job's own `if: github.event_name !=
 # 'workflow_call'` guard stopped nothing and every Release run on main failed at startup with

@@ -2,16 +2,18 @@
 // Everything that must be true about a tag before anything is built, attached or published,
 // and the release notes for the version it names.
 //
-// treadle's release is started by a person signing a tag, not by a workflow creating one, so
-// the tag is the authorisation and this is where that authorisation is checked. The checks
-// answer three questions a green build does not: is this tag the one this repository's policy
-// allows (annotated, signed, `v<semver>`), does it name the version the tree it points at
-// actually declares, and is that tree on the released branch rather than off to one side.
+// treadle's release is started by release-please creating the tag, not by a person signing
+// one, so the tag is no longer the authorisation and this is what stands in its place. The
+// checks answer three questions a green build does not: is this tag the one this repository's
+// policy allows (`v<semver>`), does it name the version the tree it points at actually
+// declares, and does it point at the commit this run released rather than at some tree that
+// carried the name first.
 //
-// Measured, and the reason the signature clause is here at all: pointback's four release tags
-// are all lightweight (`git/refs/tags` reports `"type": "commit"` for v0.1.0 through v0.1.3),
-// because release-please creates a GitHub Release and GitHub creates the tag for it. Nothing
-// signs that. docs/RELEASING.md carries what treadle does instead.
+// The annotated and signed clauses were here until ADR-0037, which reversed the decision they
+// enforced: release-please creates a GitHub Release and lets GitHub create the tag for it,
+// which is lightweight and unsigned, so those two clauses would refuse every release this
+// repository now cuts. What replaces them is the `--commit` comparison below, which is the
+// only thing that can tell a tag this run made from a tag that already existed.
 
 import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
@@ -34,12 +36,8 @@ export type Manifest = {
 }
 
 export type TagFacts = {
-  /** 'tag' for an annotated tag object, 'commit' for a lightweight one. */
-  readonly objectType: string
   /** The commit the tag resolves to, after dereferencing an annotated tag. */
   readonly commit: string
-  /** Whether `git verify-tag` accepted the signature. */
-  readonly signed: boolean
   /** Whether the commit is an ancestor of, or is, the released branch's head. */
   readonly onReleaseBranch: boolean
 }
@@ -52,6 +50,8 @@ export type TagFacts = {
 export function preflight(input: {
   readonly tag: string
   readonly facts: TagFacts
+  /** The commit release-please reported releasing in this run. */
+  readonly releasedCommit: string
   readonly manifest: Manifest
   readonly bundleBytes: number | undefined
   readonly bundleLimit: number
@@ -59,7 +59,8 @@ export function preflight(input: {
   readonly staleAgainst: string | undefined
   readonly publishing: boolean
 }): readonly string[] {
-  const { tag, facts, manifest, bundleBytes, bundleLimit, staleAgainst, publishing } = input
+  const { tag, facts, releasedCommit, manifest, bundleBytes, bundleLimit, staleAgainst, publishing } =
+    input
   const problems: string[] = []
 
   if (!SEMVER.test(tag)) {
@@ -68,16 +69,13 @@ export function preflight(input: {
   if (tag !== `v${manifest.version}`) {
     problems.push(`tag ${tag} does not name package.json's version ${manifest.version}`)
   }
-  if (facts.objectType !== 'tag') {
+  // What the signature clause used to do, and the only comparison that can still do it:
+  // release-please creates `v<version>` and reports the commit it released. A tag that already
+  // existed points somewhere else, and after the fact nothing else tells the two apart.
+  if (facts.commit !== releasedCommit) {
     problems.push(
-      `tag ${tag} is lightweight, not an annotated tag object; a release tag carries a message ` +
-        'and a signature, so it must be created with git tag -s',
-    )
-  }
-  if (!facts.signed) {
-    problems.push(
-      `tag ${tag} carries no signature git could verify; every commit in this repository is ` +
-        'signed and the tag that releases them must be too',
+      `tag ${tag} points at ${facts.commit}, not at the released commit ${releasedCommit}; ` +
+        'it existed before this run and must be deleted rather than reused',
     )
   }
   if (!facts.onReleaseBranch) {
@@ -171,23 +169,14 @@ function git(...args: readonly string[]): string {
 }
 
 function tagFacts(tag: string, branch: string): TagFacts | undefined {
-  let objectType: string
+  let commit: string
   try {
-    objectType = git('cat-file', '-t', tag)
+    // `<tag>^{}` dereferences an annotated tag to its commit; a lightweight tag answers the
+    // same thing, so one form covers both, and a tag that does not exist is a refusal with a
+    // sentence rather than a stack trace.
+    commit = git('rev-parse', `${tag}^{}`)
   } catch {
-    // A tag that does not exist is a refusal with a sentence, not a stack trace: the release
-    // path passes `github.ref_name`, so this is what a mis-triggered run should read like.
     return undefined
-  }
-  // `<tag>^{}` dereferences an annotated tag to its commit; a lightweight tag answers the
-  // same thing, so one form covers both.
-  const commit = git('rev-parse', `${tag}^{}`)
-  let signed = false
-  try {
-    execFileSync('git', ['verify-tag', tag], { stdio: 'ignore' })
-    signed = true
-  } catch {
-    signed = false
   }
   let onReleaseBranch = false
   try {
@@ -196,13 +185,14 @@ function tagFacts(tag: string, branch: string): TagFacts | undefined {
   } catch {
     onReleaseBranch = false
   }
-  return { objectType, commit, signed, onReleaseBranch }
+  return { commit, onReleaseBranch }
 }
 
 if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const { values } = parseArgs({
     options: {
       tag: { type: 'string' },
+      commit: { type: 'string' },
       branch: { type: 'string', default: 'origin/main' },
       publishing: { type: 'boolean', default: false },
       'notes-out': { type: 'string' },
@@ -210,6 +200,10 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   })
   const tag = values.tag
   if (tag === undefined) throw new Error('--tag is required')
+  // Required rather than optional: an absent released commit means nothing in the run has said
+  // this tag belongs to it, and defaulting that to "fine" is the clause not running at all.
+  const releasedCommit = values.commit
+  if (releasedCommit === undefined) throw new Error('--commit is required')
 
   const root = fileURLToPath(new URL('..', import.meta.url))
   const manifest = JSON.parse(readFileSync(path.join(root, 'package.json'), 'utf8')) as Manifest
@@ -233,6 +227,7 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   const problems = preflight({
     tag,
     facts,
+    releasedCommit,
     manifest,
     bundleBytes,
     bundleLimit: budgets.absolute['bundleBytes']?.limit ?? 768000,
@@ -243,7 +238,7 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   for (const problem of problems) console.error(`::error::${problem}`)
   console.log(
     problems.length === 0
-      ? `release preflight: ok, ${tag} is an annotated signed tag at ${facts.commit}`
+      ? `release preflight: ok, ${tag} is this run's tag at ${facts.commit}`
       : `release preflight: ${problems.length} problem(s)`,
   )
 

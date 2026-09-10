@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The third break in the release path, found on 2026-09-08 by approving the release pull
-// request's parked checks and watching them run for the first time: `checks` is a required
+// request's parked checks by hand and watching them run for the first time: `checks` is a required
 // context on main, and it went red because scripts/check-dco.sh refuses release-please's own
 // commit. `chore(main): release 0.1.0` at 95c2511 is authored by github-actions[bot] and
 // carries no Signed-off-by trailer, so the release pull request could never merge.

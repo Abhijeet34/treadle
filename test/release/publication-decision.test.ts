@@ -284,9 +284,11 @@ describe('a release that published nothing says so, and names every block', () =
   // which is the whole defect wearing a different hat. The `artifacts` guard is there because a
   // failed `artifacts` leaves no release to write onto.
   it('runs even when the job it reports on was skipped', () => {
-    assert.deepEqual(JOB?.needs, ['artifacts', 'publish'])
+    assert.deepEqual(JOB?.needs, ['release-tag', 'artifacts', 'publish'])
     assert.match(JOB?.ifExpr ?? '', /always\(\)/)
     assert.match(JOB?.ifExpr ?? '', /needs\.artifacts\.result == 'success'/)
-    assert.match(JOB?.ifExpr ?? '', /startsWith\(github\.ref, 'refs\/tags\/v'\)/)
+    // Keyed on the tag release-please made in this run, not on a tag ref: ADR-0037 removed the
+    // tag trigger, so `github.ref` is `refs/heads/main` on every release this job reports on.
+    assert.match(JOB?.ifExpr ?? '', /needs\.release-tag\.outputs\.created == 'true'/)
   })
 })

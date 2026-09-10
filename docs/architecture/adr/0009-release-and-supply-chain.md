@@ -4,6 +4,7 @@
 **Date:** 2026-09-05
 **Implements:** DR1's build rule and DR7's dependency budget; closes threat-model finding F13
 **Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the derived index, so the negative consequence that the bundle loads the index engine on every invocation and the "No lazy per-command imports" departure that priced it are both closed: `dist/treadle.js` imports `node:sqlite` zero times, and the "gitignored index directory" the compile-cache departure argues against is not a directory this tool writes any more; one bundle, the signed tag, the supply-chain controls and the rest of the departures stand
+**Overtaken in part by:** [ADR-0037](0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md), which reverses the signed annotated tag as the release authorisation: release-please creates the tag, the preflight's lightweight and unsigned clauses are replaced by a comparison against the commit this run released, `.github/rulesets/tags.json` drops `required_signatures`, and the "Porting the sibling's `approve-release-checks` script" row below is overturned with them, so "A release needs a person with a signing key" and "There is no unattended release path and there is not meant to be one" no longer hold; the bundle, the three publication interlocks, F13's three controls and every other alternative measured here stand
 
 ## Context
 

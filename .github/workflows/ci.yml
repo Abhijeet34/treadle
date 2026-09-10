@@ -10,8 +10,8 @@
 # and a Windows minute at about 1.67x, against the same allowance, so a three-platform matrix
 # here would spend most of the budget proving what the cheapest runner already proved.
 # cross-platform.yml carries macOS and Windows on the weekly schedule, on dispatch, and on
-# the release path, where release.yml calls it on the signed tag before any artifact is
-# attached. No pull request in this repository starts a macOS or Windows runner.
+# the release path, where release.yml calls it on every push to main and puts the tag on the
+# far side of it. No pull request in this repository starts a macOS or Windows runner.
 #
 # Third-party actions are pinned to a full commit SHA with the version in a trailing comment,
 # never to a tag: a tag can be repointed at new code by whoever owns the action.

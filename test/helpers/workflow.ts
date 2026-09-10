@@ -83,7 +83,10 @@ function stepsOf(block: string): readonly Step[] {
   let current: { name?: string; uses?: string; body: string[] } | undefined
   const flush = (): void => {
     if (current === undefined) return
-    const run = current.body.join('\n').trim()
+    // A step is `uses` or `run`, never both, so an action's `with:` block is not a shell body.
+    // Without this a checkout carrying `ref:` was the first step with a `run`, and a test that
+    // asks a job for its shell got `with:` and `ref: ${{ ... }}` handed to bash.
+    const run = current.uses === undefined ? current.body.join('\n').trim() : ''
     steps.push({
       ...(current.name === undefined ? {} : { name: current.name }),
       ...(current.uses === undefined ? {} : { uses: current.uses }),
