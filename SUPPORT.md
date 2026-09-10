@@ -36,8 +36,8 @@ If the answer is not there, that is a documentation bug worth an issue of its ow
 
 ## What is not supported
 
-There is no released version yet, so there is nothing to support in production.
-`package.json` carries `"private": true` and publication is gated on a name clearance that has not run.
+No package is on the registry, so there is nothing to support in production.
+See [docs/RELEASING.md](docs/RELEASING.md) for what a release is and what is gating publication.
 
 ## Response times
 
