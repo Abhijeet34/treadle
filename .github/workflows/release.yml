@@ -230,18 +230,25 @@ jobs:
         with:
           subject-path: ${{ steps.pack.outputs.tarball }}
 
-      # release-please created the tag and left the release to this job, which is what puts
-      # the three assets and the changelog notes on it in one act rather than two.
-      - name: Create the release and attach everything
+      # release-please creates the release, not only the tag: with `skip-github-release` unset
+      # it is the same call, and `release_created` is the output of having made both. So this
+      # job edits and uploads onto a release that already exists. `gh release create` here read
+      # as the natural counterpart to a tag and could never succeed - job 102910409340 built
+      # all three assets, attested the tarball, and ended on `a release with the same tag name
+      # already exists: v0.1.2`, which is the only time this job has ever run.
+      #
+      # `--verify-tag` went with the create: `gh release edit` refuses a release that is not
+      # there, which is the stronger check, because it is release-please's release or nothing.
+      - name: Attach everything to the release
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --notes-file "$RUNNER_TEMP/notes.md" \
-            --verify-tag \
-            "$TARBALL" sbom.spdx.json SHA256SUMS
+          # The notes the preflight wrote from CHANGELOG.md, over the body release-please
+          # composed from the pull request. The `publication` job below reads this body back
+          # and appends to it, so it has to be the final one.
+          gh release edit "$TAG" --title "$TAG" --notes-file "$RUNNER_TEMP/notes.md"
+          gh release upload "$TAG" "$TARBALL" sbom.spdx.json SHA256SUMS --clobber
 
   # Off until someone deliberately turns it on, and then still not until someone approves the
   # run. Three interlocks were designed, each of which stops publication on its own. The first

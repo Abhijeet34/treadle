@@ -75,23 +75,35 @@ F4 names `test/render/conformance.test.ts`, which holds the shipped rendering se
 None of the four proves that the removed surface would be safe if it were built: a guarded export and a gated hook contract are both open questions this tree answers by not having either.
 They are also not evidence about a publish that has never happened: F13's third control, provenance at publish, is asserted over the workflow and the preflight script rather than over a publish that happened.
 
-**The tag half of the release pipeline, exercised locally rather than proven by a release.**
-Two tags have fired it and neither produced a release.
+**The tag half of the release pipeline, run for real once and still short of a release that carries anything.**
+Three tags have fired it and none produced a release with assets on it.
 On `v0.1.0`, run `34453354302`, `cross-platform` ran on the tag and its three container jobs failed for want of `TREADLE_ACTOR`, so `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
 On `v0.1.1`, run `34475691252`, all six `cross-platform` jobs passed and `artifacts` failed on the tag-signature clause the row above records.
-So nothing downstream of `artifacts`'s preflight step has ever run.
 
 [ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) changed what fires those jobs: there is no tag trigger any more, `release-tag` creates the tag behind the matrix, and everything downstream keys on `needs.release-tag.outputs.created`.
-That shape has never run either, and a merge of a release pull request is the only thing that would exercise it.
+`v0.1.2` exercised that shape on 2026-09-10 and it worked.
+`release-tag` in run `34488379552` created the tag and the release at 14:25:28Z, `artifacts` ran on `created == 'true'` in job `102910409340`, and the run for the release commit itself reached `release-tag` four minutes later, found nothing left to release, and skipped `artifacts` correctly.
+
+That job is the first and only end-to-end run of `artifacts`, and it reached its last step.
+`npm ci`, `npm run build`, the preflight's accept path against a tag the run had just created, `npm pack`, the SBOM export, `SHA256SUMS`, and `actions/attest-build-provenance` signing through the workflow's OIDC identity, uploaded to Rekor at `logIndex=2784103717` and to the repository as attestation `46592135`.
+Then `gh release create` ended the job on `a release with the same tag name already exists: v0.1.2`, because release-please had created the release two seconds earlier.
 
 Every step of `artifacts` that can run without a tag was run in a worktree on 2026-09-10, in the workflow's own order and with its own commands, on Node 24.20.0 and npm 11.19.0 rather than the 24.15.0 `.nvmrc` pins: `npm ci`, `npm run build` at 386,054 bytes against DR8's 768,000, `npm pack --json --ignore-scripts` producing `treadle-0.1.0.tgz` at 116,490 bytes, the dependency-graph SBOM export at 107,021 bytes of SPDX-2.3 over 134 packages, and `sha256sum` over both into a `SHA256SUMS` that verifies against both files.
 The preflight's accept path was exercised twice: against the real `v0.1.1` tag in a clone configured the way a runner is, and through `scripts/rollback-drill.sh`, 13 of 13 on 2026-09-10 including the notes it writes and each of the six publishing refusals on a manifest broken to make it fire.
 `notesFor` was run against release pull request 69's own changelog and returned the 104-line 0.1.0 section with no leak into a second heading.
 
-Four things were not run and none of them is proven by any of that: `actions/attest-build-provenance`, which needs the workflow's OIDC identity; `gh release create --verify-tag`, which needs a tag this run created; `release-tag` itself, which needs a merged release pull request; and the `publish` and `smoke` jobs, which need a publish.
+`gh release edit` and `gh release upload --clobber`, which replaced the failed create, were run against this repository on 2026-09-10, on a throwaway tag rather than a release.
+`proof-artifacts-upload-20260910` was created outside the tag ruleset's live `refs/tags/v*` pattern, read from ruleset `22316869` rather than from `.github/rulesets/tags.json`, and deleted and read back as gone once before anything was attached to it.
+A draft release was opened on it by a separate act, standing in for the release release-please makes, and the workflow's two commands were then run verbatim against the three assets built from the `v0.1.2` tree.
+The release came back from the forge carrying `sbom.spdx.json` at 107,021 bytes, `SHA256SUMS` at 165 and `treadle-0.1.2.tgz` at 116,715, all `uploaded`, with the stand-in body replaced by the CHANGELOG section; running the same upload again left three assets rather than failing on the first, which is the `--clobber` clause.
+The release and the tag were then deleted, and the forge reports no release and no ref by that name and the same three `v` tags as before.
+
+Two limits on that proof. It used a draft, and `gh release create` succeeds against a draft on the same tag, so the shipped step's `a release with the same tag name already exists` refusal reproduces only against a published one: job `102910409340` is where that half is evidenced. And the assets were built on this machine rather than by the runner, so nothing in it exercises `actions/attest-build-provenance` a second time.
+
+The `publish` and `smoke` jobs still have not run, and need a publish.
+The sibling repository `pointback` runs the same two commands in the same position, and its `v0.1.2` and `v0.1.3`, both authored by `github-actions[bot]`, carry their tarball and their SBOM.
 `release-pr-checks` has been driven only against a fake forge, so nothing yet shows a real parked run being approved.
-A dress rehearsal of the steps is evidence about the steps.
-It is not evidence about a release, and F13's third control stays asserted over the workflow and the preflight rather than over a publish that happened.
+F13's third control stays asserted over the workflow and the preflight rather than over a publish that happened.
 
 **Coverage-guided fuzzing.**
 The fuzzer here is mutation-based over a committed corpus.

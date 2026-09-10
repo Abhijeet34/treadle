@@ -47,13 +47,15 @@ the generator no longer writes: without that, `files` ships the whole directory 
 `scripts/shebang.ts` refuses an `env` option or a node flag on it, and
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
 measurements and the trade behind that.
-No package is on the registry, and `v0.1.0` and `v0.1.1` are released with no assets:
+No package is on the registry, and `v0.1.0`, `v0.1.1` and `v0.1.2` are released with no assets:
 `docs/RELEASING.md` carries the interlocks that still hold and how a release happens, and
 `scripts/apply-repo-settings.sh` is the only thing that applies the checked-in rulesets under
 `.github/`.
 Merging the release pull request is the only human act on the release path, and it is what cuts
-the tag: `.github/workflows/release.yml` has no tag trigger, `release-tag` creates the tag behind
-the three-platform matrix, and nothing on a release carries a human signature
+the tag: `.github/workflows/release.yml` has no tag trigger, `release-tag` creates the tag AND the
+GitHub release behind the three-platform matrix so `artifacts` only uploads onto a release that
+already exists (`docs/RELEASING.md`, "Who creates the release"), and nothing on a release carries
+a human signature
 (`docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md`).
 Do not merge a release pull request, or publish, without the captain saying so.
 `scripts/rollback-drill.sh` is how the tag path is exercised without firing one: it creates real
