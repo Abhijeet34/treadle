@@ -48,7 +48,7 @@ import { checkRuntime } from './runtime.ts'
 // The one place the product's version is written. release-please rewrites this line on a
 // release through the `generic` updater the marker below selects, and a test asserts it
 // still equals package.json's version, so `treadling version` cannot drift from the tag.
-export const VERSION = '0.2.1' // x-release-please-version
+export const VERSION = '0.2.2' // x-release-please-version
 
 const RENDERERS: Readonly<Record<Rendering, Renderer>> = {
   agent: agentRenderer,

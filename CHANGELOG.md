@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/Abhijeet34/treadling/compare/v0.2.1...v0.2.2) (2026-09-10)
+
+
+### Documentation
+
+* correct docs now that @abhijeet34/treadling is published, without implying the pipeline publishes it ([#106](https://github.com/Abhijeet34/treadling/issues/106)) ([be49583](https://github.com/Abhijeet34/treadling/commit/be495838273de4ced4e98977ab5ad83b48a877f0))
+
 ## [0.2.1](https://github.com/Abhijeet34/treadling/compare/v0.2.0...v0.2.1) (2026-09-10)
 
 
