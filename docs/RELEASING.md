@@ -1,9 +1,11 @@
 # Releasing, and rolling back
 
-Two releases have been cut and neither produced anything.
-`v0.1.0` and `v0.1.1` are on the forge carrying no assets, both immutable under the tag ruleset, and each failed on a different piece of code that had never run.
+Three releases have been cut and none produced anything.
+`v0.1.0`, `v0.1.1` and `v0.1.2` are on the forge carrying no assets, all three immutable under the tag ruleset, and each failed on a different piece of code that had never run.
 On `v0.1.0` the cross-platform install checks set no `TREADLE_ACTOR`, `treadle init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
 On `v0.1.1` all six of those jobs passed and `artifacts` then failed in the release preflight, on a tag-signature check that had never been able to pass on a runner: see "Why the tag is no longer signed".
+On `v0.1.2` the automation cut its own tag for the first time, `artifacts` built and attested all three assets, and the last step of that job ended on `a release with the same tag name already exists: v0.1.2`.
+It was running `gh release create`, and release-please had already created the release two seconds earlier: see "Who creates the release" below.
 Nothing has reached npm, and no package of this name exists on the registry.
 This file is the procedure the machinery is fired with, and the procedure for undoing a release that was wrong.
 
@@ -19,7 +21,14 @@ Three steps, and a person is the second one.
 2. Someone reviews the release pull request `release-please` keeps up to date, and merges it.
    That is the only thing a person does on this path.
 3. The merge is itself a push to `main`, so the workflow runs again on the release commit.
-   This time `release-tag` finds a merged release pull request, creates `vX.Y.Z` and reports it through `release_created`, and everything downstream keys on that output.
+   This time `release-tag` finds a merged release pull request, creates `vX.Y.Z` and the GitHub release for it, and reports both through `release_created`.
+   Everything downstream keys on that output.
+
+The run that does step 3 is not always the run started by that merge.
+`release-tag` waits for `cross-platform`, which takes about five minutes, and release-please reads `main` from the API rather than the ref the run was started for.
+On `v0.1.2` the run for the previous commit reached `release-tag` at 14:25:22, by which time the release pull request had merged, and that run created the tag and the release; the run for the release commit itself reached `release-tag` four minutes later, found nothing left to release, and skipped `artifacts` correctly.
+Exactly one run releases either way, and it is the one holding the assets, so the tag and its assets stay together.
+What it costs is that the `cross-platform` legs gating that tag may have run on the commit before it.
 
 `.github/workflows/release.yml` triggers on `push: branches: [main]` and `workflow_dispatch`, and on nothing else.
 There is no tag trigger: a hand-pushed tag would fire it, and `release_created` is the only signal that means "this tag was created for this tree, just now".
@@ -32,15 +41,15 @@ any squash-merge to main
   `- cross-platform ---- macOS, Windows and Linux on this exact tree
        `- release-tag -- nothing above it has tagged; this is the only job that can
             |- artifacts --- preflight, npm run build, npm pack, SBOM, checksums,
-            |                attestation, and the GitHub release the three hang off
+            |                attestation, and the three assets onto release-tag's release
             |- publish ----- only if NPM_PUBLISH_ENABLED is "true", and then only
             |    `- smoke    after the npm-publish environment's reviewer says so
             `- publication - says whether this release reached npm, on every release
 
 on an ordinary merge, release-tag finds no merged release pull request and reports
 created=false, so artifacts, publish, smoke and publication all skip. On the merge of
-the release pull request it writes CHANGELOG.md and package.json, tags vX.Y.Z, and the
-rest of the run builds the release around that tag.
+the release pull request it writes CHANGELOG.md and package.json, tags vX.Y.Z, opens the
+release for it, and the rest of the run hangs the assets off that release.
 ```
 
 The matrix is in front of the tag rather than behind it, and that ordering is what stops another `v0.1.0`.
@@ -153,6 +162,20 @@ There is no key and no secret behind it: the identity is the workflow, the repos
 
 The publish job does not repack.
 It downloads the tarball from the release and checks it against `SHA256SUMS` before handing it to npm, so what reaches the registry is byte-for-byte what was attested.
+
+### Who creates the release
+
+release-please does, and `artifacts` only attaches to it.
+
+`skip-github-release` is the input that separates tagging from releasing, and `release-tag` does not set it, so one call makes the tag and the release together and `release_created` is the output of having made both.
+By the time `artifacts` runs there is a release on that tag carrying the notes release-please composed from the pull request.
+So the last step of that job is `gh release edit` for the notes `scripts/release-preflight.ts` read out of `CHANGELOG.md`, then `gh release upload --clobber` for the three assets.
+
+`gh release create` reads as the natural counterpart to a tag and cannot succeed here.
+Job 102910409340 is the only time `artifacts` has ever run: it built the tarball, exported the SBOM, wrote `SHA256SUMS`, uploaded an attestation to `logIndex=2784103717`, and then ended on `a release with the same tag name already exists: v0.1.2`.
+`test/release/release-assets.test.ts` refuses a `gh release create` in that job by name.
+
+`--clobber` is on the upload because a re-run of `artifacts` finds its own assets already there, and without it the first one is an error rather than a replacement.
 
 ## The interlocks in front of npm
 
