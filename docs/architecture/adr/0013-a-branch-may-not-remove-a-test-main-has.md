@@ -58,9 +58,7 @@ A required context named in the ruleset is a fact on the forge.
 That claim was asserted here and never checked against the forge itself, so it holds only while someone has actually run `scripts/apply-repo-settings.sh`, and nothing did between pull request 32 and this repository's ruleset-drift check.
 Named in `.github/rulesets/main.json`, `tests kept` was never actually a required context on the live `main` ruleset, and `secret scan` was required there before this change added it to the file too.
 `npm run ruleset-drift` and `.github/workflows/ruleset-drift.yml` are what catch the gap that remains, `tests kept`, now.
-The guard exists to stop a branch quietly turning a test into a skip, and it failed at that twice, independently.
-It was never enforced: `tests kept` is required by `.github/rulesets/main.json` and has never been a required context on the live `main` ruleset.
-It also could not see what it guards until 2026-09-10, when pull request 93 taught it Node's option-object skip form, `it('t', { skip: 'why' }, fn)`, the form all 21 skips in this repository are written in, so before that the gate exited 0 on every skip that existed.
+The guard exists to stop a branch quietly turning a test into a skip, and it failed at that twice, independently: it was never enforced, since `tests kept` has never been a required context on the live `main` ruleset, and until 2026-09-10 it also could not see what it guards, when pull request 93 taught it Node's option-object skip form, `it('t', { skip: 'why' }, fn)`, the form all 21 skips in this repository are written in, so before that the gate exited 0 on every skip that existed.
 Either failure alone makes the guard decorative.
 A branch that deletes the job never reports it, and a required check that never reports blocks the merge.
 
