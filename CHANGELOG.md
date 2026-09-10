@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.0](https://github.com/Abhijeet34/treadling/compare/v0.1.3...v0.2.0) (2026-09-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* the executable is `treadling`, every `TREADLE_*` environment variable is now `TREADLING_*`, and no package was ever published under the old name.
+
+### Bug Fixes
+
+* rename the package and command from treadle to treadling ([#102](https://github.com/Abhijeet34/treadling/issues/102)) ([04e6972](https://github.com/Abhijeet34/treadling/commit/04e6972dd19dfbb86950a5b47993a733e5f966ec))
+
 ## [0.1.3](https://github.com/Abhijeet34/treadle/compare/v0.1.2...v0.1.3) (2026-09-10)
 
 
