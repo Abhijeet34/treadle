@@ -36,8 +36,8 @@ If the answer is not there, that is a documentation bug worth an issue of its ow
 
 ## What is not supported
 
-No package is on the registry, so there is nothing to support in production.
-See [docs/RELEASING.md](docs/RELEASING.md) for what a release is and what is gating publication.
+`@abhijeet34/treadling@0.2.1` is on the registry and is pre-1.0, so nothing about it is promised to stay put: [docs/STABILITY.md](docs/STABILITY.md) is the policy, and a breaking change can land in a minor version.
+See [docs/RELEASING.md](docs/RELEASING.md) for what a release is, and for why the release run still does not publish.
 
 ## Response times
 

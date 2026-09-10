@@ -10,5 +10,5 @@ reads what a command wrote without spawning a process per assertion.
 It imports TypeScript directly, which Node runs by stripping types, and that is the entry
 point the suite and the README drive. It is not what a published package would run:
 `npm run build` bundles the same entry file to `dist/treadling.js`, and `bin` and `files` in
-`package.json` both name that bundle, so no source reaches the tarball. No package is on the
-registry yet, and `docs/RELEASING.md` carries the interlocks that hold it.
+`package.json` both name that bundle, so no source reaches the tarball. `docs/RELEASING.md`
+carries how that tarball reaches the registry.

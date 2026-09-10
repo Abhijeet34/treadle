@@ -1,13 +1,19 @@
 # Releasing, and rolling back
 
-Three releases have been cut and none produced anything.
+Six releases have been cut and the first three produced nothing.
 `v0.1.0`, `v0.1.1` and `v0.1.2` are on the forge carrying no assets, all three immutable under the tag ruleset, and each failed on a different piece of code that had never run.
 On `v0.1.0` the cross-platform install checks set no `TREADLING_ACTOR`, `treadling init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
 On `v0.1.1` all six of those jobs passed and `artifacts` then failed in the release preflight, on a tag-signature check that had never been able to pass on a runner: see "Why the tag is no longer signed".
 On `v0.1.2` the automation cut its own tag for the first time, `artifacts` built and attested all three assets, and the last step of that job ended on `a release with the same tag name already exists: v0.1.2`.
 It was running `gh release create`, and release-please had already created the release two seconds earlier: see "Who creates the release" below.
-Nothing has reached npm.
-No package named `treadling` exists on the registry and no other account holds the name: `GET /-/package/treadling/collaborators` answered `404 Package not found` on 2026-09-10, which is the probe that sees a reservation with no package document behind it.
+`v0.1.3`, `v0.2.0` and `v0.2.1` each carry the tarball, the SBOM and `SHA256SUMS`.
+
+`@abhijeet34/treadling@0.2.1` is on the registry, and the release run did not put it there.
+`GET https://registry.npmjs.org/@abhijeet34%2Ftreadling` answers 200 with `dist-tags.latest` at `0.2.1`, `abhijeet34` as the sole maintainer, and shasum `7d7da95a5518c4059279984fbedca83bd56a9774`.
+That is the byte the `artifacts` job attested: the tarball on `v0.2.1` and the tarball the registry serves compare identical, so the published artifact is the attested one even though the workflow did not publish it.
+What says it was published by hand is the absence, not the bytes: the version document carries `_npmVersion` `11.19.0` and no provenance attestation, and a trusted publish generates one.
+`v0.2.1`'s own release page says under `## Publication` that the version was not published to npm, and it is right about the workflow: the `publish` job has never run.
+The unscoped name is still nobody's: `GET /-/package/treadling/collaborators` answered `404 Package not found` on 2026-09-11, while `treadle`, the name this project no longer uses, answered 200 with `timileyindev` holding write.
 This file is the procedure the machinery is fired with, and the procedure for undoing a release that was wrong.
 
 [ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) reversed the posture this file used to describe, on 2026-09-10.
@@ -196,21 +202,28 @@ Publication uses npm Trusted Publishing over OIDC.
 There is no npm token anywhere in this repository, in any secret, at any scope.
 It passes no `--provenance` flag, because trusted publishing generates provenance itself and the flag turns a provenance-ineligible publish into a failed release rather than an unattested one.
 
-When the name clears, what is left of opening the gate is: register treadling's trusted publisher on npm against `Abhijeet34/treadling` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
+None of that has been done, and a package on the registry does not change it.
+What is left of opening the gate is still: register the trusted publisher on npm for `@abhijeet34/treadling` against `Abhijeet34/treadling` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
+Read on 2026-09-11, `GET /repos/Abhijeet34/treadling/actions/variables` answered with an empty list and `GET /repos/Abhijeet34/treadling/environments` with `total_count: 0`, so the second and third interlocks are exactly where they were.
+Until all three are done, every version reaches the registry the way `0.2.1` did, by hand.
 The name clearance ran on 2026-09-10 and `treadling` cleared every source it could reach: free at the npm ownership record, zero exact marks on the US register, free on crates.io and PyPI, and a dictionary word.
 The EU, UK and Indian registers were not read, and npm's similarity gate runs only on a real publish, so neither is cleared and [ADR-0038](architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) says so rather than rounding them up.
 That record also carries why `treadle` is no longer this package's name: another developer holds the npm ownership record for it, for a real unrelated library, and npm transfers no name on demand.
 The similarity gate then refused the unscoped `treadling` on 2026-09-11 as too similar to `readline`, which is two edits away where the screen tested one, so the trusted publisher registers against `@abhijeet34/treadling` and the scope is what publishes ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
 
 That list assumed a release and a package would arrive on the same day. They did not.
-`v0.1.0` was cut while three of those four sentences still said nothing had been released, so they were corrected on the day the release existed rather than the day a package does, and this is what is left of the list.
-Two sentences and one code block stop being true when a package first reaches the registry:
-`README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which becomes `npm install -g @abhijeet34/treadling` and `treadling init` where today it is `node bin/treadling.js init` against a clone.
-The scope is part of the install line and not of the command: `npm install -g treadling` and `npx treadling` resolve to something that is not this package, or to nothing ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
-Do not write any of them early. A quick start that names a package nobody can install is the defect this repository spent a week removing.
+`v0.1.0` was cut while three of those four sentences still said nothing had been released, so they were corrected on the day the release existed; the rest waited for the day a package does, and that day was 2026-09-10.
+Two sentences and one code block stopped being true then, and all three have been rewritten: `README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which is `npm install -g @abhijeet34/treadling` and `treadling init` where it was `node bin/treadling.js init` against a clone.
+The list is empty now, and one rule outlives it.
+The scope is part of the install line and not of the command, so `npm install -g @abhijeet34/treadling` installs a binary typed as `treadling`, while `npm install -g treadling` and `npx treadling` fetch nothing: npm refused the unscoped name and no package holds it ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
+Every install line this repository prints carries the scope, and no line trims it to match the command.
+
+The other half of the list is still open, and it is the half a reader is likelier to get wrong now that a package exists: the pipeline does not publish.
+Nothing in this tree may say a release reaches npm on its own until the three interlocks above are lifted, and a `publish` job that is built is not a `publish` job that is armed.
 
 One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
 Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
+That is not hypothetical here. `0.2.1` was published exactly that way, and the registry records it: no provenance attestation on the version document, `_npmUser` `abhijeet34`, `_npmVersion` `11.19.0`.
 The workflow's own path is already closed by construction - the `publish` job downloads the attested tarball the `artifacts` job packed one step after `npm run build` and `release-preflight`, and verifies it against `SHA256SUMS` - and `scripts/check-dist-fresh.ts` explains why a `prepack` hook cannot be the answer here.
 
 ## What a release says when it published nothing
@@ -235,8 +248,9 @@ Every condition standing in front of publication, rather than the first one to s
 ```
 
 The second bullet is history: `package.json` no longer carries `private`, so a tag cut today names the variable alone, and `test/release/publication-decision.test.ts` drives that manifest as well as the private one.
-No release carries this paragraph yet.
+`v0.1.3`, `v0.2.0` and `v0.2.1` each carry it, naming the variable alone and reporting that the `npm-publish` environment could not be read.
 The job is guarded on `needs.artifacts.result == 'success'`, because there is no release to write onto when nothing was packed, and on `v0.1.0` `artifacts` skipped, so `publication` skipped behind it and that release's notes were written by hand.
+`v0.2.1`'s paragraph is true of the workflow and says nothing about a hand publish, which is the one thing a reader can misread: the version is on the registry and this run did not put it there.
 
 That paragraph goes onto the release itself under a `## Publication` heading, because "did this version reach npm?" is asked at the release and not in a job list where a skipped job looks like a job that had nothing to do.
 The same text goes into the run's step summary, and the run carries a warning annotation naming how many conditions stand in front of publication.
@@ -247,7 +261,7 @@ The third interlock is read rather than claimed.
 The report prints whichever one is true and never rounds the first up to the second.
 
 It reports and does not gate.
-Publication is closed by design until the name clears, so the condition is true on every release this repository cuts until then, and a red that never clears is a red nobody reads.
+Publication from the workflow is closed until the three interlocks are lifted, so the condition is true on every release this repository cuts until then, and a red that never clears is a red nobody reads.
 `test/release/publication-decision.test.ts` drives the job's own shell over each outcome `publish` can have: skipped, failed, succeeded, and a result the job does not recognise.
 
 A release that publishes nothing must not read as a plain success.
@@ -338,7 +352,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate @abhijeet34/treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
+npm deprecate @abhijeet34/treadling@0.2.1 "0.2.1 quarantines a valid record on a hand-edited shard; use 0.2.2"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
@@ -347,18 +361,18 @@ The message names what is wrong and what to use instead, because a deprecation n
 **Then ship the fix.** A hotfix branches from the tag that was released, not from `main`:
 
 ```sh
-git checkout -b hotfix/v0.2.1 v0.2.0
+git checkout -b hotfix/v0.2.2 v0.2.1
 # land the fix through a pull request as usual
 ```
 
 Cutting from the tag is what keeps the fix minimal.
 Cutting from `main` ships whatever else merged since, which is how a rollback becomes a second incident.
-The patch then follows the ordinary release path above: land it, merge the release pull request, and the automation cuts `v0.2.1` from it.
+The patch then follows the ordinary release path above: land it, merge the release pull request, and the automation cuts `v0.2.2` from it.
 
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
 ```sh
-npm unpublish @abhijeet34/treadling@0.2.0
+npm unpublish @abhijeet34/treadling@0.2.1
 ```
 
 Within 72 hours, and only when nothing depends on that version.
@@ -438,10 +452,10 @@ A red drift check says the two sides disagree, not which one is right, and the f
 This was the first drift the check ever found where getting that wrong would have made things worse: `secret scan` was already required on the forge, so applying `main.json` as it then stood would have dropped `secret scan` as a merge gate to match it, and the drift check would then have reported success over a repository with one fewer guard on it.
 The fix adds `secret scan` to `main.json` beside `tests kept`, keeping the stronger side rather than matching the weaker one; deciding which side that is stays a person's job, every time this check goes red.
 
-That is why the release path is blocked today, and it is containment rather than a defect.
-`main.json` names `checks`, `tests kept` and `secret scan`; live ruleset `22314350` enforces only `checks` and `secret scan`; so `npm run ruleset-drift` exits 1, and `release-tag`'s `needs: ruleset-drift` in `.github/workflows/release.yml` stops the release path there rather than cutting a tag against rules the tree only believes it has.
-That is the check doing its job on the first drift it ever found, not something to route around: dropping `ruleset-drift` from `release-tag`'s `needs:` would delete the enforcement in the same change that added it.
-What unblocks it is running `scripts/apply-repo-settings.sh` to apply `tests kept` to the live rule, which adds a protection rather than removing one.
+That blocked the release path until the fix was applied, and it was containment rather than a defect: `release-tag`'s `needs: ruleset-drift` in `.github/workflows/release.yml` stops the release path rather than cutting a tag against rules the tree only believes it has.
+Dropping `ruleset-drift` from `release-tag`'s `needs:` would have deleted the enforcement in the same change that added it.
+What unblocked it was running `scripts/apply-repo-settings.sh` to apply `tests kept` to the live rule, which adds a protection rather than removing one.
+Read back on 2026-09-11, live ruleset `22314350` requires `checks`, `tests kept` and `secret scan`, and live ruleset `22316869` carries `update` and `deletion` and no signature rule, so both agree with their files and `v0.1.3` onward cut through that gate.
 
 ```sh
 npm run ruleset-drift
