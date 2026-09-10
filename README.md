@@ -1,17 +1,17 @@
-# treadle
+# treadling
 
 The record of the work between people and agents, over files you commit to git.
 
 A backlog that lives in a database is a backlog you cannot branch, diff, or review.
 A backlog that lives in a hand-written markdown list is one the tool cannot enforce anything about.
-treadle takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
+treadling takes the first horn: the human-readable files are the source of truth and they are committed, and the tool earns its keep by validating them on load, refusing what breaks a rule, and naming the record that broke it.
 
 It is not a Rally and not a Kanban board. What it records is a task, a decision, or a question put to a person with the answer its raiser would give, so that none of it is lost while an agent works; what it computes about that work is nothing the work does not already say.
 
-**This repository ships the domain core, the store layer, and a command surface that runs treadle's own backlog.**
+**This repository ships the domain core, the store layer, and a command surface that runs treadling's own backlog.**
 The domain core has the six work-item types and their required-field policies, one enforced lifecycle, the typed relation graph, parent/child hierarchy, and the definition-of-ready and definition-of-done evaluator.
 Underneath it the store has month-sharded record files, an append-only event log, and an advisory lock with compare-and-set.
-`bin/treadle.js` runs eighteen commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `config`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
+`bin/treadling.js` runs eighteen commands over that store, through application services, rendered as one result object in three forms: `init`, `file`, `show`, `backlog`, `transition`, `set`, `mark`, `evidence`, `relation`, `remove`, `config`, `doctor`, `next`, `explain`, `history`, `status`, `help` and `version`.
 See [Status](#status) for what is and is not here.
 
 ## Requirements
@@ -20,7 +20,7 @@ Node.js 24.15 or newer.
 [docs/STABILITY.md](docs/STABILITY.md), "The runtime floor", owns the policy that sets that number and moves it.
 
 Linux, macOS and Windows, and any POSIX userland including BusyBox: the executable opens with `#!/usr/bin/env node` and asks for nothing a userland may not have.
-One platform limit comes with that line, and no workflow produces it by accident: on macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all.
+One platform limit comes with that line, and no workflow produces it by accident: on macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadling runs at all.
 [docs/STABILITY.md](docs/STABILITY.md), "The supported userlands, and the macOS argument-block limit", carries the measurement, why no valid call reaches it, and the decision to keep it.
 
 The package has zero runtime dependencies, and that is a budget rather than a coincidence: a read is the record files parsed, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
@@ -28,39 +28,40 @@ The package has zero runtime dependencies, and that is a budget rather than a co
 ## Install
 
 No package is on the registry, and none of the three releases cut so far carries any assets.
-Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run.
+Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered.
+The name clearance ran on 2026-09-10 and cleared `treadling` on every source it could reach; [ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) carries what it read, what it could not, and why `treadle` is no longer this package's name.
 [docs/RELEASING.md](docs/RELEASING.md) says why each release came up empty, what opens the publish gate, and what a release says when it published nothing.
 Clone the repository to work on it.
 
 ```bash
-git clone https://github.com/Abhijeet34/treadle.git
-cd treadle
+git clone https://github.com/Abhijeet34/treadling.git
+cd treadling
 npm ci
 ```
 
 ## Quick start
 
 ```bash
-export TREADLE_ACTOR=your-name   # and TREADLE_ACTOR_KIND=agent when an agent runs it
-node bin/treadle.js init
-node bin/treadle.js file story "Field edits"
-node bin/treadle.js show field-edits
-node bin/treadle.js backlog
-node bin/treadle.js status
+export TREADLING_ACTOR=your-name   # and TREADLING_ACTOR_KIND=agent when an agent runs it
+node bin/treadling.js init
+node bin/treadling.js file story "Field edits"
+node bin/treadling.js show field-edits
+node bin/treadling.js backlog
+node bin/treadling.js status
 ```
 
 `file` prints the id it minted on its `item` line, and that id is the title as a slug, which is why `show field-edits` reads the record back.
 `backlog` lists what is open and names the filter it used; `status` counts the workspace rather than printing a record.
 `status` also says when no write can pass, on a `writes` line with the remedy that clears it, because a store that refuses every write is the most important fact about a workspace and the count above it would otherwise read as health.
-`treadle help <command>` is the contract for one command, and `treadle help` on its own is the whole inventory.
+`treadling help <command>` is the contract for one command, and `treadling help` on its own is the whole inventory.
 
-`TREADLE_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
+`TREADLING_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
 A command that would write an event refuses instead of recording one when neither names anyone, so no workspace ever holds an event nobody is attributable for.
 
 That refusal is worth reading precisely, because it makes the recorded name look stronger than it is.
-The actor is declared by whoever ran the command and recorded as given; treadle verifies no identity and has no way to.
+The actor is declared by whoever ran the command and recorded as given; treadling verifies no identity and has no way to.
 What is unforgeable sits one layer out: the record file is committed, and the forge's signed commit is what proves who wrote it.
-`treadle help` says the same sentence to a caller, and `treadle doctor` reports a record that no longer agrees with the log that recorded its value.
+`treadling help` says the same sentence to a caller, and `treadling doctor` reports a record that no longer agrees with the log that recorded its value.
 
 `npm run check` is the gate: types, then the suite, then the bundle.
 Development itself needs no build step: Node runs the TypeScript directly.
@@ -71,14 +72,14 @@ The seconds are a machine measurement rather than a budget, which is why they ca
 ```bash
 npm test         # node --test over test/**/*.test.ts, no build step
 npm run check    # tsc --noEmit under strict, the tests, then the bundle
-npm run build    # dist/treadle.js, weighed against the DR8 bundle budget
+npm run build    # dist/treadling.js, weighed against the DR8 bundle budget
 npm run coverage # the suite under coverage, held to a per-file gate
 npm run flake    # 20 consecutive full runs, budget zero
 ```
 
 [docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each figure is, and what is not proven.
 
-What a published install would carry is one file of executable code: `npm run build` bundles the tree into `dist/treadle.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
+What a published install would carry is one file of executable code: `npm run build` bundles the tree into `dist/treadling.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
 The budget is 768,000 bytes, recorded in `bench/budgets.json` as DR8's 768,000 bytes raised by [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and the build fails rather than warns if the bundle goes over.
 The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
@@ -102,10 +103,10 @@ const outcome = evaluateTransition({ item: story, readyGate: verdict, /* ... */ 
 
 See [Status](#status) for what is shipped, and what was declined or is blocked.
 
-- **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadle explain <id>` names the rule.
-- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadle explain <id>` lists only the moves that item's own type allows.
+- **Types that mean something.** A bug without repro steps and a severity is refused at creation. A story without an acceptance criterion can exist as a draft and can never reach `ready`, because `DOR4` refuses it and `treadling explain <id>` names the rule.
+- **One lifecycle, with guards.** Every state change goes through one table, so an illegal move fails with the id of the rule it broke rather than succeeding quietly. A story and a bug pass through `in_review` on the way to `done`; an epic, a task, a spike and an impediment do not, and `treadling explain <id>` lists only the moves that item's own type allows.
 - **The human in the loop, as configuration.** `config` sets what `ready` and `done` mean for this workspace, which types pass through review, how much may sit in `in_review` at once, and what `next` weighs. An agent cannot skip a gate a person set, and a refusal names the rule and prints the line that clears it.
-- **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a dry run, and every record has an event history that `treadle history <id>` reads back with the actor on every change. A mutation hands back the transaction id it wrote under, and `treadle history --txn <txn>` spends it: an agent auditing the command it just ran reads every record that one command moved, rather than one item at a time.
+- **Ambiguity removal as the feature.** Every state has a rule that explains it, every absence has a reason, every mutation has a dry run, and every record has an event history that `treadling history <id>` reads back with the actor on every change. A mutation hands back the transaction id it wrote under, and `treadling history --txn <txn>` spends it: an agent auditing the command it just ran reads every record that one command moved, rather than one item at a time.
 - **Finding work, and unfiling it.** `backlog --title <words>` searches titles by their words, `--label <slug>` filters on a label and `--fields +labels` prints the list, and `remove` takes a mis-filed record out of its shard while the append-only log keeps every event it earned, so `history <id>` still answers after it. A removal is refused wherever another record would be left naming it: [ADR-0024](docs/architecture/adr/0024-a-record-leaves-the-store-and-the-log-keeps-it.md).
 - **Output an agent can parse and a person can read.** One result object, three renderings, chosen by one rule: `--out`, or the terminal test when `--out` is absent.
 
@@ -127,7 +128,7 @@ See [Status](#status) for what is shipped, and what was declined or is blocked.
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
 | Release: version and changelog through release-please, the cross-platform matrix gates the tag rather than a signature, SBOM, checksums, build provenance | Shipped: [ADR-0037](docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md); a failing check spends no version number, because the automation cuts the tag itself, behind the matrix; fired three times, on `v0.1.0` through `v0.1.2`, none of which carries assets ([docs/RELEASING.md](docs/RELEASING.md)) |
-| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run |
+| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered; the name cleared on 2026-09-10 ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)) |
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
@@ -140,21 +141,21 @@ In the output contract: a multi-line description forging lines in the agent stre
 In the supply chain: the three unstated controls, which are now `ignore-scripts=true` in a committed `.npmrc`, a committed lockfile that every workflow installs with `npm ci`, and an SBOM with build provenance on the release path.
 Four closed by having their surface removed rather than guarded: the hook contract that would have executed a program named in a cloned repository, the path rule that came with it, and the adapter generator that does not exist, all argued in [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md); and CSV formula injection, which has no formula to guard now that [ADR-0035](docs/architecture/adr/0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) has cut the Markdown export it was waiting on.
 
-## treadle's own backlog
+## treadling's own backlog
 
-`.work/` is a treadle workspace holding this project's work, filed with the tool itself.
+`.work/` is a treadling workspace holding this project's work, filed with the tool itself.
 It is the proof that the tool can manage its own backlog, and it is readable and reviewable as markdown without running anything:
 
 ```bash
-treadle status                                  # where the project stands
-treadle next                                    # what to pick up, and why that order
-treadle backlog --state all                     # every record, not only the open ones
-treadle history gate-command                    # the log still answers for a removed record
+treadling status                                  # where the project stands
+treadling next                                    # what to pick up, and why that order
+treadling backlog --state all                     # every record, not only the open ones
+treadling history gate-command                    # the log still answers for a removed record
 ```
 
-Six items, and every one of them is `done`, so `treadle backlog` prints an empty open list rather than a queue.
+Six items, and every one of them is `done`, so `treadling backlog` prints an empty open list rather than a queue.
 The six that are `done` carry the commit that shipped them as evidence, and each says in its description which part of it shipped.
-Nine more left the workspace through `treadle remove`, which takes a record out of its shard and keeps every event it earned, so `treadle history <id>` still answers for each of them with the actor and the reason.
+Nine more left the workspace through `treadling remove`, which takes a record out of its shard and keeps every event it earned, so `treadling history <id>` still answers for each of them with the actor and the reason.
 
 ## Documentation
 

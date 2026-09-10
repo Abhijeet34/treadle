@@ -55,7 +55,7 @@ export function actorRefusal(actor: Actor): string | undefined {
 
 /**
  * Why an actor kind cannot be recorded, or `undefined`. `help` says
- * `TREADLE_ACTOR_KIND=human|agent`, and every other value was silently recorded as `human`:
+ * `TREADLING_ACTOR_KIND=human|agent`, and every other value was silently recorded as `human`:
  * `robot` and `AGENT` both landed there, so the field the purpose statement's "user-agent
  * interactions" is read from carried a value nobody wrote. It is the same class as an actor
  * with a control character in it, and it is refused the same way, on mutations only, because
@@ -69,7 +69,7 @@ export function actorKindRefusal(kind: string | undefined): string | undefined {
   const named = kind.length <= MAX_ACTOR_KIND_ECHO && isSafeText(kind, 'line')
     ? `"${kind}"`
     : `${kind.length} characters`
-  return `TREADLE_ACTOR_KIND is ${named}, and an actor kind is human or agent`
+  return `TREADLING_ACTOR_KIND is ${named}, and an actor kind is human or agent`
 }
 
 export type EventInput = {

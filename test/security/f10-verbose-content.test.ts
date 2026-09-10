@@ -20,7 +20,7 @@ import { aDemoWorkspace, ACTOR, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
 /** Shaped like a credential and deliberately not one: no service issues this prefix. */
-const PASTED = 'EXAMPLENOTAKEY-0000-deadbeefcafef00d-treadle-f10-probe'
+const PASTED = 'EXAMPLENOTAKEY-0000-deadbeefcafef00d-treadling-f10-probe'
 
 describe('F10: a value pasted into a description does not reach a verbose log', () => {
   let demo: Demo

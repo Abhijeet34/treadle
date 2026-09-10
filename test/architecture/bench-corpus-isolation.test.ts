@@ -26,7 +26,7 @@ const SPEC: CorpusSpec = {
 const roots: string[] = []
 
 async function scratch(): Promise<string> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-bench-isolation-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-bench-isolation-'))
   roots.push(dir)
   return dir
 }

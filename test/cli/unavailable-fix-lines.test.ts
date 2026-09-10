@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Every way the store is unavailable carries a fix line that clears that way, and no other.
 //
-// Three separate causes printed `fix treadle status`, and `status` is a read: it never takes
+// Three separate causes printed `fix treadling status`, and `status` is a read: it never takes
 // the lock, it does not look in `.txn`, and over a workspace that refused every write it
 // answered `ok items 1 findings 0`. The unreadable-shard cause was worse, because `status`
-// there reproduced the identical refusal, `fix treadle status` included, so the fix line
+// there reproduced the identical refusal, `fix treadling status` included, so the fix line
 // printed itself. Either way an agent that follows fix lines loops, while the remedy sits in
 // the `cause` sentence it was never told to act on. Four more refusals in the same class
 // carried no `fix` at all: the three `init` paths and the Node floor.
@@ -30,7 +30,7 @@ import { runCli, type Run } from '../helpers/cli-run.ts'
 import { POSIX_MODES } from '../helpers/platform.ts'
 import { codeOnly, sources, SRC } from '../helpers/src-scan.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 /** Root reads and writes a path whose mode is 0o000 anyway, so the mode proves nothing there. */
 const NEEDS_MODES = POSIX_MODES
@@ -75,7 +75,7 @@ function raisedPairs(): ReadonlyMap<string, Raised> {
  */
 function readsTheStore(line: string): boolean {
   const words = line.split(' ')
-  if (words[0] !== 'treadle') return false
+  if (words[0] !== 'treadling') return false
   const command = commandNamed(words[1] ?? '')
   return command !== undefined && command.effect === 'read' && command.standalone !== true
 }
@@ -133,7 +133,7 @@ describe('each unavailable-store fix line clears the refusal that printed it', (
   let pristine: string
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-unavailable-fix-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-unavailable-fix-'))
     work = path.join(root, '.work')
     pristine = path.join(root, 'pristine')
     const init = await runCli(['init', '--name', 'unavailable', '--yes'], { cwd: root, env: ENV })
@@ -222,7 +222,7 @@ describe('each unavailable-store fix line clears the refusal that printed it', (
     await writeFile(stray, 'this is not a journal\n')
     const run = await runCli(['file', 'task', 'A fourth task'], { cwd: root, env: ENV })
     refused(run)
-    assert.equal(fixLines(run).includes('treadle status'), false, run.err)
+    assert.equal(fixLines(run).includes('treadling status'), false, run.err)
 
     // The half that made the loop vicious rather than merely useless: over this exact state,
     // the command the old fix line named exits 0 and reports the store holding no findings.

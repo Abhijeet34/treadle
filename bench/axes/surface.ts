@@ -4,7 +4,7 @@
 // running commands, one call that captures stdout, stderr and the exit status, and a count
 // of how many calls were made.
 //
-// The driver is `src/cli/main.ts`'s own `run`, which is the function `bin/treadle.js` shims,
+// The driver is `src/cli/main.ts`'s own `run`, which is the function `bin/treadling.js` shims,
 // with argv, cwd, environment and both streams passed in. That is the entry point rather
 // than a re-implementation of it, and `crossCheck` below spawns the shipped shim on the same
 // input and compares the bytes, so the in-process claim is checked rather than asserted.
@@ -18,7 +18,7 @@ import { fileURLToPath } from 'node:url'
 import { runCli } from '../../test/helpers/cli-run.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const BIN = path.join(ROOT, 'bin', 'treadle.js')
+const BIN = path.join(ROOT, 'bin', 'treadling.js')
 
 /** The actor every surface axis writes as, so a record's provenance names one name. */
 const ACTOR = 'dana'
@@ -49,7 +49,7 @@ export type Surface = {
 
 /** A fresh workspace, created by running `init` rather than by writing the layout. */
 export async function openSurface(prefix: string): Promise<Surface> {
-  const parent = await mkdtemp(path.join(tmpdir(), `treadle-${prefix}-`))
+  const parent = await mkdtemp(path.join(tmpdir(), `treadling-${prefix}-`))
   const root = path.join(parent, 'workspace')
   await mkdir(root, { recursive: true })
   let calls = 0
@@ -59,7 +59,7 @@ export async function openSurface(prefix: string): Promise<Surface> {
     const cwd = options.cwd ?? root
     const result = await runCli(argv, {
       cwd,
-      env: options.env ?? { TREADLE_ACTOR: ACTOR },
+      env: options.env ?? { TREADLING_ACTOR: ACTOR },
     })
     return { argv, cwd, code: result.code, out: result.out, err: result.err }
   }
@@ -105,7 +105,7 @@ export function spawn(argv: readonly string[], cwd: string): Promise<Spawned> {
     execFile(
       process.execPath,
       [BIN, ...argv],
-      { cwd, env: { ...process.env, TREADLE_ACTOR: ACTOR } },
+      { cwd, env: { ...process.env, TREADLING_ACTOR: ACTOR } },
       (error, stdout, stderr) => {
         const code = error === null ? 0 : Number((error as NodeJS.ErrnoException & { code?: number }).code ?? 1)
         resolve({ argv, code, out: stdout, err: stderr })

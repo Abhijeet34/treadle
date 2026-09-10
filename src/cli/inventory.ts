@@ -74,32 +74,32 @@ export const COMMANDS: readonly Command[] = [
     name: 'init', shape: INIT_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'moderate', standalone: false,
     columns: false,
-    usage: ['treadle init [--name <name>] [--yes]'],
-    examples: [['treadle init', 'create a workspace in .work here, and say what it created']],
+    usage: ['treadling init [--name <name>] [--yes]'],
+    examples: [['treadling init', 'create a workspace in .work here, and say what it created']],
   },
   {
     name: 'file', shape: FILE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false, vocabulary: ['fields'],
     usage: [
-      'treadle file <type> <title> [--id <slug>] [--priority <1-5>] [--assignee <name>]',
-      'treadle file <type> <title> [--desc <text>] [--label <name>] [--parent <id>]',
-      'treadle file <type> <title> [--set <field>=<value>]',
+      'treadling file <type> <title> [--id <slug>] [--priority <1-5>] [--assignee <name>]',
+      'treadling file <type> <title> [--desc <text>] [--label <name>] [--parent <id>]',
+      'treadling file <type> <title> [--set <field>=<value>]',
     ],
     examples: [
-      ['treadle file story "Refresh the access token on a 401"', 'file a story in draft'],
-      ['treadle file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay"', 'a bug needs the three fields its type requires at creation'],
-      ['treadle file impediment "Staging certificate expired" --set severity=S1 --set proposed_resolution="platform renews it"', 'an impediment needs a severity and what would clear it; relation add <id> blocks <other> raises it against work'],
+      ['treadling file story "Refresh the access token on a 401"', 'file a story in draft'],
+      ['treadling file bug "Checkout fails" --set severity=S2 --set found_in=production --set repro_steps="add to cart, pay"', 'a bug needs the three fields its type requires at creation'],
+      ['treadling file impediment "Staging certificate expired" --set severity=S1 --set proposed_resolution="platform renews it"', 'an impediment needs a severity and what would clear it; relation add <id> blocks <other> raises it against work'],
     ],
   },
   {
     name: 'show', shape: SHOW_SHAPE, effect: 'read', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false, vocabulary: ['fields'],
-    usage: ['treadle show <id> [--field <name>]'],
+    usage: ['treadling show <id> [--field <name>]'],
     examples: [
-      ['treadle show auth-refresh --field desc', 'the description whole, rather than cut at 64 cells'],
-      ['treadle show auth-refresh --field ac', 'the tick count and every acceptance criterion under it'],
+      ['treadling show auth-refresh --field desc', 'the description whole, rather than cut at 64 cells'],
+      ['treadling show auth-refresh --field ac', 'the tick count and every acceptance criterion under it'],
     ],
   },
   {
@@ -107,19 +107,19 @@ export const COMMANDS: readonly Command[] = [
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: true, vocabulary: ['filters'],
     usage: [
-      'treadle backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
-      'treadle backlog [--priority <1-5>] [--label <slug>] [--title <words>] [--blocked <yes|no>]',
-      'treadle backlog [--fields <list>] [--limit <n>] [--cursor <id>]',
+      'treadling backlog [--state <s>] [--type <t>] [--assignee <a>] [--resolution <r>]',
+      'treadling backlog [--priority <1-5>] [--label <slug>] [--title <words>] [--blocked <yes|no>]',
+      'treadling backlog [--fields <list>] [--limit <n>] [--cursor <id>]',
     ],
     examples: [
-      ['treadle backlog', 'open work: the list is scoped to what is not done or cancelled, and the filter line says so'],
-      ['treadle backlog --state all', 'every state, finished work included; --state done and --state cancelled are the narrower reads'],
-      ['treadle backlog --blocked no', 'what nothing is holding up, which is what can be started now'],
-      ['treadle backlog --state ready', 'what is ready to pick up'],
-      ['treadle backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched'],
-      ['treadle backlog --label ux --label ui --state ready --fields +labels', 'every clause has to hold, --label included, so this is ready work carrying both labels, with the whole list as a column'],
-      ['treadle backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
-      ['treadle backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
+      ['treadling backlog', 'open work: the list is scoped to what is not done or cancelled, and the filter line says so'],
+      ['treadling backlog --state all', 'every state, finished work included; --state done and --state cancelled are the narrower reads'],
+      ['treadling backlog --blocked no', 'what nothing is holding up, which is what can be started now'],
+      ['treadling backlog --state ready', 'what is ready to pick up'],
+      ['treadling backlog --title "token refresh"', 'search titles: every word, case folded, anywhere in the title and in any order; descriptions are not searched'],
+      ['treadling backlog --label ux --label ui --state ready --fields +labels', 'every clause has to hold, --label included, so this is ready work carrying both labels, with the whole list as a column'],
+      ['treadling backlog --state cancelled --resolution duplicate', 'count what was stopped as a duplicate, without reading any prose'],
+      ['treadling backlog --state ready --explain-absence sso-saml', 'why one item you expected is not in the list'],
     ],
   },
   {
@@ -127,39 +127,39 @@ export const COMMANDS: readonly Command[] = [
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false, vocabulary: ['lifecycle'],
     usage: [
-      'treadle transition <id> <target> [--reason <text>] [--until <instant>]',
-      'treadle transition <id> cancelled --resolution <r> --reason <text>',
-      'treadle transition <id> ready --outcome <failed|yielded> --reason <text>',
-      'treadle transition <id> <target> --override <guard> --reason <text>',
+      'treadling transition <id> <target> [--reason <text>] [--until <instant>]',
+      'treadling transition <id> cancelled --resolution <r> --reason <text>',
+      'treadling transition <id> ready --outcome <failed|yielded> --reason <text>',
+      'treadling transition <id> <target> --override <guard> --reason <text>',
     ],
     examples: [
-      ['treadle transition sso-saml in_progress', 'start work; refused if a guard on that edge fails'],
-      ['treadle transition sso-saml in_review', 'submit for review; a story and a bug have a review step and no other type does'],
-      ['treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
-      ['treadle transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
-      ['treadle transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
+      ['treadling transition sso-saml in_progress', 'start work; refused if a guard on that edge fails'],
+      ['treadling transition sso-saml in_review', 'submit for review; a story and a bug have a review step and no other type does'],
+      ['treadling transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright"', 'stop the item and say which of the five reasons it stopped for'],
+      ['treadling transition sso-saml ready --outcome failed --reason "the migration will not apply"', 'give up the attempt and put the item back in the queue, with the failure in the log'],
+      ['treadling transition sso-saml in_progress --dry-run', 'the field diff and the exit status the real run would return'],
     ],
   },
   {
     name: 'set', shape: SET_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false, vocabulary: ['fields'],
-    usage: ['treadle set <id> <field>=<value> [<field>=<value> ...]'],
+    usage: ['treadling set <id> <field>=<value> [<field>=<value> ...]'],
     examples: [
-      ['treadle set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
-      ['treadle set checkout-500 fix_confirmed=true reviewer=kim', 'the two fields the done gate reads, in one write'],
-      ['treadle set save-cart acceptance_criteria="[x] a shopper reopens a saved cart|[ ] the cart expires after 30 days"', 'rewrite the whole checklist; a leading [x] ticks a criterion, which is how ac 0/2 becomes 1/2'],
-      ['treadle set save-cart parent_id= assignee=', 'an empty value clears a field; title and the fields the type requires at creation refuse it'],
+      ['treadling set checkout-500 expected="both orders are listed" actual="one is charged"', 'fill in what a bug was filed without, which is what the ready gate reads'],
+      ['treadling set checkout-500 fix_confirmed=true reviewer=kim', 'the two fields the done gate reads, in one write'],
+      ['treadling set save-cart acceptance_criteria="[x] a shopper reopens a saved cart|[ ] the cart expires after 30 days"', 'rewrite the whole checklist; a leading [x] ticks a criterion, which is how ac 0/2 becomes 1/2'],
+      ['treadling set save-cart parent_id= assignee=', 'an empty value clears a field; title and the fields the type requires at creation refuse it'],
     ],
   },
   {
     name: 'mark', shape: MARK_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle mark <id> [--severity <S1-S4>] [--priority <1-5>] --reason <text>'],
+    usage: ['treadling mark <id> [--severity <S1-S4>] [--priority <1-5>] --reason <text>'],
     examples: [
-      ['treadle mark checkout-500 --severity S1 --reason "it drops paid orders"', 'raise a defect, with the before and after in the log'],
-      ['treadle mark checkout-500 --priority 4 --reason "the workaround holds"', 'lower a priority; the event names who did it'],
+      ['treadling mark checkout-500 --severity S1 --reason "it drops paid orders"', 'raise a defect, with the before and after in the log'],
+      ['treadling mark checkout-500 --priority 4 --reason "the workaround holds"', 'lower a priority; the event names who did it'],
     ],
   },
   {
@@ -169,10 +169,10 @@ export const COMMANDS: readonly Command[] = [
     // Spliced from the closed set for the reason the relation kinds are, one command down:
     // `<kind>` named a set a caller could not see, so the seven words were learned from the
     // refusal for guessing an eighth.
-    usage: [`treadle evidence add <id> <${EVIDENCE_KINDS.join('|')}> <ref> [label]`],
+    usage: [`treadling evidence add <id> <${EVIDENCE_KINDS.join('|')}> <ref> [label]`],
     examples: [
-      ['treadle evidence add checkout-500 run 8813 "664 pass"', 'point at a run; the essay goes in the artefact, not here'],
-      ['treadle evidence add checkout-500 pr https://example.test/pr/42', 'a pointer needs no label'],
+      ['treadling evidence add checkout-500 run 8813 "664 pass"', 'point at a run; the essay goes in the artefact, not here'],
+      ['treadling evidence add checkout-500 pr https://example.test/pr/42', 'a pointer needs no label'],
     ],
   },
   {
@@ -183,24 +183,24 @@ export const COMMANDS: readonly Command[] = [
     // named three of them for as long as three were writable and would have gone on naming
     // three: help is generated from this inventory, so a stale list here is what a caller reads.
     usage: [
-      `treadle relation add <id> <${RELATION_KINDS.join('|')}> <other>`,
-      'treadle relation remove <id> <kind> <other>',
+      `treadling relation add <id> <${RELATION_KINDS.join('|')}> <other>`,
+      'treadling relation remove <id> <kind> <other>',
     ],
     examples: [
-      ['treadle relation add auth-refresh blocks sso-saml', 'sso-saml cannot start until auth-refresh is done; explain shows both sides'],
-      ['treadle relation add login-cta-2 duplicates login-cta', 'the first id is the copy; a copy of two things is refused'],
-      ['treadle relation add checkout-500 caused_by cart-rewrite', 'this defect came out of that change, which is a fact worth filing with it'],
-      ['treadle relation add audit-log relates-to gdpr-export', 'see also, with no rule attached, so blocks stops being used for it'],
+      ['treadling relation add auth-refresh blocks sso-saml', 'sso-saml cannot start until auth-refresh is done; explain shows both sides'],
+      ['treadling relation add login-cta-2 duplicates login-cta', 'the first id is the copy; a copy of two things is refused'],
+      ['treadling relation add checkout-500 caused_by cart-rewrite', 'this defect came out of that change, which is a fact worth filing with it'],
+      ['treadling relation add audit-log relates-to gdpr-export', 'see also, with no rule attached, so blocks stops being used for it'],
     ],
   },
   {
     name: 'remove', shape: REMOVE_SHAPE, effect: 'mutate', record: 'record',
     omits: false, pageable: false, confirm: 'severe', standalone: false,
     columns: false,
-    usage: ['treadle remove <id> --reason <text> --yes'],
+    usage: ['treadling remove <id> --reason <text> --yes'],
     examples: [
-      ['treadle remove login-cta-2 --reason "filed twice" --dry-run', 'what would go, with every guard evaluated and nothing written; --yes is what the real run needs'],
-      ['treadle remove login-cta-2 --reason "filed twice by the same import" --yes', 'take a mis-filed record out of the shard; every event it earned stays in the log and treadle history login-cta-2 still reads them, so work that really stopped is transition <id> cancelled instead, which keeps the record'],
+      ['treadling remove login-cta-2 --reason "filed twice" --dry-run', 'what would go, with every guard evaluated and nothing written; --yes is what the real run needs'],
+      ['treadling remove login-cta-2 --reason "filed twice by the same import" --yes', 'take a mis-filed record out of the shard; every event it earned stays in the log and treadling history login-cta-2 still reads them, so work that really stopped is transition <id> cancelled instead, which keeps the record'],
     ],
   },
   {
@@ -212,22 +212,22 @@ export const COMMANDS: readonly Command[] = [
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
     usage: [
-      'treadle config',
-      'treadle config set <key> <value>',
+      'treadling config',
+      'treadling config set <key> <value>',
     ],
     examples: [
-      ['treadle config', 'every key, the value in force and whether this workspace set it or it is the built-in default'],
-      ['treadle config set wip_limits "in_progress=5, in_review=2"', 'arm G3: a sixth start into a column of five is refused, and a limit of zero means unlimited'],
-      ['treadle config set ready_gate "DOR1 all field_present:title The item has a title|DOR11 story field_present:reviewer A story names its reviewer"', 'replace the ready gate whole; a rule reading a field the type has not got is refused before the write'],
-      ['treadle config set review_step "story"', 'which types pass through in_review, which is what G5 enforces; the default is story, bug'],
+      ['treadling config', 'every key, the value in force and whether this workspace set it or it is the built-in default'],
+      ['treadling config set wip_limits "in_progress=5, in_review=2"', 'arm G3: a sixth start into a column of five is refused, and a limit of zero means unlimited'],
+      ['treadling config set ready_gate "DOR1 all field_present:title The item has a title|DOR11 story field_present:reviewer A story names its reviewer"', 'replace the ready gate whole; a rule reading a field the type has not got is refused before the write'],
+      ['treadling config set review_step "story"', 'which types pass through in_review, which is what G5 enforces; the default is story, bug'],
     ],
   },
   {
     name: 'doctor', shape: DOCTOR_SHAPE, effect: 'read', record: 'list',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle doctor'],
-    examples: [['treadle doctor', 'what the files say that no write path would have accepted']],
+    usage: ['treadling doctor'],
+    examples: [['treadling doctor', 'what the files say that no write path would have accepted']],
     exits: [
       [0, 'every stored record is served; the table is empty, or its rows only report content the next write normalises'],
       [7, 'a record is held and not served, or the audit flagged a served one'],
@@ -237,50 +237,50 @@ export const COMMANDS: readonly Command[] = [
     name: 'next', shape: NEXT_SHAPE, effect: 'read', record: 'list',
     omits: true, pageable: true, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle next [--limit <n>] [--cursor <id>] [--for <actor>]'],
-    examples: [['treadle next', 'what to pick up, with the score components and the weights that ranked it']],
+    usage: ['treadling next [--limit <n>] [--cursor <id>] [--for <actor>]'],
+    examples: [['treadling next', 'what to pick up, with the score components and the weights that ranked it']],
   },
   {
     name: 'explain', shape: EXPLAIN_SHAPE, effect: 'read', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle explain <id>'],
-    examples: [['treadle explain sso-saml', 'why it is where it is, which gate rules fail, and what each move needs']],
+    usage: ['treadling explain <id>'],
+    examples: [['treadling explain sso-saml', 'why it is where it is, which gate rules fail, and what each move needs']],
   },
   {
     name: 'history', shape: HISTORY_SHAPE, effect: 'read', record: 'list',
     omits: false, pageable: true, confirm: 'none', standalone: false,
     columns: false,
     usage: [
-      'treadle history <id> [--limit <n>] [--cursor <event>]',
-      'treadle history --txn <txn> [--limit <n>] [--cursor <event>]',
+      'treadling history <id> [--limit <n>] [--cursor <event>]',
+      'treadling history --txn <txn> [--limit <n>] [--cursor <event>]',
     ],
     examples: [
-      ['treadle history checkout-500', 'who changed this item, what they moved and when'],
-      ['treadle history checkout-500 --limit 1', 'the most recent change alone'],
-      ['treadle history --txn tj0vksb', 'the other scope: every event one command wrote, whichever records it touched, under the transaction id that command returned; an id and --txn are two questions and the line takes one of them'],
+      ['treadling history checkout-500', 'who changed this item, what they moved and when'],
+      ['treadling history checkout-500 --limit 1', 'the most recent change alone'],
+      ['treadling history --txn tj0vksb', 'the other scope: every event one command wrote, whichever records it touched, under the transaction id that command returned; an id and --txn are two questions and the line takes one of them'],
     ],
   },
   {
     name: 'status', shape: STATUS_SHAPE, effect: 'read', record: 'list',
     omits: false, pageable: false, confirm: 'none', standalone: false,
     columns: false,
-    usage: ['treadle status', 'treadle'],
-    examples: [['treadle', 'the bare invocation is status inside a workspace, and help outside one']],
+    usage: ['treadling status', 'treadling'],
+    examples: [['treadling', 'the bare invocation is status inside a workspace, and help outside one']],
   },
   {
     name: 'help', shape: HELP_SHAPE, effect: 'read', record: 'list',
     omits: false, pageable: false, confirm: 'none', standalone: true,
     columns: false,
-    usage: ['treadle help [<command>]'],
-    examples: [['treadle help --out agent', 'the command inventory in the line format, for an agent']],
+    usage: ['treadling help [<command>]'],
+    examples: [['treadling help --out agent', 'the command inventory in the line format, for an agent']],
   },
   {
     name: 'version', shape: VERSION_SHAPE, effect: 'read', record: 'record',
     omits: false, pageable: false, confirm: 'none', standalone: true,
     columns: false,
-    usage: ['treadle version', 'treadle --version'],
-    examples: [['treadle version', 'the tool version, the store schema version and the contract version']],
+    usage: ['treadling version', 'treadling --version'],
+    examples: [['treadling version', 'the tool version, the store schema version and the contract version']],
   },
 ]
 
@@ -338,7 +338,7 @@ export const FLAG_SPECS: Readonly<Record<GlobalFlag, FlagSpec>> = {
   },
   '--version': {
     applies: () => false, otherwise: 'N', where: 'none', scope: 'no command, because it is a program-level flag',
-    does: 'prints the tool version; treadle version is the command form',
+    does: 'prints the tool version; treadling version is the command form',
   },
   // `--contract` replaces the command's output with the line grammar, exactly as `--help`
   // replaces it with the help page, so it is supported wherever `--help` is. It was the
@@ -390,7 +390,7 @@ export const FLAG_SPECS: Readonly<Record<GlobalFlag, FlagSpec>> = {
   },
   '--actor': {
     applies: (command) => command.effect === 'mutate', otherwise: 'A', where: 'mutation', scope: 'every mutation',
-    does: 'names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused',
+    does: 'names who the event records; TREADLING_ACTOR and TREADLING_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused',
   },
   // The human rendering lays every line of every command out at this width and refuses to
   // exceed it (interface B.4), so it is supported wherever a command answers at all. It was
@@ -410,7 +410,7 @@ export const FLAG_SPECS: Readonly<Record<GlobalFlag, FlagSpec>> = {
     does: 'bounds one page; the page line the answer ends with carries the cursor for the next',
   },
   // `--cursor` was missing from this table entirely, so `help <command>` never named a flag
-  // the tool prints itself in every `page` line, and `treadle version --cursor x` was
+  // the tool prints itself in every `page` line, and `treadling version --cursor x` was
   // accepted in silence where `--limit` was refused. It scopes exactly as `--limit` does.
   '--cursor': {
     applies: (command) => command.pageable, otherwise: 'X', where: 'pageable', scope: 'every pageable command',

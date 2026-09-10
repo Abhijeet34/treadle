@@ -128,7 +128,7 @@ export const EXPLAIN_SHAPE: ResultShape = {
 // It was a string literal in the result builder, hand-edited by four pull requests, and the
 // last of them left it writing nothing. Every other key here is a fact about the workspace
 // the caller passed; that one was a fact about the build, and there is nothing in a workspace
-// to compute it from. What this build can do is `treadle --contract` and `help`, both derived
+// to compute it from. What this build can do is `treadling --contract` and `help`, both derived
 // from the command inventory.
 export const STATUS_SHAPE: ResultShape = {
   command: 'status',
@@ -478,7 +478,7 @@ export async function status(store: Store, clock: Clock): Promise<ResultObject> 
       // Running the audit here instead would put this call at doctor's cost, 3,523 ms
       // against 479 at 50,000 items (bench/budgets.json), so the orientation call stays the
       // cheap one and says what it did not do. `H20` is one of the rules that make that gap.
-      audit: 'not run here; treadle doctor reads every record against the event log',
+      audit: 'not run here; treadling doctor reads every record against the event log',
       // The exit stays 0. The read genuinely succeeded and the records genuinely are there,
       // so exiting as though it failed would be its own lie and would break every caller
       // using this as a health check; the exit table names no code for an answer given over

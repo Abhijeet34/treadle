@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A creation refusal names every field the type requires and is missing, in one line.
 //
-// Measured on 2026-09-07: `treadle file bug "Nothing set here"` answered `a bug needs
+// Measured on 2026-09-07: `treadling file bug "Nothing set here"` answered `a bug needs
 // severity at creation`, and answering it earned `a bug needs repro_steps at creation`, and
 // answering that earned `a bug needs found_in at creation`. Three refusals and three round
 // trips for one fact the tool held all along, on `bug` and on `spike` alike.

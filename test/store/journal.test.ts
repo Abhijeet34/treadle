@@ -123,7 +123,7 @@ describe('a journal that names a path outside the layout', () => {
 
   for (const [what, at] of ESCAPES) {
     it(`refuses it and writes nothing: ${what}`, async () => {
-      const outside = await mkdtemp(path.join(tmpdir(), 'treadle-outside-'))
+      const outside = await mkdtemp(path.join(tmpdir(), 'treadling-outside-'))
       const workspace = await aWorkspace()
       try {
         const target = at.startsWith('/') ? path.join(outside, 'pwned.txt') : at

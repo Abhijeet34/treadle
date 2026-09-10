@@ -2,7 +2,7 @@
 // A text scalar sits on its own line when the line has room for it.
 //
 // The rendering had one shape for every text-marked scalar: the key on one line and the value
-// indented under it, at every width from the 40-cell floor to the 200-cell ceiling. `treadle
+// indented under it, at every width from the 40-cell floor to the 200-cell ceiling. `treadling
 // show` printed `assignee` and then `kim`, `reviewer` and then `bob`, while `item`, `type`,
 // `state`, `filed` and `v` sat inline beside their keys - so a record was laid out two ways at
 // once, and the two-line shape was the one a reader met first. No prior report examined this

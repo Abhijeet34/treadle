@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-10
-**Implements:** the captain's criterion of 2026-09-10, that treadle ships only what moves an agent's task and decision load into a file that survives a crash, and lets it plan without losing track of time, resources, goal or capabilities
+**Implements:** the captain's criterion of 2026-09-10, that treadling ships only what moves an agent's task and decision load into a file that survives a crash, and lets it plan without losing track of time, resources, goal or capabilities
 **Closes:** threat-model finding F4, CSV formula injection, which was open against the export this record removes
 
 ## Context
@@ -15,7 +15,7 @@ Its own description, the last thing written on it:
 
 > explain already prints the failing rules of both gates, and gate is the cheap single-gate form: one verdict, no record. ... This stays open because a verdict-only read is still the one shape the inventory lacks.
 
-A caller who wants to know what the ready or done gate will decide runs `treadle explain <id>`, which prints the failing rules of both gates and reads the same evaluator.
+A caller who wants to know what the ready or done gate will decide runs `treadling explain <id>`, which prints the failing rules of both gates and reads the same evaluator.
 So the whole of what `gate` would add is a narrower answer to a question the tool already answers, and the reason given for keeping it open is a gap in the command inventory rather than a caller who cannot get the answer.
 It writes no event, so nothing it printed survives the process that printed it.
 That is the one thing the criterion asks a command to do, and it is the one thing this command was specified not to do.
@@ -33,8 +33,8 @@ It moves no load off an agent and it survives no crash, because the thing that s
 
 **Both items are cancelled with resolution `wont_do` and removed from `.work` through the tool, and neither surface is built.**
 
-`treadle transition <id> cancelled --resolution wont_do --reason <this record>` records the decision on the record, and `treadle remove <id> --reason <this record> --yes` takes it out of its shard while the append-only log keeps every event it earned, which is [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md)'s rule.
-`treadle history gate-command` and `treadle history export` still answer after the removal, with the actor and the reason on every line.
+`treadling transition <id> cancelled --resolution wont_do --reason <this record>` records the decision on the record, and `treadling remove <id> --reason <this record> --yes` takes it out of its shard while the append-only log keeps every event it earned, which is [ADR-0024](0024-a-record-leaves-the-store-and-the-log-keeps-it.md)'s rule.
+`treadling history gate-command` and `treadling history export` still answer after the removal, with the actor and the reason on every line.
 
 **Threat-model finding F4 closes by absence.**
 The finding is that a CSV export is quoted but not formula-guarded.
@@ -54,8 +54,8 @@ That is now a decision with a record rather than an item somebody could pick up,
 If a caller appears who needs a verdict without the failing rules `explain` prints, the argument to reopen is that caller and not the shape of the inventory.
 
 `.work` holds six items and every one of them is `done`, so the workspace has no open work for the first time.
-Nine items have now left it through `treadle remove`, and the log answers for each.
-`treadle backlog` prints an empty open list rather than a queue of two, which is the honest read: nothing here is waiting on somebody.
+Nine items have now left it through `treadling remove`, and the log answers for each.
+`treadling backlog` prints an empty open list rather than a queue of two, which is the honest read: nothing here is waiting on somebody.
 
 `SECURITY.md` no longer names an open finding, and the sentence that invited a report against F4 goes with it.
 A CSV or Markdown export that carries an attacker's content into a formula stays in the in-scope list, because the boundary it names would apply the day an export is built.

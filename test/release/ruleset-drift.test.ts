@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // `.github/rulesets/` described what GitHub was meant to enforce and nothing read back what it
 // actually enforced. The two fixtures below are the real responses, recorded on 2026-09-10
-// from https://api.github.com/repos/Abhijeet34/treadle/rulesets/{22316869,22314350}, and each
+// from https://api.github.com/repos/Abhijeet34/treadling/rulesets/{22316869,22314350}, and each
 // carries a drift that had been live and unseen: a `required_signatures` rule on the tag
 // ruleset that .github/rulesets/tags.json dropped in #97, and a `secret scan` required context
 // on main that .github/rulesets/main.json did not name from #32 until this fix added it beside
@@ -230,7 +230,7 @@ describe('how it reads the forge and the tree', () => {
   it('takes the repository from the argument, the environment, then the manifest', () => {
     assert.equal(repositoryName('a/b', { GITHUB_REPOSITORY: 'c/d' }), 'a/b')
     assert.equal(repositoryName(undefined, { GITHUB_REPOSITORY: 'c/d' }), 'c/d')
-    assert.equal(repositoryName(undefined, {}), 'Abhijeet34/treadle')
+    assert.equal(repositoryName(undefined, {}), 'Abhijeet34/treadling')
   })
 
   it('reads every ruleset file in the tree, and each one names itself', () => {

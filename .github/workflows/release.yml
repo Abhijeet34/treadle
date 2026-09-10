@@ -91,7 +91,7 @@ jobs:
 
   # Conditioned on nothing, and that is the point. This matrix used to run on the tag, which
   # put it after the thing it was meant to gate: on `v0.1.0` the tag existed, the three
-  # container legs failed for want of TREADLE_ACTOR, `artifacts` skipped, and the tag cannot
+  # container legs failed for want of TREADLING_ACTOR, `artifacts` skipped, and the tag cannot
   # be moved or deleted.
   #
   # Asking "is this push a release?" before running it is what would put that back. That
@@ -336,9 +336,9 @@ jobs:
       - name: Publish
         run: npm publish ./*.tgz --access public
 
-  # The first thing that has ever installed treadle the way a user installs it. It runs in a
+  # The first thing that has ever installed treadling the way a user installs it. It runs in a
   # container rather than on the runner, because the runner has this repository checked out
-  # and a `treadle` on PATH from it would answer instead of the published one.
+  # and a `treadling` on PATH from it would answer instead of the published one.
   smoke:
     name: smoke
     needs: [release-tag, publish]
@@ -355,12 +355,12 @@ jobs:
           set -euo pipefail
           version="${TAG#v}"
           for attempt in 1 2 3 4 5 6; do
-            if npm install --global --ignore-scripts "treadle@${version}"; then
-              echo "installed treadle@${version} on attempt ${attempt}"
+            if npm install --global --ignore-scripts "treadling@${version}"; then
+              echo "installed treadling@${version} on attempt ${attempt}"
               break
             fi
             if [ "$attempt" = 6 ]; then
-              echo "::error::treadle@${version} was published but is not installable" >&2
+              echo "::error::treadling@${version} was published but is not installable" >&2
               exit 1
             fi
             sleep 60
@@ -375,20 +375,20 @@ jobs:
         # behind `publish`, which is closed by design - so the fault was latent rather than
         # absent, and it is fixed here alongside the jobs that did fire.
         env:
-          TREADLE_ACTOR: github-actions
-          TREADLE_ACTOR_KIND: agent
+          TREADLING_ACTOR: github-actions
+          TREADLING_ACTOR_KIND: agent
         run: |
           set -euo pipefail
           mkdir -p /tmp/smoke && cd /tmp/smoke
-          treadle version
-          treadle init --yes
-          treadle file story "A smoke test filed this"
-          treadle backlog
-          treadle status
+          treadling version
+          treadling init --yes
+          treadling file story "A smoke test filed this"
+          treadling backlog
+          treadling status
           # The envelope is the contract, so the check is on what it printed, not on exit 0
           # alone: a command that fails prints `err <CODE>` and exits non-zero, and a command
           # that succeeds prints `ok <command>`.
-          treadle status | head -1 | grep -q '^ok '
+          treadling status | head -1 | grep -q '^ok '
           echo "the published package installs and answers"
 
   # `publish` above is skipped whenever NPM_PUBLISH_ENABLED is not `true`, `smoke` skips behind

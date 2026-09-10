@@ -235,7 +235,7 @@ type Rig = {
  * item filed only to block it.
  */
 async function aWorkspaceCarryingEveryField(): Promise<Rig> {
-  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-fields-'))
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadling-fields-'))
   const root = path.join(parent, 'platform', '.work')
   const ids = sequentialIds()
   const clock = fixedClock(NOW)

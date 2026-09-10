@@ -38,7 +38,7 @@ async function git(cwd: string, args: readonly string[], env: Record<string, str
 /** Builds a repository holding one base commit and then `commits`, and reports what
  *  check-dco.sh says about the range between them. */
 async function check(commits: readonly Commit[]): Promise<Verdict> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-dco-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-dco-'))
   try {
     await git(dir, ['init', '-q', '-b', 'main'])
     await writeFile(path.join(dir, 'base'), 'base\n')

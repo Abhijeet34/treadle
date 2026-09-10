@@ -19,7 +19,7 @@ import { describe, it, before, after } from 'node:test'
 
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Cli = (argv: readonly string[]) => Promise<{ code: number; out: string; err: string }>
 
@@ -45,7 +45,7 @@ describe('a parent_id naming a record the store does not hold', () => {
   let root: string
   let cli: Cli
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-parent-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-parent-'))
     cli = (argv) => runCli(argv, { cwd: root, env: ENV })
     assert.equal((await cli(['init'])).code, 0)
     assert.equal((await cli(['file', 'story', 'A parent story', '--id', 'parent-story'])).code, 0)
@@ -58,7 +58,7 @@ describe('a parent_id naming a record the store does not hold', () => {
     const run = await cli(['doctor'])
     assert.equal(run.code, 7, run.out)
     assert.match(run.out, /^H30 child-task parent_id /m, run.out)
-    assert.match(run.out, /parent_id names parent-story and no record here carries that id; treadle set child-task parent_id= drops it/, run.out)
+    assert.match(run.out, /parent_id names parent-story and no record here carries that id; treadling set child-task parent_id= drops it/, run.out)
   })
 
   it('is the same finding on explain, which audits one item off the records it already reads', async () => {
@@ -97,7 +97,7 @@ describe('a child of a quarantined parent', () => {
   let root: string
   let cli: Cli
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-parent-q-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-parent-q-'))
     cli = (argv) => runCli(argv, { cwd: root, env: ENV })
     assert.equal((await cli(['init'])).code, 0)
     assert.equal((await cli(['file', 'story', 'A parent story', '--id', 'parent-story'])).code, 0)

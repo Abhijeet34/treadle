@@ -25,7 +25,7 @@ const SCHEMAS = generated()
 const CODES = new Set<string>(RESULT_CODES)
 
 /** A path that is not a workspace, which is the failure every read verb can be given. */
-const ABSENT = '/nonexistent/treadle-a12/.work'
+const ABSENT = '/nonexistent/treadling-a12/.work'
 
 type Case = {
   readonly verb: string

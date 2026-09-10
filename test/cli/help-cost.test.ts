@@ -136,7 +136,7 @@ describe('the index carries the whole matrix, as the rules that decide it', () =
 })
 
 describe('a page carries the closed sets its own caller has to spell', () => {
-  it('gives treadle help file every type and the fields that type is refused without', () => {
+  it('gives treadling help file every type and the fields that type is refused without', () => {
     const types = blockOf(page('file'), 'types')
     assert.ok(types !== undefined, 'help file carries no field dictionary')
     assert.deepEqual(types.rows.map((row) => row['type']), [...WORK_ITEM_TYPES])
@@ -147,7 +147,7 @@ describe('a page carries the closed sets its own caller has to spell', () => {
     }
   })
 
-  it('gives treadle help transition every edge, its guards, and the values two of them record', () => {
+  it('gives treadling help transition every edge, its guards, and the values two of them record', () => {
     const help = page('transition')
     const moves = blockOf(help, 'moves')
     assert.ok(moves !== undefined, 'help transition carries no lifecycle')
@@ -164,7 +164,7 @@ describe('a page carries the closed sets its own caller has to spell', () => {
     for (const state of WORK_ITEM_STATES) assert.ok(said.includes(state), `${state} is not named`)
   })
 
-  it('gives treadle help backlog the words its own filters take', () => {
+  it('gives treadling help backlog the words its own filters take', () => {
     const said = notes(page('backlog')).join(' ')
     for (const state of WORK_ITEM_STATES) assert.ok(said.includes(state), `--state does not name ${state}`)
     for (const type of WORK_ITEM_TYPES) assert.ok(said.includes(type), `--type does not name ${type}`)

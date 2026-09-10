@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// The development entry point: it runs treadle from TypeScript source, with no build step,
-// which is what `node bin/treadle.js` in the README and the process-spawning tests use.
-// The published executable is `dist/treadle.js`, the esbuild bundle of the same entry file,
+// The development entry point: it runs treadling from TypeScript source, with no build step,
+// which is what `node bin/treadling.js` in the README and the process-spawning tests use.
+// The published executable is `dist/treadling.js`, the esbuild bundle of the same entry file,
 // and `scripts/build.ts` reads the shebang above from this file so there is one copy of it.
 //
 // WHY THE PLAIN LINE, AND NOTHING AFTER `node`. `#!/usr/bin/env -S node --stack-size=3072`
 // stood here for one day and stopped the tool starting at all under BusyBox `env`, which is
-// what Alpine ships: measured 2026-09-07 on `node:24-alpine`, `treadle version` printed
+// what Alpine ships: measured 2026-09-07 on `node:24-alpine`, `treadling version` printed
 // `env: unrecognized option: S` and exited 1, so the first command a stranger on the most
 // common small CI image runs failed. BusyBox 1.37.0's `env` takes `-i`, `-0` and `-u` only.
 // `#!/usr/bin/env node` runs on every POSIX userland there is, which is why it is back.

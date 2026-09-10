@@ -19,7 +19,7 @@ import { generated } from './generate-schemas.ts'
 import { shebangOf } from './shebang.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const outfile = path.join(root, 'dist', 'treadle.js')
+const outfile = path.join(root, 'dist', 'treadling.js')
 // One source for how the runtime is started. The development entry point already carries the
 // line, and a second copy here is a line that can drift while both files still look right.
 const shebang = shebangOf(root)
@@ -43,7 +43,7 @@ await build({
   // cannot reach is worth more than the bytes either would save, and the measured bundle sits
   // at about half the budget, so there is nothing to buy.
   //
-  // Read from bin/treadle.js, which carries the reasoning for its plain `#!/usr/bin/env node`
+  // Read from bin/treadling.js, which carries the reasoning for its plain `#!/usr/bin/env node`
   // line; scripts/shebang.ts refuses anything after `node`.
   banner: { js: shebang },
   legalComments: 'inline',

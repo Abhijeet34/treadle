@@ -57,7 +57,7 @@ jobs:
       # With this set, the two scans in that file fail on a missing binary instead of skipping,
       # so deleting the install step below reddens this job rather than quietly returning them
       # to running in no job on any platform, which is what they had always done.
-      TREADLE_REQUIRE_GITLEAKS: "1"
+      TREADLING_REQUIRE_GITLEAKS: "1"
     strategy:
       fail-fast: false
       matrix:

@@ -2,11 +2,12 @@
 
 Three releases have been cut and none produced anything.
 `v0.1.0`, `v0.1.1` and `v0.1.2` are on the forge carrying no assets, all three immutable under the tag ruleset, and each failed on a different piece of code that had never run.
-On `v0.1.0` the cross-platform install checks set no `TREADLE_ACTOR`, `treadle init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
+On `v0.1.0` the cross-platform install checks set no `TREADLING_ACTOR`, `treadling init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
 On `v0.1.1` all six of those jobs passed and `artifacts` then failed in the release preflight, on a tag-signature check that had never been able to pass on a runner: see "Why the tag is no longer signed".
 On `v0.1.2` the automation cut its own tag for the first time, `artifacts` built and attested all three assets, and the last step of that job ended on `a release with the same tag name already exists: v0.1.2`.
 It was running `gh release create`, and release-please had already created the release two seconds earlier: see "Who creates the release" below.
-Nothing has reached npm, and no package of this name exists on the registry.
+Nothing has reached npm.
+No package named `treadling` exists on the registry and no other account holds the name: `GET /-/package/treadling/collaborators` answered `404 Package not found` on 2026-09-10, which is the probe that sees a reservation with no package document behind it.
 This file is the procedure the machinery is fired with, and the procedure for undoing a release that was wrong.
 
 [ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) reversed the posture this file used to describe, on 2026-09-10.
@@ -54,7 +55,7 @@ release for it, and the rest of the run hangs the assets off that release.
 
 The matrix is in front of the tag rather than behind it, and that ordering is what stops another `v0.1.0`.
 A `v*` tag can be neither updated nor deleted, so a check that runs after the tag is a check that spends a version number it cannot get back: that is how `0.1.0` and `0.1.1` were both lost.
-With the matrix in front, three container jobs failing for want of `TREADLE_ACTOR` fails a push to `main`, no tag is created, the release pull request stays open, and the next push after the fix cuts the release.
+With the matrix in front, three container jobs failing for want of `TREADLING_ACTOR` fails a push to `main`, no tag is created, the release pull request stays open, and the next push after the fix cuts the release.
 A red build costs a red build.
 
 It is conditioned on nothing, so every push to `main` pays for macOS and Windows.
@@ -114,7 +115,7 @@ Trusted publishing generates provenance by default and npm's prerequisites requi
 That costs a version number permanently. Two have been spent that way already.
 
 It also refuses a `dist/` older than any file under `src/`.
-`package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory then had nineteen (2026-09-07).
+`package.json` lists `dist/` in `files`, points `bin` at `dist/treadling.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory then had nineteen (2026-09-07).
 The obvious remedy is a `prepack`, and this repository cannot have one.
 `.npmrc` sets `ignore-scripts=true` for the whole lifecycle as a supply-chain control, the workflow's own pack step passes `--ignore-scripts` on top of that, and `test/architecture/supply-chain.test.ts` refuses a manifest that declares `prepack` by name, because a declared script the lifecycle never executes is a gate that looks green and is not.
 So the clause sits in `scripts/release-preflight.ts`, which the workflow runs one step after `npm run build` and one step before it packs.
@@ -153,7 +154,7 @@ Three assets on the GitHub release, plus one attestation that is not a file.
 
 | Asset | What it is |
 |---|---|
-| `treadle-<version>.tgz` | The tarball `npm pack` produced, which is what npm would publish |
+| `treadling-<version>.tgz` | The tarball `npm pack` produced, which is what npm would publish |
 | `sbom.spdx.json` | GitHub's dependency-graph export for this repository |
 | `SHA256SUMS` | `sha256sum` over the other two |
 
@@ -184,7 +185,7 @@ Three were designed, each stopping publication on its own. One is open now and t
 1. **`"private": true` in `package.json`.** Removed, and this is the only thing that removal did: npm's own refusal to publish a private package no longer applies, and `scripts/release-preflight.ts --publishing` no longer refuses on that clause.
    It publishes nothing by itself. The two interlocks below stop the `publish` job before npm is reached at all, and the `publication` job names every one of them that still applies on every tag.
    Where that refusal came from is worth keeping, because it is the reason a dry run never tested it: npm 11.19's CLI checks `private` only for a workspace publish, and for this package the refusal was raised by `libnpmpublish` after authentication and the registry version query.
-   So `npm publish --dry-run` printed `+ treadle@0.1.0` and exited 0 with no mention of `private`, and `npm publish` against an unreachable registry reached `ENEEDAUTH` first.
+   So `npm publish --dry-run` printed `+ treadling@0.1.0` and exited 0 with no mention of `private`, and `npm publish` against an unreachable registry reached `ENEEDAUTH` first.
    Measured 2026-09-07.
    `scripts/release-preflight.ts` keeps the clause, so a manifest that carries the field again is refused before anything is packed.
 2. **`NPM_PUBLISH_ENABLED`**, a repository variable rather than a secret or a default. Unset, the publish job's own condition is false, the job never starts, and the release ends at the GitHub release and its three assets.
@@ -195,13 +196,15 @@ Publication uses npm Trusted Publishing over OIDC.
 There is no npm token anywhere in this repository, in any secret, at any scope.
 It passes no `--provenance` flag, because trusted publishing generates provenance itself and the flag turns a provenance-ineligible publish into a failed release rather than an unattested one.
 
-When the name clears, what is left of opening the gate is: register treadle's trusted publisher on npm against `Abhijeet34/treadle` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
-The name clearance itself has not been run. One of its sixteen sources has: the name `treadle` is free on npm, which is one answer out of sixteen and not the screen.
+When the name clears, what is left of opening the gate is: register treadling's trusted publisher on npm against `Abhijeet34/treadling` and `.github/workflows/release.yml`, create the `npm-publish` environment with a required reviewer, and set `NPM_PUBLISH_ENABLED` to `true`.
+The name clearance ran on 2026-09-10 and `treadling` cleared every source it could reach: free at the npm ownership record, zero exact marks on the US register, free on crates.io and PyPI, and a dictionary word.
+The EU, UK and Indian registers were not read, and npm's similarity gate runs only on a real publish, so neither is cleared and [ADR-0038](architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) says so rather than rounding them up.
+That record also carries why `treadle` is no longer this package's name: another developer holds the npm ownership record for it, for a real unrelated library, and npm transfers no name on demand.
 
 That list assumed a release and a package would arrive on the same day. They did not.
 `v0.1.0` was cut while three of those four sentences still said nothing had been released, so they were corrected on the day the release existed rather than the day a package does, and this is what is left of the list.
 Two sentences and one code block stop being true when a package first reaches the registry:
-`README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which becomes `npm install -g treadle` and `treadle init` where today it is `node bin/treadle.js init` against a clone.
+`README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which becomes `npm install -g treadling` and `treadling init` where today it is `node bin/treadling.js init` against a clone.
 Do not write any of them early. A quick start that names a package nobody can install is the defect this repository spent a week removing.
 
 One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
@@ -258,7 +261,7 @@ The second reddens them once they do, and is fixed in the release-please configu
 The release pull request is opened by `github-actions[bot]`, and every workflow run on it is created and then parked rather than executed.
 
 ```text
-$ gh-axi api repos/Abhijeet34/treadle/actions/permissions/fork-pr-contributor-approval
+$ gh-axi api repos/Abhijeet34/treadling/actions/permissions/fork-pr-contributor-approval
 approval_policy: first_time_contributors
 ```
 
@@ -266,11 +269,13 @@ GitHub documents that value as requiring approval for a contributor opening thei
 The bot holds no write access and has never had a pull request merged here, so it is that contributor on every release pull request, forever.
 
 A parked run is not a slow run.
+The branch name in the two measurements below ends in the package's old name, which ADR-0038 retired; release-please derives that branch from the package name, so a run taken now would read `release-please--branches--main--components--treadling`.
 Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
 Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
 `.github/rulesets/main.json` requires the `checks`, `tests kept` and `secret scan` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
 
 A parked run also attaches no check to the pull request, so the pull request page reported nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
+That quote keeps the branch name the run answered with, retired with the package name.
 Forty-six runs had concluded `action_required` by then, and four release pull requests had waited four days.
 
 `.github/workflows/release.yml`'s `release-pr-checks` job releases them now.
@@ -331,7 +336,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate treadle@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
+npm deprecate treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
@@ -351,7 +356,7 @@ The patch then follows the ordinary release path above: land it, merge the relea
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
 ```sh
-npm unpublish treadle@0.2.0
+npm unpublish treadling@0.2.0
 ```
 
 Within 72 hours, and only when nothing depends on that version.
@@ -390,7 +395,7 @@ A rollback policy nobody has run is a document, not a policy.
 Branch protection, the tag rules and the Actions policy live on the forge rather than in the tree, so the tree carries what they should be and one script applies them.
 
 ```sh
-scripts/apply-repo-settings.sh Abhijeet34/treadle
+scripts/apply-repo-settings.sh Abhijeet34/treadling
 ```
 
 It is idempotent: a ruleset whose name already exists is updated in place rather than duplicated.

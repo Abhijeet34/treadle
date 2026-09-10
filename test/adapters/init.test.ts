@@ -22,7 +22,7 @@ const ACTOR: Actor = { id: 'dana', kind: 'human' }
 const CLOCK = fixedClock('2026-09-04T09:30:00Z')
 
 async function aDirectory(): Promise<string> {
-  return mkdtemp(path.join(tmpdir(), 'treadle-init-'))
+  return mkdtemp(path.join(tmpdir(), 'treadling-init-'))
 }
 
 describe('the workspace id is derived from the name, and is always usable as one', () => {
@@ -78,7 +78,7 @@ describe('init on a directory that already holds files', () => {
       // The path is a literal in the cause, not a pattern: on Windows every separator in it
       // is a backslash and a regex built from it reads them as escapes.
       assert.ok(String(refused.data['cause']).includes(at), `the cause does not name ${at}`)
-      assert.deepEqual(refused.data['fix'], ['treadle init --yes'])
+      assert.deepEqual(refused.data['fix'], ['treadling init --yes'])
     } finally {
       await rm(at, { recursive: true, force: true })
     }
@@ -157,7 +157,7 @@ describe('the walk prefers the nested workspace directory at the same level', ()
   })
 
   it('names the workspace after the directory above it when no name is given', async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), 'treadle-named-'))
+    const parent = await mkdtemp(path.join(tmpdir(), 'treadling-named-'))
     try {
       const at = path.join(parent, WORKSPACE_DIR)
       const created = await initWorkspace(CLOCK, sequentialIds(), { at, actor: ACTOR })

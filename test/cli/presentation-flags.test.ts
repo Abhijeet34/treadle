@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The presentation flags, against what the tool actually does with them.
 //
-// Measured on 2026-09-07, before ADR-0029 removed the colour flag: `treadle help <cmd>`
+// Measured on 2026-09-07, before ADR-0029 removed the colour flag: `treadling help <cmd>`
 // said of `--width` and `--color`, on nine
 // commands that all present something, "accepted and ignored: it only changes presentation,
 // and here there is nothing to present". Half of that verdict was wrong in each direction.
@@ -81,8 +81,8 @@ describe('--width is supported, because every rendering of every command is laid
 
   it('says what --width does, rather than that it does nothing', () => {
     const note = saysOnIndex('--width')
-    assert.ok(!note.includes('nothing to present'), `treadle help says of --width: ${note}`)
-    assert.match(note, /display cells/, `treadle help says of --width: ${note}`)
+    assert.ok(!note.includes('nothing to present'), `treadling help says of --width: ${note}`)
+    assert.match(note, /display cells/, `treadling help says of --width: ${note}`)
     assert.equal(notesOf('show').get('--width'), undefined, 'show still repeats a flag it supports')
   })
 })

@@ -4,7 +4,7 @@ status  acme-platform
   items  24
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record
+  audit  not run here; treadling doctor reads every record
     against the event log
 
 states  7 of 7
@@ -29,7 +29,7 @@ status  acme-platform
   items  24
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -53,7 +53,7 @@ status  acme-platform
   items  24
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -76,7 +76,7 @@ backlog  acme-platform
   filter  state open
   sort  priority,filed,id
   more  13
-  page  treadle backlog --state open --fields
+  page  treadling backlog --state open --fields
     id,type,state,title --cursor queue-drain
 
 items  9 of 22
@@ -96,7 +96,7 @@ backlog  acme-platform
   filter  state open
   sort  priority,filed,id
   more  13
-  page  treadle backlog --state open --fields id,type,state,title --cursor
+  page  treadling backlog --state open --fields id,type,state,title --cursor
     queue-drain
 
 items  9 of 22
@@ -116,7 +116,7 @@ backlog  acme-platform
   filter  state open
   sort  priority,filed,id
   more  13
-  page  treadle backlog --state open --fields id,type,state,title --cursor queue-drain
+  page  treadling backlog --state open --fields id,type,state,title --cursor queue-drain
 
 items  9 of 22
   ID            TYPE   STATE        TITLE
@@ -281,7 +281,7 @@ criteria  2 of 2
 next  acme-platform
   weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
-  page  treadle next --cursor webhook-retry
+  page  treadling next --cursor webhook-retry
 
 next  3 of 6
   ID           SCORE  PARTS               TITLE
@@ -293,7 +293,7 @@ next  3 of 6
 next  acme-platform
   weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
-  page  treadle next --cursor webhook-retry
+  page  treadling next --cursor webhook-retry
 
 next  3 of 6
   ID           SCORE  PARTS               TITLE
@@ -305,7 +305,7 @@ next  3 of 6
 next  acme-platform
   weights  pri 10 age 1 dep 5 asg 0 due 4 sev 6
   more  3
-  page  treadle next --cursor webhook-retry
+  page  treadling next --cursor webhook-retry
 
 next  3 of 6
   ID           SCORE  PARTS               TITLE
@@ -328,9 +328,9 @@ explain  acme-platform
 
 gates  3 of 8
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     treadle set sso-saml reviewer=<nam…
-  done  DOD4  fail     treadle set sso-saml acceptance_cr…
-  done  DOD7  fail     treadle evidence add sso-saml <kin…
+  done  DOD3  fail     treadling set sso-saml reviewer=<n…
+  done  DOD4  fail     treadling set sso-saml acceptance_…
+  done  DOD7  fail     treadling evidence add sso-saml <k…
 
 moves  4 of 4
   TO         GUARDS  RECORDS
@@ -354,9 +354,9 @@ explain  acme-platform
 
 gates  3 of 8
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     treadle set sso-saml reviewer=<name>
-  done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|…
-  done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
+  done  DOD3  fail     treadling set sso-saml reviewer=<name>
+  done  DOD4  fail     treadling set sso-saml acceptance_criteria="[x] <entry…
+  done  DOD7  fail     treadling evidence add sso-saml <kind> <ref> [label]
 
 moves  4 of 4
   TO         GUARDS  RECORDS
@@ -380,9 +380,9 @@ explain  acme-platform
 
 gates  3 of 8
   GATE  RULE  VERDICT  NEED
-  done  DOD3  fail     treadle set sso-saml reviewer=<name>
-  done  DOD4  fail     treadle set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
-  done  DOD7  fail     treadle evidence add sso-saml <kind> <ref> [label]
+  done  DOD3  fail     treadling set sso-saml reviewer=<name>
+  done  DOD4  fail     treadling set sso-saml acceptance_criteria="[x] <entry>|[x] <entry>"
+  done  DOD7  fail     treadling evidence add sso-saml <kind> <ref> [label]
 
 moves  4 of 4
   TO         GUARDS  RECORDS
@@ -452,15 +452,15 @@ reasons  2 of 2
 
 ### help @ 60
 help  acme-platform
-  topic  treadle
-  usage  treadle
-  usage  treadle <command> [args]
-  usage  treadle help <command>
+  topic  treadling
+  usage  treadling
+  usage  treadling <command> [args]
+  usage  treadling help <command>
   about
     The record of the work between people and agents,
     over files you commit to git.
   note  the actor on an event is declared by whoever ran the
-    command and recorded as given: treadle verifies no
+    command and recorded as given: treadling verifies no
     identity, and the signed commit carrying the file is
     what proves who wrote it
   note  a command page names only the flags it grades other
@@ -472,18 +472,18 @@ help  acme-platform
     decides A from X is that a flag which only presents is
     ignored where it cannot apply, and one whose absence
     would change the answer is refused there
-  example  treadle init # create a workspace in .work here,
-    and say what it created
-  example  treadle file story "Refresh the access token on a
-    401" # file a story in draft
-  example  treadle show auth-refresh --field desc # the
+  example  treadling init # create a workspace in .work
+    here, and say what it created
+  example  treadling file story "Refresh the access token on
+    a 401" # file a story in draft
+  example  treadling show auth-refresh --field desc # the
     description whole, rather than cut at 64 cells
-  example  treadle backlog # open work: the list is scoped
+  example  treadling backlog # open work: the list is scoped
     to what is not done or cancelled, and the filter line
     says so
-  example  treadle transition sso-saml in_progress # start
+  example  treadling transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
-  example  treadle set checkout-500 expected="both orders
+  example  treadling set checkout-500 expected="both orders
     are listed" actual="one is charged" # fill in what a bug
     was filed without, which is what the ready gate reads
 
@@ -530,15 +530,15 @@ globals  17 of 17
 
 ### help @ 80
 help  acme-platform
-  topic  treadle
-  usage  treadle
-  usage  treadle <command> [args]
-  usage  treadle help <command>
+  topic  treadling
+  usage  treadling
+  usage  treadling <command> [args]
+  usage  treadling help <command>
   about
     The record of the work between people and agents, over files you commit
     to git.
   note  the actor on an event is declared by whoever ran the command and
-    recorded as given: treadle verifies no identity, and the signed commit
+    recorded as given: treadling verifies no identity, and the signed commit
     carrying the file is what proves who wrote it
   note  a command page names only the flags it grades other than S, and only
     those whose grade varies by command; a flag absent from a page behaves there
@@ -547,17 +547,17 @@ help  acme-platform
     another scope, X refused; the rule that decides A from X is that a flag
     which only presents is ignored where it cannot apply, and one whose absence
     would change the answer is refused there
-  example  treadle init # create a workspace in .work here, and say what it
+  example  treadling init # create a workspace in .work here, and say what it
     created
-  example  treadle file story "Refresh the access token on a 401" # file a story
-    in draft
-  example  treadle show auth-refresh --field desc # the description whole,
+  example  treadling file story "Refresh the access token on a 401" # file a
+    story in draft
+  example  treadling show auth-refresh --field desc # the description whole,
     rather than cut at 64 cells
-  example  treadle backlog # open work: the list is scoped to what is not done
+  example  treadling backlog # open work: the list is scoped to what is not done
     or cancelled, and the filter line says so
-  example  treadle transition sso-saml in_progress # start work; refused if a
+  example  treadling transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
-  example  treadle set checkout-500 expected="both orders are listed"
+  example  treadling set checkout-500 expected="both orders are listed"
     actual="one is charged" # fill in what a bug was filed without, which is
     what the ready gate reads
 
@@ -585,7 +585,7 @@ commands  18 of 18
 globals  17 of 17
   FLAG               WHERE              NOTE
   --help             every              prints this page and runs nothing
-  --version          none               prints the tool version; treadle vers…
+  --version          none               prints the tool version; treadling ve…
   --contract         every              prints the agent/1 line grammar and t…
   --out              answers-a-record   selects the rendering, one of human, …
   --quiet            every              drops the header and the footer and k…
@@ -595,7 +595,7 @@ globals  17 of 17
   --workspace        opens-a-workspace  names the store to run against, inste…
   --dry-run          mutation           evaluates every guard and prints the …
   --yes              asks-to-confirm    answers the confirmation; without it …
-  --actor            mutation           names who the event records; TREADLE_…
+  --actor            mutation           names who the event records; TREADLIN…
   --width            every              lays the human rendering out at that …
   --fields           chooses-columns    replaces the default columns, or adds…
   --limit            pageable           bounds one page; the page line the an…
@@ -604,22 +604,22 @@ globals  17 of 17
 
 ### help @ 200
 help  acme-platform
-  topic  treadle
-  usage  treadle
-  usage  treadle <command> [args]
-  usage  treadle help <command>
+  topic  treadling
+  usage  treadling
+  usage  treadling <command> [args]
+  usage  treadling help <command>
   about  The record of the work between people and agents, over files you commit to git.
-  note  the actor on an event is declared by whoever ran the command and recorded as given: treadle verifies no identity, and the signed commit carrying the file is what proves who wrote it
+  note  the actor on an event is declared by whoever ran the command and recorded as given: treadling verifies no identity, and the signed commit carrying the file is what proves who wrote it
   note  a command page names only the flags it grades other than S, and only those whose grade varies by command; a flag absent from a page behaves there as the where column below says; all 17 are
     here
   note  a command page grades a flag S supported, A accepted and ignored, N another scope, X refused; the rule that decides A from X is that a flag which only presents is ignored where it cannot
     apply, and one whose absence would change the answer is refused there
-  example  treadle init # create a workspace in .work here, and say what it created
-  example  treadle file story "Refresh the access token on a 401" # file a story in draft
-  example  treadle show auth-refresh --field desc # the description whole, rather than cut at 64 cells
-  example  treadle backlog # open work: the list is scoped to what is not done or cancelled, and the filter line says so
-  example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
-  example  treadle set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
+  example  treadling init # create a workspace in .work here, and say what it created
+  example  treadling file story "Refresh the access token on a 401" # file a story in draft
+  example  treadling show auth-refresh --field desc # the description whole, rather than cut at 64 cells
+  example  treadling backlog # open work: the list is scoped to what is not done or cancelled, and the filter line says so
+  example  treadling transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadling set checkout-500 expected="both orders are listed" actual="one is charged" # fill in what a bug was filed without, which is what the ready gate reads
 
 commands  18 of 18
   NAME        EFFECT  PAGEABLE  SUMMARY
@@ -645,7 +645,7 @@ commands  18 of 18
 globals  17 of 17
   FLAG               WHERE              NOTE
   --help             every              prints this page and runs nothing
-  --version          none               prints the tool version; treadle version is the command form
+  --version          none               prints the tool version; treadling version is the command form
   --contract         every              prints the agent/1 line grammar and the exit table, and runs no command
   --out              answers-a-record   selects the rendering, one of human, agent, json; without it a terminal gets human and a pipe gets agent
   --quiet            every              drops the header and the footer and keeps the records; a refusal still prints whole
@@ -655,7 +655,7 @@ globals  17 of 17
   --workspace        opens-a-workspace  names the store to run against, instead of the search upward from the working directory
   --dry-run          mutation           evaluates every guard and prints the field diff and the exit status the real run would return, writing nothing
   --yes              asks-to-confirm    answers the confirmation; without it such a command refuses and prints the line that carries it
-  --actor            mutation           names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused
+  --actor            mutation           names who the event records; TREADLING_ACTOR and TREADLING_ACTOR_KIND=human|agent set it for every command, and a mutation naming nobody is refused
   --width            every              lays the human rendering out at that many display cells, clamped to 40 to 200
   --fields           chooses-columns    replaces the default columns, or adds to them with a leading plus
   --limit            pageable           bounds one page; the page line the answer ends with carries the cursor for the next
@@ -666,14 +666,14 @@ globals  17 of 17
 help  acme-platform
   topic  transition
   effect  mutate
-  usage  treadle transition <id> <target> [--reason <text>]
-    [--until <instant>]
-  usage  treadle transition <id> cancelled --resolution <r>
-    --reason <text>
-  usage  treadle transition <id> ready --outcome
+  usage  treadling transition <id> <target> [--reason
+    <text>] [--until <instant>]
+  usage  treadling transition <id> cancelled --resolution
+    <r> --reason <text>
+  usage  treadling transition <id> ready --outcome
     <failed|yielded> --reason <text>
-  usage  treadle transition <id> <target> --override <guard>
-    --reason <text>
+  usage  treadling transition <id> <target> --override
+    <guard> --reason <text>
   about
     Move one item to a target state, with every guard on
     that edge evaluated.
@@ -686,24 +686,24 @@ help  acme-platform
     from in_progress takes --outcome, one of failed, yielded
   note  --override takes G2, G3, G7 and a reason; every
     other guard is fixed by fixing the item
-  note  the other 12 global flags apply here as treadle help
-    describes them
-  example  treadle transition sso-saml in_progress # start
+  note  the other 12 global flags apply here as treadling
+    help describes them
+  example  treadling transition sso-saml in_progress # start
     work; refused if a guard on that edge fails
-  example  treadle transition sso-saml in_review # submit
+  example  treadling transition sso-saml in_review # submit
     for review; a story and a bug have a review step and no
     other type does
-  example  treadle transition sso-saml cancelled
+  example  treadling transition sso-saml cancelled
     --resolution rejected --reason "the reviewer refused it
     outright" # stop the item and say which of the five
     reasons it stopped for
-  example  treadle transition sso-saml ready --outcome
+  example  treadling transition sso-saml ready --outcome
     failed --reason "the migration will not apply" # give up
     the attempt and put the item back in the queue, with the
     failure in the log
-  example  treadle transition sso-saml in_progress --dry-run
-    # the field diff and the exit status the real run would
-    return
+  example  treadling transition sso-saml in_progress
+    --dry-run # the field diff and the exit status the real
+    run would return
 
 moves  23 of 23
   FROM         TO           MOVE     GUARDS  REASON
@@ -743,11 +743,12 @@ flags  5 of 17
 help  acme-platform
   topic  transition
   effect  mutate
-  usage  treadle transition <id> <target> [--reason <text>] [--until <instant>]
-  usage  treadle transition <id> cancelled --resolution <r> --reason <text>
-  usage  treadle transition <id> ready --outcome <failed|yielded> --reason
+  usage  treadling transition <id> <target> [--reason <text>] [--until
+    <instant>]
+  usage  treadling transition <id> cancelled --resolution <r> --reason <text>
+  usage  treadling transition <id> ready --outcome <failed|yielded> --reason
     <text>
-  usage  treadle transition <id> <target> --override <guard> --reason <text>
+  usage  treadling transition <id> <target> --override <guard> --reason <text>
   about
     Move one item to a target state, with every guard on that edge
     evaluated.
@@ -759,18 +760,18 @@ help  acme-platform
     failed, yielded
   note  --override takes G2, G3, G7 and a reason; every other guard is fixed by
     fixing the item
-  note  the other 12 global flags apply here as treadle help describes them
-  example  treadle transition sso-saml in_progress # start work; refused if a
+  note  the other 12 global flags apply here as treadling help describes them
+  example  treadling transition sso-saml in_progress # start work; refused if a
     guard on that edge fails
-  example  treadle transition sso-saml in_review # submit for review; a story
+  example  treadling transition sso-saml in_review # submit for review; a story
     and a bug have a review step and no other type does
-  example  treadle transition sso-saml cancelled --resolution rejected --reason
-    "the reviewer refused it outright" # stop the item and say which of the five
-    reasons it stopped for
-  example  treadle transition sso-saml ready --outcome failed --reason "the
+  example  treadling transition sso-saml cancelled --resolution rejected
+    --reason "the reviewer refused it outright" # stop the item and say which of
+    the five reasons it stopped for
+  example  treadling transition sso-saml ready --outcome failed --reason "the
     migration will not apply" # give up the attempt and put the item back in the
     queue, with the failure in the log
-  example  treadle transition sso-saml in_progress --dry-run # the field diff
+  example  treadling transition sso-saml in_progress --dry-run # the field diff
     and the exit status the real run would return
 
 moves  23 of 23
@@ -811,20 +812,20 @@ flags  5 of 17
 help  acme-platform
   topic  transition
   effect  mutate
-  usage  treadle transition <id> <target> [--reason <text>] [--until <instant>]
-  usage  treadle transition <id> cancelled --resolution <r> --reason <text>
-  usage  treadle transition <id> ready --outcome <failed|yielded> --reason <text>
-  usage  treadle transition <id> <target> --override <guard> --reason <text>
+  usage  treadling transition <id> <target> [--reason <text>] [--until <instant>]
+  usage  treadling transition <id> cancelled --resolution <r> --reason <text>
+  usage  treadling transition <id> ready --outcome <failed|yielded> --reason <text>
+  usage  treadling transition <id> <target> --override <guard> --reason <text>
   about  Move one item to a target state, with every guard on that edge evaluated.
   note  the targets are draft, ready, in_progress, in_review, done, on_hold, cancelled, resume; resume is the one that is not a state, and it returns a held item to the state the hold was taken from
   note  cancelled takes --resolution, one of wont_do, duplicate, superseded, cannot_reproduce, rejected; ready from in_progress takes --outcome, one of failed, yielded
   note  --override takes G2, G3, G7 and a reason; every other guard is fixed by fixing the item
-  note  the other 12 global flags apply here as treadle help describes them
-  example  treadle transition sso-saml in_progress # start work; refused if a guard on that edge fails
-  example  treadle transition sso-saml in_review # submit for review; a story and a bug have a review step and no other type does
-  example  treadle transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
-  example  treadle transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
-  example  treadle transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
+  note  the other 12 global flags apply here as treadling help describes them
+  example  treadling transition sso-saml in_progress # start work; refused if a guard on that edge fails
+  example  treadling transition sso-saml in_review # submit for review; a story and a bug have a review step and no other type does
+  example  treadling transition sso-saml cancelled --resolution rejected --reason "the reviewer refused it outright" # stop the item and say which of the five reasons it stopped for
+  example  treadling transition sso-saml ready --outcome failed --reason "the migration will not apply" # give up the attempt and put the item back in the queue, with the failure in the log
+  example  treadling transition sso-saml in_progress --dry-run # the field diff and the exit status the real run would return
 
 moves  23 of 23
   FROM         TO           MOVE     GUARDS  REASON
@@ -869,7 +870,7 @@ items
 
 Do one of these
 
-  treadle backlog
+  treadling backlog
 
 ### not-found @ 80
 sso-saml-typo is in no record here; this workspace holds 24 items
@@ -879,7 +880,7 @@ sso-saml-typo is in no record here; this workspace holds 24 items
 
 Do one of these
 
-  treadle backlog
+  treadling backlog
 
 ### not-found @ 200
 sso-saml-typo is in no record here; this workspace holds 24 items
@@ -889,7 +890,7 @@ sso-saml-typo is in no record here; this workspace holds 24 items
 
 Do one of these
 
-  treadle backlog
+  treadling backlog
 
 ### transition-dry-run @ 60
 transition  acme-platform  0 changed  txn -
@@ -976,11 +977,11 @@ in_review; the done gate fails: DOD3, DOD4, DOD7
 
 Do one of these
 
-  treadle transition sso-saml in_review
+  treadling transition sso-saml in_review
 
-  treadle explain sso-saml
+  treadling explain sso-saml
 
-  treadle show sso-saml
+  treadling show sso-saml
 
 ### guard-refused @ 80
 a story has a review step, so in_progress exits through in_review; the done gate
@@ -992,11 +993,11 @@ fails: DOD3, DOD4, DOD7
 
 Do one of these
 
-  treadle transition sso-saml in_review
+  treadling transition sso-saml in_review
 
-  treadle explain sso-saml
+  treadling explain sso-saml
 
-  treadle show sso-saml
+  treadling show sso-saml
 
 ### guard-refused @ 200
 a story has a review step, so in_progress exits through in_review; the done gate fails: DOD3, DOD4, DOD7
@@ -1007,11 +1008,11 @@ a story has a review step, so in_progress exits through in_review; the done gate
 
 Do one of these
 
-  treadle transition sso-saml in_review
+  treadling transition sso-saml in_review
 
-  treadle explain sso-saml
+  treadling explain sso-saml
 
-  treadle show sso-saml
+  treadling show sso-saml
 
 ### file @ 60
 file  acme-platform  1 changed  txn t0902
@@ -1056,7 +1057,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record
+  audit  not run here; treadling doctor reads every record
     against the event log
 
 states  7 of 7
@@ -1086,7 +1087,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1115,7 +1116,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1143,7 +1144,7 @@ status  acme-platform
   items  26
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record
+  audit  not run here; treadling doctor reads every record
     against the event log
 
 states  7 of 7
@@ -1168,7 +1169,7 @@ status  acme-platform
   items  26
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1192,7 +1193,7 @@ status  acme-platform
   items  26
   findings  0
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
 
 states  7 of 7
   STATE        N
@@ -1272,11 +1273,11 @@ explain  acme-platform
 
 gates  5 of 8
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain re…
-  ready  DOR4  fail     treadle set theme-dark acceptance…
-  done   DOD3  fail     treadle set theme-dark reviewer=<…
-  done   DOD4  fail     treadle set theme-dark acceptance…
-  done   DOD7  fail     treadle evidence add theme-dark <…
+  ready  DOR3  fail     treadling transition queue-drain …
+  ready  DOR4  fail     treadling set theme-dark acceptan…
+  done   DOD3  fail     treadling set theme-dark reviewer…
+  done   DOD4  fail     treadling set theme-dark acceptan…
+  done   DOD7  fail     treadling evidence add theme-dark…
 
 moves  3 of 3
   TO         GUARDS  RECORDS
@@ -1298,11 +1299,11 @@ explain  acme-platform
 
 gates  5 of 8
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain ready
-  ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
-  done   DOD3  fail     treadle set theme-dark reviewer=<name>
-  done   DOD4  fail     treadle set theme-dark acceptance_criteria="<entry>|<…
-  done   DOD7  fail     treadle evidence add theme-dark <kind> <ref> [label]
+  ready  DOR3  fail     treadling transition queue-drain ready
+  ready  DOR4  fail     treadling set theme-dark acceptance_criteria="<entry>…
+  done   DOD3  fail     treadling set theme-dark reviewer=<name>
+  done   DOD4  fail     treadling set theme-dark acceptance_criteria="<entry>…
+  done   DOD7  fail     treadling evidence add theme-dark <kind> <ref> [label]
 
 moves  3 of 3
   TO         GUARDS  RECORDS
@@ -1324,11 +1325,11 @@ explain  acme-platform
 
 gates  5 of 8
   GATE   RULE  VERDICT  NEED
-  ready  DOR3  fail     treadle transition queue-drain ready
-  ready  DOR4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
-  done   DOD3  fail     treadle set theme-dark reviewer=<name>
-  done   DOD4  fail     treadle set theme-dark acceptance_criteria="<entry>|<entry>"
-  done   DOD7  fail     treadle evidence add theme-dark <kind> <ref> [label]
+  ready  DOR3  fail     treadling transition queue-drain ready
+  ready  DOR4  fail     treadling set theme-dark acceptance_criteria="<entry>|<entry>"
+  done   DOD3  fail     treadling set theme-dark reviewer=<name>
+  done   DOD4  fail     treadling set theme-dark acceptance_criteria="<entry>|<entry>"
+  done   DOD7  fail     treadling evidence add theme-dark <kind> <ref> [label]
 
 moves  3 of 3
   TO         GUARDS  RECORDS
@@ -1479,7 +1480,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record
+  audit  not run here; treadling doctor reads every record
     against the event log
   writes
     .txn/stray.json is not a transaction journal this
@@ -1516,7 +1517,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
   writes
     .txn/stray.json is not a transaction journal this store wrote, so it
     cannot be replayed and no write can go past it; .txn holds journals and
@@ -1551,7 +1552,7 @@ status  acme-platform
   findings  0
   overdue  1
   defects  S1 1 S2 1 S3 1
-  audit  not run here; treadle doctor reads every record against the event log
+  audit  not run here; treadling doctor reads every record against the event log
   writes  .txn/stray.json is not a transaction journal this store wrote, so it cannot be replayed and no write can go past it; .txn holds journals and nothing else, and deleting the file clears this
   fix  delete the .txn file named in cause; read it first, because the store will not discard it on a guess
 

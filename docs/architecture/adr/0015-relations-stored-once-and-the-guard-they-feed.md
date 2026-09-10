@@ -65,7 +65,7 @@ The edge is the decision that was recorded, and `duplicates` in particular is a 
 Cancelling a blocker while something active still waits on it is `G7`'s refusal, which yields to an override with a reason, and that is unchanged.
 
 When the other end's record is removed by hand, which D1 makes a legitimate edit, the edge dangles.
-That is doctor finding `H24` on the record that holds it and on `explain` of that record, and the detail names `treadle relation remove <id> <kind> <other>` as the line that drops it.
+That is doctor finding `H24` on the record that holds it and on `explain` of that record, and the detail names `treadling relation remove <id> <kind> <other>` as the line that drops it.
 `relation remove` therefore accepts an id the store does not hold, because the remedy has to run.
 A dangling edge counts for nothing on any read: `blockedByThis` already required a known state, and `blockersOf` now does too, so a record removed by hand never holds another item forever.
 
@@ -156,7 +156,7 @@ The previous round's note on the result was the tool saying so and letting the w
 `duplicates` earns exactly one more rule, and it is `DOR10`: the ready gate fails while the item duplicates another the store holds.
 One rule reaches all three surfaces the finding named, because they all read the same verdict.
 Grooming is refused by `G1`, starting is refused because the item cannot reach `ready` to be started, and `sprint commit` is refused because `evaluateCommit` reads the ready gate.
-Its remedy is `treadle transition <id> cancelled --resolution duplicate --reason "<why>"`, which is what the `duplicate` resolution has been in the closed set for since ADR-0010.
+Its remedy is `treadling transition <id> cancelled --resolution duplicate --reason "<why>"`, which is what the `duplicate` resolution has been in the closed set for since ADR-0010.
 
 `DOR10` passes when the original is an id the store does not hold.
 A dangling edge is `H24`'s finding and its remedy is `relation remove`, and a gate rule that read the raw edge would have held the copy at `draft` for ever on a record nobody can move, which is the trap `blockersOf` documents for blockers.

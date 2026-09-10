@@ -42,7 +42,7 @@ const A3: readonly { readonly name: string; readonly budget: number; readonly re
 ]
 
 /** A.3's budgets were stated against a three-character binary name; ours is four longer. */
-const NAME_COST = 'treadle'.length - 'wmx'.length
+const NAME_COST = 'treadling'.length - 'wmx'.length
 
 export type OutputRow = Accounting & {
   readonly artefact: string
@@ -68,7 +68,7 @@ export async function runA3(loaded: readonly TokenizerLoad[]): Promise<{
     }
     const text = agentRenderer.render(result as ResultObject)
     const counted = account(spec.name, text, loaded)
-    const occurrences = (text.match(/\btreadle\b/g) ?? []).length
+    const occurrences = (text.match(/\btreadling\b/g) ?? []).length
     const allowed = spec.budget + occurrences * NAME_COST
     rows.push({
       ...counted,

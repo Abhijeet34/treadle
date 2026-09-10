@@ -2,7 +2,7 @@
 // An oversized input, at every entry point that takes free text, on the platforms that can
 // deliver one.
 //
-// Measured on 2026-09-07: `treadle set <id> desc=<1,000,000 y>` printed a raw `RangeError:
+// Measured on 2026-09-07: `treadling set <id> desc=<1,000,000 y>` printed a raw `RangeError:
 // Maximum call stack size exceeded` on stderr and exited 7, which tells a caller its store is
 // corrupt while the store is fine. The cause is not in this codebase. The same input crashes
 // `node -e 'process.stderr.write("ok\n")'` and the tool's own first line never runs: the
@@ -13,13 +13,13 @@
 // THE BOUND IS THE BLOCK, NOT THE ENTRY. POSIX bounds argv and the environment together at
 // ARG_MAX and Linux bounds each single string separately at 128 KiB, so a first version of
 // this file, which passed one 1,000,000 character argument, could not exec on Linux at all and
-// failed CI four times with `spawn E2BIG` before reaching treadle. It was measuring this
+// failed CI four times with `spawn E2BIG` before reaching treadling. It was measuring this
 // machine's per-entry limit rather than the tool's behaviour. Eleven arguments of 90,000
 // characters, every one of them far under Linux's per-entry cap, make a 990,547 byte block
 // that is a RangeError at the 984 KiB default stack and a clean run at 3072.
 //
 // WHICH IS WHY THE CEILING RUN IS LINUX'S ALONE. The shebang asked for that 3 MiB stack for
-// one day and stopped the tool starting under BusyBox `env`, so `bin/treadle.js` is back to
+// one day and stopped the tool starting under BusyBox `env`, so `bin/treadling.js` is back to
 // `#!/usr/bin/env node` and macOS keeps the platform limit rather than the flag
 // (`docs/STABILITY.md`, "The macOS argument-block limit"). Linux does not charge the block
 // against the stack - run 34106349134 answered, typed, behind 4,140,820 bytes of argv under
@@ -46,7 +46,7 @@ import { EXIT_OF } from '../../src/cli/exit.ts'
 import { flagsOf, portabilityProblem, shebangOf } from '../../scripts/shebang.ts'
 
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
-const ENTRY = path.join(ROOT, 'bin', 'treadle.js')
+const ENTRY = path.join(ROOT, 'bin', 'treadling.js')
 const FLAGS = flagsOf(shebangOf(ROOT))
 
 /** Windows has no `getconf`, no ARG_MAX and no fork of this shape; the block tests are POSIX's. */
@@ -89,7 +89,7 @@ const MARGIN = 24_000
 
 const SMALL_ENV: Readonly<Record<string, string>> = {
   PATH: process.env['PATH'] ?? '/usr/bin:/bin',
-  TREADLE_ACTOR: 'dana',
+  TREADLING_ACTOR: 'dana',
 }
 
 function bytesOf(entries: readonly string[]): number {
@@ -145,17 +145,17 @@ describe('the shipped executable starts on every userland this package says it r
     const shebang = shebangOf(ROOT)
     assert.equal(
       portabilityProblem(shebang), undefined,
-      `bin/treadle.js opens with ${shebang}, and the tool has to start under BusyBox env too`,
+      `bin/treadling.js opens with ${shebang}, and the tool has to start under BusyBox env too`,
     )
   })
 
   // The regression itself, spelled as its own case so the sentence in the failure names it.
-  it('is not the -S line that stopped treadle starting on node:24-alpine', () => {
+  it('is not the -S line that stopped treadling starting on node:24-alpine', () => {
     const shebang = shebangOf(ROOT)
     assert.equal(
       shebang.includes('-S'), false,
       `${shebang} needs env -S, which BusyBox 1.37.0 does not have: measured 2026-09-07, `
-        + '`treadle version` printed "env: unrecognized option: S" and exited 1 on node:24-alpine',
+        + '`treadling version` printed "env: unrecognized option: S" and exited 1 on node:24-alpine',
     )
   })
 
@@ -165,7 +165,7 @@ describe('the shipped executable starts on every userland this package says it r
       shebangOf(ROOT), dev,
       'the build reads a shebang that is not the development entry point\'s own first line',
     )
-    assert.ok(dev.startsWith('#!'), `bin/treadle.js does not open with a shebang: ${dev}`)
+    assert.ok(dev.startsWith('#!'), `bin/treadling.js does not open with a shebang: ${dev}`)
   })
 })
 
@@ -173,7 +173,7 @@ describe('a block at this platform\'s ceiling is an answer, not a crash', { skip
   let work: string
 
   before(async () => {
-    work = await mkdtemp(path.join(tmpdir(), 'treadle-oversized-'))
+    work = await mkdtemp(path.join(tmpdir(), 'treadling-oversized-'))
     const init = await runEntry(['init', '--name', 'oversized'], work)
     assert.equal(init.code, 0, `init failed: ${init.err}`)
     const filed = await runEntry(['file', 'task', 'wire the retry'], work)
@@ -194,7 +194,7 @@ describe('a block at this platform\'s ceiling is an answer, not a crash', { skip
     const fixed = bytesOf([process.execPath, ...FLAGS, ENTRY, 'version']) + envBytes(SMALL_ENV)
     const chunks = fill(fixed)
     const env: Record<string, string> = { ...SMALL_ENV }
-    for (const [at, chunk] of chunks.entries()) env[`TREADLE_FILLER_${String(at).padStart(2, '0')}`] = chunk
+    for (const [at, chunk] of chunks.entries()) env[`TREADLING_FILLER_${String(at).padStart(2, '0')}`] = chunk
     const ran = await runEntry(['version'], work, env)
     t.diagnostic(`${chunks.length} variables of ${PER_ENTRY}, ${envBytes(env) + fixed} bytes of block`)
     assertNoCrash(ran, 'an environment at the ceiling')
@@ -210,7 +210,7 @@ describe('the largest single entry this platform carries is a typed refusal', { 
   const huge = 'y'.repeat(Math.min(1_000_000, PER_ENTRY))
 
   before(async () => {
-    work = await mkdtemp(path.join(tmpdir(), 'treadle-oversized-one-'))
+    work = await mkdtemp(path.join(tmpdir(), 'treadling-oversized-one-'))
     const init = await runEntry(['init', '--name', 'oversized'], work)
     assert.equal(init.code, 0, `init failed: ${init.err}`)
     const filed = await runEntry(['file', 'task', 'wire the retry'], work)

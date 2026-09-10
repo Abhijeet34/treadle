@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-10
-**Implements:** the four-eyes decision taken by firstmate under the captain's standing routine authority for treadle, 2026-09-10
+**Implements:** the four-eyes decision taken by firstmate under the captain's standing routine authority for treadling, 2026-09-10
 
 ## Context
 
@@ -24,11 +24,11 @@ So the guard refused a laundered record and passed the naive one, which is the w
 Neither enforce the actor half nor delete the protection.
 
 Enforcing it means every item must involve a second actor.
-That contradicts what treadle is for: a fleet of agents that critique and correct their own work, where one agent taking an item the whole way is the normal shape and not a fault.
+That contradicts what treadling is for: a fleet of agents that critique and correct their own work, where one agent taking an item the whole way is the normal shape and not a fault.
 Deleting the rule outright drops the field half, which does work in the one case where an assignee was named.
 
 The rule is refusing the wrong thing.
-treadle is a record of what happened, not a policeman of how it happened.
+treadling is a record of what happened, not a policeman of how it happened.
 `DOD3` keeps the two facts it can read off the record - a reviewer is named, and it is not the assignee - and stops reading who is running the move.
 Its sentence loses the clause the check no longer decides, because a rule's prose is printed by `config` and `explain` and a clause with no verdict behind it is a promise nothing keeps.
 

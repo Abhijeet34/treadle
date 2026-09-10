@@ -23,7 +23,7 @@ import { EXIT_OF } from '../../src/cli/exit.ts'
 import { COMMAND_OPTIONS, GLOBAL_OPTIONS } from '../../src/cli/parse.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
@@ -34,7 +34,7 @@ function must(run: Run, what: string): Run {
 }
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-repeated-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-repeated-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   must(await cli(['init', '--name', 'repeated']), 'init')
   must(await cli(['file', 'task', 'One thing', '--id', 'one-thing', '--label', 'ux', '--label', 'qa']), 'file')
@@ -64,7 +64,7 @@ describe('a single-valued flag written twice is refused rather than resolved', (
         const run = await cli([command, `--${name}`, first, `--${name}`, second])
         assert.equal(run.code, EXIT_OF.VALIDATION, `${command} --${name}: ${run.err}`)
         assert.match(run.err, new RegExp(`^"cause --${name} takes one value and this line writes it more than once`, 'm'), run.err)
-        assert.match(run.err, new RegExp(`^fix treadle help ${command}$`, 'm'), run.err)
+        assert.match(run.err, new RegExp(`^fix treadling help ${command}$`, 'm'), run.err)
         assert.equal(run.out, '', 'a refusal wrote to stdout')
       }
     })
@@ -111,7 +111,7 @@ describe('a single-valued flag written twice is refused rather than resolved', (
 
   it('holds that list against the option table, so a new repeatable flag is a deliberate one', () => {
     const repeatable: string[] = []
-    for (const [command, options] of [['treadle', GLOBAL_OPTIONS] as const, ...Object.entries(COMMAND_OPTIONS)]) {
+    for (const [command, options] of [['treadling', GLOBAL_OPTIONS] as const, ...Object.entries(COMMAND_OPTIONS)]) {
       for (const [name, config] of Object.entries(options)) {
         if ((config as { multiple?: boolean }).multiple === true) repeatable.push(`${command} --${name}`)
       }
@@ -134,7 +134,7 @@ describe('a column named twice is refused, as a flag written twice is', () => {
       assert.equal(run.code, EXIT_OF.VALIDATION, run.err)
       assert.match(run.err, /^rule C2$/m, run.err)
       assert.match(run.err, /^"cause id is named twice and a column is printed once/m, run.err)
-      assert.match(run.err, new RegExp(`^fix treadle ${command} --fields id,type$`, 'm'), run.err)
+      assert.match(run.err, new RegExp(`^fix treadling ${command} --fields id,type$`, 'm'), run.err)
       assert.equal(run.out, '', 'a refusal wrote to stdout')
     })
   }

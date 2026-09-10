@@ -319,7 +319,7 @@ export class ShardedStore implements Store {
     if (record === undefined) {
       // A file with no record at all and a file whose one record the grammar quarantined are
       // two different edits, and saying "carries no workspace record" for both sent a caller
-      // to `treadle init`, which answers `already` and fixes nothing. The quarantine knows
+      // to `treadling init`, which answers `already` and fixes nothing. The quarantine knows
       // the line and the reason, so the refusal carries them and names the edit as the way
       // back; `doctor` cannot be the way back here, because it opens with this same read.
       const held = parsed.value.quarantined[0]
@@ -498,7 +498,7 @@ export class ShardedStore implements Store {
   /** The same, where the path being absent is the ordinary answer rather than a failure. */
   #absentOrUnreadable(full: string, error: unknown): StoreResult<never> {
     if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return storeFail('STORE_UNAVAILABLE', 'S1', `${full} is not there, so this directory is not a treadle workspace`, [this.#root])
+      return storeFail('STORE_UNAVAILABLE', 'S1', `${full} is not there, so this directory is not a treadling workspace`, [this.#root])
     }
     return this.#unreadable(full, error)
   }

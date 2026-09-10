@@ -21,14 +21,14 @@ import { POSIX_MODES } from '../helpers/platform.ts'
 const UNREADABLE = POSIX_MODES
   || (process.getuid?.() === 0 ? 'root reads a path whose mode is 0o000 anyway' : false)
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 describe('a store this process may not read is refused, not answered as empty', { skip: UNREADABLE }, () => {
   let root: string
   let work: string
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-unreadable-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-unreadable-'))
     work = path.join(root, '.work')
     const init = await runCli(['init', '--name', 'unreadable', '--yes'], { cwd: root, env: ENV })
     assert.equal(init.code, 0, init.err)

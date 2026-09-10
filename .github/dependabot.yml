@@ -46,12 +46,12 @@ updates:
       # is the reason to keep re-deciding it. @types/node 26 types `tty.WriteStream`'s error
       # event, which is how the untyped `error.code` at src/cli/entry.ts:39 was found in #15;
       # held at 24, that class of defect stays invisible. Raising the floor is a support
-      # decision about who may run treadle, not a toolchain one, so it is not taken here.
+      # decision about who may run treadling, not a toolchain one, so it is not taken here.
       - dependency-name: "@types/node"
         update-types: ["version-update:semver-major"]
     groups:
       # esbuild is separated from the rest of the toolchain because it is the one development
-      # dependency whose output ships: it produces the bytes in dist/treadle.js, so its
+      # dependency whose output ships: it produces the bytes in dist/treadling.js, so its
       # integrity is the product's rather than the build's.
       bundler:
         patterns: ["esbuild"]

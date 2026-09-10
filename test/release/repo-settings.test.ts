@@ -37,7 +37,7 @@ type Result = { readonly code: number; readonly stderr: string; readonly calls: 
 /** Runs the script against a gh-axi that refuses every call whose argument line contains
  *  `refuse`, and reports the exit code, the stderr and every call it made. */
 async function apply(refuse = ''): Promise<Result> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-settings-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-settings-'))
   const log = path.join(dir, 'calls')
   await writeFile(path.join(dir, 'gh-axi'), STUB)
   await chmod(path.join(dir, 'gh-axi'), 0o755)

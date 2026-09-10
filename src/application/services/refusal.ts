@@ -32,7 +32,7 @@ const RESTORE = 'the store file named in cause is damaged, missing or past a cei
 /**
  * The remedy for one way the store is unavailable, keyed by the rule the store raised.
  *
- * Every one of these was `treadle status` before, and `status` is a read: it never takes the
+ * Every one of these was `treadling status` before, and `status` is a read: it never takes the
  * lock, it does not look in `.txn`, and it answered `ok findings 0` over a workspace that
  * refused every write. So a caller following the fix line looped while the remedy sat in the
  * `cause` sentence it was not told to act on. A line here is either runnable as written or
@@ -47,7 +47,7 @@ export function unavailableFixes(
 ): readonly string[] {
   // Only `version` runs whatever the store holds, so it is the one command that dates a file
   // at a schema this build does not write against the build that refused it.
-  if (error.code === 'SCHEMA_NEWER' || error.code === 'SCHEMA_OLDER') return ['treadle version']
+  if (error.code === 'SCHEMA_NEWER' || error.code === 'SCHEMA_OLDER') return ['treadling version']
   if (error.code === 'LOCK_LOST') {
     return ['re-run the command; the cause says whether the transaction was journaled before the lock went']
   }
@@ -73,7 +73,7 @@ export function unavailableFixes(
 }
 
 /**
- * Every store refusal here arrives after the workspace opened, so `treadle init` is never a
+ * Every store refusal here arrives after the workspace opened, so `treadling init` is never a
  * remedy: it answered `already` under a stuck lock and told a person to initialise what they
  * were standing in. That is why `unavailableFixes` never offers it, and why the open path in
  * `src/cli/main.ts`, which is the one place `init` is the answer, decides that case itself
@@ -81,9 +81,9 @@ export function unavailableFixes(
  */
 function fixesFor(code: ResultCode, error: StoreError): readonly string[] {
   const entity = error.entities[0]
-  if (code === 'CONFLICT' && entity !== undefined) return [`treadle show ${entity}`]
+  if (code === 'CONFLICT' && entity !== undefined) return [`treadling show ${entity}`]
   if (code === 'STORE_UNAVAILABLE') return unavailableFixes(error)
-  if (code === 'INTEGRITY') return ['treadle doctor']
+  if (code === 'INTEGRITY') return ['treadling doctor']
   return []
 }
 

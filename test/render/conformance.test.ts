@@ -96,7 +96,7 @@ describe('the renderer seam', () => {
       for (const renderer of EVERY_RENDERER) before.set(`${renderer.name}/${name}`, renderer.render(result))
     }
     const cwd = process.cwd()
-    process.env['TREADLE_OUT'] = 'human'
+    process.env['TREADLING_OUT'] = 'human'
     process.env['NO_COLOR'] = '1'
     process.chdir('/')
     try {
@@ -108,7 +108,7 @@ describe('the renderer seam', () => {
       }
     } finally {
       process.chdir(cwd)
-      delete process.env['TREADLE_OUT']
+      delete process.env['TREADLING_OUT']
       delete process.env['NO_COLOR']
     }
   })
@@ -231,11 +231,11 @@ describe('right-to-left content is confined to its own field in the human render
     const errorResult: ResultObject = {
       schema: 'error/1', ok: false, code: 'GUARD_REFUSED', command: 'transition', workspace: 'w',
       effect: 'read', txn: null, changed: null,
-      data: { cause: `the gate fails: ${RTL}`, entity: RTL, near: [RTL], fix: ['treadle explain history'] },
+      data: { cause: `the gate fails: ${RTL}`, entity: RTL, near: [RTL], fix: ['treadling explain history'] },
     }
     const rendered = humanRenderer.render(errorResult, { width: 80 })
     assert.ok(rendered.includes(`\u2068${RTL}\u2069`), 'the error-path field is not isolated')
-    assert.equal(rendered.includes('\u2068treadle explain history'), false, 'a fix line was isolated too')
+    assert.equal(rendered.includes('\u2068treadling explain history'), false, 'a fix line was isolated too')
   })
 })
 

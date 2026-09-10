@@ -40,14 +40,14 @@ No second mechanism exists.
 `G2` refuses starting the blocked item, `DOR3` fails its ready gate with the impediment's next move toward `done` as the remedy, `next` leaves it out and names the impediment on `--explain-absence`, and `explain` prints `blocked yes <impediment>`.
 All of that was true of any blocker before this record.
 
-The remedy was first written as `treadle transition <impediment> done`, and that line is refused by `T1` from `draft`, `ready`, `in_review` and `on_hold`, which is every state a fresh impediment is in.
+The remedy was first written as `treadling transition <impediment> done`, and that line is refused by `T1` from `draft`, `ready`, `in_review` and `on_hold`, which is every state a fresh impediment is in.
 It now names the one move the table allows from where the impediment stands, `ready` from `draft`, `in_progress` from `ready`, `done` from `in_progress` and `resume` from a hold, so each refusal hands the reader the next runnable line and the sequence reaches `done` by running them.
 `nextTowardDone` in `src/domain/state-machine.ts` reads that move off the transition table, and `test/cli/runnable-lines.test.ts` runs every emitted line from the state that emitted it.
 
 What the type adds is `DOD2`, fed for the first time: the active blockers of an item that are impediments are what the done gate reads, so an impediment raised against work already in progress holds that work from `done` until it is resolved, with the same remedy.
 `DOR3` is not evaluated on the done gate, which is why the rule is kept beside it rather than folded into it.
 
-An impediment in any open state whose record carries no `blocks` edge is doctor finding `H27`, on `doctor` and on `explain` of the impediment, and its detail names `treadle relation add <id> blocks <id>` as the line that raises it against something.
+An impediment in any open state whose record carries no `blocks` edge is doctor finding `H27`, on `doctor` and on `explain` of the impediment, and its detail names `treadling relation add <id> blocks <id>` as the line that raises it against something.
 The contract's words were "explain should say so plainly", and a finding is how this tool says something plainly: it needs no new result key and it carries its own remedy.
 A resolved or cancelled impediment that blocks nothing is history and is not reported.
 ADR-0022 later narrowed `H27` off a `draft` impediment as well, once `DOR9` could refuse the same fact at grooming instead.
@@ -88,14 +88,14 @@ The sprint capability is landing beside this record and nothing here reads its f
 ### `proposed_resolution` is read back in three places
 
 This project has twice shipped a field that could be written and never read, and `test/architecture/field-visibility.test.ts` now holds every field to a surface.
-`proposed_resolution` prints on `show <id>` cut at 64 cells, whole under `show <id> --field proposed_resolution`, and the refusal a caller meets when they try to start blocked work names that command: a `G2` refusal on an item an impediment blocks carries `fix treadle show <impediment> --field proposed_resolution` as its first fix line, before the override.
+`proposed_resolution` prints on `show <id>` cut at 64 cells, whole under `show <id> --field proposed_resolution`, and the refusal a caller meets when they try to start blocked work names that command: a `G2` refusal on an item an impediment blocks carries `fix treadling show <impediment> --field proposed_resolution` as its first fix line, before the override.
 The refusal is where a person wants it read back, because that is the moment they are deciding whether to resolve the impediment or work around it.
 
 ### A refusal on `G1` or `G6` hands over the gate's own remedies
 
-`transition <story> ready` on blocked work was refused with `the ready gate fails: DOR3` and one fix line, `treadle explain <story>`, and the impediment was named only at the end of that second command.
-The gate rules' remedies are command lines, which `test/domain/gate-remedies.test.ts` holds, so a refusal on `G1` or `G6` now carries them as fix lines ahead of `explain`: the story is refused at `ready` with `fix treadle transition cert-expired ready` on the refusal itself, the impediment being in `draft`.
-Every other guard's remedy is a command line too, and the refusal prints the first failed guard's: a story leaving `in_progress` for `done` fails `G5` and carries `fix treadle transition <story> in_review`, which used to be prose inside the cause and on no fix line.
+`transition <story> ready` on blocked work was refused with `the ready gate fails: DOR3` and one fix line, `treadling explain <story>`, and the impediment was named only at the end of that second command.
+The gate rules' remedies are command lines, which `test/domain/gate-remedies.test.ts` holds, so a refusal on `G1` or `G6` now carries them as fix lines ahead of `explain`: the story is refused at `ready` with `fix treadling transition cert-expired ready` on the refusal itself, the impediment being in `draft`.
+Every other guard's remedy is a command line too, and the refusal prints the first failed guard's: a story leaving `in_progress` for `done` fails `G5` and carries `fix treadling transition <story> in_review`, which used to be prose inside the cause and on no fix line.
 That is error prose and a fix list, which `docs/STABILITY.md` names as not breaking.
 
 ### `status` no longer lists `impediment` as absent
@@ -131,7 +131,7 @@ Refused above: it double-counts on the one row that carries the signal.
 - `GateContext.blockers` carries each blocker's type, state and review step as a `GateItem`, `DOD2` reads the impediments among them, and its remedy is the impediment's next move toward `done`, never a move the table refuses from where it stands.
 - `H27` joins the doctor's finding ids.
 - `show` gains a `proposed_resolution` text property, placed after `findings` and before the `evidence` block, which is where every text the field sweep appended went.
-- A `G1` or `G6` refusal carries the failing gate rules' remedies as fix lines, and a `G2` refusal on work an impediment blocks carries `treadle show <impediment> --field proposed_resolution`.
+- A `G1` or `G6` refusal carries the failing gate rules' remedies as fix lines, and a `G2` refusal on work an impediment blocks carries `treadling show <impediment> --field proposed_resolution`.
 - The view every command reads is unchanged in shape: `type`, `severity` and `relations` were already summary columns, and `proposed_resolution` is read on demand by `wholeItem`, so no `INDEX_FORMAT` bump and no new column (ADR-0014).
 
 ## Departures from the design record
@@ -154,7 +154,7 @@ A second type that needs a field required at creation and a finding when it stan
 `H27` no longer fires on a `draft` impediment.
 `file` lands an impediment in `draft`, so the finding can no longer fire between the two prescribed commands, and a CI job that runs `doctor` after each of them sees exit 0 at both points.
 
-That alone would have moved the complaint one state along, so the refusal was added where the tool can make one: `DOR9`, scoped to `impediment`, fails the ready gate while the record carries no `blocks` edge, with `treadle relation add <id> blocks <id>` as its remedy.
+That alone would have moved the complaint one state along, so the refusal was added where the tool can make one: `DOR9`, scoped to `impediment`, fails the ready gate while the record carries no `blocks` edge, with `treadling relation add <id> blocks <id>` as its remedy.
 Grooming is where an impediment stops being a record someone is writing and becomes one raised against work, so that is the move to refuse.
 
 This makes the pair the same one `R2` and `H25` already are: a write-time guard for what the tool is asked to do, and a load-time finding for what a hand edit or a `relation remove` left behind.

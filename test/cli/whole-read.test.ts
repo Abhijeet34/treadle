@@ -58,7 +58,7 @@ describe('a store holding a record it cannot serve refuses every answer over it'
       assert.match(run.err, /^rule S1$/m)
       assert.match(run.err, /^entity theme-dark$/m, 'the first hidden record is named')
       assert.match(run.err, /"cause items\/2026-09\.md line \d+: line \d+: expected "<key>: <value>", a "## <section>" heading or a blank line; 3 findings hide records this workspace holds, so no answer over it is whole$/m)
-      assert.match(run.err, /^fix treadle doctor$/m)
+      assert.match(run.err, /^fix treadling doctor$/m)
     })
   }
 
@@ -167,7 +167,7 @@ describe('the duplicated id and the newer schema refuse the list path too', () =
 // singular noun, so the workspace it is read over holds one item because one was filed.
 describe('a count of one is singular', () => {
   it('on the not-found refusal and on the clean doctor line', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-one-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-one-'))
     try {
       assert.equal((await runCli(['init'], { cwd: root })).code, 0)
       const filed = await runCli(['file', 'task', 'The only record'], { cwd: root })

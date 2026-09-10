@@ -24,7 +24,7 @@ import { afterEach, describe, it } from 'node:test'
 import { runCli, type Run } from '../helpers/cli-run.ts'
 import { POSIX_MODES } from '../helpers/platform.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 type Data = Record<string, unknown>
 
@@ -38,7 +38,7 @@ describe('status names a store no write can pass, and still answers', () => {
 
   /** A workspace holding one record, with the store root handed back. */
   async function workspace(): Promise<{ dir: string; store: string }> {
-    const dir = await mkdtemp(path.join(tmpdir(), 'treadle-unwritable-'))
+    const dir = await mkdtemp(path.join(tmpdir(), 'treadling-unwritable-'))
     made.push(dir)
     const cli = (argv: readonly string[]): Promise<Run> => runCli([...argv, '--out', 'json'], { cwd: dir, env: ENV })
     assert.equal((await cli(['init', '--name', 'held'])).code, 0)

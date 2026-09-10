@@ -16,7 +16,7 @@ import {
 import { workflowOf } from '../helpers/workflow.ts'
 import { fileURLToPath } from 'node:url'
 
-const REPO = 'Abhijeet34/treadle'
+const REPO = 'Abhijeet34/treadling'
 const HEAD = 'aaaa1111'
 const ROOT = fileURLToPath(new URL('../..', import.meta.url))
 
@@ -24,7 +24,7 @@ const RELEASE_PULL: PullRequest = {
   number: 69,
   user: { login: 'github-actions[bot]' },
   head: {
-    ref: 'release-please--branches--main--components--treadle',
+    ref: 'release-please--branches--main--components--treadling',
     sha: HEAD,
     repo: { full_name: REPO },
   },
@@ -180,7 +180,7 @@ describe('the one pull request the approval may ever reach', () => {
     ],
     [
       'the head branch is in a fork',
-      { ...RELEASE_PULL, head: { ...RELEASE_PULL.head, repo: { full_name: 'someone/treadle' } } },
+      { ...RELEASE_PULL, head: { ...RELEASE_PULL.head, repo: { full_name: 'someone/treadling' } } },
     ],
     [
       'it is not based on the default branch',

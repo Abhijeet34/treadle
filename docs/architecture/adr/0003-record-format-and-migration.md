@@ -22,7 +22,7 @@ A record is a `# <slug>: <title>` heading, a block of `key: value` lines, and H2
 ```text
 schema: 1
 
-# treadle-store: Land the store layer
+# treadling-store: Land the store layer
 
 type: story
 state: ready
@@ -148,7 +148,7 @@ Rather than hope no merge is ever written, every object rebuilt from a line has 
   The first cost is that a markdown store could not carry the most common structural mark in the language it is written in: measured over one fleet's own backlog, 17 of 347 real bodies carried a `##` line and were refused, so an agent copying prose into a record had to alter the prose to store it.
   The refusal was correct and clearly named, and a refusal that names a limitation is still a limitation.
   The second cost is that the bound was the wrong shape.
-  Rule 1 resynchronises on a `<slug>: <title>` line under up to three spaces and six hashes with a mandatory field block beneath it, while the write path checked column 0 only, so a description quoting another record's four mandatory fields was written and then could not be read: measured against the released grammar, `treadle file` exited 0 and `treadle backlog` then exited 7 with `INTEGRITY`, `S1`, naming the line in the shard, and every command over that workspace exited 7 until the file was hand-edited.
+  Rule 1 resynchronises on a `<slug>: <title>` line under up to three spaces and six hashes with a mandatory field block beneath it, while the write path checked column 0 only, so a description quoting another record's four mandatory fields was written and then could not be read: measured against the released grammar, `treadling file` exited 0 and `treadling backlog` then exited 7 with `INTEGRITY`, `S1`, naming the line in the shard, and every command over that workspace exited 7 until the file was hand-edited.
   That second half needed no `#` anywhere in the input, so it was reachable before the escape and is not a consequence of it.
   A store that accepts a write it cannot read back is worse than one that says no, and the way to stop the two drifting again is to give them one predicate rather than two.
 - **Rule 7 is held at one door, not per command.** The third correction to this record, and the third instance of one defect.

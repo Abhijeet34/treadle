@@ -11,16 +11,16 @@ Two priority-zero defects were measured, and they are one defect twice: a check 
 
 **E1.** `DOD3` is the human-in-the-loop rule, and its actor half compared the caller against the `assignee` the record holds.
 `assignee` is a field one `set` writes.
-The refusal printed `fix treadle set <id> assignee=<name>`, and running that line is the whole exploit:
+The refusal printed `fix treadling set <id> assignee=<name>`, and running that line is the whole exploit:
 
 ```text
-$ treadle transition launder done                # agent-7 is the assignee and the reviewer
+$ treadling transition launder done                # agent-7 is the assignee and the reviewer
 err GUARD_REFUSED
 "cause the done gate fails: DOD3
-fix treadle set launder reviewer=<name>
-$ treadle set launder assignee=bob               # the actor-half fix line
+fix treadling set launder reviewer=<name>
+$ treadling set launder assignee=bob               # the actor-half fix line
 ok set
-$ treadle transition launder done
+$ treadling transition launder done
 ok transition
 state in_review -> done
 guards G6 pass
@@ -60,9 +60,9 @@ The residual is real and it is named here rather than closed by widening a rule 
 
 ### The remedy is the accept, run by the reviewer
 
-`treadle set <id> assignee=<name>` was argued for on the grounds that a remedy is a command line the caller can run and no command makes the caller a different person.
+`treadling set <id> assignee=<name>` was argued for on the grounds that a remedy is a command line the caller can run and no command makes the caller a different person.
 The first half is right and the second half is the reason the line was wrong: a human-in-the-loop rule is not satisfiable by the caller alone, so a fix line that the caller can satisfy alone is a fix line that defeats the rule.
-The refusal now prints `treadle transition <id> done --actor <reviewer>`, with the reviewer the record names filled in.
+The refusal now prints `treadling transition <id> done --actor <reviewer>`, with the reviewer the record names filled in.
 That is a line, it is runnable from where the item stands, and the person it is for is not the person reading it.
 An agent that types it anyway is recorded as `agent` under a human's name, which is a trace the log holds and the reassign left nothing of.
 

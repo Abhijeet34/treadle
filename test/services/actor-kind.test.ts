@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// `help` says `TREADLE_ACTOR_KIND=human|agent`, and every other value was recorded as
+// `help` says `TREADLING_ACTOR_KIND=human|agent`, and every other value was recorded as
 // `human` in silence: `robot` and `AGENT` both landed there. `actor_kind` is the field the
 // purpose statement's "user-agent interactions" is read from, and a wrong value in a
 // committed, append-only log is the same class of defect as an actor with a control
@@ -18,10 +18,10 @@ describe('the actor kind a mutation records', () => {
   let root: string
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-actor-kind-'))
-    const init = await runCli(['init'], { cwd: root, env: { TREADLE_ACTOR: 'kim' } })
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-actor-kind-'))
+    const init = await runCli(['init'], { cwd: root, env: { TREADLING_ACTOR: 'kim' } })
     assert.equal(init.code, 0, init.err)
-    const filed = await runCli(['file', 'task', 'A task', '--id', 'a-task'], { cwd: root, env: { TREADLE_ACTOR: 'kim' } })
+    const filed = await runCli(['file', 'task', 'A task', '--id', 'a-task'], { cwd: root, env: { TREADLING_ACTOR: 'kim' } })
     assert.equal(filed.code, 0, filed.err)
   })
   after(async () => { await rm(root, { recursive: true, force: true }) })
@@ -30,36 +30,36 @@ describe('the actor kind a mutation records', () => {
     assert.equal(actorKindRefusal(undefined), undefined)
     assert.equal(actorKindRefusal('human'), undefined)
     assert.equal(actorKindRefusal('agent'), undefined)
-    assert.equal(actorKindRefusal('robot'), 'TREADLE_ACTOR_KIND is "robot", and an actor kind is human or agent')
-    assert.equal(actorKindRefusal('AGENT'), 'TREADLE_ACTOR_KIND is "AGENT", and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('robot'), 'TREADLING_ACTOR_KIND is "robot", and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('AGENT'), 'TREADLING_ACTOR_KIND is "AGENT", and an actor kind is human or agent')
   })
 
   // The value comes from the environment, so it is as unbounded and as unsafe as an actor's
   // own name: a refusal that echoed it whole would print megabytes, and one that echoed a
   // newline would forge a line of the tool's own grammar (F2).
   it('names the token only where it is bounded and safe to print back', () => {
-    assert.equal(actorKindRefusal('x'.repeat(5000)), 'TREADLE_ACTOR_KIND is 5000 characters, and an actor kind is human or agent')
-    assert.equal(actorKindRefusal('age\nnt'), 'TREADLE_ACTOR_KIND is 6 characters, and an actor kind is human or agent')
-    assert.equal(actorKindRefusal(''), 'TREADLE_ACTOR_KIND is "", and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('x'.repeat(5000)), 'TREADLING_ACTOR_KIND is 5000 characters, and an actor kind is human or agent')
+    assert.equal(actorKindRefusal('age\nnt'), 'TREADLING_ACTOR_KIND is 6 characters, and an actor kind is human or agent')
+    assert.equal(actorKindRefusal(''), 'TREADLING_ACTOR_KIND is "", and an actor kind is human or agent')
   })
 
   it('refuses a mutation whose kind is neither word, naming the token and the export', async () => {
     for (const kind of ['robot', 'AGENT', 'Human', '']) {
       const run = await runCli(['set', 'a-task', 'assignee=zed'], {
-        cwd: root, env: { TREADLE_ACTOR: 'kim', TREADLE_ACTOR_KIND: kind },
+        cwd: root, env: { TREADLING_ACTOR: 'kim', TREADLING_ACTOR_KIND: kind },
       })
       assert.equal(run.code, 2, `${kind}: ${run.out}${run.err}`)
-      assert.match(run.err, new RegExp(`^"cause TREADLE_ACTOR_KIND is "${kind}", and an actor kind is human or agent$`, 'm'))
-      assert.match(run.err, /^fix export TREADLE_ACTOR_KIND=agent$/m)
+      assert.match(run.err, new RegExp(`^"cause TREADLING_ACTOR_KIND is "${kind}", and an actor kind is human or agent$`, 'm'))
+      assert.match(run.err, /^fix export TREADLING_ACTOR_KIND=agent$/m)
     }
   })
 
   it('records the value a caller wrote, and nothing was silently written meanwhile', async () => {
     const agent = await runCli(['set', 'a-task', 'assignee=yves'], {
-      cwd: root, env: { TREADLE_ACTOR: 'kim', TREADLE_ACTOR_KIND: 'agent' },
+      cwd: root, env: { TREADLING_ACTOR: 'kim', TREADLING_ACTOR_KIND: 'agent' },
     })
     assert.equal(agent.code, 0, agent.err)
-    const log = await runCli(['history', 'a-task', '--limit', '5'], { cwd: root, env: { TREADLE_ACTOR: 'kim' } })
+    const log = await runCli(['history', 'a-task', '--limit', '5'], { cwd: root, env: { TREADLING_ACTOR: 'kim' } })
     assert.match(log.out, /^\S+ agent item\.set assignee=\(unset\)->yves kim$/m)
     assert.equal(/ item\.set assignee=\(unset\)->zed /.test(log.out), false,
       'the refused kinds wrote nothing')
@@ -68,7 +68,7 @@ describe('the actor kind a mutation records', () => {
   // A read never records the kind, so it is not held to it, which is the same scoping the
   // actor bound has carried since it was added.
   it('leaves a read alone', async () => {
-    const run = await runCli(['show', 'a-task'], { cwd: root, env: { TREADLE_ACTOR: 'kim', TREADLE_ACTOR_KIND: 'robot' } })
+    const run = await runCli(['show', 'a-task'], { cwd: root, env: { TREADLING_ACTOR: 'kim', TREADLING_ACTOR_KIND: 'robot' } })
     assert.equal(run.code, 0, run.err)
   })
 })
@@ -83,7 +83,7 @@ describe('a mutation that names nobody', () => {
   let root: string
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-actor-named-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-actor-named-'))
   })
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
@@ -93,18 +93,18 @@ describe('a mutation that names nobody', () => {
   it('refuses the first write of all, so no workspace is created under nobody', async () => {
     const init = await bare(['init'])
     assert.equal(init.code, 2, init.out)
-    assert.match(init.err, /^"cause init records who made the change, and neither TREADLE_ACTOR nor --actor names anyone/m, init.err)
-    assert.match(init.err, /^fix export TREADLE_ACTOR=<your-name>$/m, init.err)
-    assert.match(init.err, /^fix treadle --actor <name>$/m, init.err)
+    assert.match(init.err, /^"cause init records who made the change, and neither TREADLING_ACTOR nor --actor names anyone/m, init.err)
+    assert.match(init.err, /^fix export TREADLING_ACTOR=<your-name>$/m, init.err)
+    assert.match(init.err, /^fix treadling --actor <name>$/m, init.err)
   })
 
   it('takes either line that supplies one, and records the name it was given', async () => {
-    assert.equal((await bare(['init'], { TREADLE_ACTOR: 'kim' })).code, 0)
-    const filed = await bare(['file', 'task', 'A task', '--id', 'named-task'], { TREADLE_ACTOR: 'kim' })
+    assert.equal((await bare(['init'], { TREADLING_ACTOR: 'kim' })).code, 0)
+    const filed = await bare(['file', 'task', 'A task', '--id', 'named-task'], { TREADLING_ACTOR: 'kim' })
     assert.equal(filed.code, 0, filed.err)
     const flagged = await bare(['file', 'task', 'Another', '--id', 'flagged-task', '--actor', 'ravi'])
     assert.equal(flagged.code, 0, flagged.err)
-    const log = await bare(['history', 'flagged-task'], { TREADLE_ACTOR: 'kim' })
+    const log = await bare(['history', 'flagged-task'], { TREADLING_ACTOR: 'kim' })
     assert.match(log.out, /ravi$/m, log.out)
   })
 
@@ -112,15 +112,15 @@ describe('a mutation that names nobody', () => {
   // job produces from an unpopulated secret. Left as a value it earned the whitespace
   // sentence, whose fix line named the flag and never the variable that was empty.
   for (const [what, value] of [['empty', ''], ['blank', '   ']] as const) {
-    it(`treats an ${what} TREADLE_ACTOR as naming nobody, not as a malformed name`, async () => {
-      const run = await bare(['file', 'task', 'X', '--id', `x-${what}`], { TREADLE_ACTOR: value })
+    it(`treats an ${what} TREADLING_ACTOR as naming nobody, not as a malformed name`, async () => {
+      const run = await bare(['file', 'task', 'X', '--id', `x-${what}`], { TREADLING_ACTOR: value })
       assert.equal(run.code, 2, run.out)
-      assert.match(run.err, /^fix export TREADLE_ACTOR=<your-name>$/m, run.err)
+      assert.match(run.err, /^fix export TREADLING_ACTOR=<your-name>$/m, run.err)
     })
   }
 
   it('lets the flag win over an empty variable, which is the line a caller reaches for', async () => {
-    const run = await bare(['file', 'task', 'Y', '--id', 'y-flagged', '--actor', 'dana'], { TREADLE_ACTOR: '' })
+    const run = await bare(['file', 'task', 'Y', '--id', 'y-flagged', '--actor', 'dana'], { TREADLING_ACTOR: '' })
     assert.equal(run.code, 0, run.err)
   })
 

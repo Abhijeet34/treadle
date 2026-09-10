@@ -116,7 +116,7 @@ export async function initWorkspace(
     return errorResult({
       code: 'VALIDATION', command: 'init', workspace: '-', effect: 'mutate', rule: 'C1',
       cause: `${above} is already a workspace above this directory, and every command run here would answer from the new one instead`,
-      fix: [`treadle status --workspace ${above}`, 'treadle init --yes'],
+      fix: [`treadling status --workspace ${above}`, 'treadling init --yes'],
     })
   }
 
@@ -124,7 +124,7 @@ export async function initWorkspace(
     return errorResult({
       code: 'VALIDATION', command: 'init', workspace: '-', effect: 'mutate', rule: 'C1',
       cause: `${root} already holds files and is not a workspace; creating one here may collide with them`,
-      fix: ['treadle init --yes'],
+      fix: ['treadling init --yes'],
     })
   }
 

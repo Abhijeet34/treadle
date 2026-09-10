@@ -21,7 +21,7 @@ function pkg(dir: string, manifest: Record<string, unknown>): void {
   writeFileSync(path.join(dir, 'package.json'), JSON.stringify(manifest))
 }
 
-const fixture = mkdtempSync(path.join(os.tmpdir(), 'treadle-licences-'))
+const fixture = mkdtempSync(path.join(os.tmpdir(), 'treadling-licences-'))
 after(() => rmSync(fixture, { recursive: true, force: true }))
 
 writeFileSync(path.join(fixture, 'package.json'), JSON.stringify({ name: 'fixture', version: '0.0.0' }))

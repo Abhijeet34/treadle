@@ -220,7 +220,7 @@ export type Workspace = {
 }
 
 export async function aWorkspace(options: ShardedStoreOptions = {}): Promise<Workspace> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-store-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-store-'))
   const made = await createWorkspace(root, {
     id: 'test-workspace',
     name: 'Test workspace',

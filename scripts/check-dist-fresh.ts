@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // Refuses to pack a bundle older than the source it was built from.
 //
-// Found by walking into it on 2026-09-07: a checked-out tree carried a `dist/treadle.js`
-// from 2026-09-05 beside a `src/` from 2026-09-07, and `treadle help` reported fourteen
+// Found by walking into it on 2026-09-07: a checked-out tree carried a `dist/treadling.js`
+// from 2026-09-05 beside a `src/` from 2026-09-07, and `treadling help` reported fourteen
 // commands where the inventory then had nineteen (2026-09-07). `package.json` lists `dist/`
-// in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, and no
+// in `files`, points `bin` at `dist/treadling.js` and gitignores the directory, and no
 // `prepare`, `prepack` or `prepublishOnly` script existed, so `npm pack` in that tree would
 // have shipped the fourteen-command tool with a nineteen-command README and nothing would
 // have said so.
@@ -50,14 +50,14 @@ function newestUnder(directory: string): { readonly at: number; readonly file: s
 export function staleAgainst(root: string): string | undefined {
   let built: number
   try {
-    built = statSync(path.join(root, 'dist', 'treadle.js')).mtimeMs
+    built = statSync(path.join(root, 'dist', 'treadling.js')).mtimeMs
   } catch {
     return undefined
   }
   const newest = newestUnder(path.join(root, 'src'))
   if (newest === undefined || newest.at <= built) return undefined
   // Repository-relative and always with `/`, so the sentence below reads the same on every
-  // platform: it already names `dist/treadle.js` that way, and a Windows run put
+  // platform: it already names `dist/treadling.js` that way, and a Windows run put
   // `src\cli\main.ts` in the other half of the same line.
   return path.relative(root, newest.file).replaceAll(path.sep, '/')
 }
@@ -66,9 +66,9 @@ export function staleAgainst(root: string): string | undefined {
 export function distProblems(root: string): readonly string[] {
   let mode: number
   try {
-    mode = statSync(path.join(root, 'dist', 'treadle.js')).mode
+    mode = statSync(path.join(root, 'dist', 'treadling.js')).mode
   } catch {
-    return ['dist/treadle.js does not exist; run npm run build, which the release workflow runs before its preflight']
+    return ['dist/treadling.js does not exist; run npm run build, which the release workflow runs before its preflight']
   }
   // esbuild writes 0644, and a shebang no kernel reads is a shebang that does nothing: the
   // bundle names its interpreter on that line, and `npm install -g` links the bin straight at
@@ -76,7 +76,7 @@ export function distProblems(root: string): readonly string[] {
   // generates `.cmd`, `.ps1` and sh shims that name the interpreter themselves, so the clause
   // is asserted where it is real. Without this, `check-dist-fresh` refused every Windows tree.
   if (process.platform !== 'win32' && (mode & 0o111) === 0) {
-    return ['dist/treadle.js is not executable, so the kernel never reads its shebang; run npm run build']
+    return ['dist/treadling.js is not executable, so the kernel never reads its shebang; run npm run build']
   }
   if (newestUnder(path.join(root, 'src')) === undefined) {
     return ['src/ holds no file, so there is nothing this bundle could have been built from']
@@ -84,7 +84,7 @@ export function distProblems(root: string): readonly string[] {
   const stale = staleAgainst(root)
   if (stale === undefined) return []
   return [
-    `dist/treadle.js was written before ${stale} was last changed, `
+    `dist/treadling.js was written before ${stale} was last changed, `
       + 'so the tarball would carry a bundle that is not this source; run npm run build',
   ]
 }

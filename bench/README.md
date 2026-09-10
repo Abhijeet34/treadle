@@ -18,7 +18,7 @@ rather than running the whole rig on a typo.
 
 Parameters that decide what a figure means live in `bench.config.json`, not in a flag list:
 the seed, the scales, the sample count per scale, the parallel-writer counts and the size of
-the malformed-input corpus. `TREADLE_BENCH_DIR` overrides the base the rig works under.
+the malformed-input corpus. `TREADLING_BENCH_DIR` overrides the base the rig works under.
 
 ## Two runs at once
 
@@ -53,7 +53,7 @@ entries it supersedes, and a full set of four is about 354 MB, so the ceiling is
 megabytes per generator version until the directory is removed. Deleting a superseded entry
 automatically is the thing not done here on purpose: another run may be cloning it at that
 moment, and a reaper racing a reader is the failure this layout exists to remove. Remove the
-whole base when it is in the way, with `rm -rf /tmp/treadle-bench`, and the next run rebuilds
+whole base when it is in the way, with `rm -rf /tmp/treadling-bench`, and the next run rebuilds
 what it needs.
 
 One check survives all of that, because none of the above covers a generation that completed
@@ -96,5 +96,5 @@ The six behaviour axes go the other way and drive `src/cli/main.ts`'s own `run` 
 with argv, the working directory, the environment and both streams passed in: 612 spawns at
 the store-loaded floor the run measures is one to two minutes of Node startup, and startup
 cannot change what they measure. Each one runs a single read through the shipped
-`bin/treadle.js` as a real child and compares the bytes, so that trade is checked rather than
+`bin/treadling.js` as a real child and compares the bytes, so that trade is checked rather than
 assumed.

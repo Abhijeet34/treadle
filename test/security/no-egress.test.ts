@@ -128,7 +128,7 @@ describe('no command opens a socket', () => {
     demo = await aDemoWorkspace()
     cwd = path.dirname(demo.root)
     await demo.store.close()
-    elsewhere = await mkdtemp(path.join(tmpdir(), 'treadle-egress-'))
+    elsewhere = await mkdtemp(path.join(tmpdir(), 'treadling-egress-'))
   })
 
   after(async () => {

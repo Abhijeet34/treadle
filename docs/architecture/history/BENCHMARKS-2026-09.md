@@ -2,8 +2,9 @@
 
 This is a record of runs taken in September 2026, kept in `history/` rather than in `docs/` because every figure below was measured on a tree that carried surfaces this repository has since removed, and no run has been taken on the current one.
 The method, the confounds and the mechanism behind each figure are what it is kept for.
+Every command, path and link below spells `treadle`, the name this package carried until [ADR-0038](../adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) retired it on 2026-09-10; the runs were taken under that name and the page is left saying so.
 
-The acceptance bar for treadle is a measured margin over the reference on twelve axes, not an adjective.
+The acceptance bar for treadling is a measured margin over the reference on twelve axes, not an adjective.
 Ten of the twelve are measured here.
 Two are not, and each says so in its own row with the reason rather than as a gap, because a gap in a table reads as a pass to whoever skims it.
 

@@ -3,8 +3,8 @@
 // TTY test and the exit status; everything a test needs to drive is `run`, which takes all
 // four as arguments, so the suite never spawns a process to check what a command printed.
 //
-// `bin/treadle.js` imports this file to run from source in development. The release build
-// bundles it into `dist/treadle.js`, which is the executable the published package installs.
+// `bin/treadling.js` imports this file to run from source in development. The release build
+// bundles it into `dist/treadling.js`, which is the executable the published package installs.
 
 import module from 'node:module'
 import process from 'node:process'

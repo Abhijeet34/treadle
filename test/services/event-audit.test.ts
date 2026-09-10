@@ -29,17 +29,17 @@ describe('what each read says about a hand-written event line', () => {
   let filedAt: string
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-audit-'))
-    const init = await runCli(['init'], { cwd: root, env: { TREADLE_ACTOR: 'alice' } })
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-audit-'))
+    const init = await runCli(['init'], { cwd: root, env: { TREADLING_ACTOR: 'alice' } })
     assert.equal(init.code, 0, init.err)
-    const filed = await runCli(['file', 'story', 'First story', '--id', 'first-story'], { cwd: root, env: { TREADLE_ACTOR: 'alice' } })
+    const filed = await runCli(['file', 'story', 'First story', '--id', 'first-story'], { cwd: root, env: { TREADLING_ACTOR: 'alice' } })
     assert.equal(filed.code, 0, filed.err)
     filedAt = /^"set filed_at - -> (\S+)$/m.exec(filed.out)?.[1] as string
     assert.ok(filedAt !== undefined)
   })
   after(async () => { await rm(root, { recursive: true, force: true }) })
 
-  const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: { TREADLE_ACTOR: 'alice' } })
+  const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: { TREADLING_ACTOR: 'alice' } })
 
   it('explain names the event that agrees with the stored state, and doctor reports the one that does not as H20', async () => {
     const clean = await cli(['explain', 'first-story'])

@@ -26,7 +26,7 @@ export type BenchConfig = {
 
 export function loadConfig(root: string): BenchConfig {
   const file = JSON.parse(readFileSync(path.join(root, 'bench', 'bench.config.json'), 'utf8')) as BenchConfig
-  return { ...file, corpusDir: process.env['TREADLE_BENCH_DIR'] ?? file.corpusDir }
+  return { ...file, corpusDir: process.env['TREADLING_BENCH_DIR'] ?? file.corpusDir }
 }
 
 export function samplesFor(config: BenchConfig, items: number): number {

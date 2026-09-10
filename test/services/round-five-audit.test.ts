@@ -18,11 +18,11 @@ import { openWorkspace } from '../../src/adapters/store/index.ts'
 import { activeBlockerIndex, activeBlockers, readWorkspace } from '../../src/application/services/context.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 /** A fresh workspace per suite, driven through the real command surface. */
 async function aWorkspace(): Promise<{ root: string; cli: (argv: readonly string[]) => Promise<{ code: number; out: string; err: string }> }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-r5-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-r5-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   const init = await cli(['init'])
   assert.equal(init.code, 0, init.err)

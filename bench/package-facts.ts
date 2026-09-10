@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The DR8 budget rows that are properties of the package rather than of a run: dependency
 // count, install size and bundle size. All three need `npm run build` to have run, because
-// `dist/treadle.js` is what the `files` allowlist ships and what `bin` points at. Without it
+// `dist/treadling.js` is what the `files` allowlist ships and what `bin` points at. Without it
 // every one of them says so rather than reporting a number that weighs an incomplete tree.
 //
 // A bundle older than the sources says so too. An absent one was already refused, and a stale
@@ -29,13 +29,13 @@ export function packageFacts(root: string): PackageFacts {
   }
 
   const dist = path.join(root, 'dist')
-  const bundle = path.join(dist, 'treadle.js')
+  const bundle = path.join(dist, 'treadling.js')
   const present = existsSync(bundle)
   const staleBy = present ? olderThanSources(root, bundle) : undefined
   const built = present && staleBy === undefined
   const unbuilt = !present
-    ? 'NOT MEASURED: dist/treadle.js has not been built, so the package is incomplete; run npm run build'
-    : `NOT MEASURED: dist/treadle.js is older than ${staleBy}, so it is not this tree; run npm run build`
+    ? 'NOT MEASURED: dist/treadling.js has not been built, so the package is incomplete; run npm run build'
+    : `NOT MEASURED: dist/treadling.js is older than ${staleBy}, so it is not this tree; run npm run build`
 
   let packed: number | string
   let unpacked: number | string

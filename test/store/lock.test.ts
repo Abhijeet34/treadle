@@ -40,7 +40,7 @@ async function writer(root: string, id: string): Promise<Reported> {
  *  says what each situation models. */
 async function underEperm(root: string, situation: string): Promise<Reported> {
   const { stdout } = await run(process.execPath, [UNDER_EPERM, path.join(root, '.lock')], {
-    encoding: 'utf8', env: { ...process.env, TREADLE_EPERM: situation },
+    encoding: 'utf8', env: { ...process.env, TREADLING_EPERM: situation },
   })
   return JSON.parse(stdout) as Reported
 }

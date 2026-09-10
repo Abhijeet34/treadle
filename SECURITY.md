@@ -1,6 +1,6 @@
 # Security policy
 
-treadle is maintained by one person, Abhijeet Halder, in his own time.
+treadling is maintained by one person, Abhijeet Halder, in his own time.
 There is no security team and no bug bounty.
 What follows is what one maintainer can actually do, stated so you can hold him to it.
 
@@ -10,7 +10,7 @@ Report it privately through GitHub, not in a public issue.
 
 Open the repository on GitHub, click the **Security** tab, then **Report a vulnerability**.
 That opens a draft security advisory visible only to the maintainer, and it lets the two of you talk in private until there is a fix.
-The direct link is <https://github.com/Abhijeet34/treadle/security/advisories/new>.
+The direct link is <https://github.com/Abhijeet34/treadling/security/advisories/new>.
 
 A useful report names the commit or version you tested, your operating system and `node --version`, the steps that reproduce it, and what an attacker gains at the end.
 A proof of concept is welcome and never required.
@@ -36,14 +36,14 @@ A report against a copy installed from npm and a report against the `v*` tag of 
 
 ## Scope
 
-treadle is a command-line tool that runs on your own machine and edits work-item files in a directory you point it at.
+treadling is a command-line tool that runs on your own machine and edits work-item files in a directory you point it at.
 It opens no network connection in any code path, and the files it reads and writes are the workspace you gave it.
 Its trust boundary is that repository content is untrusted: a workspace you cloned from someone else is attacker-controlled input, and the tool's job is to parse it, render it, and refuse the parts that are malformed without ever executing them.
 Reports are in scope when they break that boundary.
 
 In scope:
 
-- Code execution of any kind, a write outside the resolved workspace, or a read outside it, caused by the content of a cloned workspace: a crafted record, event line, or configuration value. treadle runs no program and evaluates no string, by the decision in `docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md`, so any execution at all is a report against that record.
+- Code execution of any kind, a write outside the resolved workspace, or a read outside it, caused by the content of a cloned workspace: a crafted record, event line, or configuration value. treadling runs no program and evaluates no string, by the decision in `docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md`, so any execution at all is a report against that record.
 - Output that forges the tool's own agent-facing lines, so a consumer reads a field, an envelope, or a state the tool did not emit, from a crafted title, body, or field.
 - A crafted field that rewrites or spoofs a terminal, or reorders a rendered row, past the store's own validation.
 - An export (CSV, Markdown) that carries an attacker's content into a formula or a script when a person opens it.

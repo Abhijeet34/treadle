@@ -7,7 +7,7 @@
 // taken with @anthropic-ai/tokenizer and gpt-tokenizer outside this tree.
 //
 // A budget is stated against a three-character binary name, and every figure shifts by
-// (len(name) - 3) per occurrence; `treadle` is four characters longer, so a budget is
+// (len(name) - 3) per occurrence; `treadling` is four characters longer, so a budget is
 // re-derived here by counting the occurrences in the artefact itself.
 
 import assert from 'node:assert/strict'
@@ -40,7 +40,7 @@ const BUDGET: Readonly<Record<string, number>> = {
   'guard-refused': 270,
 }
 
-const NAME_COST = 'treadle'.length - 'wmx'.length
+const NAME_COST = 'treadling'.length - 'wmx'.length
 
 describe('every budgeted artefact is inside the byte budget A.3 measured', () => {
   let golden: ReadonlyMap<string, ResultObject>
@@ -59,7 +59,7 @@ describe('every budgeted artefact is inside the byte budget A.3 measured', () =>
     it(`${name} is at most ${budget} B`, () => {
       const bytes = agentRenderer.render(golden.get(name) as ResultObject)
       const size = Buffer.byteLength(bytes, 'utf8')
-      const occurrences = (bytes.match(/\btreadle\b/g) ?? []).length
+      const occurrences = (bytes.match(/\btreadling\b/g) ?? []).length
       const allowed = budget + occurrences * NAME_COST
       assert.ok(
         size <= allowed,

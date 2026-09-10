@@ -21,7 +21,7 @@ A CI job running `doctor` therefore failed between two lines the tool told the c
 `evaluateCommit` reads the ready gate and never the state, so a `draft` item with complete fields commits to a sprint.
 `board` then filed it under draft, `status` counted it `0/1`, and `next` refused to rank it: the sprint held work the tool would not suggest and nothing said why.
 
-`treadle show sprint-1` and `explain sprint-1` answered `NOT_FOUND` with "is in no record here; this workspace holds N items" while `history sprint-1` answered from the same id, because `notFound` searched item ids only.
+`treadling show sprint-1` and `explain sprint-1` answered `NOT_FOUND` with "is in no record here; this workspace holds N items" while `history sprint-1` answered from the same id, because `notFound` searched item ids only.
 `sprints <id>`, the read that works, was named in no refusal.
 
 `addRelation` checked no state, so a `blocks` edge out of a done or cancelled item was accepted and inert: `explain` on the target said `blocked no` while the caller believed they had blocked something.
@@ -48,7 +48,7 @@ Velocity is a historical record. A figure that rises after the period it describ
 `H27` no longer fires on a `draft` impediment.
 `file` lands an impediment in `draft`, so the finding can no longer fire between the two prescribed commands, and a CI job that runs `doctor` after each of them sees exit 0 at both points.
 
-That alone would have moved the complaint one state along, so the refusal was added where the tool can make one: `DOR9`, scoped to `impediment`, fails the ready gate while the record carries no `blocks` edge, with `treadle relation add <id> blocks <id>` as its remedy.
+That alone would have moved the complaint one state along, so the refusal was added where the tool can make one: `DOR9`, scoped to `impediment`, fails the ready gate while the record carries no `blocks` edge, with `treadling relation add <id> blocks <id>` as its remedy.
 Grooming is where an impediment stops being a record someone is writing and becomes one raised against work, so that is the move to refuse.
 
 This makes the pair the same one `R2` and `H25` already are: a write-time guard for what the tool is asked to do, and a load-time finding for what a hand edit or a `relation remove` left behind.
@@ -78,7 +78,7 @@ A team must be able to read "three committed, one not ready" without inferring i
 ### `notFound` searches the sprint ids too
 
 A sprint is a record with an id, so an id-taking read that cannot find an item now looks at the sprints before it says the id names nothing.
-An exact hit is a refusal that says `<id> is a sprint here, not an item, and show reads items`, with `treadle sprints <id>` and `treadle backlog --sprint <id>` as its fix lines.
+An exact hit is a refusal that says `<id> is a sprint here, not an item, and show reads items`, with `treadling sprints <id>` and `treadling backlog --sprint <id>` as its fix lines.
 A near miss reaches the `near` list beside the item ids, so a mistyped sprint id gets the same two-step correction a mistyped item id gets.
 
 `show` and `explain` refuse rather than answer, because `show` is the item read and `sprints` is the sprint read, and one command rendering two record shapes would be two answers behind one name.
@@ -94,7 +94,7 @@ The previous round's note on the result was the tool saying so and letting the w
 `duplicates` earns exactly one more rule, and it is `DOR10`: the ready gate fails while the item duplicates another the store holds.
 One rule reaches all three surfaces the finding named, because they all read the same verdict.
 Grooming is refused by `G1`, starting is refused because the item cannot reach `ready` to be started, and `sprint commit` is refused because `evaluateCommit` reads the ready gate.
-Its remedy is `treadle transition <id> cancelled --resolution duplicate --reason "<why>"`, which is what the `duplicate` resolution has been in the closed set for since ADR-0010.
+Its remedy is `treadling transition <id> cancelled --resolution duplicate --reason "<why>"`, which is what the `duplicate` resolution has been in the closed set for since ADR-0010.
 
 `DOR10` passes when the original is an id the store does not hold.
 A dangling edge is `H24`'s finding and its remedy is `relation remove`, and a gate rule that read the raw edge would have held the copy at `draft` for ever on a record nobody can move, which is the trap `blockersOf` documents for blockers.

@@ -25,7 +25,7 @@ Every one of them also cost something to keep.
 `board` was a fourth read over the same records `backlog` already reads.
 The point scale was a workspace-configurable bound with a live defect behind it, recorded below.
 
-The audit that measured this is `treadle-shape-and-use-review-c9`, and the captain chose "cut all of it" over three narrower options on 2026-09-08.
+The audit that measured this is `treadling-shape-and-use-review-c9`, and the captain chose "cut all of it" over three narrower options on 2026-09-08.
 
 ## Decision
 
@@ -50,7 +50,7 @@ What is not removed is everything that records something: the seven work-item ty
 `sprint_id`, `points`, `hours_estimate`, `timebox_hours` and `component` are declared retired in the item codec's own `RETIRED_FIELDS` map (src/adapters/store/item-codec.ts), the same mechanism the epic-only `target_date` used when it was renamed to the common `due`: a retired key is read as nothing rather than carried into `extra`, and it is simply absent the next time the record is rendered, so it disappears with no user action, no cleanup command and no file rewritten.
 So a workspace written by the build before this one loads and serves every record exactly as before; `set <id> points=` is no longer a rule `V5` refusal for a field the caller cannot name, because the field is gone the next time anything touches the record.
 A key this build has never heard of, one a *newer* build might write, is not in that map and is not touched by it: it is still carried into `extra` on read and written back byte for byte on the next mutation. That distinction is what makes dropping the five retired keys safe where a blanket "drop every unknown key" would be data loss, and it is unchanged by this decision.
-treadle's own `.work` store keeps `points` on every pre-cut item for the same reason any other pre-cut workspace does: the codec had not declared it retired until this decision, so the key was still riding `extra`. It now drops the way a user's would, through the next ordinary write to each record, with no sweep and no hand edit.
+treadling's own `.work` store keeps `points` on every pre-cut item for the same reason any other pre-cut workspace does: the codec had not declared it retired until this decision, so the key was still riding `extra`. It now drops the way a user's would, through the next ordinary write to each record, with no sweep and no hand edit.
 The one judgement call this raises is whether dropping a retired key should itself write an event. `target_date` set the precedent already shipped and documented: the codec drops it below the event layer, and no event records that the rename happened. The five fields chosen here follow that precedent, for reasons beyond consistency. The event log records what a *caller* did to a record, and retiring a field is this build's change, not any caller's; an event written on first touch would need an actor, and the only one available is whoever happened to touch the record next for an unrelated reason, which misattributes the change rather than recording it. What was retired and when is recorded already, in this ADR and in the commit that made it, and the value each record carried before the drop is in git history. And it is not free: an event per record per retired field, written on first touch, is up to 250,000 additional committed log lines for five fields over a 50,000-item workspace, appended to writes the caller did not ask to be about retirement. Silence is the chosen answer, on those grounds.
 
 **`I5` becomes `V9`.** Four of the five `I` rules were the sprint's and went with it, and the fifth was never about sprints: it is the rule that an id names one thing, which `file` raises for a taken id and `history --txn` raises for an event id given where a transaction was wanted. Both branches survive the cut, so the rule moves into the `V` namespace `docs/DOMAIN.md` already owns rather than being the last inhabitant of a namespace that is otherwise empty.
@@ -73,9 +73,9 @@ The last of them was already the weakest: `points` was validated against a scale
 
 Neither is fixed. Both are answered by the surface not existing.
 
-`treadle config set point_scale "1, 2"` made every later write to every item off the new scale fail `V4`, and neither `doctor` nor `explain` said why: the write path applied the scale and the load path did not, so a record the tool had written became one it refused to write again. The key is gone, so the sequence cannot be typed.
+`treadling config set point_scale "1, 2"` made every later write to every item off the new scale fail `V4`, and neither `doctor` nor `explain` said why: the write path applied the scale and the load path did not, so a record the tool had written became one it refused to write again. The key is gone, so the sequence cannot be typed.
 
-`treadle ceremonies` read a record kind no command in the build could write. The command is gone.
+`treadling ceremonies` read a record kind no command in the build could write. The command is gone.
 
 ### What the cut costs the benchmark
 

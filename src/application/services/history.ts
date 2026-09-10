@@ -392,7 +392,7 @@ async function noTransaction(
     // The list of records, which is what `notFound` answers an unknown id with. There is no
     // listing of transactions to point at and building one is a command of its own, so the
     // line offered is the other scope's: these are the ids `history <id>` reads.
-    fix: ['treadle backlog'],
+    fix: ['treadling backlog'],
   })
 }
 
@@ -468,7 +468,7 @@ export async function history(
       ? `${absent.size} of the records these rows name ${absent.size === 1 ? 'is' : 'are'} no longer here; the entity in each what cell names ${absent.size === 1 ? 'it' : 'them'}, and the log keeps every event ${absent.size === 1 ? 'it' : 'they'} earned`
       : removalRecorded(events.value)
         ? 'this record was removed; the log keeps every event it earned while it was here'
-        : 'no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadle doctor reports it as H33'
+        : 'no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadling doctor reports it as H33'
 
   const recorded = page
     .filter((event) => event.reason !== undefined)

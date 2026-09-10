@@ -10,7 +10,7 @@
 
 Every command starts with `readWorkspace` in `src/application/services/context.ts`, because every answer depends on the whole set: a backlog counts it, a gate reads an item's children from it, a new id is chosen against it.
 Until this record that read was `store.list()` with no query, which decoded every record in the store into a `WorkItem`, indexed the result by id and built the hierarchy graph off it.
-`treadle show` printed 532 bytes about one item by first materialising 50,000 of them.
+`treadling show` printed 532 bytes about one item by first materialising 50,000 of them.
 
 The measurement rig weighed DR8's 100 MiB read budget over `store.list` bounded at 50 rows, which no command performs, and reported 99.2 MiB.
 Weighed over `readWorkspace` the same budget read 418,336 KiB, 4.06x over, and the read took 1.2 s at 50,000 items where `get` took 7 ms.
@@ -87,7 +87,7 @@ The figures below are what they printed, and the DR8 read row, which `bench/gate
 - The read every command performs, in-process median and peak RSS, before and after: 17.0 ms and 104,240 KiB to 12.0 ms and 101,904 KiB at 100 items; 49.9 ms and 112,576 KiB to 17.4 ms and 103,584 KiB at 1,000; 287.6 ms and 201,104 KiB to 80.4 ms and 117,584 KiB at 10,000; 1,268.7 ms and 418,592 KiB to 338.8 ms and 166,944 KiB at 50,000.
 - `get` did not move: 7.2, 7.7, 13.2 and 7.7 ms before against 7.2, 7.7, 13.6 and 7.4 ms after at the four scales, and the 10,000 row is the re-index of the shard the previous sample's create changed on both trees.
 - The mutation the rig prices at 50,000 items: `create` 175.1 ms and 162,560 KiB to 119.5 ms and 147,088 KiB, `transition` 177.9 ms and 163,904 KiB to 133.1 ms and 146,960 KiB.
-- At the command surface on the 50,000-item corpus, three samples each: `treadle show` 1,434.6 ms and 486,144 KiB from source to 531.0 ms and 202,320 KiB, and through the bundle 1,344.7 ms and 387,424 KiB to 421.8 ms and 129,680 KiB; `backlog --limit 9`, `next --limit 3`, `status` and `history` land within 3 percent of `show` on both trees; `file` 1,560.0 ms and 432,576 KiB from source to 618.3 ms and 203,344 KiB, and through the bundle 1,473.7 ms and 405,648 KiB to 562.1 ms and 168,112 KiB.
+- At the command surface on the 50,000-item corpus, three samples each: `treadling show` 1,434.6 ms and 486,144 KiB from source to 531.0 ms and 202,320 KiB, and through the bundle 1,344.7 ms and 387,424 KiB to 421.8 ms and 129,680 KiB; `backlog --limit 9`, `next --limit 3`, `status` and `history` land within 3 percent of `show` on both trees; `file` 1,560.0 ms and 432,576 KiB from source to 618.3 ms and 203,344 KiB, and through the bundle 1,473.7 ms and 405,648 KiB to 562.1 ms and 168,112 KiB.
 - The allocation of the read fell from 1,072 MiB to 119 MiB, and what the view retains from 103 MiB to 36.3 MiB: 13.4 MiB of strings, 8.5 of arrays and 6.5 of objects over 50,021 items.
 
 **Negative**

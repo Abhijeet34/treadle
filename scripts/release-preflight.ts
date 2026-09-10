@@ -2,7 +2,7 @@
 // Everything that must be true about a tag before anything is built, attached or published,
 // and the release notes for the version it names.
 //
-// treadle's release is started by release-please creating the tag, not by a person signing
+// treadling's release is started by release-please creating the tag, not by a person signing
 // one, so the tag is no longer the authorisation and this is what stands in its place. The
 // checks answer three questions a green build does not: is this tag the one this repository's
 // policy allows (`v<semver>`), does it name the version the tree it points at actually
@@ -88,16 +88,16 @@ export function preflight(input: {
   // The bundle is the product. A release with no bundle would attach a tarball carrying the
   // metadata and the schemas, which installs and then has no executable to run.
   if (bundleBytes === undefined) {
-    problems.push('dist/treadle.js does not exist; run npm run build before packing')
+    problems.push('dist/treadling.js does not exist; run npm run build before packing')
   } else if (bundleBytes > bundleLimit) {
-    problems.push(`dist/treadle.js is ${bundleBytes} bytes, over DR1's ${bundleLimit}`)
+    problems.push(`dist/treadling.js is ${bundleBytes} bytes, over DR1's ${bundleLimit}`)
   } else if (bundleBytes < bundleLimit / 10) {
     // A floor as well as a ceiling, found by truncating a bundle and watching the freshness
     // clause pass it: an mtime says when a file was written and not that a build wrote it. The
     // measured bundle sits at about half the limit, so a tenth of it is far below any plausible
     // build of this tool and far above a partial write.
     problems.push(
-      `dist/treadle.js is ${bundleBytes} bytes, under a tenth of DR1's ${bundleLimit}; `
+      `dist/treadling.js is ${bundleBytes} bytes, under a tenth of DR1's ${bundleLimit}; `
         + 'that is a partial write rather than a build, so run npm run build again',
     )
   } else if (staleAgainst !== undefined) {
@@ -107,7 +107,7 @@ export function preflight(input: {
     // workflow's own pack step passes --ignore-scripts as well, so the packing lifecycle is
     // off by design and this is the gate that actually runs before the tarball is built.
     problems.push(
-      `dist/treadle.js was written before ${staleAgainst} was last changed, so the tarball `
+      `dist/treadling.js was written before ${staleAgainst} was last changed, so the tarball `
         + 'would carry a bundle that is not this source; run npm run build',
     )
   }
@@ -118,7 +118,7 @@ export function preflight(input: {
     // packed, and the refusal reads as the gate holding rather than as a broken workflow.
     if (manifest.private === true) {
       problems.push(
-        'package.json is "private": true, which is treadle\'s publication interlock: the name ' +
+        'package.json is "private": true, which is treadling\'s publication interlock: the name ' +
           'has not been cleared, so nothing may be published until the captain removes it',
       )
     }
@@ -212,7 +212,7 @@ if (path.resolve(process.argv[1] ?? '') === fileURLToPath(import.meta.url)) {
   }
   let bundleBytes: number | undefined
   try {
-    bundleBytes = readFileSync(path.join(root, 'dist', 'treadle.js')).byteLength
+    bundleBytes = readFileSync(path.join(root, 'dist', 'treadling.js')).byteLength
   } catch {
     bundleBytes = undefined
   }

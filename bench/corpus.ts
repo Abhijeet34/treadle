@@ -372,7 +372,7 @@ async function generateInto(root: string, spec: CorpusSpec): Promise<Generated> 
 
 /**
  * The corpus a run measures: its own private clone, taken from a shared cache entry that
- * nothing ever mutates. Isolation is the default here rather than a `TREADLE_BENCH_DIR` a
+ * nothing ever mutates. Isolation is the default here rather than a `TREADLING_BENCH_DIR` a
  * caller has to remember, because every axis mutates what it measures - A1 writes records,
  * A5 edits shard lines, A4 deletes the index - and two runs sharing one root produce figures
  * that look ordinary and describe a corpus neither of them was in.

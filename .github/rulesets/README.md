@@ -18,7 +18,7 @@ A file nobody reads back is documentation, whatever it is called.
 ## Applying them
 
 ```sh
-scripts/apply-repo-settings.sh Abhijeet34/treadle
+scripts/apply-repo-settings.sh Abhijeet34/treadling
 ```
 
 It sends both files, and four more under `.github/settings/`, to the forge.

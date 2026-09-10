@@ -13,7 +13,7 @@ The run that added them, 5,000 relations, 24 sprints and 489 impediments over 50
 Neither was a regression: `doctor` had never been measured, and `next` had never ranked over a graph.
 
 ADR-0014 is the precedent.
-Its profile found `treadle show` printing 532 bytes about one item by first materialising 50,000, and the fix was to hold the fourteen fields a scan reads rather than whole records.
+Its profile found `treadling show` printing 532 bytes about one item by first materialising 50,000, and the fix was to hold the fourteen fields a scan reads rather than whole records.
 The shape here is the same one twice over.
 
 ### Where the memory went

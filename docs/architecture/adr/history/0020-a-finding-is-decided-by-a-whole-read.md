@@ -10,8 +10,8 @@
 
 Two ordinary commands at once locked a workspace with nothing wrong in its files.
 
-    one process:  treadle set <id> <field>=<value>   in a loop
-    another:      treadle show <id>                  in a loop
+    one process:  treadling set <id> <field>=<value>   in a loop
+    another:      treadling show <id>                  in a loop
 
 The reader refreshed the index beside the writer.
 It read the event file's fingerprint before the writer had indexed its append, saw the file had grown, checked that the old prefix was unchanged, and scanned the tail from the older size.
@@ -68,7 +68,7 @@ The whole pass is also the only pass that runs `#invalidateAgainst`, so a clash 
 ### `doctor` answers from the files, never from what the index held
 
 Even with the race closed, an index can disagree with the files: a file restored with its old mtime and size, a crash that ADR-0004's journal replay does not cover, a bug not yet found.
-Every integrity refusal prints one fix line, `treadle doctor`, so that command has to be the way back.
+Every integrity refusal prints one fix line, `treadling doctor`, so that command has to be the way back.
 
 `doctor` opens the store with `rederive`, which forgets every fingerprint and the hierarchy verdict in one transaction and keeps every row.
 The refresh that follows re-reads every file whole: a record file is diffed against its rows and rewrites only what moved, an event file is dropped and reloaded inside its own transaction, and a file that has gone has its rows dropped because the forgotten names are carried into the pass.

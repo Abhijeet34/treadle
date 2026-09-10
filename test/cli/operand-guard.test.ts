@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // G2: an id operand carrying a delimiter was an internal error at exit 1.
 //
-// `treadle show $'a\nb'` printed `err INTERNAL -` with a render invariant in its cause and
+// `treadling show $'a\nb'` printed `err INTERNAL -` with a render invariant in its cause and
 // no rule id, and so did `explain`, `history`, `remove`, `set`, `mark`, `transition`,
 // `evidence add` and `relation add`. The contract says every failure is a structured,
 // typed, machine-readable error, and that was the one path where it was not, on twelve
@@ -26,7 +26,7 @@ import { entityOperands } from '../../src/cli/operands.ts'
 import { EXIT_OF } from '../../src/cli/exit.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
@@ -37,7 +37,7 @@ function must(run: Run, what: string): Run {
 }
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-operand-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-operand-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   must(await cli(['init', '--name', 'guarded']), 'init')
   must(await cli(['file', 'task', 'A record to name', '--id', 'a-record']), 'file')

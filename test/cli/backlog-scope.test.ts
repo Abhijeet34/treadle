@@ -23,7 +23,7 @@ import { describe, it, before, after } from 'node:test'
 
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
@@ -39,7 +39,7 @@ function must(run: Run, what: string): Run {
  * something stops it, so a ready item can carry one.
  */
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-backlog-scope-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-backlog-scope-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   must(await cli(['init']), 'init')
   must(await cli(['file', 'task', 'Rotate the signing key', '--id', 'key-rotate', '--priority', '1']), 'file')
@@ -96,7 +96,7 @@ describe('the default backlog is open work, and every line says which list it is
 
   it('carries the scope into the page line, so the walk continues the list that printed it', async () => {
     const first = must(await cli(['backlog', '--limit', '1']), 'first page')
-    const page = /^page (treadle backlog .+)$/m.exec(first.out)
+    const page = /^page (treadling backlog .+)$/m.exec(first.out)
     assert.ok(page !== null, `no page line to follow:\n${first.out}`)
     assert.match(page[1] as string, /--state open /, 'the page line dropped the scope it walked')
     const second = must(await cli((page[1] as string).split(' ').slice(1)), 'second page')

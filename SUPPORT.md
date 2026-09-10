@@ -5,7 +5,7 @@ Here is where each kind of question goes, so you get an answer rather than silen
 
 ## Something is broken
 
-[Open a bug report](https://github.com/Abhijeet34/treadle/issues/new?template=bug.yml).
+[Open a bug report](https://github.com/Abhijeet34/treadling/issues/new?template=bug.yml).
 
 The report that gets fixed fastest names the version or commit you ran, your operating system and `node --version`, the exact command, what you expected, and what happened instead.
 Paste the output rather than describing it.
@@ -17,7 +17,7 @@ Do not open a public issue.
 
 ## You want it to do something it does not do
 
-[Open a feature request](https://github.com/Abhijeet34/treadle/issues/new?template=feature.yml).
+[Open a feature request](https://github.com/Abhijeet34/treadling/issues/new?template=feature.yml).
 
 Say what you were trying to accomplish before saying what you want added.
 The design for this project was written before the code, so a request that names the problem can often be answered from a decision that already exists.

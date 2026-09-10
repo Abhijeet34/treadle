@@ -41,7 +41,7 @@ describe('the temp file cannot be aimed at anything', () => {
 
   it('does not follow a symlink pre-placed at the name the design would have used', async () => {
     const workspace = await aWorkspace()
-    const outside = await mkdtemp(path.join(tmpdir(), 'treadle-victim-'))
+    const outside = await mkdtemp(path.join(tmpdir(), 'treadling-victim-'))
     const victim = path.join(outside, 'victim.txt')
     try {
       await writeFile(victim, 'the co-tenant cannot have this')
@@ -59,7 +59,7 @@ describe('the temp file cannot be aimed at anything', () => {
   })
 
   it('fails with EEXIST on an occupied path', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-atomic-'))
     const taken = path.join(root, 'taken')
     await writeFile(taken, 'squatted')
     await assert.rejects(
@@ -74,7 +74,7 @@ describe('the temp file cannot be aimed at anything', () => {
   // first and creates its target, which is why the braces matter there: the name carries 96
   // bits of randomness, so there is nothing for a co-tenant to pre-place.
   it('fails with EEXIST on a dangling symlink rather than following it', { skip: POSIX_SYMLINKS }, async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-atomic-'))
     const aimed = path.join(root, 'aimed')
     await symlink(path.join(root, 'nowhere'), aimed)
     await assert.rejects(
@@ -84,8 +84,8 @@ describe('the temp file cannot be aimed at anything', () => {
   })
 
   it('replaces a symlink at the target by rename rather than writing through it', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
-    const outside = await mkdtemp(path.join(tmpdir(), 'treadle-victim-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-atomic-'))
+    const outside = await mkdtemp(path.join(tmpdir(), 'treadling-victim-'))
     const victim = path.join(outside, 'victim.txt')
     await writeFile(victim, 'untouched')
     const target = path.join(root, 'file.md')
@@ -115,7 +115,7 @@ describe('the permissions on every file the store owns', { skip: POSIX_MODES }, 
   })
 
   it('keeps a mode the workspace tightened on an existing file', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-atomic-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-atomic-'))
     const target = path.join(root, 'file.md')
     await writeFile(target, 'first', { mode: 0o600 })
     await writeFileAtomic(target, 'second')

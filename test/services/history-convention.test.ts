@@ -47,7 +47,7 @@ type Rig = { readonly store: Store; readonly dispose: () => Promise<void> }
 
 /** One item taken through every op this build's log records. */
 async function aLogCarryingEveryOp(): Promise<Rig> {
-  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-what-'))
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadling-what-'))
   const root = path.join(parent, 'platform', '.work')
   const ids = sequentialIds()
   const clock = fixedClock(NOW)
@@ -178,7 +178,7 @@ describe('a stored value shaped like the length marker does not become one', () 
   const MARKER_ID = 'marker-collision'
 
   before(async () => {
-    const parent = await mkdtemp(path.join(tmpdir(), 'treadle-what-marker-'))
+    const parent = await mkdtemp(path.join(tmpdir(), 'treadling-what-marker-'))
     const root = path.join(parent, 'platform', '.work')
     const ids = sequentialIds()
     const clock = fixedClock(NOW)

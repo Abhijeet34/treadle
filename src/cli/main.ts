@@ -47,7 +47,7 @@ import { checkRuntime } from './runtime.ts'
 
 // The one place the product's version is written. release-please rewrites this line on a
 // release through the `generic` updater the marker below selects, and a test asserts it
-// still equals package.json's version, so `treadle version` cannot drift from the tag.
+// still equals package.json's version, so `treadling version` cannot drift from the tag.
 export const VERSION = '0.1.3' // x-release-please-version
 
 const RENDERERS: Readonly<Record<Rendering, Renderer>> = {
@@ -78,7 +78,7 @@ function flag(flags: Readonly<Record<string, unknown>>, name: string): string | 
 /**
  * The actor this line names, from the flag or the environment, or `undefined` for neither.
  *
- * An exported `TREADLE_ACTOR=` is neither: a variable set to nothing names nobody exactly as
+ * An exported `TREADLING_ACTOR=` is neither: a variable set to nothing names nobody exactly as
  * an unset one does, and it is what a CI job produces from an unpopulated secret. Left as a
  * value it earned `an actor must be a name with no leading or trailing whitespace`, a sentence
  * about a rule the caller did not break, whose fix line named the flag and never the variable
@@ -86,7 +86,7 @@ function flag(flags: Readonly<Record<string, unknown>>, name: string): string | 
  * wrote the flag and the flag is what the refusal already names.
  */
 function namedActor(env: Environment, flags: Readonly<Record<string, unknown>>): string | undefined {
-  const exported = env.env['TREADLE_ACTOR']
+  const exported = env.env['TREADLING_ACTOR']
   return flag(flags, 'actor') ?? (exported === undefined || exported.trim() === '' ? undefined : exported)
 }
 
@@ -102,7 +102,7 @@ function namedActor(env: Environment, flags: Readonly<Record<string, unknown>>):
 function actorOf(env: Environment, flags: Readonly<Record<string, unknown>>): Actor {
   return {
     id: namedActor(env, flags) ?? '',
-    kind: env.env['TREADLE_ACTOR_KIND'] === 'agent' ? 'agent' : 'human',
+    kind: env.env['TREADLING_ACTOR_KIND'] === 'agent' ? 'agent' : 'human',
   }
 }
 
@@ -161,7 +161,7 @@ const BOUNDED_ELSEWHERE = new Set(['desc', 'goal', 'reason', 'set', 'actor', 'wo
  * caller wrote is `--width`'s own help note one layer down.
  *
  * Every other flag names an entity or filters on a field, and no field of a record holds more
- * than one line. `treadle backlog --assignee <100,000 characters>` exited 0 with 200 KB of
+ * than one line. `treadling backlog --assignee <100,000 characters>` exited 0 with 200 KB of
  * stdout, because the value no record could carry came back in the `filter` and `narrowest`
  * lines and in the `page` line built from them. Refusing it here bounds all four and every
  * later reader of a filter, rather than one guard per line that prints one.
@@ -174,13 +174,13 @@ const BOUNDED_ELSEWHERE = new Set(['desc', 'goal', 'reason', 'set', 'actor', 'wo
 function flagValueRefusal(
   flags: Readonly<Record<string, unknown>>, command: string | undefined,
 ): ResultObject | undefined {
-  const help = [command === undefined ? 'treadle help' : `treadle help ${command}`]
+  const help = [command === undefined ? 'treadling help' : `treadling help ${command}`]
   for (const name of ['width', 'limit'] as const) {
     const value = flag(flags, name)
     if (value === undefined) continue
     if (COUNT.test(value) && Number.parseInt(value, 10) > 0) continue
     return validation(
-      command ?? 'treadle',
+      command ?? 'treadling',
       `--${name} takes a whole number of at least 1, and ${shellWord(value)} is not one`,
       help,
     )
@@ -191,7 +191,7 @@ function flagValueRefusal(
   const forActor = flag(flags, 'for')
   if (forActor !== undefined) {
     const bad = actorRefusal({ id: forActor, kind: 'human' })
-    if (bad !== undefined) return validation(command ?? 'treadle', bad, help)
+    if (bad !== undefined) return validation(command ?? 'treadling', bad, help)
   }
   for (const [name, value] of Object.entries(flags)) {
     if (BOUNDED_ELSEWHERE.has(name)) continue
@@ -202,7 +202,7 @@ function flagValueRefusal(
     // before the renderer has already thrown on it.
     if (typeof value === 'string' && value.length > MAX_LINE) {
       return validation(
-        command ?? 'treadle',
+        command ?? 'treadling',
         `--${name} is ${value.length} characters and no field of a record holds more than ${MAX_LINE}, so nothing could match it`,
         help,
       )
@@ -211,7 +211,7 @@ function flagValueRefusal(
       const found = findUnsafeCharacter(one, 'line')
       if (found === undefined) continue
       return validation(
-        command ?? 'treadle',
+        command ?? 'treadling',
         `--${name} carries ${found.label} at character ${found.at + 1}, and no field of a record holds one: a value on this line is a single line with no control or bidi override characters`,
         help,
       )
@@ -343,7 +343,7 @@ function setFieldsOf(
       const value = entry.slice(at + 1)
       const before = spelled.get(name)
       if (before !== undefined && before.value !== value) {
-        return { refusal: validation('file', `${before.by} and --set ${entry.slice(0, at)}= both set ${name}, and a field is set once on one line`, ['treadle help file']) }
+        return { refusal: validation('file', `${before.by} and --set ${entry.slice(0, at)}= both set ${name}, and a field is set once on one line`, ['treadling help file']) }
       }
       fields[name] = value
       spelled.set(name, { by: `--set ${entry.slice(0, at)}=`, value })
@@ -360,7 +360,7 @@ function versionResult(env: Environment): ResultObject {
   return okResult(VERSION_SHAPE, {
     workspace: '-',
     data: {
-      name: 'treadle',
+      name: 'treadling',
       version: VERSION,
       store_schema: SCHEMA,
       contract: 'agent/1',
@@ -390,7 +390,7 @@ export async function run(env: Environment): Promise<number> {
 
 /** The refusal an escaped exception becomes. It names what failed, never how it was thrown. */
 function internal(command: string | undefined, error: unknown): ResultObject {
-  const named = command ?? 'treadle'
+  const named = command ?? 'treadling'
   const thrown = error instanceof Error ? error : undefined
   const said = thrown === undefined ? String(error) : `${thrown.name}: ${thrown.message}`
   return errorResult({
@@ -403,7 +403,7 @@ function internal(command: string | undefined, error: unknown): ResultObject {
     // stop a throw. Newlines survive, because the renderer puts a multi-line cause in a
     // counted block; nothing else the grammar treats as a delimiter does.
     cause: `${named} did not complete: ${said.replaceAll('\r\n', '\n').replaceAll('\r', ' ')}`,
-    fix: ['treadle version'],
+    fix: ['treadling version'],
   })
 }
 
@@ -414,7 +414,7 @@ async function execute(env: Environment): Promise<number> {
   const runtime = checkRuntime(env.nodeVersion)
   if (!runtime.ok) {
     const result = errorResult({
-      code: 'STORE_UNAVAILABLE', command: 'treadle', workspace: '-', effect: 'read',
+      code: 'STORE_UNAVAILABLE', command: 'treadling', workspace: '-', effect: 'read',
       cause: runtime.cause, fix: runtime.fix,
     })
     return emit(env, result, presentationFlags(env.argv))
@@ -422,14 +422,14 @@ async function execute(env: Environment): Promise<number> {
 
   const parsed = parse(env.argv)
   if (!parsed.ok) {
-    const result = validation(env.argv[0] ?? 'treadle', parsed.cause, parsed.fix)
+    const result = validation(env.argv[0] ?? 'treadling', parsed.cause, parsed.fix)
     return emit(env, result, presentationFlags(env.argv))
   }
   const { command, operands, flags, filterOrder } = parsed.value
 
   // Before `--contract`, `--help` and `version`, which are the three lines that answer
   // without reaching a dispatch arm: an operand no usage line takes is refused wherever it
-  // was written, and `treadle version extra` was one of the twelve that swallowed it.
+  // was written, and `treadling version extra` was one of the twelve that swallowed it.
   const badArity = arityRefusal(command, operands)
   if (badArity !== undefined) return emit(env, badArity, flags)
 
@@ -442,7 +442,7 @@ async function execute(env: Environment): Promise<number> {
 
   const rendering = renderingOf(flags, env.isTTY)
   if (rendering === undefined) {
-    return emit(env, validation('treadle', `--out takes one of ${RENDERINGS.join(', ')}`, ['treadle help']), flags)
+    return emit(env, validation('treadling', `--out takes one of ${RENDERINGS.join(', ')}`, ['treadling help']), flags)
   }
 
   const badFlag = flagValueRefusal(flags, command)
@@ -459,7 +459,7 @@ async function execute(env: Environment): Promise<number> {
     if (topic === undefined) return emit(env, topLevelHelp('-'), flags)
     const help = commandHelp(topic, '-')
     if (help === undefined) {
-      return emit(env, validation('help', `${topic} is not a treadle command`, ['treadle help']), flags)
+      return emit(env, validation('help', `${topic} is not a treadling command`, ['treadling help']), flags)
     }
     return emit(env, help, flags)
   }
@@ -482,21 +482,21 @@ async function execute(env: Environment): Promise<number> {
     // about a value the caller never wrote.
     if (namedActor(env, flags) === undefined) {
       return emit(env, validation(
-        command ?? 'treadle',
-        `${command ?? 'treadle'} records who made the change, and neither TREADLE_ACTOR nor --actor names anyone; the record would carry a name nobody wrote`,
-        ['export TREADLE_ACTOR=<your-name>', 'treadle --actor <name>'],
+        command ?? 'treadling',
+        `${command ?? 'treadling'} records who made the change, and neither TREADLING_ACTOR nor --actor names anyone; the record would carry a name nobody wrote`,
+        ['export TREADLING_ACTOR=<your-name>', 'treadling --actor <name>'],
       ), flags)
     }
     const badActor = actorRefusal(actorOf(env, flags))
     if (badActor !== undefined) {
-      return emit(env, validation(command ?? 'treadle', badActor, ['treadle --actor <name>']), flags)
+      return emit(env, validation(command ?? 'treadling', badActor, ['treadling --actor <name>']), flags)
     }
     // The raw variable, because `actorOf` above has already resolved it to one of the two
     // words: anything else was recorded as `human` in silence, against a `help` line that
     // names the pair. There is no flag for it, so the remedy is the export itself.
-    const badKind = actorKindRefusal(env.env['TREADLE_ACTOR_KIND'])
+    const badKind = actorKindRefusal(env.env['TREADLING_ACTOR_KIND'])
     if (badKind !== undefined) {
-      return emit(env, validation(command ?? 'treadle', badKind, ['export TREADLE_ACTOR_KIND=agent']), flags)
+      return emit(env, validation(command ?? 'treadling', badKind, ['export TREADLING_ACTOR_KIND=agent']), flags)
     }
   }
 
@@ -527,8 +527,8 @@ async function execute(env: Environment): Promise<number> {
     if (command === undefined) return emit(env, topLevelHelp('-'), flags)
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read', rule: 'S1',
-      cause: `no treadle workspace was found from ${env.cwd} or any directory above it`,
-      fix: ['treadle init'],
+      cause: `no treadling workspace was found from ${env.cwd} or any directory above it`,
+      fix: ['treadling init'],
     }), flags)
   }
   diagnostics.note('store', root)
@@ -543,7 +543,7 @@ async function execute(env: Environment): Promise<number> {
     // quarantined also refuses under `S1` and `init` answers `already` over it. That one is a
     // damaged file, which the table sends to git rather than to a command.
     const missing = opened.error.code === 'STORE_UNAVAILABLE' && opened.error.rule === 'S1'
-    const fix = missing ? ['treadle init'] : unavailableFixes(opened.error)
+    const fix = missing ? ['treadling init'] : unavailableFixes(opened.error)
     return emit(env, errorResult({
       code: 'STORE_UNAVAILABLE', command: command ?? 'status', workspace: '-', effect: 'read',
       rule: opened.error.rule, cause: opened.error.message, ...(fix.length === 0 ? {} : { fix }),
@@ -597,15 +597,15 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     const verb = operands[0]
     if (verb === undefined) return readConfig(store)
     if (verb !== 'set') {
-      return validation('config', `config takes no verb to read and set to write, and ${shellWord(verb)} is neither`, ['treadle config', 'treadle help config'])
+      return validation('config', `config takes no verb to read and set to write, and ${shellWord(verb)} is neither`, ['treadling config', 'treadling help config'])
     }
     const key = operands[1]
     const value = operands[2]
-    if (key === undefined) return validation('config', 'config set needs the key to write', ['treadle config'])
+    if (key === undefined) return validation('config', 'config set needs the key to write', ['treadling config'])
     // An empty value is a real value for no key here: every key's grammar needs at least one
     // character, so the clearing syntax `set <field>=` has nothing to mean and a key is put
     // back to its default by writing the default, which the `source` column then reports.
-    if (value === undefined) return validation('config', `config set needs the value to write to ${key}`, ['treadle config', `treadle help config`])
+    if (value === undefined) return validation('config', `config set needs the value to write to ${key}`, ['treadling config', `treadling help config`])
     return setConfig(target, systemClock, randomIds, { key, value, actor })
   }
 
@@ -623,11 +623,11 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
 
   const id = operands[0]
   if (command === 'show') {
-    if (id === undefined) return validation('show', 'show needs the id of one item', ['treadle backlog'])
+    if (id === undefined) return validation('show', 'show needs the id of one item', ['treadling backlog'])
     return showItem(store, systemClock, id, flag(flags, 'field'))
   }
   if (command === 'explain') {
-    if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadle backlog'])
+    if (id === undefined) return validation('explain', 'explain needs the id of one item', ['treadling backlog'])
     return explain(store, systemClock, id)
   }
   if (command === 'history') {
@@ -646,10 +646,10 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     // named nothing: `cause  names no transaction here`, with no `entity` line at all,
     // because the renderer drops an empty scalar. No id is a shorter line than a wrong one.
     if (txn !== undefined && txn.length === 0) {
-      return validation('history', '--txn needs the transaction id a write returned, and this line gives it no value', ['treadle help history'])
+      return validation('history', '--txn needs the transaction id a write returned, and this line gives it no value', ['treadling help history'])
     }
     if (id === undefined && txn === undefined) {
-      return validation('history', 'history needs the id of one record, or --txn with the transaction id a write returned', ['treadle backlog'])
+      return validation('history', 'history needs the id of one record, or --txn with the transaction id a write returned', ['treadling backlog'])
     }
     const cursor = flag(flags, 'cursor')
     return history(store, {
@@ -663,9 +663,9 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     const type = operands[0]
     const title = operands[1]
     if (type === undefined || !(WORK_ITEM_TYPES as readonly string[]).includes(type)) {
-      return validation('file', `file needs a type, one of ${WORK_ITEM_TYPES.join(', ')}`, ['treadle help file'])
+      return validation('file', `file needs a type, one of ${WORK_ITEM_TYPES.join(', ')}`, ['treadling help file'])
     }
-    if (title === undefined) return validation('file', 'file needs a title in quotes', ['treadle help file'])
+    if (title === undefined) return validation('file', 'file needs a title in quotes', ['treadling help file'])
     const chosen = flag(flags, 'id')
     const given = setFieldsOf(flags, title)
     if ('refusal' in given) return given.refusal
@@ -676,17 +676,17 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   }
 
   if (command === 'set') {
-    if (id === undefined) return validation('set', 'set needs the id of one item', ['treadle backlog'])
+    if (id === undefined) return validation('set', 'set needs the id of one item', ['treadling backlog'])
     const assignments = operands.slice(1)
     const twice = repeatedAssignment(assignments)
     if (twice !== undefined) {
-      return validation('set', `${twice} is assigned more than once on this line and the last would silently replace the first`, ['treadle help set'])
+      return validation('set', `${twice} is assigned more than once on this line and the last would silently replace the first`, ['treadling help set'])
     }
     return setFields(target, systemClock, randomIds, { id, assignments, actor })
   }
 
   if (command === 'mark') {
-    if (id === undefined) return validation('mark', 'mark needs the id of one item', ['treadle backlog'])
+    if (id === undefined) return validation('mark', 'mark needs the id of one item', ['treadling backlog'])
     const severity = flag(flags, 'severity')
     const priority = flag(flags, 'priority')
     const reason = flag(flags, 'reason')
@@ -704,10 +704,10 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     // and a later `evidence list` or `evidence drop` must not silently inherit this path.
     const [verb, entity, kind, ref, label] = operands
     if (verb !== 'add') {
-      return validation('evidence', `evidence takes one subcommand, add, not ${verb ?? 'nothing'}`, ['treadle help evidence'])
+      return validation('evidence', `evidence takes one subcommand, add, not ${verb ?? 'nothing'}`, ['treadling help evidence'])
     }
     if (entity === undefined || kind === undefined || ref === undefined) {
-      return validation('evidence', 'evidence add needs an id, a kind and a ref', ['treadle help evidence'])
+      return validation('evidence', 'evidence add needs an id, a kind and a ref', ['treadling help evidence'])
     }
     return addEvidence(target, systemClock, randomIds, {
       id: entity, kind, ref, ...(label === undefined ? {} : { label }), actor,
@@ -717,16 +717,16 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === 'relation') {
     const [verb, entity, kind, other] = operands
     if (verb === undefined || !(RELATION_VERBS as readonly string[]).includes(verb)) {
-      return validation('relation', `relation takes one of ${RELATION_VERBS.join(', ')}, not ${verb ?? 'nothing'}`, ['treadle help relation'])
+      return validation('relation', `relation takes one of ${RELATION_VERBS.join(', ')}, not ${verb ?? 'nothing'}`, ['treadling help relation'])
     }
     if (entity === undefined || kind === undefined || other === undefined) {
-      return validation('relation', `relation ${verb} needs an id, a kind and the other id`, ['treadle help relation'])
+      return validation('relation', `relation ${verb} needs an id, a kind and the other id`, ['treadling help relation'])
     }
     return relate(target, systemClock, randomIds, { verb: verb as RelationVerb, id: entity, kind, other, actor })
   }
 
   if (command === 'remove') {
-    if (id === undefined) return validation('remove', 'remove needs the id of one item', ['treadle backlog'])
+    if (id === undefined) return validation('remove', 'remove needs the id of one item', ['treadling backlog'])
     // Every other single-entity command drops an operand past the first, which costs a
     // re-run. Here it would cost a record: `remove a b` removed `a`, exited 0, and left `b`
     // filed, and no line of that answer says the second id was dropped. One id, named.
@@ -734,7 +734,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     // and neither of them reaches a fix line.
     if (operands.length > 1) {
       return validation('remove', `remove takes one id and this line names ${operands.length}; a removal is confirmed one record at a time`,
-        ['treadle remove <id> --reason "<why>" --yes'])
+        ['treadling remove <id> --reason "<why>" --yes'])
     }
     const reason = flag(flags, 'reason')
     return removeItem(target, systemClock, randomIds, {
@@ -745,10 +745,10 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
   if (command === 'transition') {
     const targetState = operands[1]
     if (id === undefined || targetState === undefined) {
-      return validation('transition', 'transition needs an id and a target state', ['treadle help transition'])
+      return validation('transition', 'transition needs an id and a target state', ['treadling help transition'])
     }
     if (!(TRANSITION_TARGETS as readonly string[]).includes(targetState)) {
-      return validation('transition', `${targetState} is not a target; the targets are ${TRANSITION_TARGETS.join(', ')}`, ['treadle help transition'])
+      return validation('transition', `${targetState} is not a target; the targets are ${TRANSITION_TARGETS.join(', ')}`, ['treadling help transition'])
     }
     const reason = flag(flags, 'reason')
     const until = flag(flags, 'until')
@@ -770,7 +770,7 @@ async function dispatch(env: Environment, input: Dispatch): Promise<ResultObject
     })
   }
 
-  return validation(command, `${command} is not wired to a use case yet`, ['treadle help'])
+  return validation(command, `${command} is not wired to a use case yet`, ['treadling help'])
 }
 
 function emit(env: Environment, result: ResultObject, flags: Readonly<Record<string, unknown>>): number {
@@ -793,7 +793,7 @@ function emit(env: Environment, result: ResultObject, flags: Readonly<Record<str
 function pageFor(result: ResultObject): string | undefined {
   const item = result.data['item']
   if (result.command !== 'show' || typeof item !== 'string') return undefined
-  return `treadle show ${item}`
+  return `treadling show ${item}`
 }
 
 function widthOf(env: Environment): number {

@@ -1,6 +1,6 @@
 # Stability and versioning
 
-treadle follows [Semantic Versioning 2.0.0](https://semver.org/).
+treadling follows [Semantic Versioning 2.0.0](https://semver.org/).
 This file says what a breaking change is for this project, because "breaking" means nothing until someone writes down what the contract is.
 
 ## The pre-1.0 policy
@@ -80,7 +80,7 @@ Breaking, and therefore never done:
 
 Breaking, and allowed with a minor bump plus release notes:
 
-- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is still read as it stands, and a mutation to it is refused as `SCHEMA_OLDER` (`S9`) at exit `6`, because writing it would rewrite the whole file as a side effect of a one-record change. The command that would rewrite it is `migrate`, which the README's Status table records as Declined until a schema 2 exists, so the refusal names no rewrite: it says that no command here rewrites the file yet, and its fix line is `treadle version`. A fix line naming a command the tool does not carry would not run as printed, which `test/cli/runnable-lines.test.ts` refuses.
+- A change to the grammar or to the meaning of an existing field, which bumps the compiled-in schema number. A file below that number is still read as it stands, and a mutation to it is refused as `SCHEMA_OLDER` (`S9`) at exit `6`, because writing it would rewrite the whole file as a side effect of a one-record change. The command that would rewrite it is `migrate`, which the README's Status table records as Declined until a schema 2 exists, so the refusal names no rewrite: it says that no command here rewrites the file yet, and its fix line is `treadling version`. A fix line naming a command the tool does not carry would not run as printed, which `test/cli/runnable-lines.test.ts` refuses.
 
 Not breaking:
 
@@ -90,7 +90,7 @@ Not breaking:
 
 A section body may carry a markdown heading.
 The record boundary is a `# ` line at column 0 and a section boundary is a `## ` one, so a body line beginning with `#` is stored with one backslash in front of it: `## Findings` is written to the file as `\## Findings`.
-That is CommonMark's own escape, which means a markdown reader still renders the line as the text the record holds, and `treadle show --field desc` returns the body exactly as it was filed.
+That is CommonMark's own escape, which means a markdown reader still renders the line as the text the record holds, and `treadling show --field desc` returns the body exactly as it was filed.
 A body line that already begins with a backslash run in front of a hash gets one more, so the escape reverses cleanly and a rewrite never accumulates them.
 The first version of this rule refused the write instead, and a refusal that names a limitation is still a limitation: 17 of 347 real backlog bodies could not be stored without altering the prose.
 
@@ -111,13 +111,13 @@ Raising the floor is a breaking change and gets a minor bump and a release note.
 
 ## The supported userlands, and the macOS argument-block limit
 
-`bin/treadle.js` and the shipped bundle open with `#!/usr/bin/env node`, which every POSIX
+`bin/treadling.js` and the shipped bundle open with `#!/usr/bin/env node`, which every POSIX
 userland runs, BusyBox included.
 That is a support statement: `node:24-alpine` is the smallest official Node image and the one a
 container-based agent reaches for first, and a tool whose first command prints
 `env: unrecognized option: S` has failed before it started.
 It is also a Windows statement, because npm does not link on Windows: `cmd-shim` reads that
-first line and writes the program it names into the generated `treadle.cmd` and `treadle.ps1`.
+first line and writes the program it names into the generated `treadling.cmd` and `treadling.ps1`.
 `scripts/shebang.ts`'s `portabilityProblem` holds the line, `test/cli/oversized-argument.test.ts`
 asserts it on every platform, and the `installed` and `installed-windows` jobs of
 `.github/workflows/cross-platform.yml` start the packed tarball from BusyBox, glibc, `cmd.exe`
@@ -143,7 +143,7 @@ Measured 2026-09-07 on Node 24.11.1, below the 24.15.0 floor `package.json` decl
 |---|---|
 | Single argument of 955,173 bytes, a block of about 955,270 | survives |
 | Single argument of 955,182 bytes | `RangeError`, exit 7 |
-| Single argument of 1,048,000 bytes, over the 1,048,576 `ARG_MAX` | exit 126, `argument list too long`, from the shell; treadle never runs |
+| Single argument of 1,048,000 bytes, over the 1,048,576 `ARG_MAX` | exit 126, `argument list too long`, from the shell; treadling never runs |
 | The same block delivered as environment variables behind a short command line | dies identically |
 | `node /dev/null "$(cat 1mb)"`, an empty script | dies identically |
 
@@ -176,7 +176,7 @@ Every block inside it is a call this tool refuses on every platform; what macOS 
 refusal's shape, from `err VALIDATION` at exit 2 to a `RangeError` at exit 7.
 
 Linux is not uniformly better.
-Linux refuses a large single argument at exec, before treadle runs, so the typed refusal macOS
+Linux refuses a large single argument at exec, before treadling runs, so the typed refusal macOS
 gives is not available there.
 CI run 34106349134 answered behind 4,140,820 bytes of argv and 4,142,278 bytes of environment
 on a runner with a raised stack rlimit; under the default 8 MiB stack the Linux total is 2 MiB.
@@ -191,7 +191,7 @@ Both ways of doing that were built and run, and each costs a platform the packag
 
 `#!/usr/bin/env -S node --stack-size=3072` was shipped for one day and reverted.
 BusyBox `env` takes `-i`, `-0` and `-u` and has no `-S`, so on `node:24-alpine`, measured
-2026-09-07, `treadle version` printed `env: unrecognized option: S` and exited 1.
+2026-09-07, `treadling version` printed `env: unrecognized option: S` and exited 1.
 The first command a stranger runs on the most common small CI image failed.
 
 `#!/bin/sh` with `':' //; exec node --stack-size=2048 "$0" "$@"` on the second line removes the
@@ -207,8 +207,8 @@ Measured 2026-09-08 on `windows-2025` with Node 24.15.0 and npm 11.12.1, from a 
 | `#!/usr/bin/env sh` | `ok version -`, exit 0 | `ok version -`, exit 0 |
 | `#!/usr/bin/env sh`, no POSIX `sh` on `PATH` | `'"sh"' is not recognized as an internal or external command`, exit 1 | `The term 'sh.exe' is not recognized`, exit **0** |
 
-`treadle init` and `treadle file task` behave as their `version` row does, in both shells.
-The exit 0 is the reason this trade is worse than it reads: npm's `treadle.ps1` assigns
+`treadling init` and `treadling file task` behave as their `version` row does, in both shells.
+The exit 0 is the reason this trade is worse than it reads: npm's `treadling.ps1` assigns
 `$ret=$LASTEXITCODE` after a call that never happened, so a `CommandNotFoundException` leaves
 the exit code at 0 and a Windows user's script sees success over a launcher that never ran.
 
@@ -217,7 +217,7 @@ It starts in all three native Windows shells and on `node:24-alpine` and `node:2
 but only because npm's shim resolves a bare `sh` through `PATH` and the machine happened to
 carry Git for Windows.
 Take that off `PATH` and it fails exactly like `#!/bin/sh`, invisibly in PowerShell.
-It does not make treadle run on Windows; it makes treadle run on a Windows machine that already
+It does not make treadling run on Windows; it makes treadling run on a Windows machine that already
 has something else installed.
 
 ### The decision, and what it gives up

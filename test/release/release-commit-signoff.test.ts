@@ -36,7 +36,7 @@ describe('the release pull request can pass the sign-off check', () => {
       'release-please writes no Signed-off-by without this key, and `checks` is required on main',
     )
 
-    const repo = await mkdtemp(path.join(tmpdir(), 'treadle-signoff-'))
+    const repo = await mkdtemp(path.join(tmpdir(), 'treadling-signoff-'))
     const git = (...args: string[]): Promise<unknown> => run('git', ['-C', repo, ...args])
     await git('init', '-q', '-b', 'main')
     await git('config', 'user.name', 'A Reviewer')

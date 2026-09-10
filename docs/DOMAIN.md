@@ -95,8 +95,8 @@ That one setting decides `G5`, which is why `in_progress` exits through `in_revi
 An epic is out of that set because a container has no reviewer and no artefact to accept: what is reviewed is each child, and `G8` is what holds the epic to the children being finished.
 A workspace that wants its epics reviewed sets `review_step` and gets `in_review` back for them.
 `next` still ranks no epic under that setting, and that is not an oversight: the review step is a policy a workspace chooses, and a container not being the thing to pick up is a fact about the type.
-`treadle next --explain-absence <epic>` says so in as many words, and the children are what the ranking hands back instead.
-`treadle help transition` names the set, and `treadle explain <id>` lists only the moves the item's own type allows.
+`treadling next --explain-absence <epic>` says so in as many words, and the children are what the ranking hands back instead.
+`treadling help transition` names the set, and `treadling explain <id>` lists only the moves the item's own type allows.
 
 An impediment is a blocker as a record of its own: it flows through the same seven states, `done` means resolved, and it holds work up through the `blocks` relation like any other item.
 `proposed_resolution` is required because raising one obliges the raiser to say what would clear it; [architecture/adr/0017-an-impediment-is-a-type-that-blocks.md](architecture/adr/0017-an-impediment-is-a-type-that-blocks.md) carries the four decisions around it.
@@ -111,7 +111,7 @@ A field another command owns is cleared by that command: a transition off `on_ho
 `file` reads an empty value as the field left unset, so `--set assignee=` files without one and `--set severity=` on a bug is the same `V4` as leaving it off.
 `help set` carries the rule as its last example.
 
-`treadle help file`, `treadle help set` and `treadle help show` print that table, generated from these two records rather than transcribed, so a caller who has to name a field reads the dictionary on the page that takes the name instead of learning it from a `V5` refusal one field at a time.
+`treadling help file`, `treadling help set` and `treadling help show` print that table, generated from these two records rather than transcribed, so a caller who has to name a field reads the dictionary on the page that takes the name instead of learning it from a `V5` refusal one field at a time.
 
 `requiredAtCreation(type)` returns the first column and `fieldsOf(type)` returns the common set plus the second.
 `validateWorkItem(item, { now })` checks both, plus every field's own validation from the field dictionary.
@@ -158,7 +158,7 @@ Blocked is not one of them.
 It is derived from the relation graph and shown beside the state, never in place of it.
 
 `TRANSITION_TABLE` holds twenty-three edges: the twenty-two the model draws, and `release`.
-`treadle help transition` prints them, one row per edge name with the states it runs between, the guards on it and whether it requires a reason, and names the closed sets `--resolution`, `--outcome` and `--override` take.
+`treadling help transition` prints them, one row per edge name with the states it runs between, the guards on it and whether it requires a reason, and names the closed sets `--resolution`, `--outcome` and `--override` take.
 
 `release` runs from `in_progress` back to `ready`, requires a reason, and evaluates no guard.
 It is the exit an attempt that ended without the work being done had nowhere to record: a hold leaves `next`, which ranks `ready` only, and a cancel leaves the queue.
@@ -299,10 +299,10 @@ What it cannot see is a `reviewer` naming somebody who never looked at the work,
 Together `DOD3` and `DOD7` are the anti-attestation pair: the record names a reviewer other than its maker, and points at something a third party can open.
 
 What the recorded actor is worth, said here because `H34` is the finding that reads it back, is bounded and it is easy to over-read.
-The actor is declared by whoever ran the command, from `--actor` or `TREADLE_ACTOR`, and is recorded as given; the tool verifies no identity and has no way to.
+The actor is declared by whoever ran the command, from `--actor` or `TREADLING_ACTOR`, and is recorded as given; the tool verifies no identity and has no way to.
 A mutation naming nobody is refused, so no event is unattributable, and that refusal is the thing most likely to be misread: it makes the recorded name look checked, and nothing checks it.
 What is unforgeable is one layer out.
-`D1` makes the committed file authoritative, so a hand edit to it is a legitimate edit and the forge's signed commit is what proves its authorship; `treadle help` says the same sentence to a caller, and `src/application/services/doctor.ts` argues it beside `H20`, the audit that notices a record disagreeing with the log that recorded the value.
+`D1` makes the committed file authoritative, so a hand edit to it is a legitimate edit and the forge's signed commit is what proves its authorship; `treadling help` says the same sentence to a caller, and `src/application/services/doctor.ts` argues it beside `H20`, the audit that notices a record disagreeing with the log that recorded the value.
 
 `validateGate(gate)` refuses a duplicate rule id (`V7`) and a rule that reads a field the scoped type does not have (`V6`), which is what makes a workspace-configured gate safe to load.
 
@@ -312,7 +312,7 @@ A workspace gate composes those; there is no custom predicate, because a gate is
 ## Workspace configuration
 
 The key set is closed and every key is optional; the absence of a key is the compiled-in default in the third column, so a workspace nobody has configured behaves exactly as one written before this existed.
-[architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) is the record; `treadle config` prints every key with the value in force and whether it came from the file or the default.
+[architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md](architecture/adr/0026-workspace-configuration-is-the-policy-seams-second-implementation.md) is the record; `treadling config` prints every key with the value in force and whether it came from the file or the default.
 
 | Key | What reads it | Default |
 |---|---|---|

@@ -77,7 +77,7 @@ They are also not evidence about a publish that has never happened: F13's third 
 
 **The tag half of the release pipeline, run for real once and still short of a release that carries anything.**
 Three tags have fired it and none produced a release with assets on it.
-On `v0.1.0`, run `34453354302`, `cross-platform` ran on the tag and its three container jobs failed for want of `TREADLE_ACTOR`, so `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
+On `v0.1.0`, run `34453354302`, `cross-platform` ran on the tag and its three container jobs failed for want of `TREADLING_ACTOR`, so `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
 On `v0.1.1`, run `34475691252`, all six `cross-platform` jobs passed and `artifacts` failed on the tag-signature clause the row above records.
 
 [ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) changed what fires those jobs: there is no tag trigger any more, `release-tag` creates the tag behind the matrix, and everything downstream keys on `needs.release-tag.outputs.created`.
@@ -88,14 +88,14 @@ That job is the first and only end-to-end run of `artifacts`, and it reached its
 `npm ci`, `npm run build`, the preflight's accept path against a tag the run had just created, `npm pack`, the SBOM export, `SHA256SUMS`, and `actions/attest-build-provenance` signing through the workflow's OIDC identity, uploaded to Rekor at `logIndex=2784103717` and to the repository as attestation `46592135`.
 Then `gh release create` ended the job on `a release with the same tag name already exists: v0.1.2`, because release-please had created the release two seconds earlier.
 
-Every step of `artifacts` that can run without a tag was run in a worktree on 2026-09-10, in the workflow's own order and with its own commands, on Node 24.20.0 and npm 11.19.0 rather than the 24.15.0 `.nvmrc` pins: `npm ci`, `npm run build` at 386,054 bytes against DR8's 768,000, `npm pack --json --ignore-scripts` producing `treadle-0.1.0.tgz` at 116,490 bytes, the dependency-graph SBOM export at 107,021 bytes of SPDX-2.3 over 134 packages, and `sha256sum` over both into a `SHA256SUMS` that verifies against both files.
+Every step of `artifacts` that can run without a tag was run in a worktree on 2026-09-10, in the workflow's own order and with its own commands, on Node 24.20.0 and npm 11.19.0 rather than the 24.15.0 `.nvmrc` pins: `npm ci`, `npm run build` at 386,054 bytes against DR8's 768,000, `npm pack --json --ignore-scripts` producing `treadling-0.1.0.tgz` at 116,490 bytes, the dependency-graph SBOM export at 107,021 bytes of SPDX-2.3 over 134 packages, and `sha256sum` over both into a `SHA256SUMS` that verifies against both files.
 The preflight's accept path was exercised twice: against the real `v0.1.1` tag in a clone configured the way a runner is, and through `scripts/rollback-drill.sh`, 13 of 13 on 2026-09-10 including the notes it writes and each of the six publishing refusals on a manifest broken to make it fire.
 `notesFor` was run against release pull request 69's own changelog and returned the 104-line 0.1.0 section with no leak into a second heading.
 
 `gh release edit` and `gh release upload --clobber`, which replaced the failed create, were run against this repository on 2026-09-10, on a throwaway tag rather than a release.
 `proof-artifacts-upload-20260910` was created outside the tag ruleset's live `refs/tags/v*` pattern, read from ruleset `22316869` rather than from `.github/rulesets/tags.json`, and deleted and read back as gone once before anything was attached to it.
 A draft release was opened on it by a separate act, standing in for the release release-please makes, and the workflow's two commands were then run verbatim against the three assets built from the `v0.1.2` tree.
-The release came back from the forge carrying `sbom.spdx.json` at 107,021 bytes, `SHA256SUMS` at 165 and `treadle-0.1.2.tgz` at 116,715, all `uploaded`, with the stand-in body replaced by the CHANGELOG section; running the same upload again left three assets rather than failing on the first, which is the `--clobber` clause.
+The release came back from the forge carrying `sbom.spdx.json` at 107,021 bytes, `SHA256SUMS` at 165 and `treadling-0.1.2.tgz` at 116,715, all `uploaded`, with the stand-in body replaced by the CHANGELOG section; running the same upload again left three assets rather than failing on the first, which is the `--clobber` clause.
 The release and the tag were then deleted, and the forge reports no release and no ref by that name and the same three `v` tags as before.
 
 Two limits on that proof. It used a draft, and `gh release create` succeeds against a draft on the same tag, so the shipped step's `a release with the same tag name already exists` refusal reproduces only against a published one: job `102910409340` is where that half is evidenced. And the assets were built on this machine rather than by the runner, so nothing in it exercises `actions/attest-build-provenance` a second time.
@@ -175,7 +175,7 @@ A 90,000-character description was accepted and left a 90,675-byte shard; a 10,0
 After: both are refused, each naming the field, the observed length, the limit and the difference, and the shard is byte-identical to what it was before the refused write.
 
 **And the evidence rule that ships with them.**
-A bug with a reviewer, a confirmed fix and no evidence is refused at `done` with `DOD7` as the only failing rule, and `explain` prints `treadle evidence add retry-key <kind> <ref> [label]` as the remedy.
+A bug with a reviewer, a confirmed fix and no evidence is refused at `done` with `DOD7` as the only failing rule, and `explain` prints `treadling evidence add retry-key <kind> <ref> [label]` as the remedy.
 Two pointers cost 2 rows on `show` and one `## Evidence` section in the shard.
 A ref carrying a space is refused, an invented kind is refused naming the seven, a duplicate is refused, and the twenty-first entry is refused naming the count and the limit.
 
@@ -204,7 +204,7 @@ Of those 29, 24 are readable now and 5 are declared hidden with a reason.
 `history <id>` is the reader [ADR-0011](architecture/adr/0011-evidence-and-the-severity-audit.md) named when it widened the `file` event to carry the fields an item was created with.
 
 ```text
-$ treadle history pay-hook
+$ treadling history pay-hook
 ok history demo
 item pay-hook
 sort at desc
@@ -219,7 +219,7 @@ sort at desc
 `explain` gains one line for the same fact about the write that put the item where it is, because that is where the axis looked and it already reads that event for `since` and `from_event`:
 
 ```text
-$ treadle explain pay-hook
+$ treadling explain pay-hook
 ...
 sev S1
 "by kim
@@ -250,13 +250,13 @@ A field a caller can set and cannot read back is a field the tool cannot answer 
 ## The defect pull request 6 found
 
 Writing the coverage gate exposed two reachable filesystem-failure paths on the same class.
-`treadle init` where `.work` is already a file, and `treadle file` into a shard directory with its write bit off.
+`treadling init` where `.work` is already a file, and `treadling file` into a shard directory with its write bit off.
 At the base pull request 6 rebases onto, pull request 4's command-boundary backstop already turns both into a structured envelope with no stack trace.
 
 ```text
 err INTERNAL -
 "cause init did not complete: Error: ENOTDIR: not a directory, mkdir '.../.work/items'
-fix treadle version
+fix treadling version
 ```
 
 Both were reported as `INTERNAL` with exit 1 and no rule id.
@@ -281,26 +281,26 @@ answered as a store holding nothing. Driven through the built bundle on a worksp
 two records, with `chmod 000` on the paths, at `1bc0049`:
 
 ```text
-$ chmod 000 .work/items && treadle status --out agent
+$ chmod 000 .work/items && treadling status --out agent
 ok status <workspace>
 items 0
 findings 0
 rc=0
-$ treadle doctor --out agent
+$ treadling doctor --out agent
 ok doctor <workspace>
 checked 0
 clean checked 0 items and 3 events
 rc=0
-$ treadle show first-task --out agent
+$ treadling show first-task --out agent
 err NOT_FOUND <workspace>
 "cause first-task is in no record here; this workspace holds 0 items
 rc=5
-$ chmod 755 .work/items && chmod 000 .work/items/*.md && treadle status --out agent
+$ chmod 755 .work/items && chmod 000 .work/items/*.md && treadling status --out agent
 err INTERNAL -
 "cause status did not complete: Error: EACCES: permission denied, open '.../.work/items/2026-09.md'
-fix treadle version
+fix treadling version
 rc=1
-$ chmod 644 .work/items/*.md && chmod 000 .work/events && treadle history first-task --out agent
+$ chmod 644 .work/items/*.md && chmod 000 .work/events && treadling history first-task --out agent
 ok history <workspace>
 none first-task has no recorded change
 rc=0
@@ -318,7 +318,7 @@ err STORE_UNAVAILABLE -
 rule S13
 entity .../.work
 "cause .../.work/items could not be read: scandir failed with EACCES
-fix treadle status
+fix treadling status
 rc=6
 ```
 
@@ -358,7 +358,7 @@ Every other budgeted artefact is byte-identical.
 A remedy is a promise, and a remedy naming no command is a promise nothing keeps.
 
 **A remedy naming a command is not yet a promise kept.**
-Eleven of the 41 command shapes the source emitted at the time were refused when run as printed with only the placeholder filled: `treadle transition <blocker> done` from a blocker in `draft`, `ready`, `in_review` or `on_hold` (`T1`), a two-flag clash fix with its operands dropped, `on_hold --until` without `--reason`, `set` naming the first three settable fields of the whole dictionary on a type that lacks the first, `mark --severity` on a task, `treadle init` on a workspace that already exists, and three shapes that went with the sprint in ADR-0029.
+Eleven of the 41 command shapes the source emitted at the time were refused when run as printed with only the placeholder filled: `treadling transition <blocker> done` from a blocker in `draft`, `ready`, `in_review` or `on_hold` (`T1`), a two-flag clash fix with its operands dropped, `on_hold --until` without `--reason`, `set` naming the first three settable fields of the whole dictionary on a type that lacks the first, `mark --severity` on a task, `treadling init` on a workspace that already exists, and three shapes that went with the sprint in ADR-0029.
 Every `page` and `whole` line dropped the caller's filters, `--fields`, `--limit` and `--for`, so `backlog --state draft --limit 2` printed a cursor whose page was six unfiltered rows including a `done` item.
 `test/cli/runnable-lines.test.ts` holds all of it by running the lines: 145 provocations over nine workspace states collect 90 or more distinct lines, each is filled from one placeholder table, tokenised as a shell would and run in-process on a fresh copy of the state that printed it, and each has to exit 0 or with an exit the inventory declares as a verdict.
 Three more cases walk a filtered `backlog`, a `next --for` and a `history` by the lines they print and assert the pages concatenate to what the same filter prints in one page.
@@ -380,9 +380,9 @@ $ npm test
 ℹ pass 1122
 ℹ fail 0
 
-$ treadle set cart acceptance_criteria=...
+$ treadling set cart acceptance_criteria=...
 set acceptance_criteria - -> [object Object]        # main: [ ] a shopper reopens a saved cart
-$ treadle show cart --field ac
+$ treadling show cart --field ac
 ac 0/1                                              # main: ac 0/1, then ~criteria 1 1 and the text
 
 $ node scripts/check-tests-kept.ts 3bce1ca HEAD
@@ -416,5 +416,5 @@ The comparison is against the merge base, so a test main gained after the fork i
 ## Running it
 
 The README's Quick start carries the gate commands and what each one runs.
-Two forms belong to this file's subject rather than to that block: `npm run flake -- 5` is a shorter local check than the 20-run default, and `TREADLE_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.
+Two forms belong to this file's subject rather than to that block: `npm run flake -- 5` is a shorter local check than the 20-run default, and `TREADLING_FUZZ_INPUTS=<n> npm test` raises the fuzzer above its gate count for a soak run.
 `npm run tests-kept` is the third, and CONTRIBUTING.md carries it beside the trailer that declares a removal.
