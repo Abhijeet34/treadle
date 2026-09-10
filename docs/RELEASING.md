@@ -21,8 +21,10 @@ Five steps, and a person is the third one.
    ```
 
 5. The tag fires `.github/workflows/release.yml`, which runs three platforms on the tagged tree, builds the bundle, packs it, exports an SBOM, checksums both, attests the tarball, and creates the GitHub release with the changelog section as its notes.
+   It then writes onto that release whether it published to npm, and when it did not, every condition that stopped it.
 
 Publishing to npm is a sixth step that only runs when three separate interlocks are open, and none of them is.
+The release says which ones held rather than leaving a green run to imply a publish: see "What a release says when it published nothing".
 
 ## Why the tag is signed, and why release-please does not create it
 
@@ -100,7 +102,8 @@ Each of these stops publication on its own, and all three are closed today.
    Where the refusal comes from is worth knowing before anyone tests the gate: npm 11.19's CLI checks `private` only for a workspace publish, and for this package the refusal is raised by `libnpmpublish` after authentication and the registry version query.
    So `npm publish --dry-run` prints `+ treadle@0.1.0` and exits 0 with no mention of `private`, and `npm publish` against an unreachable registry reaches `ENEEDAUTH` first.
    Measured 2026-09-07. A dry run is not a test of this interlock; removing the field and watching the real publish fail is, and nobody should run that.
-2. **`NPM_PUBLISH_ENABLED`**, a repository variable rather than a secret or a default. Unset, the publish job is visibly skipped and the release ends at the GitHub release and its three assets.
+2. **`NPM_PUBLISH_ENABLED`**, a repository variable rather than a secret or a default. Unset, the publish job's own condition is false, the job never starts, and the release ends at the GitHub release and its three assets.
+   A skipped job is not a report of that, and this line used to say it was: the run still concluded success and the release said nothing. The next section is the surface that says it.
 3. **The `npm-publish` environment**, configured to require a reviewer. The job stops and waits for a person before it can reach the registry.
 
 Publication uses npm Trusted Publishing over OIDC.
@@ -115,6 +118,41 @@ Four sentences in the tree stop being true on the same day and none of them is c
 One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
 Until that is set, a person with publish rights can `npm publish` by hand from a stale checkout and ship whatever `dist/` is on their disk.
 The workflow's own path is already closed by construction - the `publish` job downloads the attested tarball the `artifacts` job packed one step after `npm run build` and `release-preflight`, and verifies it against `SHA256SUMS` - and `scripts/check-dist-fresh.ts` explains why a `prepack` hook cannot be the answer here.
+
+## What a release says when it published nothing
+
+A skipped job is not a report.
+
+`publish` is gated on `vars.NPM_PUBLISH_ENABLED`, this repository has no Actions variables at all, and a job whose `if:` is false is skipped rather than run.
+So the Release run concluded success, `smoke` skipped behind `publish`, and the release page carried three assets and no sentence about npm.
+An absent signal reading as a pass is the defect class this repository has been removing, and here it misled twice rather than once.
+A reader who set the variable to lift the first interlock still got nothing, because `"private": true` stops the publish a step later and nothing named that up front.
+
+`.github/workflows/release.yml`'s `publication` job is what says so now.
+It runs on every tag whatever `publish` did, under `always()` because the skipped job it reports on would otherwise skip it too, and it names every block that applies rather than the first one to stop it:
+
+```text
+**`v0.1.0` was not published to npm.** The assets on this release are the whole of it.
+
+Every condition standing in front of publication, rather than the first one to stop it:
+
+- The repository variable `NPM_PUBLISH_ENABLED` is unset, not `true`, so the `publish` job's own condition is false and the job never starts.
+- `package.json` at `v0.1.0` carries `"private": true`, which `scripts/release-preflight.ts --publishing` refuses and npm refuses after it. Setting the variable above does not lift this one.
+```
+
+That paragraph goes onto the release itself under a `## Publication` heading, because "did this version reach npm?" is asked at the release and not in a job list where a skipped job looks like a job that had nothing to do.
+The same text goes into the run's step summary, and the run carries a warning annotation naming how many conditions stand in front of publication.
+A re-run replaces its own paragraph rather than stacking a second one, and the release notes the `artifacts` job wrote survive it.
+
+The third interlock is read rather than claimed.
+`GET /repos/{owner}/{repo}/environments/npm-publish` answers 404 for an environment nobody has created, and GitHub creates an environment on first use carrying no protection rules, so "could not be read" and "requires a reviewer" are opposite answers about whether anything would hold the job.
+The report prints whichever one is true and never rounds the first up to the second.
+
+It reports and does not gate, for the same reason `parked-checks` does not.
+Publication is closed by design until the name clears, so the condition is true on every release this repository cuts until then, and a red that never clears is a red nobody reads.
+`test/release/publication-decision.test.ts` drives the job's own shell over each outcome `publish` can have: skipped, failed, succeeded, and a result the job does not recognise.
+
+A release that publishes nothing must not read as a plain success.
 
 ## What stands between the release pull request and a merge
 
