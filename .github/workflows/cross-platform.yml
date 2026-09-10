@@ -143,7 +143,13 @@ jobs:
           npm pack --ignore-scripts --pack-destination pack
           ls -l pack
 
-      - name: Install it and run the happy path
+      # Both directions of the C1 guard, in the order a first user meets them: an `init` with
+      # no actor set is refused under C1, and the same `init` succeeds once one is. The refusal
+      # half is here because it is what this job actually met on the first real release - no
+      # job in this repository had ever set an actor, `version` passed everywhere because
+      # reading writes no record, and every step that writes one was stopped. A check that only
+      # exercised the success path would have gone green on a tool that refuses a first user.
+      - name: Install it, and check it refuses without an actor before it answers with one
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
@@ -152,10 +158,28 @@ jobs:
             echo "shebang: $(head -1 /usr/local/lib/node_modules/treadle/dist/treadle.js)"
             treadle version
             mkdir -p /tmp/ws && cd /tmp/ws
+
+            if treadle init --name refuses-with-no-actor > /tmp/refusal.txt 2>&1; then
+              cat /tmp/refusal.txt
+              echo "init wrote a record with no actor set, so the C1 guard is gone" >&2
+              exit 1
+            fi
+            cat /tmp/refusal.txt
+            grep -q "^rule C1$" /tmp/refusal.txt || {
+              echo "init refused with no actor, but not under rule C1" >&2
+              exit 1
+            }
+
+            # `github-actions` is the name GitHub itself attributes automated work to, and it
+            # is true of these records: a runner filed them, not a person. The kind is `agent`
+            # for the same reason - `human` here would be the one thing C1 exists to keep out
+            # of a log, a name nobody wrote. The same pair is set in `installed-windows` below.
+            export TREADLE_ACTOR=github-actions
+            export TREADLE_ACTOR_KIND=agent
             treadle init --name installed-smoke
             treadle file story "The installed binary filed this"
             treadle status | head -1 | grep -q "^ok "
-            echo "the packed tarball installs and answers on this userland"
+            echo "the packed tarball installs, refuses with no actor and answers with one"
           '
 
   # The same question as `installed` above, for the two shells npm shims rather than links.
@@ -208,6 +232,27 @@ jobs:
           findstr /C:"ok version" "%RUNNER_TEMP%\version.txt" >NUL || (echo ::error::treadle version started from cmd.exe but answered no ok line & exit /b 1)
           mkdir "%RUNNER_TEMP%\cmd-ws"
           cd /d "%RUNNER_TEMP%\cmd-ws"
+          rem The refusal direction first, with no actor in the environment: this is the shell
+          rem that met C1 on the first real release, so it is the one that has to keep meeting
+          rem it. `set VAR=` with nothing after the `=` clears the variable in cmd.
+          set TREADLE_ACTOR=
+          set TREADLE_ACTOR_KIND=
+          call treadle init --name refuses-with-no-actor > "%RUNNER_TEMP%\refusal.txt" 2>&1 && (type "%RUNNER_TEMP%\refusal.txt" & echo ::error::treadle init wrote a record with no actor set, so the C1 guard is gone & exit /b 1)
+          type "%RUNNER_TEMP%\refusal.txt"
+          rem `for /f` rather than findstr, and the reason is measured. findstr anchors a line
+          rem START on a bare LF but its line END anchors want a CR, so on this tool's LF-only
+          rem output no line ever ends and every exact form misses. Probed on windows-2025 in
+          rem run 34459665363 against a file certutil dumped as `0a 72 75 6c 65 20 43 31 0a`,
+          rem an unpadded `rule C1` between two LFs: `/C:` substring matched at errorlevel 0
+          rem while `/X`, `/B /E` and `/R "^rule C1$"` all reported 1. `for /f` splits on LF
+          rem and hands over the whole line, so `==` is a true exact match on either ending.
+          for /f "usebackq delims=" %%L in ("%RUNNER_TEMP%\refusal.txt") do if "%%L"=="rule C1" goto :refused_under_c1
+          echo ::error::treadle init refused with no actor from cmd.exe, but no line was exactly rule C1
+          exit /b 1
+          :refused_under_c1
+          echo the refusal named rule C1, so the guard is the one that stopped it
+          set TREADLE_ACTOR=github-actions
+          set TREADLE_ACTOR_KIND=agent
           call treadle init --name cmd-smoke > "%RUNNER_TEMP%\init.txt" 2>&1 || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init failed from cmd.exe & exit /b 1)
           findstr /C:"ok init" "%RUNNER_TEMP%\init.txt" >NUL || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init answered no ok line from cmd.exe & exit /b 1)
           call treadle file task "The installed binary filed this from cmd.exe" > "%RUNNER_TEMP%\file.txt" 2>&1 || (type "%RUNNER_TEMP%\file.txt" & echo ::error::treadle file failed from cmd.exe & exit /b 1)
@@ -230,6 +275,23 @@ jobs:
           if ($version -notmatch 'ok version') { throw "treadle version answered no ok line from PowerShell" }
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwsh-ws" | Out-Null
           Set-Location "$env:RUNNER_TEMP\pwsh-ws"
+          # The refusal direction, with no actor in the environment. `$ErrorActionPreference`
+          # is dropped to `continue` for exactly this command: the runner's `stop` turns a
+          # native command's stderr, redirected by `2>&1`, into a terminating error, and a
+          # refusal is all stderr - so under `stop` the one command here that is expected to
+          # fail would fail the step rather than be read.
+          $env:TREADLE_ACTOR = $null
+          $env:TREADLE_ACTOR_KIND = $null
+          $prior = $ErrorActionPreference
+          $ErrorActionPreference = 'continue'
+          $refusal = (treadle init --name refuses-with-no-actor 2>&1 | Out-String)
+          $refused = $LASTEXITCODE
+          $ErrorActionPreference = $prior
+          Write-Host $refusal
+          if ($refused -eq 0) { throw "treadle init wrote a record with no actor set, so the C1 guard is gone" }
+          if ($refusal -notmatch '(?m)^rule C1\s*$') { throw "treadle init refused with no actor from PowerShell, but not under rule C1" }
+          $env:TREADLE_ACTOR = 'github-actions'
+          $env:TREADLE_ACTOR_KIND = 'agent'
           $init = (treadle init --name pwsh-smoke 2>&1 | Out-String)
           if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadle init exited $LASTEXITCODE from PowerShell" }
           if ($init -notmatch 'ok init') { Write-Host $init; throw "treadle init answered no ok line from PowerShell" }
