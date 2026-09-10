@@ -36,7 +36,7 @@ treadling version
 
 The install line carries the scope and the command does not.
 `npm install -g @abhijeet34/treadling` and `npx @abhijeet34/treadling` fetch this package; `npm install -g treadling` and `npx treadling` fetch nothing, because npm refused the unscoped `treadling` as too similar to `readline` and no such package exists to resolve ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
-`treadle` is not this package either: another developer holds that npm record, which is why the name moved ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)).
+`treadle` is no longer this package's name either: another developer holds that npm record, and npm transfers no name on demand ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)).
 
 `0.2.1` was published by hand.
 The release workflow carries a `publish` job and it has never run: it is gated on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, the `npm-publish` environment does not exist either, and no trusted publisher is registered against this repository.
@@ -92,7 +92,7 @@ npm run flake    # 20 consecutive full runs, budget zero
 
 [docs/VERIFICATION.md](docs/VERIFICATION.md) is the table of what is measured, what each figure is, and what is not proven.
 
-What a published install would carry is one file of executable code: `npm run build` bundles the tree into `dist/treadling.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
+A published install carries one file of executable code: `npm run build` bundles the tree into `dist/treadling.js` with esbuild, and that bundle plus the JSON Schemas and the licence files is the whole tarball.
 The budget is 768,000 bytes, recorded in `bench/budgets.json` as DR8's 768,000 bytes raised by [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md), and the build fails rather than warns if the bundle goes over.
 The build prints the byte count and the margin every time it runs, and `.github/workflows/ci.yml` runs it on every pull request, so the budget is enforced rather than asserted.
 
@@ -177,7 +177,7 @@ Nine more left the workspace through `treadling remove`, which takes a record ou
 - [docs/DOMAIN.md](docs/DOMAIN.md) - the domain core's public surface and the rule ids its errors name.
 - [docs/architecture/adr/](docs/architecture/adr/README.md) - one record per decision, with what it departs from and why.
 - [docs/STABILITY.md](docs/STABILITY.md) - what counts as a breaking change, and the pre-1.0 policy.
-- [docs/RELEASING.md](docs/RELEASING.md) - how a release happens, why the tag is signed by a person, and how to roll one back.
+- [docs/RELEASING.md](docs/RELEASING.md) - how a release happens, why no release carries a human signature, what still stands between the release run and npm, and how to roll one back.
 - [docs/PROVENANCE.md](docs/PROVENANCE.md) - how this was built, and why no third-party notice attaches.
 - [docs/VERIFICATION.md](docs/VERIFICATION.md) - every claim this project makes about itself, with the measurement behind it and the ones that are not proven.
 - [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), [SUPPORT.md](SUPPORT.md).

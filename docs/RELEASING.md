@@ -9,9 +9,11 @@ It was running `gh release create`, and release-please had already created the r
 `v0.1.3`, `v0.2.0` and `v0.2.1` each carry the tarball, the SBOM and `SHA256SUMS`.
 
 `@abhijeet34/treadling@0.2.1` is on the registry, and the release run did not put it there.
-`GET https://registry.npmjs.org/@abhijeet34%2Ftreadling` answers 200 with `dist-tags.latest` at `0.2.1`, `abhijeet34` as the sole maintainer, and shasum `7d7da95a5518c4059279984fbedca83bd56a9774`, which is the tarball `npm pack` produced; the version document carries `_npmVersion` `11.19.0` and no provenance attestation, so it came from a CLI on a laptop rather than from a trusted publish.
+`GET https://registry.npmjs.org/@abhijeet34%2Ftreadling` answers 200 with `dist-tags.latest` at `0.2.1`, `abhijeet34` as the sole maintainer, and shasum `7d7da95a5518c4059279984fbedca83bd56a9774`.
+That is the byte the `artifacts` job attested: the tarball on `v0.2.1` and the tarball the registry serves compare identical, so the published artifact is the attested one even though the workflow did not publish it.
+What says it was published by hand is the absence, not the bytes: the version document carries `_npmVersion` `11.19.0` and no provenance attestation, and a trusted publish generates one.
 `v0.2.1`'s own release page says under `## Publication` that the version was not published to npm, and it is right about the workflow: the `publish` job has never run.
-The unscoped name is still nobody's: `GET /-/package/treadling/collaborators` answered `404 Package not found` on 2026-09-11, and `treadle` answered 200 with `timileyindev` holding write.
+The unscoped name is still nobody's: `GET /-/package/treadling/collaborators` answered `404 Package not found` on 2026-09-11, while `treadle`, the name this project no longer uses, answered 200 with `timileyindev` holding write.
 This file is the procedure the machinery is fired with, and the procedure for undoing a release that was wrong.
 
 [ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) reversed the posture this file used to describe, on 2026-09-10.
@@ -350,7 +352,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate @abhijeet34/treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
+npm deprecate @abhijeet34/treadling@0.2.1 "0.2.1 quarantines a valid record on a hand-edited shard; use 0.2.2"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
@@ -359,18 +361,18 @@ The message names what is wrong and what to use instead, because a deprecation n
 **Then ship the fix.** A hotfix branches from the tag that was released, not from `main`:
 
 ```sh
-git checkout -b hotfix/v0.2.1 v0.2.0
+git checkout -b hotfix/v0.2.2 v0.2.1
 # land the fix through a pull request as usual
 ```
 
 Cutting from the tag is what keeps the fix minimal.
 Cutting from `main` ships whatever else merged since, which is how a rollback becomes a second incident.
-The patch then follows the ordinary release path above: land it, merge the release pull request, and the automation cuts `v0.2.1` from it.
+The patch then follows the ordinary release path above: land it, merge the release pull request, and the automation cuts `v0.2.2` from it.
 
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
 ```sh
-npm unpublish @abhijeet34/treadling@0.2.0
+npm unpublish @abhijeet34/treadling@0.2.1
 ```
 
 Within 72 hours, and only when nothing depends on that version.
@@ -450,10 +452,10 @@ A red drift check says the two sides disagree, not which one is right, and the f
 This was the first drift the check ever found where getting that wrong would have made things worse: `secret scan` was already required on the forge, so applying `main.json` as it then stood would have dropped `secret scan` as a merge gate to match it, and the drift check would then have reported success over a repository with one fewer guard on it.
 The fix adds `secret scan` to `main.json` beside `tests kept`, keeping the stronger side rather than matching the weaker one; deciding which side that is stays a person's job, every time this check goes red.
 
-That is why the release path is blocked today, and it is containment rather than a defect.
-`main.json` names `checks`, `tests kept` and `secret scan`; live ruleset `22314350` enforces only `checks` and `secret scan`; so `npm run ruleset-drift` exits 1, and `release-tag`'s `needs: ruleset-drift` in `.github/workflows/release.yml` stops the release path there rather than cutting a tag against rules the tree only believes it has.
-That is the check doing its job on the first drift it ever found, not something to route around: dropping `ruleset-drift` from `release-tag`'s `needs:` would delete the enforcement in the same change that added it.
-What unblocks it is running `scripts/apply-repo-settings.sh` to apply `tests kept` to the live rule, which adds a protection rather than removing one.
+That blocked the release path until the fix was applied, and it was containment rather than a defect: `release-tag`'s `needs: ruleset-drift` in `.github/workflows/release.yml` stops the release path rather than cutting a tag against rules the tree only believes it has.
+Dropping `ruleset-drift` from `release-tag`'s `needs:` would have deleted the enforcement in the same change that added it.
+What unblocked it was running `scripts/apply-repo-settings.sh` to apply `tests kept` to the live rule, which adds a protection rather than removing one.
+Read back on 2026-09-11, live ruleset `22314350` requires `checks`, `tests kept` and `secret scan`, and live ruleset `22316869` carries `update` and `deletion` and no signature rule, so both agree with their files and `v0.1.3` onward cut through that gate.
 
 ```sh
 npm run ruleset-drift
