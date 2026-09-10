@@ -55,6 +55,9 @@ The range is the pull request's own commits, so a trailer that merges into main 
 This is the part of the decision that is not a convenience.
 `checks` is an aggregate that `needs:` the jobs in its own workflow, and that workflow file is in the branch: a resolution that deleted the `tests-kept` job from `.github/workflows/ci.yml` would leave `checks` green with the guard gone, which is the exact failure mode the guard exists to stop.
 A required context named in the ruleset is a fact on the forge.
+That claim was asserted here and never checked against the forge itself, so it holds only while someone has actually run `scripts/apply-repo-settings.sh`, and nothing did between pull request 32 and this repository's ruleset-drift check.
+Named in `.github/rulesets/main.json`, `tests kept` was never actually a required context on the live `main` ruleset, while `secret scan` was required there with no file in the tree saying so.
+`npm run ruleset-drift` and `.github/workflows/ruleset-drift.yml` are what catch that gap now.
 A branch that deletes the job never reports it, and a required check that never reports blocks the merge.
 
 The cost is a rule the workflow's own header used to state: every job could be added or renamed without touching the ruleset.
