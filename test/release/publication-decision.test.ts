@@ -5,8 +5,10 @@
 // the release page said only that three assets existed.
 //
 // It misled twice rather than once. A reader who set the variable to lift that block still got
-// nothing, because `package.json` carries `"private": true` and the publishing preflight refuses
-// a step later; neither block was named anywhere on the run.
+// nothing, because `package.json` carried `"private": true` and the publishing preflight refused
+// a step later; neither block was named anywhere on the run. That field has since been removed,
+// which is why the scenarios below drive both manifests: the report has to be right about the
+// tree the tag names rather than about the tree this file was written against.
 //
 // These tests drive the `publication` job's own shell, read out of .github/workflows/release.yml,
 // so what runs here is the text CI runs rather than a copy of it that can drift. `gh` is a stub
@@ -159,10 +161,10 @@ function section(result: Result): string {
 }
 
 describe('a release that published nothing says so, and names every block', () => {
-  // The repository state on 2026-09-10: zero Actions variables, `"private": true`, no release
-  // ever fired. Both blocks apply, and reporting only the first is the defect.
+  // The state the report was built for: zero Actions variables and a private manifest. Both
+  // blocks apply, and reporting only the first is the defect.
   it('names both blocks when the variable is absent and the package is private', async () => {
-    const result = await drive({ publishResult: 'skipped' })
+    const result = await drive({ publishResult: 'skipped', private: true })
 
     assert.equal(result.code, 0, `the job failed:\n${result.stdout}`)
     const said = section(result)
@@ -183,6 +185,18 @@ describe('a release that published nothing says so, and names every block', () =
     assert.match(said, /carries `"private": true`/)
     assert.match(said, /ended `failure`/)
     assert.match(said, /Setting the variable above does not lift this one/)
+  })
+
+  // The repository state from 2026-09-10 on: no Actions variables, and a manifest that no longer
+  // carries `private`. One block stands, and naming a lifted one would be as wrong as hiding one.
+  it('names the variable alone once the manifest no longer carries private', async () => {
+    const result = await drive({ publishResult: 'skipped', private: false })
+
+    assert.equal(result.code, 0, `the job failed:\n${result.stdout}`)
+    const said = section(result)
+    assert.match(said, /`v0\.1\.0` was not published to npm/)
+    assert.match(said, /`NPM_PUBLISH_ENABLED` is unset, not `true`/)
+    assert.doesNotMatch(said, /"private": true/)
   })
 
   it('reports a variable set to something that is not true, rather than calling it unset', async () => {

@@ -19,7 +19,7 @@
 //
 // A barrel line is not a reader. `export { X } from './x.ts'` names X and reads nothing, so
 // a symbol whose only mention outside its own file is a barrel line is exported to nobody:
-// nothing is published (`"private": true`), only `dist/treadle.js` ships, and no external
+// no package is on the registry, only `dist/treadle.js` ships, and no external
 // consumer keeps one alive. Eleven values sat in that position when this rule was widened,
 // so the re-export clauses are stripped out of the reference text before the match.
 //

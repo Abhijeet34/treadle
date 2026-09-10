@@ -34,8 +34,8 @@ VERSION=$(node -p "require('./package.json').version")
 npm ci --silent --ignore-scripts >/dev/null
 npm run --silent build >/dev/null
 
-# The preflight reads the release notes out of the changelog, and this clone's is empty
-# because nothing has been released. The drill supplies the section a release would have.
+# The preflight reads the release notes out of the changelog, and the drill supplies its own
+# section rather than depending on whatever the clone's changelog happens to carry.
 printf '# Changelog\n\n## %s (2026-01-01)\n\n### Features\n\n* the drill wrote this\n' "$VERSION" > CHANGELOG.md
 
 pass=0

@@ -23,12 +23,14 @@ Linux, macOS and Windows, and any POSIX userland including BusyBox: the executab
 One platform limit comes with that line, and no workflow produces it by accident: on macOS an argument block over about 955 KB kills the process inside Node's own startup, before treadle runs at all.
 [docs/STABILITY.md](docs/STABILITY.md), "The supported userlands, and the macOS argument-block limit", carries the measurement, why no valid call reaches it, and the decision to keep it.
 
-The published package has zero runtime dependencies, and that is a budget rather than a coincidence: a read is the record files parsed, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
+The package has zero runtime dependencies, and that is a budget rather than a coincidence: a read is the record files parsed, argument parsing is `node:util`, hashing is `node:crypto`, and the record format is this project's own grammar.
 
 ## Install
 
-Nothing is published yet: publication is gated on a name clearance that has not run, so `package.json` carries `"private": true`.
-The release machinery is built and has never been fired; [docs/RELEASING.md](docs/RELEASING.md) says what opens it and how that refusal actually presents.
+No package is on the registry, and the one release that exists carries no assets.
+`v0.1.0` is on the forge because the machinery has been fired: the cross-platform install checks refused for want of an actor, the `artifacts` job skipped behind them, and nothing was built to attach.
+Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run.
+[docs/RELEASING.md](docs/RELEASING.md) says what opens that gate, and what a release says when it published nothing.
 Clone the repository to work on it.
 
 ```bash
@@ -125,8 +127,8 @@ See [Status](#status) for what is shipped, and what was declined or is blocked.
 | `doctor`: fifteen findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
-| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); never fired, because firing it needs a signed tag |
-| Published package | Blocked on a name clearance that has not run |
+| Release: version and changelog through release-please, signed-tag gate, SBOM, checksums, build provenance | Shipped: [ADR-0009](docs/architecture/adr/0009-release-and-supply-chain.md); fired once, on `v0.1.0`, which carries no assets because the install checks refused for want of an actor and `artifacts` skipped behind them |
+| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a name clearance screen that has not been run |
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.

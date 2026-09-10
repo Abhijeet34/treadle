@@ -250,11 +250,12 @@ jobs:
             "$TARBALL" sbom.spdx.json SHA256SUMS
 
   # Off until someone deliberately turns it on, and then still not until someone approves the
-  # run. Three interlocks, each of which stops publication on its own:
+  # run. Three interlocks were designed, each of which stops publication on its own. The first
+  # is open now and the two below it hold:
   #
-  #   1. `private: true` in package.json, which npm itself refuses to publish. The name has
-  #      not been through its clearance screen, and this is what makes that a fact rather than
-  #      an intention. The preflight names it so a refusal reads as the gate holding.
+  #   1. `private: true` in package.json, which npm itself refuses to publish. Removed, so this
+  #      one no longer stops anything. The preflight keeps the clause, so a manifest that
+  #      carries the field again is refused before a tarball is built.
   #   2. NPM_PUBLISH_ENABLED, a repository variable rather than a secret or a default. Unset,
   #      a release ends at the GitHub release and its three assets. A skipped job is not a
   #      report of that: the run still concludes success, and the release says nothing. The
@@ -303,7 +304,8 @@ jobs:
           ' "$(npm --version)"
 
       # The same clauses as the artifacts job, plus the ones that only matter when a tarball
-      # is about to leave the machine. This is where `private: true` refuses.
+      # is about to leave the machine, among them the `private: true` clause the manifest no
+      # longer trips.
       - name: Release preflight
         run: |
           npm ci
@@ -383,8 +385,8 @@ jobs:
   # `publish` above is skipped whenever NPM_PUBLISH_ENABLED is not `true`, `smoke` skips behind
   # it, and the run then concludes success having published nothing. An absent signal reading as
   # a pass is the defect class this repository has been removing, and here it misleads twice
-  # rather than once: a reader who sets the variable to lift the first block still gets nothing,
-  # because `private: true` stops the publish a step later and nothing said so up front.
+  # rather than once: a reader who set the variable to lift the first block still got nothing,
+  # because `private: true` stopped the publish a step later and nothing said so up front.
   #
   # So this job says what happened, on every tag, whatever `publish` did. It names every block
   # that applies rather than the one that happened to stop it first, and it writes that onto the
