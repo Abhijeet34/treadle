@@ -338,7 +338,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
+npm deprecate @abhijeet34/treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
@@ -358,7 +358,7 @@ The patch then follows the ordinary release path above: land it, merge the relea
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
 ```sh
-npm unpublish treadling@0.2.0
+npm unpublish @abhijeet34/treadling@0.2.0
 ```
 
 Within 72 hours, and only when nothing depends on that version.
