@@ -20,8 +20,9 @@
 // A barrel line is not a reader. `export { X } from './x.ts'` names X and reads nothing, so
 // a symbol whose only mention outside its own file is a barrel line is exported to nobody:
 // the published package declares `bin` and no `main`, `exports` or `types`, so only
-// `dist/treadling.js` ships and no external consumer can import a symbol to keep it alive. Eleven values sat in that position when this rule was widened,
-// so the re-export clauses are stripped out of the reference text before the match.
+// `dist/treadling.js` ships and no external consumer can import a symbol to keep it
+// alive. Eleven values sat in that position when this rule was widened, so the
+// re-export clauses are stripped out of the reference text before the match.
 //
 // docs/DOMAIN.md IS a reader, and it is the only document that is. It publishes the domain
 // core's surface, so naming a symbol there is a deliberate claim about it; `MAX_EVIDENCE_REF`
