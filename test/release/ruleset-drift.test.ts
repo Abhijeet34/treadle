@@ -4,7 +4,8 @@
 // from https://api.github.com/repos/Abhijeet34/treadle/rulesets/{22316869,22314350}, and each
 // carries a drift that had been live and unseen: a `required_signatures` rule on the tag
 // ruleset that .github/rulesets/tags.json dropped in #97, and a `secret scan` required context
-// on main where .github/rulesets/main.json has said `tests kept` since #32.
+// on main that .github/rulesets/main.json did not name from #32 until this fix added it beside
+// `tests kept`, which the live ruleset still does not require.
 //
 // They are asserted against the real files rather than against copies, so a file edited back
 // into disagreement with the recorded drift reddens here.
@@ -86,7 +87,7 @@ describe('the drift the files could not see', () => {
     assert.match(named?.detail ?? '', /live ruleset enforces this rule and the file does not/)
   })
 
-  it('names the required context main enforces in place of the one the file states', () => {
+  it('names the required context main is still missing, now that the file states all three', () => {
     const findings = compareRuleset(file('main.json'), LIVE_MAIN)
     assert.deepEqual(drifted(findings), [
       'rules.required_status_checks.parameters.required_status_checks',

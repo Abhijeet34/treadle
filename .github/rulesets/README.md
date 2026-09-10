@@ -10,7 +10,8 @@ That gap has been real twice.
   Live ruleset `22316869` was created and last modified in the same second on 2026-09-05 and was not touched again, so it still required a signature.
   `release-tag` then created an unsigned tag as the automation, GitHub refused it, and the refusal read `Resource not accessible by integration`, which looks like a token problem and is not one.
 - `main.json` has required the `tests kept` context since #32.
-  Live ruleset `22314350` was last modified on 2026-09-08 and requires `secret scan` in its place, so the guard [ADR-0013](../../docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md) argues for has never been a required context on `main`.
+  Live ruleset `22314350` was last modified on 2026-09-08 and requires `checks` and `secret scan`, so the guard [ADR-0013](../../docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md) argues for has never been a required context on `main`, and `secret scan` was required there with no file naming it.
+  `main.json` now names all three, `checks`, `tests kept` and `secret scan`, because the drift check does not say which side is right: matching the file to live here would have dropped a guard the forge already enforced, so the file gained a context instead of losing one.
 
 A file nobody reads back is documentation, whatever it is called.
 

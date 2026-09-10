@@ -8,9 +8,12 @@
 // again, so that edit changed documentation and nothing else. `release-tag` then created an
 // unsigned tag as the automation and GitHub refused it, which surfaced as
 // `Resource not accessible by integration` and reads like a token problem it is not.
-// This check also found a second, older drift nobody was looking for: main.json has required
-// the `tests kept` context since #32, and live ruleset 22314350 requires `secret scan` in its
-// place, so the guard ADR-0013 argues for has never been a required context on main.
+// This check also found a second, older drift nobody was looking for: main.json named only
+// `tests kept` beside `checks` since #32, and live ruleset 22314350 also requires `secret scan`,
+// which no file named, so the guard ADR-0013 argues for has never been a required context on
+// main. A drift check says only that the two sides disagree, not which one is right: the file
+// gained `secret scan` rather than losing `tests kept`, because the live rule was the one worth
+// keeping. `tests kept` remains the gap this check still reports against the live ruleset.
 //
 // No credential. Both ruleset endpoints answer an unauthenticated request on a public
 // repository, measured at HTTP 200, so this runs under the read-only default workflow token or

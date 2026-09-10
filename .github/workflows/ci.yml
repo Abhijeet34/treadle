@@ -1,10 +1,11 @@
 # SPDX-License-Identifier: Apache-2.0
 # Every job a merge depends on lives in this one file, because the `checks` aggregate at the
 # bottom can only `needs:` jobs in its own workflow. The ruleset requires that one context and
-# one other, `tests kept`, which is named there rather than reached through the aggregate
-# because a branch that deleted it from this file would otherwise leave `checks` green with
-# the guard gone (ADR-0013). Every other job here can be added or renamed without touching
-# .github/rulesets/main.json; renaming `tests-kept` cannot.
+# two others named outside it: `tests kept`, below, and `secret scan` from
+# .github/workflows/secret-scan.yml. `tests kept` is named in the ruleset rather than reached
+# through the aggregate because a branch that deleted it from this file would otherwise leave
+# `checks` green with the guard gone (ADR-0013). Every other job here can be added or renamed
+# without touching .github/rulesets/main.json; renaming `tests-kept` cannot.
 #
 # A pull request runs Linux runners only. GitHub bills a macOS minute at about 10x a Linux one
 # and a Windows minute at about 1.67x, against the same allowance, so a three-platform matrix
@@ -202,11 +203,12 @@ jobs:
           HEAD: ${{ github.event.pull_request.head.sha }}
         run: scripts/check-dco.sh "$BASE" "$HEAD"
 
-  # The one job named in .github/rulesets/main.json beside `checks`, and it is named there
-  # because of what it checks. A branch that deletes this job from this file would leave
-  # `checks` green with the guard gone, which is the failure the guard exists to stop; a
-  # required context the branch cannot write is what closes that. ADR-0013 carries the
-  # argument, and renaming this job means editing the ruleset in the same change.
+  # One of two jobs named in .github/rulesets/main.json beside `checks`, the other being
+  # `secret scan` in .github/workflows/secret-scan.yml, and it is named there because of what
+  # it checks. A branch that deletes this job from this file would leave `checks` green with
+  # the guard gone, which is the failure the guard exists to stop; a required context the
+  # branch cannot write is what closes that. ADR-0013 carries the argument, and renaming this
+  # job means editing the ruleset in the same change.
   #
   # No `npm ci`: the script calls git and nothing else, and Node runs it from source.
   tests-kept:

@@ -245,7 +245,7 @@ The bot holds no write access and has never had a pull request merged here, so i
 A parked run is not a slow run.
 Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
 Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
-`.github/rulesets/main.json` requires the `checks` and `tests kept` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
+`.github/rulesets/main.json` requires the `checks`, `tests kept` and `secret scan` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
 
 A parked run also attaches no check to the pull request, so the pull request page reported nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
 Forty-six runs had concluded `action_required` by then, and four release pull requests had waited four days.
@@ -379,7 +379,7 @@ A settings script that half-applies is worse than one that refuses, because the 
 
 | File | What it sets |
 |---|---|
-| `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the required `checks` and `tests kept` contexts |
+| `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the required `checks`, `tests kept` and `secret scan` contexts |
 | `.github/rulesets/tags.json` | A `refs/tags/v*` tag that cannot be updated or deleted. No signature is required: see "Why the tag is no longer signed". The name itself is checked by the release preflight, not here |
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives, and deleting a branch once its pull request merges |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
@@ -401,8 +401,12 @@ Live ruleset `22316869` was created and last modified in the same second on 2026
 `release-tag` created an unsigned tag as the automation, GitHub refused it, and the refusal read `Resource not accessible by integration`, which looks like a missing permission and is not one.
 
 Reading the rulesets back found a second drift nobody was looking for.
-`.github/rulesets/main.json` has required the `tests kept` context since #32, and live ruleset `22314350` requires `secret scan` in its place.
-The guard ADR-0013 argues for has never been a required context on `main`, and only a read of the forge could have said so.
+`.github/rulesets/main.json` named only `tests kept` beside `checks` since #32, while live ruleset `22314350` requires `checks` and `secret scan`.
+The guard ADR-0013 argues for has never been a required context on `main`, and `secret scan` was required there with no file in the tree saying so, and only a read of the forge could have said either.
+
+A red drift check says the two sides disagree, not which one is right, and the file is not automatically the answer.
+This was the first drift the check ever found where getting that wrong would have made things worse: `secret scan` was already required on the forge, so applying `main.json` as it then stood would have dropped `secret scan` as a merge gate to match it, and the drift check would then have reported success over a repository with one fewer guard on it.
+The fix adds `secret scan` to `main.json` beside `tests kept`, keeping the stronger side rather than matching the weaker one; deciding which side that is stays a person's job, every time this check goes red.
 
 ```sh
 npm run ruleset-drift
