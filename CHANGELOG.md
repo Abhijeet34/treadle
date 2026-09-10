@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Abhijeet34/treadling/compare/v0.2.0...v0.2.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* publish the package under the scoped name @abhijeet34/treadling ([#104](https://github.com/Abhijeet34/treadling/issues/104)) ([4eaaf46](https://github.com/Abhijeet34/treadling/commit/4eaaf463af0804854c81648f52aed6143f6ab730))
+
 ## [0.2.0](https://github.com/Abhijeet34/treadling/compare/v0.1.3...v0.2.0) (2026-09-10)
 
 

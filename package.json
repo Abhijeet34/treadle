@@ -1,6 +1,6 @@
 {
   "name": "@abhijeet34/treadling",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "The record of the work between people and agents, over files you commit to git.",
   "license": "Apache-2.0",
   "bin": {
