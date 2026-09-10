@@ -51,6 +51,9 @@ Nothing is published: `docs/RELEASING.md` carries the three interlocks, the sign
 how a release happens, and `scripts/apply-repo-settings.sh` is the only thing that applies the
 checked-in rulesets under `.github/`.
 Do not tag, release or publish without the captain saying so.
+`scripts/rollback-drill.sh` is how the tag path is exercised without firing one: it signs real
+tags in a `mktemp` clone and pushes nothing, so the preflight's accept path can be proven with no
+tag anywhere near this repository or its remote.
 
 `package.json` declares `engines.node` at the product's floor of 24.15, which is what `.nvmrc`
 pins, what the first CI leg runs, and what every figure in `docs/architecture/history/BENCHMARKS-2026-09.md` was measured
