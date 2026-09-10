@@ -479,6 +479,10 @@ Never add `cancel-in-progress` to a release, publish, or scheduled workflow: can
 Dispatch the workflow by hand (`gh-axi workflow run cross-platform.yml --ref <branch>`) whenever a branch touches the store, a path, the shebang, or the human rendering: `ci.yml` is Linux and cannot see any of them, and the first run this workflow ever had was red on two platforms.
 A `workflow_dispatch` only fires for a workflow that already exists on the default branch, so a new workflow file cannot be dispatched from a branch at all; measure inside an existing one.
 
+Any CI step that runs a mutating `treadle` command must export `TREADLE_ACTOR=github-actions` and `TREADLE_ACTOR_KIND=agent`, because C1 refuses to write a record that names nobody and no fallback exists by design.
+Reads are unaffected, which is why the first real release saw `version` pass on every platform while `init` and `file` were refused on three.
+A check that drives the tool asserts both directions, the refusal naming C1 with no actor set and the success with one, since a success-only check goes green on a tool that refuses a first user.
+
 ## Writing a test that will run on Windows
 
 Three quarters of what a Windows job reports is the suite asserting POSIX at it, so the rules are short.
@@ -486,10 +490,13 @@ Compare paths through `node:path` and never against a literal `/`, and never bui
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
 The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
 
-Three things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 on 2026-09-08 and each silent:
+Four things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 and each silent:
 `npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
 a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;
 and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows does not have, because `CommandNotFoundException` is not a process exit, so a check there asserts the ok line the command should have printed and not the exit code alone.
+The fourth was measured in run 34459665363: `findstr` cannot exact-match a line of this tool's output, because it anchors a line start on a bare LF but wants a CR to end one, and the tool writes LF everywhere.
+Against a file `certutil` dumped as `0a 72 75 6c 65 20 43 31 0a`, `/C:` substring matched at errorlevel 0 while `/X`, `/B /E` and `/R "^rule C1$"` all reported 1; use `for /f "usebackq delims="` with `==`, which splits on LF and compares the whole line.
+PowerShell needs `$ErrorActionPreference` dropped to `continue` around a command expected to fail, because the runner sets `stop` and that turns a native command's `2>&1` stderr into a terminating error.
 
 ## Secret scanning
 

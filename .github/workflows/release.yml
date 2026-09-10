@@ -358,6 +358,14 @@ jobs:
       # The happy path, driven the way the README drives it, against a workspace this job
       # creates in a directory that has never held one.
       - name: Run the happy path
+        # The same identity the cross-platform install checks record under, and here for the
+        # same reason: `init` and `file` write an event naming who made the change, and C1
+        # refuses a record that names nobody. This job never ran to find that out - it sits
+        # behind `publish`, which is closed by design - so the fault was latent rather than
+        # absent, and it is fixed here alongside the jobs that did fire.
+        env:
+          TREADLE_ACTOR: github-actions
+          TREADLE_ACTOR_KIND: agent
         run: |
           set -euo pipefail
           mkdir -p /tmp/smoke && cd /tmp/smoke
