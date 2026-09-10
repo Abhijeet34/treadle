@@ -256,8 +256,10 @@ jobs:
   #      not been through its clearance screen, and this is what makes that a fact rather than
   #      an intention. The preflight names it so a refusal reads as the gate holding.
   #   2. NPM_PUBLISH_ENABLED, a repository variable rather than a secret or a default. Unset,
-  #      a release ends at the GitHub release and its three assets, and this job is visibly
-  #      skipped rather than silently absent.
+  #      a release ends at the GitHub release and its three assets. A skipped job is not a
+  #      report of that: the run still concludes success, and the release says nothing. The
+  #      `publication` job below is the report, and it names this block and the one above it
+  #      together, because lifting either one alone publishes nothing.
   #   3. The `npm-publish` environment, which is configured to require a reviewer. The job
   #      stops and waits for a person before it can reach the registry.
   #
@@ -369,3 +371,128 @@ jobs:
           # that succeeds prints `ok <command>`.
           treadle status | head -1 | grep -q '^ok '
           echo "the published package installs and answers"
+
+  # `publish` above is skipped whenever NPM_PUBLISH_ENABLED is not `true`, `smoke` skips behind
+  # it, and the run then concludes success having published nothing. An absent signal reading as
+  # a pass is the defect class this repository has been removing, and here it misleads twice
+  # rather than once: a reader who sets the variable to lift the first block still gets nothing,
+  # because `private: true` stops the publish a step later and nothing said so up front.
+  #
+  # So this job says what happened, on every tag, whatever `publish` did. It names every block
+  # that applies rather than the one that happened to stop it first, and it writes that onto the
+  # release itself, because "did this version reach npm?" is asked at the release and not in a
+  # job list where a skipped job looks like a job that had nothing to do.
+  #
+  # It reports and does not gate, for the reason `parked-checks` above does not gate: with
+  # publication closed by design the condition is true on every release this repository will cut
+  # until the name clears, and a red that never clears is a red nobody reads. The run carries a
+  # warning annotation and a summary, the release carries the sentence, and neither turns the
+  # release red.
+  publication:
+    name: publication
+    needs: [artifacts, publish]
+    # `always()` because the whole point is to report a `publish` that was skipped, and a
+    # skipped dependency skips its dependents by default. Guarded on `artifacts` succeeding
+    # because there is no release to write onto when it did not.
+    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.artifacts.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      # Editing the release the `artifacts` job just created. This job publishes nothing, holds
+      # no registry credential, and changes nothing but what the release says about itself.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.ref_name }}
+      # `skipped`, `success`, `failure` or `cancelled`. This is the only place in the run where
+      # that word is turned into a sentence.
+      PUBLISH_RESULT: ${{ needs.publish.result }}
+      PUBLISH_ENABLED: ${{ vars.NPM_PUBLISH_ENABLED }}
+      SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+    steps:
+      # For one field. `private` is read out of the tree the tag names rather than asserted from
+      # this file, so the report cannot claim an interlock the released tree does not carry.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Say whether this release published, and name every block that stopped it
+        run: |
+          set -euo pipefail
+
+          # Every block is tested, and none of them short-circuits the next: the defect being
+          # fixed is a reader lifting the first one and finding the second waiting behind it.
+          blocks="$RUNNER_TEMP/blocks.md"
+          : > "$blocks"
+
+          enabled="${PUBLISH_ENABLED:-}"
+          if [ "$enabled" != "true" ]; then
+            shown="unset"
+            [ -z "$enabled" ] || shown="\`$enabled\`"
+            printf -- "- The repository variable \`NPM_PUBLISH_ENABLED\` is %s, not \`true\`, so the \`publish\` job's own condition is false and the job never starts.\n" "$shown" >> "$blocks"
+          fi
+
+          if [ "$(jq -r '.private == true' package.json)" = "true" ]; then
+            printf -- "- \`package.json\` at \`%s\` carries \`\"private\": true\`, which \`scripts/release-preflight.ts --publishing\` refuses and npm refuses after it. Setting the variable above does not lift this one.\n" "$TAG" >> "$blocks"
+          fi
+
+          # The third interlock docs/RELEASING.md names is not a file, so it is read rather than
+          # claimed. An environment that does not exist is created on first use with no
+          # protection rules, so "not readable" and "requires a reviewer" are opposite answers
+          # and must not be printed as the same one.
+          reviewers=$(gh api "repos/${GITHUB_REPOSITORY}/environments/npm-publish" \
+            --jq '[.protection_rules[]? | select(.type == "required_reviewers")] | length' 2>/dev/null) || reviewers=""
+          case "$reviewers" in
+            '') remaining="The \`npm-publish\` environment could not be read here, so nothing in this run confirms the reviewer interlock \`docs/RELEASING.md\` names. An environment that does not exist yet is created on first use carrying no protection rules, which stops nothing." ;;
+            0) remaining="The \`npm-publish\` environment exists and carries no required-reviewer rule, so it would stop nothing once the two blocks above are lifted." ;;
+            *) remaining="The \`npm-publish\` environment carries ${reviewers} required-reviewer rule(s), which would hold the job for a person once the blocks above are lifted." ;;
+          esac
+
+          section="$RUNNER_TEMP/publication.md"
+          {
+            echo '## Publication'
+            echo
+            case "$PUBLISH_RESULT" in
+              success)
+                echo "\`$TAG\` was published to npm by the \`publish\` job of [this run]($SUMMARY_URL). The \`smoke\` job is what checks that it installs."
+                ;;
+              skipped)
+                echo "**\`$TAG\` was not published to npm.** The assets on this release are the whole of it."
+                ;;
+              failure | cancelled)
+                echo "**\`$TAG\` was not published to npm.** The \`publish\` job of [this run]($SUMMARY_URL) ended \`$PUBLISH_RESULT\`. The assets on this release are the whole of it."
+                ;;
+              *)
+                echo "**Treat \`$TAG\` as unpublished until someone checks the registry.** The \`publish\` job reported \`$PUBLISH_RESULT\`, which this job does not know how to read."
+                ;;
+            esac
+            if [ -s "$blocks" ]; then
+              echo
+              echo 'Every condition standing in front of publication, rather than the first one to stop it:'
+              echo
+              cat "$blocks"
+            fi
+            if [ "$PUBLISH_RESULT" != "success" ]; then
+              echo
+              echo "$remaining"
+            fi
+          } > "$section"
+
+          if [ "$PUBLISH_RESULT" = "success" ]; then
+            echo "::notice::$TAG was published to npm"
+          else
+            echo "::warning::$TAG published nothing to npm; $(wc -l < "$blocks" | tr -d ' ') condition(s) stand in front of publication and the release notes name each one"
+          fi
+          cat "$section" >> "$GITHUB_STEP_SUMMARY"
+
+          # Read, trim, append: a re-run of this job replaces its own paragraph rather than
+          # stacking a second one, and the release notes the `artifacts` job wrote survive it.
+          # The awk holds blank lines back until a non-blank follows, so the trailing gap before
+          # a previous `## Publication` does not grow by one line every time.
+          body="$RUNNER_TEMP/body.md"
+          gh release view "$TAG" --json body --jq '.body' > "$body"
+          awk '
+            /^## Publication$/ { exit }
+            /^[[:space:]]*$/ { pending = pending $0 "\n"; next }
+            { printf "%s", pending; pending = ""; print }
+          ' "$body" > "$RUNNER_TEMP/notes.md"
+          { cat "$RUNNER_TEMP/notes.md"; echo; cat "$section"; } > "$RUNNER_TEMP/new-body.md"
+          gh release edit "$TAG" --notes-file "$RUNNER_TEMP/new-body.md"
