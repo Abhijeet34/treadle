@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.1](https://github.com/Abhijeet34/treadle/compare/v0.1.0...v0.1.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* **ci:** recognize Node's option-object test skip and run the secret-scan proof in CI ([#93](https://github.com/Abhijeet34/treadle/issues/93)) ([ccc32bc](https://github.com/Abhijeet34/treadle/commit/ccc32bc3401f98a2f2a15b2feade02391868d970))
+* **release:** remove the private flag and correct release-truth claims ([#96](https://github.com/Abhijeet34/treadle/issues/96)) ([ec9ccbe](https://github.com/Abhijeet34/treadle/commit/ec9ccbef1190a292f9d6f47eb3eb942b2e0334a4))
+* **store:** wait out an EPERM from an exclusive create when the directory still takes a file ([#94](https://github.com/Abhijeet34/treadle/issues/94)) ([6d82d10](https://github.com/Abhijeet34/treadle/commit/6d82d10d2f2532ffe10ae7b863aeeb6247c9053c))
+
 ## 0.1.0 (2026-09-10)
 
 
