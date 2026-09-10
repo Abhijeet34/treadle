@@ -55,7 +55,10 @@ The package publishes as `@abhijeet34/treadling` while the typed command, the `T
 variables and the repository stay the bare word, so an install line carries the scope, a usage
 example never does, and `npm pack` writes `abhijeet34-treadling-<version>.tgz`
 (`docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md`).
-No package is on the registry, and `v0.1.0`, `v0.1.1` and `v0.1.2` are released with no assets:
+`@abhijeet34/treadling@0.2.1` is on the registry, published by hand: the `publish` job has never
+run, `NPM_PUBLISH_ENABLED` and the `npm-publish` environment do not exist, and no trusted
+publisher is registered, so nothing here may say a release publishes itself.
+`v0.1.0`, `v0.1.1` and `v0.1.2` are released with no assets and `v0.1.3` onward carry all three:
 `docs/RELEASING.md` carries the interlocks that still hold and how a release happens, and
 `scripts/apply-repo-settings.sh` is the only thing that applies the checked-in rulesets under
 `.github/`.
