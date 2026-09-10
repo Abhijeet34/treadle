@@ -37,31 +37,12 @@ const GITHUB_CONTEXT: Record<string, string> = {
   token: 'gh-token-stub',
 }
 
-/** The job's `env:` block as a normalized key/value map, values still holding `${{ }}`. */
-function envOf(block: string): Record<string, string> {
-  const section = /^ {4}env:\n((?: {6}.+\n?)+)/m.exec(`${block}\n`)?.[1] ?? ''
-  const out: Record<string, string> = {}
-  for (const line of section.split('\n')) {
-    const kv = /^ {6}([A-Za-z0-9_]+):\s*(.+)$/.exec(line)
-    if (kv) out[kv[1] as string] = (kv[2] as string).trim()
-  }
-  return out
-}
-
 function expandGithubExpr(value: string): string {
   return value.replace(/\$\{\{\s*github\.([a-zA-Z_]+)\s*\}\}/g, (_, key: string) => {
     const expanded = GITHUB_CONTEXT[key]
     assert.ok(expanded !== undefined, `no fake github.${key} to expand this env value against`)
     return expanded
   })
-}
-
-/** The job's `needs:` field as a normalized list, rather than a line matched anywhere. */
-function needsOf(block: string): readonly string[] {
-  const raw = /^ {4}needs:\s*(.+)$/m.exec(block)?.[1]?.trim()
-  if (raw === undefined) return []
-  const bracket = /^\[(.*)\]$/.exec(raw)
-  return (bracket ? (bracket[1] as string).split(',') : [raw]).map((s) => s.trim()).filter((s) => s.length > 0)
 }
 
 function escapeRegExp(value: string): string {
@@ -71,7 +52,7 @@ function escapeRegExp(value: string): string {
 // Driven as the step's real environment below, so a renamed or deleted key fails the step
 // under `set -euo pipefail` rather than surviving as an unnoticed text mismatch.
 const JOB_ENV = Object.fromEntries(
-  Object.entries(envOf(JOB?.text ?? '')).map(([key, value]) => [key, expandGithubExpr(value)]),
+  Object.entries(JOB?.env ?? {}).map(([key, value]) => [key, expandGithubExpr(value)]),
 )
 assert.ok(Object.keys(JOB_ENV).length > 0, 'parked-checks job env block not found')
 
@@ -299,7 +280,7 @@ describe('the release pull request carries its own parked state', () => {
   // commit release-please was about to replace, so the status would land on a commit the pull
   // request no longer points at. Measured on run 34288199967.
   it('reads the pull request after release-please has updated it', () => {
-    assert.deepEqual(needsOf(JOB?.text ?? ''), ['release-pr'])
+    assert.deepEqual(JOB?.needs, ['release-pr'])
     // The guard `needs` exists to protect: a job-level `if:` that lets this job run after
     // `release-pr` fails would defeat the ordering even though `needs` still names it.
     assert.doesNotMatch(JOB?.ifExpr ?? '', /\b(always|failure|cancelled)\s*\(/)
