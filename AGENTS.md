@@ -490,6 +490,10 @@ Compare paths through `node:path` and never against a literal `/`, and never bui
 `test/helpers/platform.ts` carries the three skips with their reasons - POSIX mode bits, POSIX signals, a dangling symlink through an exclusive create - and a skip goes there rather than as a bare `process.platform` in a test.
 The root `.gitattributes` is what keeps a Windows clone from rewriting `.work/items/*.md` and the layout snapshot to CRLF; without it 30 tests fail there and every shard reads as an `H16`.
 
+An errno is the other thing that is not portable, and it is harder to see than a path: Windows answers an exclusive create with `EPERM` where POSIX answers `EEXIST`, because a file being deleted is delete-pending rather than gone, and that cost three `windows-2025` runs out of five before ADR-0036 named it.
+When a Windows-only occurrence has a platform-independent behaviour behind it, test the behaviour everywhere rather than waiting for a runner: `test/store/fixtures/eperm-open.ts` registers a module `resolve` hook that substitutes one function for one importer, and `test/store/fixtures/eperm.ts` runs the acquisition under it in a child process, because the hook has to be registered before the module under test is loaded.
+The cost of a skip is worth stating plainly, because `platform.ts` states the reason and not the consequence: the two `POSIX_SIGNALS` skips are the lock's `EPERM`-is-alive rule and the lost-write fence's own regression test, so neither of those has any Windows coverage at all.
+
 Four things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 and each silent:
 `npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
 a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;

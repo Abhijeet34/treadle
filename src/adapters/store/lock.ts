@@ -17,6 +17,19 @@
 // printed and no bound to reach. A critical section here is milliseconds, so a holder past
 // the budget is stuck rather than busy, and saying so beats waiting forever.
 //
+// What counts as contention is an errno, and POSIX and Windows disagree about which one. POSIX
+// answers an exclusive create over a file that exists with EEXIST. Windows answers
+// ERROR_ACCESS_DENIED while the target is delete-pending, which is the state a lock file is in
+// from the moment its holder's unlink is issued until the last handle on it closes, and libuv
+// maps that to EPERM. So a Windows waiter meets EPERM where a POSIX waiter meets EEXIST, for
+// the same situation. ADR-0036 carries the two sources and the measurement.
+//
+// EPERM cannot simply be retried: a read-only mount and a denied ACL answer it too, and
+// retrying those waits forever on a store that will never hold a lock. The discriminator is
+// the directory rather than the lock file: delete-pending ends when the last handle closes,
+// so whether the file is still there when a question about it is answered is a race with no
+// lower bound, and a directory's answer is not a race at all.
+//
 // Liveness alone is not enough, which is why the heartbeat exists: a process paused in a
 // debugger answers `kill(pid, 0)` forever, while its heartbeat timer, which runs on the
 // event loop, stops with it. `EPERM` from `kill` means alive and outside our reach, never
@@ -36,7 +49,7 @@ import { readFile, stat, unlink, utimes } from 'node:fs/promises'
 import { randomBytes } from 'node:crypto'
 
 import { storeFail, storeOk, type StoreResult } from '../../application/ports/store.ts'
-import { openExclusive } from './atomic.ts'
+import { openExclusive, tempNameFor } from './atomic.ts'
 
 const HEARTBEAT_MS = 200
 const STALE_MS = 5_000
@@ -134,7 +147,8 @@ export async function acquireLock(
       }
       return storeOk(held(path, token, body, heartbeatMs, staleMs))
     } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') {
+      const code = (error as NodeJS.ErrnoException).code
+      if (code !== 'EEXIST' && !(code === 'EPERM' && await directoryTakesAFile(path))) {
         return storeFail('STORE_UNAVAILABLE', 'S11', `the lock ${path} could not be created: ${(error as Error).message}`, [path])
       }
     }
@@ -167,6 +181,24 @@ export async function acquireLock(
     await reclaimIfAbandoned(path, staleMs)
     await sleep(RETRY_MIN_MS + Math.floor(Math.random() * (RETRY_MAX_MS - RETRY_MIN_MS)))
   }
+}
+
+/**
+ * Whether the directory holding the lock will take a file at all, which is the question an
+ * EPERM from the exclusive create leaves open. The name is the temp convention's 96 random
+ * bits, so nothing contends for it and the answer is about the directory and nothing else; a
+ * later lock holder's `sweepTempFiles` removes one a process died beside.
+ */
+async function directoryTakesAFile(lockPath: string): Promise<boolean> {
+  const probe = tempNameFor(lockPath)
+  try {
+    await (await openExclusive(probe, 0o600)).close()
+  } catch {
+    return false
+  } finally {
+    await unlink(probe).catch(() => undefined)
+  }
+  return true
 }
 
 /** A wait that ended without the lock, naming the holder whenever the token can be read. */
