@@ -45,7 +45,7 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for why.
 
 **A pull request may not remove a test that main already has.**
 CI reads the test titles at the merge base and at your branch, and fails on one that main runs and your branch does not.
-A test that is renamed, or turned into `.skip`, counts as removed, because a renamed title is a title main had and no longer runs.
+A test that is renamed, or turned into a skip in either form - `it.skip(...)` or `it('...', { skip: reason }, ...)` - counts as removed, because a renamed title is a title main had and no longer runs.
 This exists because a rebase resolution once took four pre-rebase service files whole, deleted the tests along with the code they covered, and left a green suite over four reverted fixes.
 [docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md](docs/architecture/adr/0013-a-branch-may-not-remove-a-test-main-has.md) argues it.
 

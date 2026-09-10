@@ -37,6 +37,7 @@ A test that moves between files keeps its title and its count, so a refactor tha
 
 A title the branch keeps but marks `.skip` or `.todo` counts as removed.
 A skipped test runs nothing and asserts nothing, so the alternative is a check a resolution can satisfy by adding four characters.
+Node's option-object form of the same modifier, `it('...', { skip: reason }, ...)`, counts identically, and until 2026-09-10 it did not: the reader saw a modifier only in the `it.skip(` position while every one of this repository's 21 skips was written the other way, so the check exited 0 on all of them.
 
 ### The declaration is a commit trailer, one per title
 
