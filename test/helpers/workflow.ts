@@ -23,6 +23,10 @@ export type Job = {
   runsOn?: string
   environment?: string
   permissions: Record<string, string>
+  /** The job's `env:` block, values still holding any `${{ }}` the caller must expand. */
+  env: Record<string, string>
+  /** The jobs this one waits for, from either the scalar or the bracket-list form. */
+  needs: readonly string[]
   uses: string[]
   steps: readonly Step[]
   text: string
@@ -30,6 +34,26 @@ export type Job = {
 
 function field(block: string, key: string): string | undefined {
   return new RegExp(`^ {4}${key}:\\s*(.+)$`, 'm').exec(block)?.[1]?.trim()
+}
+
+/** A job's `env:` block as a key/value map, rather than a line matched anywhere in it. */
+function envOf(block: string): Record<string, string> {
+  const section = /^ {4}env:\n((?: {6}.+\n?)+)/m.exec(`${block}\n`)?.[1] ?? ''
+  const out: Record<string, string> = {}
+  for (const line of section.split('\n')) {
+    const kv = /^ {6}([A-Za-z0-9_]+):\s*(.+)$/.exec(line)
+    if (kv) out[kv[1] as string] = (kv[2] as string).trim()
+  }
+  return out
+}
+
+function needsOf(block: string): readonly string[] {
+  const raw = /^ {4}needs:\s*(.+)$/m.exec(block)?.[1]?.trim()
+  if (raw === undefined) return []
+  const bracket = /^\[(.*)\]$/.exec(raw)
+  return (bracket ? (bracket[1] as string).split(',') : [raw])
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0)
 }
 
 function permissionsOf(block: string): Record<string, string> {
@@ -103,6 +127,8 @@ export function parseWorkflow(text: string): Record<string, Job> {
       runsOn: field(block, 'runs-on'),
       environment: field(block, 'environment'),
       permissions: permissionsOf(block),
+      env: envOf(block),
+      needs: needsOf(block),
       uses: [...block.matchAll(/^\s*(?:-\s*)?uses:\s*(\S+)/gm)].map((m) => m[1] as string),
       steps: stepsOf(block),
       text: block,
