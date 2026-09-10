@@ -18,7 +18,7 @@ import { after, before, describe, it } from 'node:test'
 
 import { runCli, type Run } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 type Data = Record<string, unknown>
 
@@ -39,7 +39,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
   const held = async (): Promise<number> => (dataOf(await must(['status']))['items'] as number)
 
   before(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'treadle-parent-'))
+    dir = await mkdtemp(path.join(tmpdir(), 'treadling-parent-'))
     await must(['init', '--name', 'parents'])
     await must(['file', 'epic', 'Epic one', '--id', 'epic-one', '--set', 'outcome=tenants sign in'])
     await must(['file', 'story', 'Child story', '--id', 'child-story', '--parent', 'epic-one'])
@@ -55,7 +55,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     const data = dataOf(run)
     assert.equal(data['rule'], 'P2')
     assert.equal(data['cause'], 'draft-task cannot be its own parent')
-    assert.deepEqual(data['fix'], ['treadle backlog --type epic', 'treadle backlog --type story', 'treadle backlog --type spike'])
+    assert.deepEqual(data['fix'], ['treadling backlog --type epic', 'treadling backlog --type story', 'treadling backlog --type spike'])
     assert.equal(await parentOf('draft-task'), undefined)
     const doctor = await cli(['doctor'])
     assert.equal(doctor.code, 0, doctor.err)
@@ -68,7 +68,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     assert.equal(data['rule'], 'P1')
     assert.equal(data['cause'], 'a story cannot be the parent of an epic')
     // Nothing may parent an epic, so the one line left is the item itself.
-    assert.deepEqual(data['fix'], ['treadle show epic-one'])
+    assert.deepEqual(data['fix'], ['treadling show epic-one'])
     assert.equal(await parentOf('epic-one'), undefined)
   })
 
@@ -78,7 +78,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     const data = dataOf(run)
     assert.equal(data['rule'], 'P1')
     assert.equal(data['cause'], 'a task cannot be the parent of a task')
-    assert.deepEqual(data['fix'], ['treadle backlog --type epic', 'treadle backlog --type story', 'treadle backlog --type spike'])
+    assert.deepEqual(data['fix'], ['treadling backlog --type epic', 'treadling backlog --type story', 'treadling backlog --type spike'])
   })
 
   it('refuses a parent naming no record as NOT_FOUND, with the nearest ids beside it', async () => {
@@ -142,7 +142,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     const data = dataOf(run)
     assert.equal(data['rule'], 'P1')
     assert.equal(data['cause'], 'an epic cannot be the parent of an impediment')
-    assert.deepEqual(data['fix'], ['treadle file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>'])
+    assert.deepEqual(data['fix'], ['treadling file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>'])
     assert.equal(await held(), before)
   })
 
@@ -173,7 +173,7 @@ describe('a parent edge is held to the hierarchy rules where it is written', () 
     const data = dataOf(run)
     assert.equal(data['rule'], 'V9')
     assert.equal(data['cause'], 'draft-task is already an item here, and an id names one thing')
-    assert.deepEqual(data['fix'], ['treadle show draft-task', 'treadle file task "<title>" --id <slug>'])
+    assert.deepEqual(data['fix'], ['treadling show draft-task', 'treadling file task "<title>" --id <slug>'])
   })
 })
 
@@ -187,7 +187,7 @@ describe('a stored field is cleared by an empty value', () => {
   }
 
   before(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'treadle-clear-'))
+    dir = await mkdtemp(path.join(tmpdir(), 'treadling-clear-'))
     await must(['init', '--name', 'clearing'])
     await must(['file', 'epic', 'Epic one', '--id', 'epic-one', '--set', 'outcome=tenants sign in'])
     await must(['file', 'task', 'Draft task', '--id', 'draft-task'])
@@ -236,11 +236,11 @@ describe('a stored field is cleared by an empty value', () => {
     const title = await cli(['set', 'draft-task', 'title='])
     assert.equal(title.code, 2, title.err)
     assert.equal(dataOf(title)['cause'], 'title cannot be cleared; a task needs it')
-    assert.deepEqual(dataOf(title)['fix'], ['treadle set draft-task title=<value>'])
+    assert.deepEqual(dataOf(title)['fix'], ['treadling set draft-task title=<value>'])
     const repro = await cli(['set', 'bug-cold', 'repro_steps='])
     assert.equal(repro.code, 2, repro.err)
     assert.equal(dataOf(repro)['cause'], 'repro_steps cannot be cleared; a bug needs it')
-    assert.deepEqual(dataOf(repro)['fix'], ['treadle set bug-cold repro_steps=<value>'])
+    assert.deepEqual(dataOf(repro)['fix'], ['treadling set bug-cold repro_steps=<value>'])
     // A field another command owns is refused as that command's, whatever the value.
     const severity = await cli(['set', 'bug-cold', 'severity='])
     assert.equal(severity.code, 2, severity.err)

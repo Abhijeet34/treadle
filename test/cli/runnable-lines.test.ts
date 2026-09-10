@@ -8,7 +8,7 @@
 // under, so an agent following the cursor the tool handed it read a different list and never
 // learned that it did. Six more fix lines were refused as printed: a dropped operand, a
 // missing required flag, a field the type has not got. `test/domain/gate-remedies.test.ts`
-// let all of them through, because it checks that a remedy's first word is `treadle` and its
+// let all of them through, because it checks that a remedy's first word is `treadling` and its
 // second is a command, and a line can be both and still be refused.
 //
 // So this file does not read the lines. It runs them. Each scenario builds a workspace in a
@@ -45,7 +45,7 @@ import { describe, it, before, after } from 'node:test'
 import { commandNamed } from '../../src/cli/inventory.ts'
 import { runCli, type Run } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 /**
  * Every placeholder an emitted line may carry, and the value a reader in this workspace
@@ -127,12 +127,12 @@ function emittedLines(run: Run): readonly string[] {
   if (text.startsWith('{')) {
     const walk = (value: unknown): void => {
       if (typeof value === 'string') {
-        if (value.startsWith('treadle ')) found.push(value)
+        if (value.startsWith('treadling ')) found.push(value)
         // A command line inside a sentence, as `note` and `cause` carry one after a
-        // semicolon: `... and next ranks ready work; treadle transition <id> ready`. The
+        // semicolon: `... and next ranks ready work; treadling transition <id> ready`. The
         // sweep never saw that shape, so a line there could be refused as printed unseen.
-        const embedded = /; (treadle [^;]+)$/.exec(value)
-        if (embedded !== null && !value.startsWith('treadle ')) found.push(embedded[1] as string)
+        const embedded = /; (treadling [^;]+)$/.exec(value)
+        if (embedded !== null && !value.startsWith('treadling ')) found.push(embedded[1] as string)
       } else if (Array.isArray(value)) {
         for (const entry of value) walk(entry)
       } else if (typeof value === 'object' && value !== null) {
@@ -143,7 +143,7 @@ function emittedLines(run: Run): readonly string[] {
   } else {
     // A refusal the parser raises is rendered before `--out` is read, so it arrives in the
     // line format whatever was asked for.
-    for (const match of text.matchAll(/^(?:fix|page|whole) (treadle .*)$/gm)) found.push(match[1] as string)
+    for (const match of text.matchAll(/^(?:fix|page|whole) (treadling .*)$/gm)) found.push(match[1] as string)
   }
   return [...new Set(found)]
 }
@@ -449,7 +449,7 @@ const SCENARIOS: readonly Scenario[] = [
     build: async () => {},
     provocations: [['status'], ['backlog'], ['nope']],
   },
-  // `status` here prints `treadle init`, which this directory refuses with `init --yes` as its
+  // `status` here prints `treadling init`, which this directory refuses with `init --yes` as its
   // own fix: the line is the right next command from where the reader stands, and the state
   // that makes it refuse is one only `init` can see. It is provoked through `init` directly.
   {
@@ -504,34 +504,34 @@ const SCENARIOS: readonly Scenario[] = [
  * otherwise.
  */
 const MUST_SEE: readonly (readonly [string, RegExp])[] = [
-  ['a blocker remedied by its next move rather than by done', /^treadle transition imp-draft ready$/],
-  ['a held blocker remedied by resume', /^treadle transition imp-hold resume$/],
-  ['an edge whose target left with its holder answered by the log, not by explain', /^treadle history cut-dependent$/],
-  ['an open child remedied by its next move', /^treadle transition child-story in_review$/],
-  ['a G5 refusal naming the submit', /^treadle transition story-wip in_review$/],
-  ['a G2 refusal naming the blocker\'s move and the override', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
-  ['a page line carrying the filter and the limit', /^treadle backlog --state draft --limit 2 --cursor \S+$/],
-  ['a page line carrying the columns', /^treadle backlog --state open --type task --fields id,state --limit 1 --cursor \S+$/],
-  ['a page line carrying --for', /^treadle next --for kim --limit 1 --cursor \S+$/],
-  ['a history page carrying the limit', /^treadle history blocked-held --limit 1 --cursor \S+$/],
-  ['a transaction-scoped history page keeping its transaction', /^treadle history --txn tknown1 --limit 1 --cursor \S+$/],
-  ['an event id answered with the transaction that wrote it', /^treadle history --txn tknown1$/],
-  ['two scopes on one line answered with each of them alone', /^treadle history ready-task$/],
-  ['a hold line carrying --reason', /^treadle transition task-plain on_hold --until <instant> --reason "<why>"$/],
-  ['a mark line naming the field the type has', /^treadle mark task-plain --priority <1-5> --reason "<why>"$/],
-  ['an unknown field answered with the set syntax', /^treadle set task-plain <field>=<value>$/],
-  ['a bug filed without its required fields answered with the line that files it', /^treadle file bug "<title>" --set severity=<S1-S4> --set repro_steps=<value> --set found_in=<[a-z|]+>$/],
-  ['an older schema answered with version, not init', /^treadle version$/],
-  ['a refused parent answered with the types that may parent the item', /^treadle backlog --type epic$/],
-  ['a field that refuses to clear answered with the write that fills it', /^treadle set bug-cold repro_steps=<value>$/],
-  ['a parent refused on a type nothing may parent answered with the line that files it alone', /^treadle file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>$/],
-  ['a missing reason answered with the caller\'s line completed', /^treadle transition task-plain cancelled --resolution wont_do --reason "<why>"$/],
-  ['a missing outcome answered with the release completed', /^treadle transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
-  ['an override without a reason answered with the reason added', /^treadle transition blocked-ready in_progress --override G2 --reason "<why>"$/],
-  ['a configured gate rule remedied by the write that fills its field', /^treadle set no-assignee assignee=<value>$/],
-  ['a state over its configured limit answered with the list that shows it', /^treadle backlog --state in_progress$/],
-  ['an aged item answered with the read that says what it waits on', /^treadle explain wip-one$/],
-  ['a configuration refusal answered with the reading of every key', /^treadle config$/],
+  ['a blocker remedied by its next move rather than by done', /^treadling transition imp-draft ready$/],
+  ['a held blocker remedied by resume', /^treadling transition imp-hold resume$/],
+  ['an edge whose target left with its holder answered by the log, not by explain', /^treadling history cut-dependent$/],
+  ['an open child remedied by its next move', /^treadling transition child-story in_review$/],
+  ['a G5 refusal naming the submit', /^treadling transition story-wip in_review$/],
+  ['a G2 refusal naming the blocker\'s move and the override', /^treadling transition blocked-ready in_progress --override G2 --reason "<why>"$/],
+  ['a page line carrying the filter and the limit', /^treadling backlog --state draft --limit 2 --cursor \S+$/],
+  ['a page line carrying the columns', /^treadling backlog --state open --type task --fields id,state --limit 1 --cursor \S+$/],
+  ['a page line carrying --for', /^treadling next --for kim --limit 1 --cursor \S+$/],
+  ['a history page carrying the limit', /^treadling history blocked-held --limit 1 --cursor \S+$/],
+  ['a transaction-scoped history page keeping its transaction', /^treadling history --txn tknown1 --limit 1 --cursor \S+$/],
+  ['an event id answered with the transaction that wrote it', /^treadling history --txn tknown1$/],
+  ['two scopes on one line answered with each of them alone', /^treadling history ready-task$/],
+  ['a hold line carrying --reason', /^treadling transition task-plain on_hold --until <instant> --reason "<why>"$/],
+  ['a mark line naming the field the type has', /^treadling mark task-plain --priority <1-5> --reason "<why>"$/],
+  ['an unknown field answered with the set syntax', /^treadling set task-plain <field>=<value>$/],
+  ['a bug filed without its required fields answered with the line that files it', /^treadling file bug "<title>" --set severity=<S1-S4> --set repro_steps=<value> --set found_in=<[a-z|]+>$/],
+  ['an older schema answered with version, not init', /^treadling version$/],
+  ['a refused parent answered with the types that may parent the item', /^treadling backlog --type epic$/],
+  ['a field that refuses to clear answered with the write that fills it', /^treadling set bug-cold repro_steps=<value>$/],
+  ['a parent refused on a type nothing may parent answered with the line that files it alone', /^treadling file impediment "<title>" --set severity=<S1-S4> --set proposed_resolution=<value>$/],
+  ['a missing reason answered with the caller\'s line completed', /^treadling transition task-plain cancelled --resolution wont_do --reason "<why>"$/],
+  ['a missing outcome answered with the release completed', /^treadling transition blocked-wip ready --outcome <failed\|yielded> --reason "<why>"$/],
+  ['an override without a reason answered with the reason added', /^treadling transition blocked-ready in_progress --override G2 --reason "<why>"$/],
+  ['a configured gate rule remedied by the write that fills its field', /^treadling set no-assignee assignee=<value>$/],
+  ['a state over its configured limit answered with the list that shows it', /^treadling backlog --state in_progress$/],
+  ['an aged item answered with the read that says what it waits on', /^treadling explain wip-one$/],
+  ['a configuration refusal answered with the reading of every key', /^treadling config$/],
 ]
 
 type Collected = {
@@ -541,7 +541,7 @@ type Collected = {
 }
 
 describe('every line the tool prints for the reader to run is runnable as printed, from the state that printed it', () => {
-  const parent = mkdtemp(path.join(tmpdir(), 'treadle-runnable-'))
+  const parent = mkdtemp(path.join(tmpdir(), 'treadling-runnable-'))
   const built = new Map<string, string>()
   const collected: Collected[] = []
 
@@ -586,20 +586,20 @@ describe('every line the tool prints for the reader to run is runnable as printe
 
   for (const scenario of SCENARIOS) {
     for (const provocation of scenario.provocations) {
-      it(`${scenario.name}: treadle ${provocation.join(' ').slice(0, 80)}`, async () => {
+      it(`${scenario.name}: treadling ${provocation.join(' ').slice(0, 80)}`, async () => {
         const entry = collected.find((c) => c.scenario === scenario && c.provocation === provocation) as Collected
         const refused: string[] = []
         for (const line of entry.lines) {
           const words = shellSplit(fill(line))
-          assert.equal(words[0], 'treadle', `${line} does not start with the binary name`)
+          assert.equal(words[0], 'treadling', `${line} does not start with the binary name`)
           const run = await runCli(words.slice(1), { cwd: await copyOf(scenario), env: ENV })
           // An exit the inventory declares as a verdict is the command answering, not failing.
           const verdicts = commandNamed(words[1] ?? 'status')?.exits?.map(([code]) => code) ?? []
           if (run.code !== 0 && !verdicts.includes(run.code)) {
-            refused.push(`${line}\n    filled: treadle ${words.slice(1).join(' ')}\n    exit ${run.code}: ${run.err.trim().replaceAll('\n', '\n    ')}`)
+            refused.push(`${line}\n    filled: treadling ${words.slice(1).join(' ')}\n    exit ${run.code}: ${run.err.trim().replaceAll('\n', '\n    ')}`)
           }
         }
-        assert.deepEqual(refused, [], `printed by treadle ${provocation.join(' ')} and refused as printed:\n  ${refused.join('\n  ')}`)
+        assert.deepEqual(refused, [], `printed by treadling ${provocation.join(' ')} and refused as printed:\n  ${refused.join('\n  ')}`)
       })
     }
   }

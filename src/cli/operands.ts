@@ -3,7 +3,7 @@
 //
 // G2: every id-taking command handed the caller's word straight to its service, and a word
 // carrying a delimiter came back out of the renderer's own invariant as `err INTERNAL` at
-// exit 1 with no rule id - `treadle show $'a\nb'` printed "entity carries \n". That was the
+// exit 1 with no rule id - `treadling show $'a\nb'` printed "entity carries \n". That was the
 // one path where the contract's promise of a structured, typed error was false, on twelve
 // commands at once.
 //
@@ -42,7 +42,7 @@ type Shape = { readonly slots: readonly Slot[]; readonly repeats: boolean }
  */
 function shapeOf(usage: string, command: string): Shape {
   const tokens = usage.split(' ').filter((token) => token.length > 0)
-  const named = tokens[0] === 'treadle' ? tokens.slice(1) : tokens
+  const named = tokens[0] === 'treadling' ? tokens.slice(1) : tokens
   const body = named[0] === command ? named.slice(1) : named
   const slots: Slot[] = []
   for (const token of body) {
@@ -121,7 +121,7 @@ export function operandRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
       cause: `the ${what} in operand ${at + 1} carries ${found.label} at character ${found.at + 1}, and no ${what} holds one: an id is a single line of lowercase letters, digits and hyphens`,
-      fix: ['treadle backlog'],
+      fix: ['treadling backlog'],
     })
   }
   return undefined
@@ -185,6 +185,6 @@ export function arityRefusal(
   return errorResult({
     code: 'VALIDATION', command, workspace: '-', effect: 'read', rule: 'C1',
     cause: `${command} takes ${counted(most)} operand${most === 1 ? '' : 's'} and this line writes ${operands.length}, so operand ${most + 1} would be read by nothing`,
-    fix: [`treadle help ${command}`],
+    fix: [`treadling help ${command}`],
   })
 }

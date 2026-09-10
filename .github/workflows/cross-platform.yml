@@ -109,7 +109,7 @@ jobs:
   # matrix jobs above all run the suite from a checkout, so none of them ever executes the
   # shipped bundle through its own first line, and that is exactly where the regression this
   # job exists for lived: `#!/usr/bin/env -S node --stack-size=3072` shipped on 2026-09-07 and
-  # `treadle version` answered `env: unrecognized option: S` and exited 1 on node:24-alpine,
+  # `treadling version` answered `env: unrecognized option: S` and exited 1 on node:24-alpine,
   # the smallest official Node image. `release.yml` gates `artifacts` on this workflow, so a
   # tool that cannot start on BusyBox cannot reach a release.
   #
@@ -154,12 +154,12 @@ jobs:
           set -euo pipefail
           docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
             set -eu
-            npm install --global --ignore-scripts /pack/treadle-*.tgz >/dev/null 2>&1
-            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadle/dist/treadle.js)"
-            treadle version
+            npm install --global --ignore-scripts /pack/treadling-*.tgz >/dev/null 2>&1
+            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadling/dist/treadling.js)"
+            treadling version
             mkdir -p /tmp/ws && cd /tmp/ws
 
-            if treadle init --name refuses-with-no-actor > /tmp/refusal.txt 2>&1; then
+            if treadling init --name refuses-with-no-actor > /tmp/refusal.txt 2>&1; then
               cat /tmp/refusal.txt
               echo "init wrote a record with no actor set, so the C1 guard is gone" >&2
               exit 1
@@ -174,18 +174,18 @@ jobs:
             # is true of these records: a runner filed them, not a person. The kind is `agent`
             # for the same reason - `human` here would be the one thing C1 exists to keep out
             # of a log, a name nobody wrote. The same pair is set in `installed-windows` below.
-            export TREADLE_ACTOR=github-actions
-            export TREADLE_ACTOR_KIND=agent
-            treadle init --name installed-smoke
-            treadle file story "The installed binary filed this"
-            treadle status | head -1 | grep -q "^ok "
+            export TREADLING_ACTOR=github-actions
+            export TREADLING_ACTOR_KIND=agent
+            treadling init --name installed-smoke
+            treadling file story "The installed binary filed this"
+            treadling status | head -1 | grep -q "^ok "
             echo "the packed tarball installs, refuses with no actor and answers with one"
           '
 
   # The same question as `installed` above, for the two shells npm shims rather than links.
   # Nothing else anywhere starts the shipped binary from `cmd.exe` or PowerShell: npm's
   # `cmd-shim` reads the bundle's first line and writes the program it names into
-  # `treadle.cmd` and `treadle.ps1`, so a launcher edit that is invisible on POSIX can stop
+  # `treadling.cmd` and `treadling.ps1`, so a launcher edit that is invisible on POSIX can stop
   # the tool starting here and no POSIX job can see it. Measured 2026-09-08 in run
   # 34152092418 on windows-2025: the shipped `#!/usr/bin/env node` answers `ok version -` at
   # exit 0 from cmd, PowerShell 7 and Windows PowerShell 5.1, and a `#!/bin/sh` first line
@@ -213,31 +213,31 @@ jobs:
           node scripts/check-dist-fresh.ts
           mkdir -p pack
           npm pack --ignore-scripts --pack-destination pack
-          # `./` is load-bearing: npm reads `pack/treadle-0.1.0.tgz` as the `owner/repo`
+          # `./` is load-bearing: npm reads `pack/treadling-0.1.0.tgz` as the `owner/repo`
           # GitHub shorthand and tries `git ls-remote ssh://git@github.com/pack/...`, which
           # failed this job at exit 128 in run 34151979303.
-          npm install --global --ignore-scripts "./$(ls pack/treadle-*.tgz)"
+          npm install --global --ignore-scripts "./$(ls pack/treadling-*.tgz)"
           prefix=$(npm prefix -g)
-          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadle/dist/treadle.js")"
+          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadling/dist/treadling.js")"
           echo "the program npm's shim will run:"
-          grep -E '^\s+SET "_prog=' "$prefix/treadle.cmd"
+          grep -E '^\s+SET "_prog=' "$prefix/treadling.cmd"
 
       - name: cmd.exe starts the installed binary
         shell: cmd
         run: |
           rem `call` is load-bearing. A .cmd invoked from a batch script without it transfers
           rem control and never returns, so every later line here would be dead.
-          call treadle version > "%RUNNER_TEMP%\version.txt" 2>&1 || (type "%RUNNER_TEMP%\version.txt" & echo ::error::treadle version did not start from cmd.exe & exit /b 1)
+          call treadling version > "%RUNNER_TEMP%\version.txt" 2>&1 || (type "%RUNNER_TEMP%\version.txt" & echo ::error::treadling version did not start from cmd.exe & exit /b 1)
           type "%RUNNER_TEMP%\version.txt"
-          findstr /C:"ok version" "%RUNNER_TEMP%\version.txt" >NUL || (echo ::error::treadle version started from cmd.exe but answered no ok line & exit /b 1)
+          findstr /C:"ok version" "%RUNNER_TEMP%\version.txt" >NUL || (echo ::error::treadling version started from cmd.exe but answered no ok line & exit /b 1)
           mkdir "%RUNNER_TEMP%\cmd-ws"
           cd /d "%RUNNER_TEMP%\cmd-ws"
           rem The refusal direction first, with no actor in the environment: this is the shell
           rem that met C1 on the first real release, so it is the one that has to keep meeting
           rem it. `set VAR=` with nothing after the `=` clears the variable in cmd.
-          set TREADLE_ACTOR=
-          set TREADLE_ACTOR_KIND=
-          call treadle init --name refuses-with-no-actor > "%RUNNER_TEMP%\refusal.txt" 2>&1 && (type "%RUNNER_TEMP%\refusal.txt" & echo ::error::treadle init wrote a record with no actor set, so the C1 guard is gone & exit /b 1)
+          set TREADLING_ACTOR=
+          set TREADLING_ACTOR_KIND=
+          call treadling init --name refuses-with-no-actor > "%RUNNER_TEMP%\refusal.txt" 2>&1 && (type "%RUNNER_TEMP%\refusal.txt" & echo ::error::treadling init wrote a record with no actor set, so the C1 guard is gone & exit /b 1)
           type "%RUNNER_TEMP%\refusal.txt"
           rem `for /f` rather than findstr, and the reason is measured. findstr anchors a line
           rem START on a bare LF but its line END anchors want a CR, so on this tool's LF-only
@@ -247,17 +247,17 @@ jobs:
           rem while `/X`, `/B /E` and `/R "^rule C1$"` all reported 1. `for /f` splits on LF
           rem and hands over the whole line, so `==` is a true exact match on either ending.
           for /f "usebackq delims=" %%L in ("%RUNNER_TEMP%\refusal.txt") do if "%%L"=="rule C1" goto :refused_under_c1
-          echo ::error::treadle init refused with no actor from cmd.exe, but no line was exactly rule C1
+          echo ::error::treadling init refused with no actor from cmd.exe, but no line was exactly rule C1
           exit /b 1
           :refused_under_c1
           echo the refusal named rule C1, so the guard is the one that stopped it
-          set TREADLE_ACTOR=github-actions
-          set TREADLE_ACTOR_KIND=agent
-          call treadle init --name cmd-smoke > "%RUNNER_TEMP%\init.txt" 2>&1 || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init failed from cmd.exe & exit /b 1)
-          findstr /C:"ok init" "%RUNNER_TEMP%\init.txt" >NUL || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadle init answered no ok line from cmd.exe & exit /b 1)
-          call treadle file task "The installed binary filed this from cmd.exe" > "%RUNNER_TEMP%\file.txt" 2>&1 || (type "%RUNNER_TEMP%\file.txt" & echo ::error::treadle file failed from cmd.exe & exit /b 1)
+          set TREADLING_ACTOR=github-actions
+          set TREADLING_ACTOR_KIND=agent
+          call treadling init --name cmd-smoke > "%RUNNER_TEMP%\init.txt" 2>&1 || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadling init failed from cmd.exe & exit /b 1)
+          findstr /C:"ok init" "%RUNNER_TEMP%\init.txt" >NUL || (type "%RUNNER_TEMP%\init.txt" & echo ::error::treadling init answered no ok line from cmd.exe & exit /b 1)
+          call treadling file task "The installed binary filed this from cmd.exe" > "%RUNNER_TEMP%\file.txt" 2>&1 || (type "%RUNNER_TEMP%\file.txt" & echo ::error::treadling file failed from cmd.exe & exit /b 1)
           type "%RUNNER_TEMP%\file.txt"
-          findstr /C:"ok file" "%RUNNER_TEMP%\file.txt" >NUL || (echo ::error::treadle file answered no ok line from cmd.exe & exit /b 1)
+          findstr /C:"ok file" "%RUNNER_TEMP%\file.txt" >NUL || (echo ::error::treadling file answered no ok line from cmd.exe & exit /b 1)
 
       - name: PowerShell starts the installed binary
         shell: pwsh
@@ -269,10 +269,10 @@ jobs:
           # `stop`, measured red in run 34152591740 - but a user's PowerShell defaults to
           # `continue`, and a shim that runs something harmless raises nothing at all. So each
           # command is also checked for the ok line it should have printed.
-          $version = (treadle version 2>&1 | Out-String)
+          $version = (treadling version 2>&1 | Out-String)
           Write-Host $version
-          if ($LASTEXITCODE -ne 0) { throw "treadle version exited $LASTEXITCODE from PowerShell" }
-          if ($version -notmatch 'ok version') { throw "treadle version answered no ok line from PowerShell" }
+          if ($LASTEXITCODE -ne 0) { throw "treadling version exited $LASTEXITCODE from PowerShell" }
+          if ($version -notmatch 'ok version') { throw "treadling version answered no ok line from PowerShell" }
           New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\pwsh-ws" | Out-Null
           Set-Location "$env:RUNNER_TEMP\pwsh-ws"
           # The refusal direction, with no actor in the environment. `$ErrorActionPreference`
@@ -280,22 +280,22 @@ jobs:
           # native command's stderr, redirected by `2>&1`, into a terminating error, and a
           # refusal is all stderr - so under `stop` the one command here that is expected to
           # fail would fail the step rather than be read.
-          $env:TREADLE_ACTOR = $null
-          $env:TREADLE_ACTOR_KIND = $null
+          $env:TREADLING_ACTOR = $null
+          $env:TREADLING_ACTOR_KIND = $null
           $prior = $ErrorActionPreference
           $ErrorActionPreference = 'continue'
-          $refusal = (treadle init --name refuses-with-no-actor 2>&1 | Out-String)
+          $refusal = (treadling init --name refuses-with-no-actor 2>&1 | Out-String)
           $refused = $LASTEXITCODE
           $ErrorActionPreference = $prior
           Write-Host $refusal
-          if ($refused -eq 0) { throw "treadle init wrote a record with no actor set, so the C1 guard is gone" }
-          if ($refusal -notmatch '(?m)^rule C1\s*$') { throw "treadle init refused with no actor from PowerShell, but not under rule C1" }
-          $env:TREADLE_ACTOR = 'github-actions'
-          $env:TREADLE_ACTOR_KIND = 'agent'
-          $init = (treadle init --name pwsh-smoke 2>&1 | Out-String)
-          if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadle init exited $LASTEXITCODE from PowerShell" }
-          if ($init -notmatch 'ok init') { Write-Host $init; throw "treadle init answered no ok line from PowerShell" }
-          $filed = (treadle file task "The installed binary filed this from PowerShell" 2>&1 | Out-String)
+          if ($refused -eq 0) { throw "treadling init wrote a record with no actor set, so the C1 guard is gone" }
+          if ($refusal -notmatch '(?m)^rule C1\s*$') { throw "treadling init refused with no actor from PowerShell, but not under rule C1" }
+          $env:TREADLING_ACTOR = 'github-actions'
+          $env:TREADLING_ACTOR_KIND = 'agent'
+          $init = (treadling init --name pwsh-smoke 2>&1 | Out-String)
+          if ($LASTEXITCODE -ne 0) { Write-Host $init; throw "treadling init exited $LASTEXITCODE from PowerShell" }
+          if ($init -notmatch 'ok init') { Write-Host $init; throw "treadling init answered no ok line from PowerShell" }
+          $filed = (treadling file task "The installed binary filed this from PowerShell" 2>&1 | Out-String)
           Write-Host $filed
-          if ($LASTEXITCODE -ne 0) { throw "treadle file exited $LASTEXITCODE from PowerShell" }
-          if ($filed -notmatch 'ok file') { throw "treadle file answered no ok line from PowerShell" }
+          if ($LASTEXITCODE -ne 0) { throw "treadling file exited $LASTEXITCODE from PowerShell" }
+          if ($filed -notmatch 'ok file') { throw "treadling file answered no ok line from PowerShell" }

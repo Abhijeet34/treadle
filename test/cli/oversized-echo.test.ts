@@ -2,9 +2,9 @@
 // No command echoes an oversized argument back, in any position, on any path.
 //
 // Found by attacking the fix for the runtime crash: once a megabyte-long argument stopped
-// killing the process, the refusals it reached printed it. `treadle show <1,000,000 y>`
-// returned a one megabyte `entity` line, `treadle backlog --assignee <the same>` exited 0
-// with two megabytes of stdout across its `filter` and `narrowest` lines, and `treadle help
+// killing the process, the refusals it reached printed it. `treadling show <1,000,000 y>`
+// returned a one megabyte `entity` line, `treadling backlog --assignee <the same>` exited 0
+// with two megabytes of stdout across its `filter` and `narrowest` lines, and `treadling help
 // <the same>` returned the argument as its cause. The result object's own rule already says
 // this of `fix` ("built only from bounded values... no user-supplied free text is ever
 // spliced into one"); every other property was outside it.
@@ -63,7 +63,7 @@ describe('no command returns an oversized argument to the caller', () => {
         const argv = tokens(line)
         for (const at of valuePositions(argv, command.name)) {
           const mutated = argv.map((token, index) => (index === at ? HUGE : token))
-          const run = await runCli(mutated, { cwd: demo.root, env: { TREADLE_ACTOR: 'dana' } })
+          const run = await runCli(mutated, { cwd: demo.root, env: { TREADLING_ACTOR: 'dana' } })
           ran += 1
           assert.equal(
             RUN.test(`${run.out}${run.err}`), false,
@@ -88,7 +88,7 @@ describe('no command returns an oversized argument to the caller', () => {
       ['--workspace', '--actor', '--cursor', '--fields', '--limit', '--width', '--explain-absence'].includes(flag))
     assert.ok(carriers.length >= 7, 'the list of value-carrying global flags no longer matches the inventory')
     for (const flag of carriers) {
-      const run = await runCli(['backlog', flag, HUGE], { cwd: demo.root, env: { TREADLE_ACTOR: 'dana' } })
+      const run = await runCli(['backlog', flag, HUGE], { cwd: demo.root, env: { TREADLING_ACTOR: 'dana' } })
       assert.equal(
         RUN.test(`${run.out}${run.err}`), false,
         `backlog ${flag} <100,000 characters> returned the argument (${run.out.length + run.err.length} bytes)`,
@@ -104,7 +104,7 @@ describe('no command returns an oversized argument to the caller', () => {
       ['evidence', 'add', HUGE, 'run', '1'], ['relation', 'add', HUGE, 'blocks', 'sso-saml'],
       ['file', 'task', 'A title', '--id', HUGE],
     ]) {
-      const run = await runCli(argv, { cwd: demo.root, env: { TREADLE_ACTOR: 'dana' } })
+      const run = await runCli(argv, { cwd: demo.root, env: { TREADLING_ACTOR: 'dana' } })
       assert.equal(
         RUN.test(`${run.out}${run.err}`), false,
         `${argv[0] as string} returned the oversized id (${run.out.length + run.err.length} bytes)`,

@@ -23,4 +23,4 @@ The failure message prints the offending input as base64 so the case can be lift
 without re-running the fuzzer.
 
 The gate runs 250,000 inputs against each of the parser and the escaper.
-`TREADLE_FUZZ_INPUTS=<n> npm test` raises that for a soak run.
+`TREADLING_FUZZ_INPUTS=<n> npm test` raises that for a soak run.

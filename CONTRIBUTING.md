@@ -15,8 +15,8 @@ You need Node.js 24.15 or newer.
 The `.nvmrc` names the version.
 
 ```bash
-git clone https://github.com/Abhijeet34/treadle.git
-cd treadle
+git clone https://github.com/Abhijeet34/treadling.git
+cd treadling
 npm ci
 git config core.hooksPath .githooks   # arms the pre-push secret scan; see AGENTS.md "Secret scanning"
 npm run check   # tsc --noEmit under strict, then the tests, then the bundle

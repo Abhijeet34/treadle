@@ -7,7 +7,7 @@
 
 ## Context
 
-A truth audit of treadle's own claims found, among the rows it named, three shapes a caller could hit but no argument had ever settled: a second work-item type with no rule, gate, guard, ranking or read that told it from the first; a closed set of relation kinds where half had no command able to write them; and two definition-of-ready rules that no record could ever fail. Each is a decision this record makes, not a correction of a defect; the other rows the audit found are bug fixes and are not argued here.
+A truth audit of treadling's own claims found, among the rows it named, three shapes a caller could hit but no argument had ever settled: a second work-item type with no rule, gate, guard, ranking or read that told it from the first; a closed set of relation kinds where half had no command able to write them; and two definition-of-ready rules that no record could ever fail. Each is a decision this record makes, not a correction of a defect; the other rows the audit found are bug fixes and are not argued here.
 
 ## Decision
 
@@ -15,7 +15,7 @@ A truth audit of treadle's own claims found, among the rows it named, three shap
 
 No rule, gate, guard, ranking or read told a `chore` from a `task`: neither required a field at creation, neither owned a field beyond the common set, neither had a review step, and both took the same moves through the state machine. The word was the whole difference, and a label carries a word: a caller who means maintenance writes `--label chore`, which `backlog --label` already filters on. The `epic > chore` hierarchy pair goes with it, because `epic > task` already covers what it allowed.
 
-The id a `chore` record held is not reused. Type has no writer once a record exists, so this is a record migration and not a field retirement: `RETIRED_FIELDS` in the item codec retires a field *key* and can never reach a *value* of a closed set, so a stored `chore` cannot be reinterpreted in place. The migration is remove then file under the same id, driven through the tool itself, which is how treadle's own `.work` record moved: `chore` filed, removed, and refiled as `task` with its label, doctor clean over 8 items and 94 events and `history` keeping the whole original life across the seam.
+The id a `chore` record held is not reused. Type has no writer once a record exists, so this is a record migration and not a field retirement: `RETIRED_FIELDS` in the item codec retires a field *key* and can never reach a *value* of a closed set, so a stored `chore` cannot be reinterpreted in place. The migration is remove then file under the same id, driven through the tool itself, which is how treadling's own `.work` record moved: `chore` filed, removed, and refiled as `task` with its label, doctor clean over 8 items and 94 events and `history` keeping the whole original life across the seam.
 
 ### Every declared relation kind gets a writer, and `split_from` is removed
 

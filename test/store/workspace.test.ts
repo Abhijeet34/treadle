@@ -29,20 +29,20 @@ describe('resolving the store', () => {
   })
 
   it('returns nothing outside a workspace rather than inventing one', async () => {
-    const empty = await mkdtemp(path.join(tmpdir(), 'treadle-nowhere-'))
+    const empty = await mkdtemp(path.join(tmpdir(), 'treadling-nowhere-'))
     const found = await resolveStore(empty)
     assert.equal(found === empty, false, 'a directory with no workspace.md is not a workspace')
   })
 
   it('refuses to open a directory that is not a workspace, naming the file it wanted', async () => {
-    const empty = await mkdtemp(path.join(tmpdir(), 'treadle-nowhere-'))
+    const empty = await mkdtemp(path.join(tmpdir(), 'treadling-nowhere-'))
     const opened = await openWorkspace(empty)
     assert.equal(opened.ok, false)
     assert.match(opened.ok ? '' : opened.error.message, /workspace\.md is not there/)
   })
 
   it('refuses a workspace.md that carries no record', async () => {
-    const root = await mkdtemp(path.join(tmpdir(), 'treadle-hollow-'))
+    const root = await mkdtemp(path.join(tmpdir(), 'treadling-hollow-'))
     await writeFile(path.join(root, 'workspace.md'), 'schema: 1\n\n')
     const opened = await openWorkspace(root)
     assert.equal(opened.ok, false)

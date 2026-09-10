@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // `mark --reason` is recorded and can be read back.
 //
-// Measured on 2026-09-07: `treadle mark <id> --priority 1 --reason "revenue path"` wrote
+// Measured on 2026-09-07: `treadling mark <id> --priority 1 --reason "revenue path"` wrote
 // `"reason":"revenue path"` into events/<month>.jsonl, and `history <id>`, `history <id>
 // --out json` and `history <id> -vvv --log-values` printed no part of it. `mark`'s own
 // one-line contract says the reason is in the log; the log is the tool's, so a caller who

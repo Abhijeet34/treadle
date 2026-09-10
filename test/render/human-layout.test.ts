@@ -126,7 +126,7 @@ describe('a scalar that follows a table is not part of it', () => {
     }
   })
 
-  // TREADLE_SNAPSHOT=update rewrites the file; the diff is then the thing under review.
+  // TREADLING_SNAPSHOT=update rewrites the file; the diff is then the thing under review.
   it('renders every golden object at 60, 80 and 200 as the snapshot records', () => {
     const parts: string[] = []
     for (const [name, result] of golden) {
@@ -139,7 +139,7 @@ describe('a scalar that follows a table is not part of it', () => {
     // nothing else: substituting the path here left its LENGTH in, and a macOS runner's
     // 44-character `/var/folders/...` root wrapped the `store` scalar onto a second line.
     const rendered = `${parts.join('\n')}\n`
-    if (process.env['TREADLE_SNAPSHOT'] === 'update') {
+    if (process.env['TREADLING_SNAPSHOT'] === 'update') {
       writeFileSync(SNAPSHOT, rendered)
       return
     }
@@ -147,7 +147,7 @@ describe('a scalar that follows a table is not part of it', () => {
     const got = rendered.split('\n')
     for (const [index, line] of got.entries()) {
       assert.equal(line, want[index],
-        `line ${index + 1} of the snapshot moved; review it and rerun with TREADLE_SNAPSHOT=update`)
+        `line ${index + 1} of the snapshot moved; review it and rerun with TREADLING_SNAPSHOT=update`)
     }
     assert.equal(got.length, want.length, 'the snapshot has a different number of lines')
   })

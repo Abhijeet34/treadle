@@ -90,7 +90,7 @@ type Result = {
 
 /** Runs the job's step against that scenario, and reports what it said and what it wrote. */
 async function drive(scenario: Scenario): Promise<Result> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-publication-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-publication-'))
   const bin = path.join(dir, 'bin')
   const fx = path.join(dir, 'fixtures')
   const runnerTemp = path.join(dir, 'runner-temp')
@@ -108,7 +108,7 @@ async function drive(scenario: Scenario): Promise<Result> {
   // The one field the job checks out the tagged tree for.
   await writeFile(
     path.join(dir, 'package.json'),
-    `${JSON.stringify({ name: 'treadle', version: '0.1.0', private: scenario.private ?? true })}\n`,
+    `${JSON.stringify({ name: 'treadling', version: '0.1.0', private: scenario.private ?? true })}\n`,
   )
 
   const log = path.join(dir, 'calls')

@@ -16,7 +16,7 @@ The first is the signature itself.
 Every commit in this repository is signed, and the argument was that the tag releasing them should not be the one unsigned object in the chain.
 `scripts/release-preflight.ts` refused a lightweight or unsigned tag, and `.github/rulesets/tags.json` required a signature at the forge as well.
 
-The second is stated in `docs/RELEASING.md` as "Nothing in CI can release treadle by itself", and it was the load-bearing half:
+The second is stated in `docs/RELEASING.md` as "Nothing in CI can release treadling by itself", and it was the load-bearing half:
 
 > The gate that holds publication is not a flag someone might forget to unset, it is the absence of a signed tag.
 
@@ -33,7 +33,7 @@ So the release cost two deliberate human acts: approving the release pull reques
 `v0.1.0` and `v0.1.1` are on the forge, both immutable under the tag ruleset, and neither carries a release with assets.
 
 `v0.1.0` was the first release.
-Run `34453354302` ran `cross-platform` on the tag, its three container install checks failed for want of `TREADLE_ACTOR`, and `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
+Run `34453354302` ran `cross-platform` on the tag, its three container install checks failed for want of `TREADLING_ACTOR`, and `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
 The tag stands and the release carries no tarball, no SBOM and no checksums.
 The matrix that was meant to gate the release ran after the tag it was gating, which is the defect the sibling repository had already paid for twice.
 
@@ -104,11 +104,11 @@ So a check that runs after the tag is a check that spends a version number it ca
 Two failures, two different checks, one mechanism: the tag existed before anything had a chance to say no.
 
 The matrix is the largest and most failure-prone gate on this path, and it is now entirely in front of the tag.
-`v0.1.0`'s failure mode is closed by that ordering alone: three container jobs failing for want of `TREADLE_ACTOR` now fails a push to `main`, no tag is created, no version number is consumed, the release pull request stays open, and the next push after the fix cuts the release that was always meant to be cut.
+`v0.1.0`'s failure mode is closed by that ordering alone: three container jobs failing for want of `TREADLING_ACTOR` now fails a push to `main`, no tag is created, no version number is consumed, the release pull request stays open, and the next push after the fix cuts the release that was always meant to be cut.
 A red build costs a red build.
 
 This is the same ordering the sibling repository arrived at after paying for two empty releases of its own, so it is not a departure from that shape.
-What is different here is the price of getting it wrong: a `v*` tag there is also immutable, and treadle keeps more checks behind the tag than pointback does.
+What is different here is the price of getting it wrong: a `v*` tag there is also immutable, and treadling keeps more checks behind the tag than pointback does.
 
 That residual is real and is not closed by the ordering.
 `artifacts` still runs the preflight after `release-tag`, so a preflight refusal still costs a version number, and that is exactly what `v0.1.1` was.
@@ -197,7 +197,7 @@ A reader who wants to know that a released tree is the tree the maintainers revi
 None of those is a person's signature on the release.
 
 The second thing ADR-0009 bought is given up with it.
-"Nothing in CI can release treadle by itself" is no longer true.
+"Nothing in CI can release treadling by itself" is no longer true.
 CI cuts the tag, creates the release and attaches the assets, and the only thing standing in front of it is the merge.
 The gate that holds publication is now `NPM_PUBLISH_ENABLED` and an environment reviewer, which are flags someone could forget to leave unset, and that is exactly the property ADR-0009 refused to depend on.
 
@@ -209,7 +209,7 @@ Nobody should have to infer either of those from the shape of the workflow.
 |---|---|
 | Keep the signed tag and ship an allowed-signers file for the runner | It makes the refusal satisfiable and keeps both human acts, which are the cost being removed. It also puts a list of trusted keys in the tree that has to be maintained, and a stale entry there fails a release the same way |
 | Keep the signed tag and drop only the preflight's signature clause | The forge would still require the signature, so the tag would still have to be created by a person at a terminal, and `v0.1.0`'s failure mode would be untouched |
-| A signing key in CI, so a workflow can create the signed tag | ADR-0009's reason still holds: a long-lived private key whose leak lets anyone forge a treadle release, in exchange for a signature nothing else in the chain now depends on |
+| A signing key in CI, so a workflow can create the signed tag | ADR-0009's reason still holds: a long-lived private key whose leak lets anyone forge a treadling release, in exchange for a signature nothing else in the chain now depends on |
 | Loosen `approval_policy` from `first_time_contributors` | Buys the unattended release by removing a control on every fork pull request this public repository will ever receive. `.github/settings/actions-fork-pr-approval.json` records the strict value and `test/release/repo-settings.test.ts` asserts it |
 | A stored token with wider rights, so the release pull request's runs execute | `docs/RELEASING.md`, "Why Actions may create pull requests", rules a long-lived credential out for the whole release design, and the approver needs none: the run's own token is enough |
 | Keep `parked-checks` as a report beside the approver | Two jobs answering the same question, one of which is green on every run once the other has done its work |

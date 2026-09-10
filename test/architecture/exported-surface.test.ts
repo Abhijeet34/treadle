@@ -19,7 +19,7 @@
 //
 // A barrel line is not a reader. `export { X } from './x.ts'` names X and reads nothing, so
 // a symbol whose only mention outside its own file is a barrel line is exported to nobody:
-// no package is on the registry, only `dist/treadle.js` ships, and no external
+// no package is on the registry, only `dist/treadling.js` ships, and no external
 // consumer keeps one alive. Eleven values sat in that position when this rule was widened,
 // so the re-export clauses are stripped out of the reference text before the match.
 //
@@ -32,7 +32,7 @@
 //
 // Only `src/` is held. Nine values under `test/`, `bench/` and `scripts/` are in the same
 // position and are left alone deliberately: a helper exported for symmetry inside a suite
-// costs nothing that ships, and only `src` reaches `dist/treadle.js`.
+// costs nothing that ships, and only `src` reaches `dist/treadling.js`.
 //
 // The reference scan is a word match over every `.ts` in the tree, `bin/`, and that one
 // document. That is deliberately lenient in one direction only: an unrelated local or a

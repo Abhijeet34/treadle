@@ -129,7 +129,7 @@ Every reference figure in the axes table is quoted from the prior-art report and
 
 **Negative**
 
-- A full four-scale run costs about five and a half minutes and about 430 MB of corpora under `TREADLE_BENCH_DIR`. A pull request pays the two small scales.
+- A full four-scale run costs about five and a half minutes and about 430 MB of corpora under `TREADLING_BENCH_DIR`. A pull request pays the two small scales.
 - Every axis mutates the corpus it measures, so a run measures a private clone of a shared, content-addressed cache entry rather than a shared root. The cost is one copy-on-write clone per corpus, reported as `cloneMs`; the alternative was a shared mutable path where two concurrent runs agreed on figures taken from a store neither was in. `bench/README.md` carries the layout.
 - The timing limits are calibrated to one machine and are not yet armed anywhere else.
 - Axis A1's 200-writer round alone takes about 70 seconds, because 200 cold Node processes serialise through one store lock.

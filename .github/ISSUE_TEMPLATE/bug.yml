@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Not a bug in behaviour but a security problem? Do not file it here.
-        Use the private route in [SECURITY.md](https://github.com/Abhijeet34/treadle/blob/main/SECURITY.md).
+        Use the private route in [SECURITY.md](https://github.com/Abhijeet34/treadling/blob/main/SECURITY.md).
   - type: input
     id: version
     attributes:

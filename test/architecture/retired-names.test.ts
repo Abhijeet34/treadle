@@ -76,7 +76,7 @@ const RETIRED: readonly Retired[] = [
   { name: 'H28', by: 'ADR-0029' },
   { name: 'H29', by: 'ADR-0029' },
   { name: 'I5', by: 'ADR-0029, which moved the rule to V9' },
-  // What the tool called itself. `treadle help` opened with "Agile work management for a team
+  // What the tool called itself. `treadling help` opened with "Agile work management for a team
   // and its agents" while README.md's third line is "The record of the work between people and
   // agents" and its ninth denies the category outright, so the phrase outlived the surface
   // ADR-0029 removed by a page no test read.
@@ -155,6 +155,10 @@ const RETIRED: readonly Retired[] = [
   // conduct and a security policy, and `--test-reporter` is the runtime's own flag.
   { name: 'reporter', by: 'ADR-0032', spelling: /--reporter\b|^\s*reporter:|['"`]reporter['"`]/ },
   { name: 'linkableKindOf', by: 'the truth sweep, renamed relationKindOf' },
+  // ADR-0038: the name the package, the command, the environment variables and the repository
+  // all carried until 2026-09-10. It is matched as its own word so `treadling` does not trip it,
+  // and the allowlist below carries the records that legitimately still spell it.
+  { name: 'treadle', by: 'ADR-0038', spelling: /\btreadle\b/i },
   // Earlier removals, kept here so the list is the whole set rather than the last change's.
   { name: 'src/adapters/init.ts', by: 'PR #24' },
 ]
@@ -169,6 +173,7 @@ const ALLOWED_FILES: readonly (readonly [RegExp, string])[] = [
   // instead. So an ADR naming a removed thing is the record working, not a stale reference.
   [/^docs\/architecture\/adr\//, 'a decision record is never rewritten; a later record marks it overtaken or superseded'],
   [/^CHANGELOG\.md$/, 'generated release history, which records what each version removed'],
+  [/^\.work\/workspace\.md$/, 'the workspace record this repository dogfoods, written at init and never hand-edited'],
   [/^docs\/architecture\/history\/BENCHMARKS-2026-09\.md$/, 'dated measurements of runs that happened; a figure is a fact about its run'],
   [/^docs\/VERIFICATION\.md$/, 'the same, plus the one sentence that names what the cut removed'],
   [/^\.work\/events\//, 'the append-only event log, which is never edited'],

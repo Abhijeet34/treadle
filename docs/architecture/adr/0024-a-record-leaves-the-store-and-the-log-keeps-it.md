@@ -11,17 +11,17 @@
 A scout ran a stranger's first week against the tool and came back with four holes, each one a thing the tool could write and could not read, or a mistake it could make and could not undo.
 
 ```text
-$ treadle set login-cta labels=frontend,backend        # accepted
-$ treadle backlog --label frontend
+$ treadling set login-cta labels=frontend,backend        # accepted
+$ treadling backlog --label frontend
 err VALIDATION  rule C1  --label is not a flag of backlog                    exit 2
-$ treadle backlog --fields +labels
+$ treadling backlog --fields +labels
 err VALIDATION  rule C2  labels is not a column of this list                 exit 2
-$ treadle set sprint-1 goal="Ship the token refresh"
+$ treadling set sprint-1 goal="Ship the token refresh"
 err NOT_FOUND  rule I5  sprint-1 is a sprint here, not an item               exit 5
-$ treadle backlog --title login
+$ treadling backlog --title login
 err VALIDATION  rule C1  --title is not a flag of backlog                    exit 2
-$ treadle remove login-cta-2
-err VALIDATION  rule C1  remove is not a treadle command                     exit 2
+$ treadling remove login-cta-2
+err VALIDATION  rule C1  remove is not a treadling command                     exit 2
 ```
 
 Three of the four are missing readers, and their answer is not interesting: a field that only `show` prints is a field nobody can act on across a backlog, an open sprint whose typo is permanent is a record pretending to be immutable when only its closed form is, and a backlog with six exact-match filters and no way to find "the login thing" is answered by reading the whole list.
@@ -36,7 +36,7 @@ So "the store is append-only and committed to git" is true of the log and half t
 
 ### Removed means the record leaves its shard, and the event log is not touched
 
-`treadle remove <id> --reason <text> --yes` takes one record out of `items/YYYY-MM.md` under the same compare-and-set token a write uses, and appends one `item.remove` event carrying the record's audited fields on the `before` side, the caller's reason, and the actor.
+`treadling remove <id> --reason <text> --yes` takes one record out of `items/YYYY-MM.md` under the same compare-and-set token a write uses, and appends one `item.remove` event carrying the record's audited fields on the `before` side, the caller's reason, and the actor.
 
 The trail is intact because the log gains a line and loses none.
 Every event that record ever earned is still in the log, and `history <id>` reads them back after the removal, because the log is keyed by entity id rather than by a record existing.
@@ -44,12 +44,12 @@ That last part was not free: `history` refused an id no record carried, so befor
 It now queries the log first and refuses only an id with neither a record nor an event, and prints `note no record here carries this id now; these are the events it earned while it did`.
 
 ```text
-$ treadle remove login-cta-2 --reason "filed twice by the same import" --yes
+$ treadling remove login-cta-2 --reason "filed twice by the same import" --yes
 ok remove acme tm59l25 1
 item login-cta-2
 "set state draft -> -
 event ea9kzye
-$ treadle history login-cta-2
+$ treadling history login-cta-2
 note no record here carries this id now; these are the events it earned while it did
 2026-09-07T14:18:56Z human item.remove type=task,state=draft,filed_at=… dana
 2026-09-07T14:18:55Z human item.file  type=task,state=draft,filed_at=… dana
@@ -104,7 +104,7 @@ A value with no word in it is refused with `C1`, because it is the one filter va
 
 ### An open sprint's four written fields move; a closed sprint's do not
 
-`treadle sprint set <sprint> [--title] [--goal] [--start] [--end]` writes what `open` wrote, through one `sprint.set` event, with the same `already` answer, the same `--dry-run`, and the same `--goal=` clearing syntax `set` uses on an item.
+`treadling sprint set <sprint> [--title] [--goal] [--start] [--end]` writes what `open` wrote, through one `sprint.set` event, with the same `already` answer, the same `--dry-run`, and the same `--goal=` clearing syntax `set` uses on an item.
 A required field refuses an empty value the way `set` refuses clearing `title`.
 
 A closed sprint refuses every one of them with `I2`, naming `reopen` as the way back.
@@ -137,7 +137,7 @@ It is one character in one file and it changes `id`, `parent_id`, `sprint_id` an
 **`set <sprint> goal=…` rather than a `sprint set` verb.**
 Rejected.
 `set` is the item field editor and its whole refusal set, its field dictionary and its `writerOf` routing are an item's; `sprint` is the verb namespace for sprints and already carries `--start`, `--end` and `--goal`.
-The `I5` refusal a caller meets first, `sprint-1 is a sprint here, not an item`, already names `treadle sprints sprint-1` and is where a reader learns the namespace.
+The `I5` refusal a caller meets first, `sprint-1 is a sprint here, not an item`, already names `treadling sprints sprint-1` and is where a reader learns the namespace.
 
 ## Consequences
 

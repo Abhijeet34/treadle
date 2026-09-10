@@ -369,7 +369,7 @@ describe('evidence is a bounded pointer list, and done requires one', () => {
     assert.equal(refused.code, 3)
     assert.match(refused.err, /the done gate fails: DOD7$/m)
     const why = await cli(['explain', 'retry-key'])
-    assert.match(why.out, /^done DOD7 fail treadle evidence add retry-key <kind> <ref> \[label\]$/m)
+    assert.match(why.out, /^done DOD7 fail treadling evidence add retry-key <kind> <ref> \[label\]$/m)
     await demo.dispose()
   })
 

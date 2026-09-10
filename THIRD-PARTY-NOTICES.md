@@ -2,13 +2,13 @@
 
 Nothing third-party ships in the published package.
 
-The tarball carries `dist/treadle.js`, the JSON Schemas, `LICENSE`, `NOTICE` and this file.
-The bundle is built from this repository's own source and from no other code: treadle declares zero runtime dependencies, which `test/architecture/layering.test.ts` enforces, so there is no third-party attribution to make and `NOTICE` states that.
+The tarball carries `dist/treadling.js`, the JSON Schemas, `LICENSE`, `NOTICE` and this file.
+The bundle is built from this repository's own source and from no other code: treadling declares zero runtime dependencies, which `test/architecture/layering.test.ts` enforces, so there is no third-party attribution to make and `NOTICE` states that.
 That is the whole notice obligation, and the rest of this file is about a tree that never leaves the machine it was installed on.
 
 ## The development tree
 
-Building, type checking, testing and benchmarking treadle installs a tree of packages.
+Building, type checking, testing and benchmarking treadling installs a tree of packages.
 None of them ships.
 Every one of them still has to carry a licence this project may use, and `scripts/check-licences.ts` checks the whole installed tree, transitive packages included, against this allowlist:
 
@@ -26,7 +26,7 @@ Versions move; the licence and the reason are what this table is for.
 | `@anthropic-ai/tokenizer` | Apache-2.0 | the token counts in the benchmark rig's output budgets |
 | `@commitlint/cli` | MIT | the Conventional Commits check CI runs over a pull request |
 | `@commitlint/config-conventional` | MIT | the rule set that check uses |
-| `@types/node` | MIT | type declarations for the runtime, which is the only API treadle's code calls |
+| `@types/node` | MIT | type declarations for the runtime, which is the only API treadling's code calls |
 | `esbuild` | MIT | DR1's bundler: one entry file, weighed against bench/budgets.json's bundle budget |
 | `gpt-tokenizer` | MIT | the second tokenizer the rig reports, so no single vocabulary decides a budget |
 | `typescript` | Apache-2.0 | type checking; Node strips the types at run time and never compiles them |

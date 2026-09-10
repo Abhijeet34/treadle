@@ -15,13 +15,13 @@ import { describe, it, before, after } from 'node:test'
 
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-r6-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-r6-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   const init = await cli(['init'])
   assert.equal(init.code, 0, init.err)
@@ -88,7 +88,7 @@ describe('SEAM-2: status and doctor count findings by one definition', () => {
     assert.match(status.out, /^findings 0$/m, status.out)
     // The audit line's own definition of what that number counts, which is what made the
     // previous answer of 1 wrong rather than merely different.
-    assert.match(status.out, /^audit not run here; treadle doctor reads every record/m)
+    assert.match(status.out, /^audit not run here; treadling doctor reads every record/m)
 
     const doctor = await cli(['doctor'])
     assert.equal(doctor.code, 0, doctor.err)
@@ -182,19 +182,19 @@ describe('STR-7: the two variables that decide who every event names', () => {
     // On the index, which is where a supported flag is now described: a command page prints
     // only the flags it grades other than `S`, and `--actor` is `S` on every mutation.
     const help = must(await cli(['help']), 'help')
-    assert.match(help.out, /^--actor mutation names who the event records; TREADLE_ACTOR and TREADLE_ACTOR_KIND/m)
+    assert.match(help.out, /^--actor mutation names who the event records; TREADLING_ACTOR and TREADLING_ACTOR_KIND/m)
 
     // The first thing init tells a stranger is now the refusal rather than a next step. A
     // workspace's creation event is entry one of the record an agent later trusts, and
     // recording it under nobody would seed every workspace with a name nobody wrote, so the
     // line that supplies an actor is what init answers with until one is set.
-    const fresh = await mkdtemp(path.join(tmpdir(), 'treadle-r6-init-'))
+    const fresh = await mkdtemp(path.join(tmpdir(), 'treadling-r6-init-'))
     try {
       const nameless = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: {} })
       assert.equal(nameless.code, 2, nameless.out)
-      assert.match(nameless.err, /^fix export TREADLE_ACTOR=<your-name>$/m, nameless.err)
+      assert.match(nameless.err, /^fix export TREADLING_ACTOR=<your-name>$/m, nameless.err)
 
-      const started = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: { TREADLE_ACTOR: 'dana' } })
+      const started = await runCli(['init', '--name', 'fresh'], { cwd: fresh, env: { TREADLING_ACTOR: 'dana' } })
       assert.equal(started.code, 0, started.err)
       assert.match(started.out, /^actor dana$/m, started.out)
     } finally {

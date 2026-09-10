@@ -30,11 +30,11 @@ import { Gen } from '../helpers/store-fixtures.ts'
 const CORPUS = fileURLToPath(new URL('./corpus/', import.meta.url))
 
 /**
- * The gate's count, which every `npm test` pays for. `TREADLE_FUZZ_INPUTS` raises it for a
+ * The gate's count, which every `npm test` pays for. `TREADLING_FUZZ_INPUTS` raises it for a
  * soak run without touching the gate: a fuzzer that is slow enough to be skipped is a
  * fuzzer nobody runs, and one that only ever runs at its floor never finds anything new.
  */
-const INPUTS = Number(process.env['TREADLE_FUZZ_INPUTS'] ?? 250_000)
+const INPUTS = Number(process.env['TREADLING_FUZZ_INPUTS'] ?? 250_000)
 
 const PARSER_INPUTS = INPUTS
 const ESCAPER_INPUTS = INPUTS

@@ -94,7 +94,7 @@ export type CarriedFlag = readonly [name: string, value: string | true | undefin
  * validated, quoted where a shell would split it.
  */
 export function invocation(command: string, operands: readonly string[], flags: readonly CarriedFlag[]): string {
-  const words = [`treadle ${command}`, ...operands.map(shellWord)]
+  const words = [`treadling ${command}`, ...operands.map(shellWord)]
   for (const [name, value] of flags) {
     if (value === undefined) continue
     words.push(`--${name}`)
@@ -363,7 +363,7 @@ export async function fileItem(
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'C1', entity: request.type,
       cause: 'no character of this title becomes part of an id, so the id would name the type and nothing else; name one with --id',
-      fix: [`treadle file ${request.type} "<title>" --id <slug>`],
+      fix: [`treadling file ${request.type} "<title>" --id <slug>`],
     })
   }
   // An id another record still names is not free, whatever the store no longer holds under
@@ -376,7 +376,7 @@ export async function fileItem(
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'V9', entity: id,
       cause: `${holder} still names ${id} and no record here carries it, so filing under that id would attach a stored reference to an item that never had it`,
-      fix: ['treadle doctor', `treadle file ${request.type} "<title>" --id <slug>`],
+      fix: ['treadling doctor', `treadling file ${request.type} "<title>" --id <slug>`],
     })
   }
   // Left to the store this was `CONFLICT S10`, "already exists at version 1", which a caller
@@ -385,7 +385,7 @@ export async function fileItem(
     return errorResult({
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate', rule: 'V9', entity: id,
       cause: `${id} is already an item here, and an id names one thing`,
-      fix: [`treadle show ${id}`, `treadle file ${request.type} "<title>" --id <slug>`],
+      fix: [`treadling show ${id}`, `treadling file ${request.type} "<title>" --id <slug>`],
     })
   }
   const draft: Record<string, unknown> = {
@@ -410,8 +410,8 @@ export async function fileItem(
       code: 'VALIDATION', command: 'file', workspace, effect: 'mutate',
       rule: valid.error.rule ?? 'V4', entity: id, cause: valid.error.message,
       fix: required.length === 0
-        ? ['treadle help file']
-        : [`treadle file ${request.type} "<title>"${required}`, 'treadle help file'],
+        ? ['treadling help file']
+        : [`treadling file ${request.type} "<title>"${required}`, 'treadling help file'],
     })
   }
 
@@ -573,7 +573,7 @@ export async function showItem(
       return errorResult({
         code: 'VALIDATION', command: 'show', workspace, effect: 'read', rule: 'C2', entity: item.id,
         cause: `${item.id} carries ${field} and this build has no field of that name; a newer version wrote it, and it is preserved on the record and counted by extra`,
-        fix: [`treadle show ${item.id}`],
+        fix: [`treadling show ${item.id}`],
       })
     }
     const known = SHOW_SHAPE.properties
@@ -583,7 +583,7 @@ export async function showItem(
     return errorResult({
       code: 'VALIDATION', command: 'show', workspace, effect: 'read', rule: 'C2', entity: item.id,
       cause: `${item.id} carries no field named ${field}; this record has ${known.join(', ')}`,
-      fix: [`treadle show ${item.id}`],
+      fix: [`treadling show ${item.id}`],
     })
   }
   const projection: Record<string, Value> = { item: item.id, [key]: data[key] as Value }
@@ -766,7 +766,7 @@ function columnRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C2',
       cause: `${unknown} is not a column of this list; the columns are ${known.map((c) => c.name).join(', ')}`,
-      fix: [`treadle help ${command}`],
+      fix: [`treadling help ${command}`],
     })
   }
   // The same rule the CLI's repeated-flag refusal takes one layer up: a line that
@@ -778,7 +778,7 @@ function columnRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C2',
       cause: `${twice} is named twice and a column is printed once; a row is read by position, so a repeat moves every field after it`,
-      fix: [`treadle ${command} --fields ${[...new Set(columns)].join(',')}`],
+      fix: [`treadling ${command} --fields ${[...new Set(columns)].join(',')}`],
     })
   }
   const free = columns.filter((name) => known.some((column) => column.name === name && column.text === true))
@@ -786,7 +786,7 @@ function columnRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C3',
       cause: `${free.join(' and ')} both carry free text, and a row can carry one such column; every field after the first would be read wrong`,
-      fix: [`treadle ${command} --fields ${columns.filter((name) => name !== free[0]).join(',')}`],
+      fix: [`treadling ${command} --fields ${columns.filter((name) => name !== free[0]).join(',')}`],
     })
   }
   return undefined
@@ -827,7 +827,7 @@ function filterRefusal(
     return errorResult({
       code: 'VALIDATION', command, workspace, effect: 'read', rule: 'C1',
       cause: `${filter.value} is not ${withArticle(FILTER_NOUN[filter.field] ?? filter.field)}; the set is ${allowed.join(', ')}`,
-      fix: [`treadle help ${command}`],
+      fix: [`treadling help ${command}`],
     })
   }
   return undefined
@@ -982,7 +982,7 @@ export function notFound(
     // workspace is one: `history <workspace>` is what reads a configuration change back, and
     // a typed id that missed it had no way of learning which of the two kinds it was near.
     near: nearIds([...view.byId.keys(), view.identity.id], id),
-    fix: ['treadle backlog'],
+    fix: ['treadling backlog'],
   })
 }
 
@@ -1008,14 +1008,14 @@ export function parentRefusal(
   if (edge.ok) return undefined
   const unknown = edge.error.rule === 'P4'
   const parents = ALLOWED_PARENT_PAIRS.filter((pair) => pair.child === child.type)
-    .map((pair) => `treadle backlog --type ${pair.parent}`)
+    .map((pair) => `treadling backlog --type ${pair.parent}`)
   // A type nothing may parent has no list to offer. For a filed item the record is the answer;
   // for `file` nothing was filed, so `show <id>` named a record that did not exist and the
   // line is the one that files it without the parent.
   const required = requiredAtCreation(child.type).map((field) => ` --set ${field}=${placeholderOf(field)}`).join('')
-  const alone = filed ? `treadle show ${child.id}` : `treadle file ${child.type} "<title>"${required}`
+  const alone = filed ? `treadling show ${child.id}` : `treadling file ${child.type} "<title>"${required}`
   // A chain that already closes a cycle above the parent is the store's finding, not this write's.
-  const fix = edge.error.code === 'INTEGRITY' ? ['treadle doctor'] : parents.length > 0 ? parents : [alone]
+  const fix = edge.error.code === 'INTEGRITY' ? ['treadling doctor'] : parents.length > 0 ? parents : [alone]
   return errorResult({
     code: unknown ? 'NOT_FOUND' : edge.error.code, command, workspace, effect: 'mutate',
     rule: edge.error.rule ?? 'P1', entity: child.id, cause: edge.error.message,

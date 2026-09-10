@@ -76,14 +76,14 @@ function namedBy(view: WorkspaceView, item: WorkItem): Reference | undefined {
   if (edge !== undefined) {
     return {
       cause: `${edge.source} ${edge.kind} ${id}, and removing ${id} would leave that edge naming no record`,
-      fix: [`treadle relation remove ${edge.source} ${edge.kind} ${id}`, `treadle explain ${id}`],
+      fix: [`treadling relation remove ${edge.source} ${edge.kind} ${id}`, `treadling explain ${id}`],
     }
   }
   const child = (view.hierarchy.childrenOf.get(id) ?? [])[0]
   if (child !== undefined) {
     return {
       cause: `${child} has ${id} as its parent, and removing ${id} would leave that record naming no parent`,
-      fix: [`treadle set ${child} parent_id=`, `treadle backlog --fields id,type,state,title`],
+      fix: [`treadling set ${child} parent_id=`, `treadling backlog --fields id,type,state,title`],
     }
   }
   return undefined
@@ -120,10 +120,10 @@ export async function removeItem(
   if (request.reason === undefined || request.reason.trim() === '') {
     return refusal(workspace, 'C1', item.id,
       'a removal records why the record should not exist, and none was given',
-      [`treadle remove ${item.id} --reason "<why>" --yes`])
+      [`treadling remove ${item.id} --reason "<why>" --yes`])
   }
   if (request.reason.length > MAX_REASON) {
-    return refusal(workspace, 'T7', item.id, overLength('a reason', MAX_REASON, request.reason.length), ['treadle help remove'])
+    return refusal(workspace, 'T7', item.id, overLength('a reason', MAX_REASON, request.reason.length), ['treadling help remove'])
   }
   const named = namedBy(view.value, item)
   if (named !== undefined) {
@@ -141,7 +141,7 @@ export async function removeItem(
       `removing ${item.id} takes the record out of ${workspace} and no command puts it back; the log keeps its events either way`,
       // A.6: no caller text in a fix line, so the reason they already wrote is a placeholder
       // here as it is everywhere else the tool offers a line back.
-      [`treadle remove ${item.id} --reason "<why>" --dry-run`, `treadle remove ${item.id} --reason "<why>" --yes`])
+      [`treadling remove ${item.id} --reason "<why>" --dry-run`, `treadling remove ${item.id} --reason "<why>" --yes`])
   }
 
   // The audited fields only, in the dictionary's order. The prose a record carries is not

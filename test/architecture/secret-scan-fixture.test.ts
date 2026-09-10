@@ -36,7 +36,7 @@ function syntheticAwsAccessKeyId(): string {
 }
 
 /**
- * gitleaks is not a runtime dependency of treadle, so a developer's machine without the binary
+ * gitleaks is not a runtime dependency of treadling, so a developer's machine without the binary
  * skips the two scans below with this named reason rather than failing the build.
  */
 const GITLEAKS_MISSING: string | false = (() => {
@@ -56,16 +56,16 @@ const GITLEAKS_MISSING: string | false = (() => {
  * these tests instead of skipping them - so deleting that install step reddens the job rather
  * than returning them to running nowhere.
  */
-const REQUIRED = process.env['TREADLE_REQUIRE_GITLEAKS'] === '1'
+const REQUIRED = process.env['TREADLING_REQUIRE_GITLEAKS'] === '1'
 
 const SKIP: string | false = REQUIRED ? false : GITLEAKS_MISSING
 
 async function scan(line: string): Promise<Array<{ RuleID: string }>> {
   assert.equal(
     GITLEAKS_MISSING, false,
-    'TREADLE_REQUIRE_GITLEAKS is set, so this job undertook to install gitleaks and did not',
+    'TREADLING_REQUIRE_GITLEAKS is set, so this job undertook to install gitleaks and did not',
   )
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-secret-scan-fixture-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-secret-scan-fixture-'))
   try {
     await writeFile(path.join(dir, 'deploy.env'), `${line}\n`)
     const report = execFileSync(
@@ -142,7 +142,7 @@ describe('the job that runs the suite carries the scanner the two scans above ne
     assert.equal(installs.length, 1, 'the check job does not install gitleaks, so the scans above skip in CI')
     assert.equal(suite.length, 1, 'the check job no longer runs npm test, so nothing here runs the scans above')
     assert.equal(
-      check.env['TREADLE_REQUIRE_GITLEAKS'], '"1"',
+      check.env['TREADLING_REQUIRE_GITLEAKS'], '"1"',
       'without this a failed or deleted install is a silent skip again, which is the finding',
     )
   })

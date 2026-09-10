@@ -50,7 +50,7 @@ The cell does not carry the blocker's own type or severity, because that is the 
 
 ### The open sprint is the default scope
 
-With no flag the board is the one open sprint, `scope <id> <state> day <sprintDay>` says so ([ADR-0016](0016-sprints.md) owns the token's shape), and a `whole` line carries `treadle board --all` for the reader who wanted the workspace.
+With no flag the board is the one open sprint, `scope <id> <state> day <sprintDay>` says so ([ADR-0016](0016-sprints.md) owns the token's shape), and a `whole` line carries `treadling board --all` for the reader who wanted the workspace.
 The alternative, the whole workspace by default, shows a team its history mixed with its current work, and `next` already weights membership of an open sprint for the same reason.
 
 `--sprint <id>` is the backlog's own filter, so a closed sprint's board is what still points at it and `sprints <id>` carries what moved on; the two are the same set until the carry-over is committed onward, which is what ADR-0016 asks a team to do.
@@ -123,7 +123,7 @@ The shared design refuses it for this record, and a projection that stores nothi
 
 **Neutral**
 
-- The `absent_features` line is gone from the `status` shape, and `STATUS_SHAPE` is v2 with `schemas/status.v1.json` replaced by `schemas/status.v2.json`. This record originally kept it declared, on the ground that removing a property is a breaking change under `docs/STABILITY.md`; what that reasoning missed is that the key was never computed. It was the string literal `absent_features: 'board'` in the result builder, hand-edited by each of the four pull requests that landed relation, sprint, impediment and board, and this record's own change deleted the last write. A declared key nothing can write is a promise to every consumer that the tool does not keep, and there is nothing in a workspace to compute it from: every other key in the shape is a fact about the store the caller passed, and this one was a fact about the build, which `treadle --contract` and `help` already answer off the command inventory. Removing it is breaking and is treated as breaking, on the precedent #26 set for `backlog` v1 to v2: the shape's version moves, the old schema file goes, and `docs/STABILITY.md`'s pre-1.0 policy carries it in the release notes.
+- The `absent_features` line is gone from the `status` shape, and `STATUS_SHAPE` is v2 with `schemas/status.v1.json` replaced by `schemas/status.v2.json`. This record originally kept it declared, on the ground that removing a property is a breaking change under `docs/STABILITY.md`; what that reasoning missed is that the key was never computed. It was the string literal `absent_features: 'board'` in the result builder, hand-edited by each of the four pull requests that landed relation, sprint, impediment and board, and this record's own change deleted the last write. A declared key nothing can write is a promise to every consumer that the tool does not keep, and there is nothing in a workspace to compute it from: every other key in the shape is a fact about the store the caller passed, and this one was a fact about the build, which `treadling --contract` and `help` already answer off the command inventory. Removing it is breaking and is treated as breaking, on the precedent #26 set for `backlog` v1 to v2: the shape's version moves, the old schema file goes, and `docs/STABILITY.md`'s pre-1.0 policy carries it in the release notes.
 
 ## Departures from the design record
 

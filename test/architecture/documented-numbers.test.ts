@@ -75,13 +75,13 @@ const README = read('README.md')
 const INVENTORY = COMMANDS.map((command) => command.name).sort()
 
 describe('the README names the command surface the inventory carries', () => {
-  it('lists every command in the sentence that says what bin/treadle.js runs', () => {
-    const sentence = README.split('\n').find((line) => line.startsWith('`bin/treadle.js` runs'))
-    assert.ok(sentence !== undefined, 'README has no sentence beginning "`bin/treadle.js` runs"')
+  it('lists every command in the sentence that says what bin/treadling.js runs', () => {
+    const sentence = README.split('\n').find((line) => line.startsWith('`bin/treadling.js` runs'))
+    assert.ok(sentence !== undefined, 'README has no sentence beginning "`bin/treadling.js` runs"')
     assert.deepEqual(commandsIn(sentence), INVENTORY,
-      "the README's `bin/treadle.js` runs sentence backticks a different set of commands than src/cli/inventory.ts declares; edit the sentence to the inventory")
+      "the README's `bin/treadling.js` runs sentence backticks a different set of commands than src/cli/inventory.ts declares; edit the sentence to the inventory")
     assert.equal(spelled(sentence, 'commands'), INVENTORY.length,
-      `the README's \`bin/treadle.js\` runs sentence spells a command count the inventory does not have; src/cli/inventory.ts declares ${INVENTORY.length}`)
+      `the README's \`bin/treadling.js\` runs sentence spells a command count the inventory does not have; src/cli/inventory.ts declares ${INVENTORY.length}`)
   })
 
   it('lists every command in the Status row that calls them implemented', () => {
@@ -97,8 +97,8 @@ describe('the README names the command surface the inventory carries', () => {
   })
 })
 
-describe("the README's figures for treadle's own backlog are what .work holds", () => {
-  // Counted off the committed records rather than through `treadle status`, because D1 makes
+describe("the README's figures for treadling's own backlog are what .work holds", () => {
+  // Counted off the committed records rather than through `treadling status`, because D1 makes
   // those files authoritative and reading them needs no index and no lock, so this file is
   // not racing another test file for the one workspace the repository keeps.
   const states = new Map<string, number>()
@@ -111,11 +111,11 @@ describe("the README's figures for treadle's own backlog are what .work holds", 
     }
   }
   const total = [...states.values()].reduce((sum, count) => sum + count, 0)
-  const section = README.slice(README.indexOf("## treadle's own backlog"))
+  const section = README.slice(README.indexOf("## treadling's own backlog"))
 
   it('states the number of items the workspace holds', () => {
     assert.equal(spelled(section, 'items'), total,
-      `the README's "treadle's own backlog" section spells an item count .work does not hold; the records under .work/items carry ${total}`)
+      `the README's "treadling's own backlog" section spells an item count .work does not hold; the records under .work/items carry ${total}`)
   })
 
   // The states are the ones .work holds rather than a list written here, so a workspace
@@ -124,7 +124,7 @@ describe("the README's figures for treadle's own backlog are what .work holds", 
   for (const state of [...states.keys()].sort()) {
     it(`states how many items are ${state}, the same in every sentence that says so`, () => {
       assert.equal(spelled(section, `(?:(?:that )?(?:is|are)|in) \`${state}\``), states.get(state) ?? 0,
-        `the README's "treadle's own backlog" section spells a ${state} count .work does not hold; the records under .work/items carry ${states.get(state) ?? 0}`)
+        `the README's "treadling's own backlog" section spells a ${state} count .work does not hold; the records under .work/items carry ${states.get(state) ?? 0}`)
     })
   }
 })
@@ -363,7 +363,7 @@ describe('every document that counts the benchmark axes counts the rig', () => {
   const unmeasured = [...read('bench/axes/remaining.ts').matchAll(/notMeasured\(\{/g)].length
 
   it('the acceptance bar in docs/architecture/history/BENCHMARKS-2026-09.md is stated over every axis', () => {
-    assert.equal(spelled(lineWith('docs/architecture/history/BENCHMARKS-2026-09.md', BENCHMARKS, 'The acceptance bar for treadle'), 'axes'),
+    assert.equal(spelled(lineWith('docs/architecture/history/BENCHMARKS-2026-09.md', BENCHMARKS, 'The acceptance bar for treadling'), 'axes'),
       axes.size, `docs/architecture/history/BENCHMARKS-2026-09.md states the bar over an axis count the rig does not emit; bench/ emits ${axes.size}: ${[...axes].join(', ')}`)
   })
 
@@ -399,8 +399,8 @@ describe('every document that counts the benchmark axes counts the rig', () => {
 
 describe('every document that counts the renderings counts the renderer seam', () => {
   it('the README and docs/ARCHITECTURE.md spell what RENDERINGS declares', () => {
-    assert.equal(spelled(lineWith('README.md', README, '`bin/treadle.js` runs'), 'forms'), RENDERINGS.length,
-      `the README's \`bin/treadle.js\` runs sentence names a rendering count src/adapters/render does not ship; RENDERINGS declares ${RENDERINGS.length}`)
+    assert.equal(spelled(lineWith('README.md', README, '`bin/treadling.js` runs'), 'forms'), RENDERINGS.length,
+      `the README's \`bin/treadling.js\` runs sentence names a rendering count src/adapters/render does not ship; RENDERINGS declares ${RENDERINGS.length}`)
     assert.equal(spelled(ARCHITECTURE, 'renderers'), RENDERINGS.length,
       `docs/ARCHITECTURE.md names a renderer count src/adapters/render does not ship; RENDERINGS declares ${RENDERINGS.length}`)
   })

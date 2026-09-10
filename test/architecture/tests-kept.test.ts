@@ -57,7 +57,7 @@ async function commit(dir: string, tree: Tree, message: string): Promise<void> {
  *  about the range between them. `head` replaces the whole tree, which is what a resolution
  *  that takes a file whole does. */
 async function check(base: Tree, head: Tree, message = 'fix: the change'): Promise<Verdict> {
-  const dir = await mkdtemp(path.join(tmpdir(), 'treadle-kept-'))
+  const dir = await mkdtemp(path.join(tmpdir(), 'treadling-kept-'))
   made.push(dir)
   await git(dir, ['init', '-q', '-b', 'main'])
   await commit(dir, base, 'chore: base')

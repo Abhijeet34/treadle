@@ -14,10 +14,10 @@ That threw away every line 28 had added to those files, and the tests 28 had add
 The suite passed.
 1132 tests, zero failures, and all ten checks green, because the resolution deleted the tests along with the code they covered.
 A test protects a behaviour only while the test survives, so a green suite is not evidence that the suite is intact.
-It was caught by a person building both branches and running `treadle show cart --field ac` against each: `ac 0/1` on the branch, the criteria block on main.
+It was caught by a person building both branches and running `treadling show cart --field ac` against each: `ac 0/1` on the branch, the criteria block on main.
 
 The reconstruction is in this repository's history rather than in prose.
-A branch off `3bce1ca` with the four service files and their tests returned to their pre-28 state typechecks clean and reports **1122 tests, 0 failures**, while `treadle set cart acceptance_criteria=...` echoes `[object Object]` and `show cart --field ac` prints `ac 0/1` and nothing else.
+A branch off `3bce1ca` with the four service files and their tests returned to their pre-28 state typechecks clean and reports **1122 tests, 0 failures**, while `treadling set cart acceptance_criteria=...` echoes `[object Object]` and `show cart --field ac` prints `ac 0/1` and nothing else.
 `docs/VERIFICATION.md` carries both transcripts.
 
 The one sentence that decides the design: **a guard that lives only in the branch it protects is not a guard.**
@@ -69,7 +69,7 @@ That is now true of every job but this one.
 
 ### A manifest of behaviours checked against the built binary
 
-Heavier, and it catches more: a manifest of commands and expected output, run against `dist/treadle.js`, would have caught the `ac 0/1` regression directly rather than through the test that covered it.
+Heavier, and it catches more: a manifest of commands and expected output, run against `dist/treadling.js`, would have caught the `ac 0/1` regression directly rather than through the test that covered it.
 It catches the revert that keeps a test's title and guts its body, which the chosen mechanism does not see at all.
 
 Rejected on the maintenance ratio.

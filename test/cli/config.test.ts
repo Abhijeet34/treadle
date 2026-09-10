@@ -20,7 +20,7 @@ type Rig = { readonly root: string; readonly dispose: () => Promise<void> }
 
 /** An empty workspace, so each suite writes exactly the records its own claim needs. */
 async function aWorkspace(): Promise<Rig> {
-  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-config-'))
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadling-config-'))
   const root = path.join(parent, '.work')
   const made = await runCli(['init', '--name', 'config probe', '--workspace', root])
   assert.equal(made.code, 0, made.err)
@@ -94,7 +94,7 @@ describe('G3 is armed by the configured column limit', () => {
     assert.equal(sixth.code, 3, `the sixth start should be refused: ${sixth.out}`)
     assert.match(sixth.err, /^guard G3$/m)
     assert.match(sixth.err, /^"cause the in_progress column is at its limit of 5$/m)
-    assert.match(sixth.err, /^fix treadle transition task-6 in_progress --override G3 --reason "<why>"$/m)
+    assert.match(sixth.err, /^fix treadling transition task-6 in_progress --override G3 --reason "<why>"$/m)
 
     // `doctor` reports the column that is already over, and says so without exiting on it:
     // a threshold a team set is not a store that hides a record.
@@ -151,7 +151,7 @@ describe('an invalid gate is refused before the write and reported after a hand 
     const listed = await cli(['backlog'])
     assert.equal(listed.code, 7, `a read over an unloadable gate is refused: ${listed.out}`)
     assert.match(listed.err, /^rule H14$/m)
-    assert.match(listed.err, /^fix treadle doctor$/m)
+    assert.match(listed.err, /^fix treadling doctor$/m)
   })
 })
 
@@ -279,7 +279,7 @@ describe('a workspace record the grammar quarantines names the line to edit', ()
   after(async () => { await rig.dispose() })
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: rig.root })
 
-  it('does not offer treadle init, which answers already and fixes nothing', async () => {
+  it('does not offer treadling init, which answers already and fixes nothing', async () => {
     const file = path.join(rig.root, 'workspace.md')
     await writeFile(file, `${await readFile(file, 'utf8')}\n## Ready gate\n\nR1 all field_present:title A title\n\n## Ready gate\n\nR2 all no_active_blocker Nothing blocks it\n`, 'utf8')
 
@@ -287,7 +287,7 @@ describe('a workspace record the grammar quarantines names the line to edit', ()
       const run = await cli(argv)
       assert.equal(run.code, 6, `${argv[0]}: ${run.out}`)
       assert.match(run.err, /^"cause workspace\.md holds one record, at line \d+, and does not serve it: line \d+: the section Ready gate appears twice/m)
-      assert.equal(run.err.includes('treadle init'), false, `${argv[0]} offered init, which answers already over a workspace that exists`)
+      assert.equal(run.err.includes('treadling init'), false, `${argv[0]} offered init, which answers already over a workspace that exists`)
     }
   })
 })

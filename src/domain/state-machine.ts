@@ -229,13 +229,13 @@ export function nextTowardDone(state: WorkItemState, reviewStep: boolean): WorkI
 
 /** The one command that moves a blocker or an open child a step toward done. */
 export function advance(item: GateItem): string {
-  return `treadle transition ${item.id} ${nextTowardDone(item.state, item.reviewStep) ?? 'done'}`
+  return `treadling transition ${item.id} ${nextTowardDone(item.state, item.reviewStep) ?? 'done'}`
 }
 
 /** The override line for one of the three guards that yield to one, with what the edge records. */
 export function overrideCommand(id: ItemId, to: WorkItemState, guard: GuardId, resolution: Resolution | undefined): string {
   const recorded = resolution === undefined ? '' : ` --resolution ${resolution}`
-  return `treadle transition ${id} ${to}${recorded} --override ${guard} --reason "<why>"`
+  return `treadling transition ${id} ${to}${recorded} --override ${guard} --reason "<why>"`
 }
 
 function refuse(error: DomainError, guards: readonly GuardResult[] = []): TransitionOutcome {
@@ -266,7 +266,7 @@ function evaluateGuard(
       ? { guard, pass: false, reason, remedy }
       : { guard, pass: false, reason, remedy, observed })
   const gateRemedy = (verdict: GateVerdict): string =>
-    verdict.rules.find((rule) => !rule.pass && rule.remedy !== undefined)?.remedy ?? `treadle explain ${item.id}`
+    verdict.rules.find((rule) => !rule.pass && rule.remedy !== undefined)?.remedy ?? `treadling explain ${item.id}`
 
   switch (guard) {
     case 'G1': {
@@ -292,8 +292,8 @@ function evaluateGuard(
       const wantsReview = spec.name === 'submit'
       if (wantsReview === context.reviewStep) return pass(context.reviewStep ? 'review' : 'no-review')
       return context.reviewStep
-        ? no(`${withArticle(item.type)} has a review step, so in_progress exits through in_review`, `treadle transition ${item.id} in_review`)
-        : no(`${withArticle(item.type)} has no review step, so in_progress exits through done`, `treadle transition ${item.id} done`)
+        ? no(`${withArticle(item.type)} has a review step, so in_progress exits through in_review`, `treadling transition ${item.id} in_review`)
+        : no(`${withArticle(item.type)} has no review step, so in_progress exits through done`, `treadling transition ${item.id} done`)
     }
     case 'G6': {
       const failed = context.doneGate.rules.filter((r) => !r.pass).map((r) => r.rule)

@@ -140,7 +140,7 @@ describe('no command runs a program or evaluates a string', () => {
     demo = await aDemoWorkspace()
     cwd = path.dirname(demo.root)
     await demo.store.close()
-    elsewhere = await mkdtemp(path.join(tmpdir(), 'treadle-no-exec-'))
+    elsewhere = await mkdtemp(path.join(tmpdir(), 'treadling-no-exec-'))
   })
 
   after(async () => {

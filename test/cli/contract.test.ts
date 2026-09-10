@@ -127,7 +127,7 @@ describe('streams and renderings, end to end', () => {
     const terminal = await runCli(['show', 'auth-refresh'], { cwd, isTTY: true })
     assert.match(terminal.out, /^show {2}acme-platform/)
     const withEnv = await runCli(['show', 'auth-refresh'], {
-      cwd, isTTY: false, env: { TREADLE_OUT: 'human', WMX_OUT: 'human', NO_COLOR: '1' },
+      cwd, isTTY: false, env: { TREADLING_OUT: 'human', WMX_OUT: 'human', NO_COLOR: '1' },
     })
     assert.equal(withEnv.out, piped.out, 'an environment variable moved the rendering')
   })
@@ -151,7 +151,7 @@ describe('streams and renderings, end to end', () => {
     const run = await runCli(['backlog'], { cwd: path.dirname(path.dirname(cwd)) })
     assert.equal(run.code, 6)
     assert.match(run.err, /^err STORE_UNAVAILABLE -\n/)
-    assert.match(run.err, /^fix treadle init$/m)
+    assert.match(run.err, /^fix treadling init$/m)
   })
 
   it('under --quiet keeps the records and drops everything around them', async () => {
@@ -172,8 +172,8 @@ describe('streams and renderings, end to end', () => {
 
   it('pages a ranked list with --cursor, which is what makes --limit honest there', async () => {
     const first = await runCli(['next', '--limit', '2'], { cwd })
-    assert.match(first.out, /^page treadle next --limit 2 --cursor (\S+)$/m, 'the page line carries the limit it was asked with')
-    const cursor = /^page treadle next --limit 2 --cursor (\S+)$/m.exec(first.out)?.[1] as string
+    assert.match(first.out, /^page treadling next --limit 2 --cursor (\S+)$/m, 'the page line carries the limit it was asked with')
+    const cursor = /^page treadling next --limit 2 --cursor (\S+)$/m.exec(first.out)?.[1] as string
     const second = await runCli(['next', '--limit', '2', '--cursor', cursor], { cwd })
     assert.match(second.out, new RegExp(`^${cursor} `, 'm'))
     // The first row is the line after the column header, found rather than counted: the

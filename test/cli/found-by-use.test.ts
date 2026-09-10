@@ -33,7 +33,7 @@ describe('the defects found by using the tool', () => {
       assert.equal(refusal.out, '')
       assert.match(refusal.err, /^err NOT_FOUND /)
       assert.match(refusal.err, /"cause no-such-item is in no record here/)
-      assert.match(refusal.err, /^fix treadle backlog$/m, 'the remediation is part of the error object')
+      assert.match(refusal.err, /^fix treadling backlog$/m, 'the remediation is part of the error object')
     })
 
     it('still drops the envelope and the scalars on a success', async () => {
@@ -253,8 +253,8 @@ describe('a gate that demands a field names a command that can set it', () => {
     const why = await cli(['explain', 'checkout-500'])
     const remedies = why.out.split('\n').filter((line) => line.startsWith('ready DOR'))
     assert.deepEqual(remedies, [
-      'ready DOR6 fail treadle set checkout-500 expected=<value>',
-      'ready DOR7 fail treadle set checkout-500 actual=<value>',
+      'ready DOR6 fail treadling set checkout-500 expected=<value>',
+      'ready DOR7 fail treadling set checkout-500 actual=<value>',
     ])
 
     const set = await cli(['set', 'checkout-500', 'expected=both orders are listed', 'actual=one is charged'])
@@ -270,8 +270,8 @@ describe('a gate that demands a field names a command that can set it', () => {
   it('keeps severity with mark, and says so rather than writing it', async () => {
     const refused = await cli(['set', 'checkout-500', 'severity=S1'])
     assert.equal(refused.code, 2, refused.out)
-    assert.match(refused.err, /^"cause severity is not set here; treadle mark checkout-500 --severity/m)
-    assert.match(refused.err, /^fix treadle mark checkout-500 --severity/m)
+    assert.match(refused.err, /^"cause severity is not set here; treadling mark checkout-500 --severity/m)
+    assert.match(refused.err, /^fix treadling mark checkout-500 --severity/m)
   })
 
   it('records the change in the log, with prose recorded as its length', async () => {
@@ -362,7 +362,7 @@ describe('S3: a duplicate id refuses every answer rather than serving the first 
     const shard = path.join(demo.root, 'items', '2026-09.md')
     const refused = await cli(['transition', 'i18n-dates', 'ready'])
     assert.equal(refused.code, 7, refused.out)
-    assert.match(refused.err, /^fix treadle doctor$/m)
+    assert.match(refused.err, /^fix treadling doctor$/m)
 
     const text = await readFile(shard, 'utf8')
     assert.ok(text.endsWith(copy), 'the fixture no longer ends with the copy this case removes')
@@ -395,7 +395,7 @@ describe('a refusal about a flag is written by the tool, not by its argument par
     ['a value that starts with a dash', ['backlog', '--limit', '-x'], /^"cause --limit needs a value, and one starting with a dash is written --limit=-x$/m],
     // The first pass is not strict and there is no command word to trigger the second, so
     // this line used to run the default command with the flag silently dropped.
-    ['an unknown flag with no command word', ['--nope'], /^"cause --nope is not a flag of treadle$/m],
+    ['an unknown flag with no command word', ['--nope'], /^"cause --nope is not a flag of treadling$/m],
   ]
 
   for (const [what, argv, cause] of lines) {
@@ -404,7 +404,7 @@ describe('a refusal about a flag is written by the tool, not by its argument par
       assert.equal(refused.code, 2, `${refused.out}${refused.err}`)
       assert.match(refused.err, cause)
       assert.doesNotMatch(refused.err, PARSER_PROSE, 'no third-party message reaches the surface')
-      assert.match(refused.err, /^fix treadle help( \w+)?$/m, 'the remedy is the command that prints the flags')
+      assert.match(refused.err, /^fix treadling help( \w+)?$/m, 'the remedy is the command that prints the flags')
       // A `cause` is a marked scalar; the parser's three-line message arrived as a counted
       // block instead, which is a different line kind for the same key.
       assert.doesNotMatch(refused.err, /^\|cause /m)
@@ -568,14 +568,14 @@ describe('the defects a caller found on its first walk through the tool', () => 
 
   it('names --cursor in the help of every command that prints a --cursor line', async () => {
     const index = await cli(['help'])
-    assert.match(index.out, /^--cursor pageable /m, 'treadle help does not name --cursor')
+    assert.match(index.out, /^--cursor pageable /m, 'treadling help does not name --cursor')
     for (const command of ['backlog', 'next', 'history']) {
       const help = await cli(['help', command])
       assert.equal(help.code, 0, help.err)
       // The page names it in its own usage, and does not repeat the index's row for it: a
       // pageable command supports `--cursor`, which is what the absence of a row means.
-      assert.match(help.out, /--cursor </, `treadle help ${command} has no usage line for --cursor`)
-      assert.doesNotMatch(help.out, /^--cursor /m, `treadle help ${command} repeats a flag it supports`)
+      assert.match(help.out, /--cursor </, `treadling help ${command} has no usage line for --cursor`)
+      assert.doesNotMatch(help.out, /^--cursor /m, `treadling help ${command} repeats a flag it supports`)
     }
   })
 
@@ -585,7 +585,7 @@ describe('the defects a caller found on its first walk through the tool', () => 
     const refused = await cli(['show', 'csv-export', '--cursor', 'anything'])
     assert.equal(refused.code, 2)
     assert.match(refused.err, /--cursor cannot apply to show/)
-    assert.match(refused.err, /^fix treadle help show$/m)
+    assert.match(refused.err, /^fix treadling help show$/m)
   })
 })
 
@@ -640,7 +640,7 @@ describe('what the tool says about itself', () => {
     // `epic` left the set when the epic lost its review step, which is why this reads two.
     const help = await cli(['help', 'transition'])
     assert.equal(help.code, 0, help.err)
-    assert.match(help.out, /^example treadle transition .*a story and a bug have a review step/m)
+    assert.match(help.out, /^example treadling transition .*a story and a bug have a review step/m)
   })
 
   it('declares a NOT_FOUND from a mutating command a mutation, not a read', async () => {
@@ -695,7 +695,7 @@ describe('help names every flag the parser accepts', () => {
     assert.equal(index.code, 0, index.err)
     const missing: string[] = []
     for (const flag of Object.keys(GLOBAL_OPTIONS)) {
-      if (!new RegExp(`^--${flag} \\S+ `, 'm').test(index.out)) missing.push(`treadle help --${flag}`)
+      if (!new RegExp(`^--${flag} \\S+ `, 'm').test(index.out)) missing.push(`treadling help --${flag}`)
     }
     for (const command of COMMANDS) {
       const help = await cli(['help', command.name])
@@ -723,7 +723,7 @@ describe('help names every flag the parser accepts', () => {
       const refused = await cli(['status', flag])
       assert.equal(refused.code, 2, refused.out)
       assert.match(refused.err, new RegExp(`${flag} is not a flag of status`))
-      assert.match(refused.err, /^fix treadle help status$/m)
+      assert.match(refused.err, /^fix treadling help status$/m)
     }
   })
 

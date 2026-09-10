@@ -24,13 +24,13 @@ import { describe, it, before, after } from 'node:test'
 import { MAX_LINE, MAX_REASON } from '../../src/domain/index.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-first-run-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-first-run-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   const init = await cli(['init'])
   assert.equal(init.code, 0, init.err)
@@ -299,7 +299,7 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     const unconfirmed = await cli(['remove', 'login-cta-2', '--reason', 'filed twice'])
     assert.equal(unconfirmed.code, 2)
     assert.match(unconfirmed.err, /takes the record out of .* and no command puts it back/)
-    assert.match(unconfirmed.err, /^fix treadle remove login-cta-2 --reason "<why>" --yes$/m)
+    assert.match(unconfirmed.err, /^fix treadling remove login-cta-2 --reason "<why>" --yes$/m)
     must(await cli(['show', 'login-cta-2']), 'the record is still there')
   })
 
@@ -357,7 +357,7 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     assert.equal(refused.code, 3)
     assert.match(refused.err, /^rule R6$/m)
     assert.match(refused.err, /^"cause a-blocker blocks login-cta, and removing login-cta would leave that edge naming no record$/m)
-    assert.match(refused.err, /^fix treadle relation remove a-blocker blocks login-cta$/m)
+    assert.match(refused.err, /^fix treadling relation remove a-blocker blocks login-cta$/m)
   })
 
   it('takes it once the edge is gone, which is what the refusal offered', async () => {
@@ -372,7 +372,7 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     assert.equal(refused.code, 3)
     assert.match(refused.err, /^rule R6$/m)
     assert.match(refused.err, /^"cause a-child has an-epic as its parent, and removing an-epic would leave that record naming no parent$/m)
-    assert.match(refused.err, /^fix treadle set a-child parent_id=$/m)
+    assert.match(refused.err, /^fix treadling set a-child parent_id=$/m)
   })
 
   it('says what stopped being blocked, rather than changing it in silence', async () => {
@@ -416,14 +416,14 @@ describe('STR-6: a mis-filed record is removed and its trail is not', () => {
     const both = await cli(['remove', 'one-of-two', 'two-of-two', '--reason', 'both', '--yes'])
     assert.equal(both.code, 2)
     assert.match(both.err, /^"cause remove takes one id and this line names 2; a removal is confirmed one record at a time$/m)
-    assert.match(both.err, /^fix treadle remove <id> --reason "<why>" --yes$/m)
+    assert.match(both.err, /^fix treadling remove <id> --reason "<why>" --yes$/m)
     must(await cli(['show', 'one-of-two']), 'the first record is still there')
     must(await cli(['show', 'two-of-two']), 'and so is the second')
   })
 
   it('names the command, its flags and the transition it is not, in help', async () => {
     const help = must(await cli(['help', 'remove']), 'help remove')
-    assert.match(help.out, /treadle remove <id> --reason <text> --yes/)
+    assert.match(help.out, /treadling remove <id> --reason <text> --yes/)
     assert.match(help.out, /work that really stopped is transition <id> cancelled instead, which keeps the record/)
   })
 

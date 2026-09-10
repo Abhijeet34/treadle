@@ -66,7 +66,7 @@ const SPECIFIC_NOTE: Readonly<Record<string, string>> = {
  * caller meets, and `src/application/services/doctor.ts` argues it beside the audit that
  * notices a record disagreeing with the log that recorded it.
  */
-const ATTRIBUTION = 'the actor on an event is declared by whoever ran the command and recorded as given: treadle verifies no identity, and the signed commit carrying the file is what proves who wrote it'
+const ATTRIBUTION = 'the actor on an event is declared by whoever ran the command and recorded as given: treadling verifies no identity, and the signed commit carrying the file is what proves who wrote it'
 
 const VERDICT_RULE = 'a command page grades a flag S supported, A accepted and ignored, N another scope, X refused; the rule that decides A from X is that a flag which only presents is ignored where it cannot apply, and one whose absence would change the answer is refused there'
 
@@ -74,7 +74,7 @@ const FLAG_RULE = `a command page names only the flags it grades other than S, a
 
 /** Counted, because a page that prints a subset has to say how big the subset is not. */
 function pageRule(shown: number): string {
-  return `the other ${GLOBAL_FLAGS.length - shown} global flags apply here as treadle help describes them`
+  return `the other ${GLOBAL_FLAGS.length - shown} global flags apply here as treadling help describes them`
 }
 
 function noteFor(flag: GlobalFlag, verdict: string): string {
@@ -186,11 +186,11 @@ export function topLevelHelp(workspace: string): ResultObject {
   return okResult(HELP_SHAPE, {
     workspace,
     data: {
-      topic: 'treadle',
+      topic: 'treadling',
       usage: [
-        'treadle',
-        'treadle <command> [args]',
-        'treadle help <command>',
+        'treadling',
+        'treadling <command> [args]',
+        'treadling help <command>',
       ],
       // The README's own first line, and package.json's description. It read "Agile work
       // management" while README.md:9 says "It is not a Rally and not a Kanban board" and

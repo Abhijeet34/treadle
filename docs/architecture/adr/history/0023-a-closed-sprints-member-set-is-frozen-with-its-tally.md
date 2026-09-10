@@ -15,11 +15,11 @@ The fifth adversarial round measured what that leaves.
 Then two legal moves, each of which a team makes without thinking:
 
 ```text
-$ treadle transition gamma-task draft --reason "back on"   # revive the cancelled member
-$ treadle sprint commit sp2 gamma-task
-$ treadle transition alpha-task in_progress --reason regressed   # reopen the done member
-$ treadle sprint commit sp2 alpha-task
-$ treadle sprints sp1
+$ treadling transition gamma-task draft --reason "back on"   # revive the cancelled member
+$ treadling sprint commit sp2 gamma-task
+$ treadling transition alpha-task in_progress --reason regressed   # reopen the done member
+$ treadling sprint commit sp2 alpha-task
+$ treadling sprints sp1
 committed 4
 done 1
 cancelled 1
@@ -67,7 +67,7 @@ Reading that absence as "an older build closed this, count live" let a hand edit
 A record with no `points` reads live, which is what it always did.
 
 `sprints <id>` prints `members`, the two stored lists as the one set they record, so a reader can see what the four numbers describe.
-`backlog --sprint` filters on the item's current `sprint_id` and `board --sprint` shows the live state of what still points at the sprint; for a closed sprint each now prints a `note` saying so and naming `treadle sprints <id>` as the record.
+`backlog --sprint` filters on the item's current `sprint_id` and `board --sprint` shows the live state of what still points at the sprint; for a closed sprint each now prints a `note` saying so and naming `treadling sprints <id>` as the record.
 Three commands answer three different questions about one sprint, and each says which.
 
 The close event carries the whole frozen record on both sides, so a reading of the log alone recovers the tally.
@@ -117,7 +117,7 @@ Every `set` list is marked, because `set <field> <before> -> <after>` ends in a 
 
 ### Carried plus pointing, or pointing only, as a closed sprint's set
 
-Both were rejected because each revokes something treadle has already published.
+Both were rejected because each revokes something treadling has already published.
 `I2`'s own refusal text and ADR-0022's title both say the committed set is a record; neither alternative can be true at the same time as that sentence.
 The velocity figure a team reads at a retrospective is the artefact, and one that moves afterwards is worse than none, because it is read as history.
 

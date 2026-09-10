@@ -38,8 +38,8 @@ type Work = {
 
 /** A real workspace on disk, made by `init`, because a hand edit is what these tests apply. */
 async function aWorkspace(): Promise<Work> {
-  const cwd = await mkdtemp(path.join(tmpdir(), 'treadle-blind-'))
-  const run = (argv: readonly string[]) => runCli(argv, { cwd, env: { TREADLE_ACTOR: 'alice' } })
+  const cwd = await mkdtemp(path.join(tmpdir(), 'treadling-blind-'))
+  const run = (argv: readonly string[]) => runCli(argv, { cwd, env: { TREADLING_ACTOR: 'alice' } })
   const started = await run(['init'])
   assert.equal(started.code, 0, started.err)
   const file = path.join(cwd, '.work', 'items', '2026-09.md')
@@ -298,7 +298,7 @@ describe('H34: a done record whose whole log names one actor', () => {
       assert.equal((await work.run(
         ['config', 'set', 'review_step', 'story, bug, epic, task'])).code, 0)
       const found = await work.run(['doctor'])
-      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ship-it$/m)
+      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadling history ship-it$/m)
     } finally {
       await work.dispose()
     }
@@ -324,7 +324,7 @@ describe('H34: a done record whose whole log names one actor', () => {
         'a single actor taking an item the whole way is a shape the write path allows')
 
       const found = await work.run(['doctor'])
-      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ship-it$/m)
+      assert.match(found.out, /^H34 ship-it state alice filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadling history ship-it$/m)
       assert.doesNotMatch(found.out, /^clean /m)
     } finally {
       await work.dispose()
@@ -342,7 +342,7 @@ describe('H34: a done record whose whole log names one actor', () => {
       }
       assert.equal((await work.run(
         ['evidence', 'add', 'ship-it', 'url', 'https://example.invalid/pr/1', 'the pr'])).code, 0)
-      const accepted = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLE_ACTOR: 'bob' } })
+      const accepted = await runCli(['transition', 'ship-it', 'done'], { cwd: work.cwd, env: { TREADLING_ACTOR: 'bob' } })
       assert.equal(accepted.code, 0, accepted.err)
 
       const found = await work.run(['doctor'])
@@ -382,7 +382,7 @@ describe('H33: a record the log filed, nothing removed, and no shard carries', (
 
       // The sentence a reader acts on: a loss and a removal must not read the same.
       const lost = await work.run(['history', 'three-thing'])
-      assert.match(lost.out, /^note no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadle doctor reports it as H33$/m)
+      assert.match(lost.out, /^note no record here carries this id and the log records no removal of it, so the record left the store outside the tool; these are the events it earned, and treadling doctor reports it as H33$/m)
       const removed = await work.run(['history', 'one-thing'])
       assert.match(removed.out, /^note this record was removed; the log keeps every event it earned while it was here$/m)
     } finally {

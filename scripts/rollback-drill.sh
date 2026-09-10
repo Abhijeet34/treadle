@@ -13,13 +13,13 @@
 set -eu
 
 SOURCE=$(cd "$(dirname "$0")/.." && pwd)
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/treadle-rollback-drill.XXXXXX")
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/treadling-rollback-drill.XXXXXX")
 cleanup() {
   [ -n "${WORK:-}" ] && [ -d "$WORK" ] && rm -rf "$WORK"
 }
 trap cleanup EXIT
 
-CLONE="$WORK/treadle"
+CLONE="$WORK/treadling"
 # --no-tags because the drill creates `v<the tree's version>` and the source now carries a real
 # release tag of that name: without it the first scenario died at `tag 'v0.1.0' already exists`,
 # which is a drill that stops working the moment the thing it rehearses happens once.
@@ -99,10 +99,10 @@ git checkout --quiet drill-main
 check "a tag on a commit that never reached the released branch" "not on the released branch" \
   --tag v8.8.8 --commit "$SIDELINE" --branch origin/main
 
-mv dist/treadle.js "$WORK/treadle.js"
+mv dist/treadling.js "$WORK/treadling.js"
 check "a release with no bundle built" "does not exist" \
   --tag "v$VERSION" --commit "$RELEASED" --branch origin/main
-mv "$WORK/treadle.js" dist/treadle.js
+mv "$WORK/treadling.js" dist/treadling.js
 
 echo
 echo "== the publish refusals, each on a manifest broken to make it fire"
@@ -146,7 +146,7 @@ publishes "publishing with no files allowlist, which would ship the whole tree" 
 publishes "publishing with no repository, which npm rejects after the tag is cut" "provenance" \
   'delete m.repository'
 publishes "publishing a bin that points outside the bundle" "must point into the bundle" \
-  'm.bin = { treadle: "bin/treadle.js" }'
+  'm.bin = { treadling: "bin/treadling.js" }'
 
 # The other half of the same truth, and the reason the release says so on its own page: nothing
 # in this gate stops publication any more. NPM_PUBLISH_ENABLED and the npm-publish environment

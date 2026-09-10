@@ -2,7 +2,7 @@
 // Threat-model finding F11: interface A.8 rule 3 has an agent adapter "generated ... written
 // where the caller asks", with no diff, backup, idempotence or reversibility contract.
 //
-// Establish the surface before securing it. treadle generates no adapter, no completion and
+// Establish the surface before securing it. treadling generates no adapter, no completion and
 // no man page: the thirteen commands in the inventory are the whole surface, and every module
 // that can write a byte is the store or the workspace it was pointed at. So F11 closes for the
 // same reason F1 does, by having nothing to attack, and this file is the tripwire that fires

@@ -77,7 +77,7 @@ export type Demo = {
 }
 
 export async function aDemoWorkspace(): Promise<Demo> {
-  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-cli-'))
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadling-cli-'))
   const root = path.join(parent, 'platform', '.work')
   const ids = sequentialIds()
   await initWorkspace(fixedClock('2026-08-01T09:00:00Z'), ids, { at: root, name: 'acme-platform', actor: ACTOR })

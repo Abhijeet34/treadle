@@ -220,8 +220,8 @@ const NEGATIVE_NUMBER = /^-[0-9]/
 function flagFault(
   argv: readonly string[], options: OptionConfig, command: string | undefined,
 ): ParseFailure | undefined {
-  const scope = command ?? 'treadle'
-  const fix = [command === undefined ? 'treadle help' : `treadle help ${command}`]
+  const scope = command ?? 'treadling'
+  const fix = [command === undefined ? 'treadling help' : `treadling help ${command}`]
   for (const token of flagTokens(argv, options)) {
     const config = options[token.name] as { type?: string } | undefined
     if (config === undefined) {
@@ -292,7 +292,7 @@ function repeatRefusal(
       return {
         ok: false,
         cause: `${token.raw} takes one value and this line writes it more than once; the last would silently replace the first`,
-        fix: [command === undefined ? 'treadle help' : `treadle help ${command}`],
+        fix: [command === undefined ? 'treadling help' : `treadling help ${command}`],
       }
     }
     seen.add(token.name)
@@ -304,11 +304,11 @@ function repeatRefusal(
 function flagRefusal(
   argv: readonly string[], options: OptionConfig, command: string | undefined,
 ): ParseFailure {
-  const scope = command ?? 'treadle'
+  const scope = command ?? 'treadling'
   return flagFault(argv, options, command) ?? {
     ok: false,
     cause: `${scope} cannot read the flags on this line`,
-    fix: [command === undefined ? 'treadle help' : `treadle help ${command}`],
+    fix: [command === undefined ? 'treadling help' : `treadling help ${command}`],
   }
 }
 
@@ -344,7 +344,7 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
   if (command === undefined) {
     // The first pass is not strict, so it accepts an unknown flag rather than throwing, and
     // with no command word there is no second pass to catch it. Without this the invariant
-    // at the top of the file held for every line but the shortest one: `treadle --nope` ran
+    // at the top of the file held for every line but the shortest one: `treadling --nope` ran
     // the default command and said nothing about the flag it dropped.
     const fault = flagFault(argv, GLOBAL_OPTIONS, undefined) ?? repeatRefusal(argv, GLOBAL_OPTIONS, undefined)
     if (fault !== undefined) return fault
@@ -360,8 +360,8 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
   if (known === undefined) {
     return {
       ok: false,
-      cause: `${command} is not a treadle command`,
-      fix: ['treadle help'],
+      cause: `${command} is not a treadling command`,
+      fix: ['treadling help'],
     }
   }
 
@@ -391,7 +391,7 @@ export function parse(argv: readonly string[]): ParseSuccess | ParseFailure {
       cause: verdict === 'N'
         ? `${refused} belongs to another scope and ${command} does not take it`
         : `${refused} cannot apply to ${command}, and ignoring it would answer a question you did not ask`,
-      fix: [`treadle help ${command}`],
+      fix: [`treadling help ${command}`],
     }
   }
 

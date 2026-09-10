@@ -165,7 +165,7 @@ function run(check: GateCheck, context: GateContext): Outcome {
       // rule fails again on what is left, which is `set`'s and groups into one line.
       const first = missing[0] as string
       return missing.every((f) => writerOf(f).kind === 'set')
-        ? no(reason, `treadle set ${item.id} ${missing.map((f) => `${f}=${placeholderOf(f)}`).join(' ')}`)
+        ? no(reason, `treadling set ${item.id} ${missing.map((f) => `${f}=${placeholderOf(f)}`).join(' ')}`)
         : no(reason, writeCommand(first, item.id, placeholderOf(first)))
     }
     case 'no_active_blocker': {
@@ -185,7 +185,7 @@ function run(check: GateCheck, context: GateContext): Outcome {
         ? PASS
         : no(
           `the item has no ${wanted ?? 'child'} child`,
-          `treadle file ${wanted ?? '<type>'} "<title>" --set parent_id=${item.id}`,
+          `treadling file ${wanted ?? '<type>'} "<title>" --set parent_id=${item.id}`,
         )
     }
     case 'no_open_child': {
@@ -220,14 +220,14 @@ function run(check: GateCheck, context: GateContext): Outcome {
       if (isTerminal(item.state)) return PASS
       return (item.relations ?? []).some((relation) => relation.kind === 'blocks')
         ? PASS
-        : no('it holds nothing up', `treadle relation add ${item.id} blocks <id>`)
+        : no('it holds nothing up', `treadling relation add ${item.id} blocks <id>`)
     case 'not_a_duplicate': {
       const original = context.duplicateOf
       return original === undefined || isTerminal(item.state)
         ? PASS
         : no(
           `it duplicates ${original.id}, and a copy is not separate work`,
-          `treadle transition ${item.id} cancelled --resolution duplicate --reason "<why>"`,
+          `treadling transition ${item.id} cancelled --resolution duplicate --reason "<why>"`,
         )
     }
     // One promise, on the record's own two fields: the work was reviewed by somebody other
@@ -252,7 +252,7 @@ function run(check: GateCheck, context: GateContext): Outcome {
         ? PASS
         : no(
           'the item points at no evidence',
-          `treadle evidence add ${item.id} <kind> <ref> [label]`,
+          `treadling evidence add ${item.id} <kind> <ref> [label]`,
         )
     }
   }

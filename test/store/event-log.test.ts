@@ -145,7 +145,7 @@ describe('the store serves a log line back whole', () => {
         id: 'ev-whole', entity: 'item-one', op: 'transition',
         before: { state: 'draft' }, after: { state: 'ready' },
         guards: ['G1', 'G2'], reason: 'ready for pickup', outcome: 'accepted',
-        cmd: 'treadle transition item-one ready',
+        cmd: 'treadling transition item-one ready',
       })
       await workspace.store.apply({ txn: 't1', writes: [{ item: anItem({ id: 'item-one' }) }], events: [event] })
 

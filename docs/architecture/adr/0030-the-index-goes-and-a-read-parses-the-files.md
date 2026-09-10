@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-08
-**Implements:** the captain's decision `replace-the-index-with-a-plain-read`, on the measurement in `treadle-apparatus-weight-audit-w4`
+**Implements:** the captain's decision `replace-the-index-with-a-plain-read`, on the measurement in `treadling-apparatus-weight-audit-w4`
 **Supersedes:** [ADR-0020](history/0020-a-finding-is-decided-by-a-whole-read.md), whose whole subject is a partial re-index of a file
 **Overtakes in part:** [ADR-0002](0002-storage-layout.md)'s derived index, [ADR-0014](0014-the-view-is-a-projection.md)'s index columns as the place a scan field lives, [ADR-0004](0004-concurrency-and-durability.md)'s index-contention ordering and journal path, [ADR-0006](0006-the-store-seam.md)'s description of `ShardedStore` as reading through the index, and [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md)'s recap of the layout as still carrying one
 
@@ -15,7 +15,7 @@ duplicate through a primary key, `S14` decided a repeated event id through anoth
 `meta` row with a durable dirty marker, and `doctor` opened the store with `rederive` because a
 cache that disagreed with the files had locked a workspace with no printed way back.
 
-The audit `treadle-apparatus-weight-audit-w4` weighed what that bought against what it cost,
+The audit `treadling-apparatus-weight-audit-w4` weighed what that bought against what it cost,
 on the fleet's own backlog of 347 records written through the CLI. A read through the warm
 index cost 24 ms above the bundle floor; parsing all 347 records cost 41 to 49 ms. The index
 bought 20 to 25 ms a read, inside the run-to-run noise of its own p90.
@@ -80,7 +80,7 @@ meaning at every one of them: a workspace with no `items` directory holds no rec
 ## Consequences
 
 Read latency, whole-process wall clock, median and p90 in milliseconds, fifteen cold processes
-per cell on one machine, before and after on the same tree. The floor, `treadle version`, is
+per cell on one machine, before and after on the same tree. The floor, `treadling version`, is
 71/72 in every run.
 
 | Read | 347 before | 347 after | 3,000 before | 3,000 after | 10,000 before | 10,000 after |

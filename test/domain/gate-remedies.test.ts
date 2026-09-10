@@ -156,10 +156,10 @@ describe('every remedy a gate can emit names a command that exists', () => {
   for (const { rule, remedy } of remedies) {
     it(`${rule}: ${remedy}`, () => {
       const [tool, name] = remedy.split(' ')
-      assert.equal(tool, 'treadle', `${rule} remedies with prose rather than a command: ${remedy}`)
+      assert.equal(tool, 'treadling', `${rule} remedies with prose rather than a command: ${remedy}`)
       assert.ok(
         COMMANDS.some((command) => command.name === name),
-        `${rule} names ${String(name)}, which is not a treadle command: ${remedy}`,
+        `${rule} names ${String(name)}, which is not a treadling command: ${remedy}`,
       )
       const command = COMMANDS.find((entry) => entry.name === name)
       assert.equal(command?.effect, 'mutate', `${rule} remedies with a read: ${remedy}`)

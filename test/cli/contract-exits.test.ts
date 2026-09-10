@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // `--contract` hands a stranger the machine interface, so it carries the exit table.
 //
-// Measured on 2026-09-07: `treadle --contract` printed the line grammar and its eight line
+// Measured on 2026-09-07: `treadling --contract` printed the line grammar and its eight line
 // kinds and named no exit status at all, and neither did `help`, `help help` or `version`.
 // The statuses are real and load-bearing, and they were documented only in
 // docs/architecture/adr/0005-output-and-exit-code-contract.md, which an agent driving the

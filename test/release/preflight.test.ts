@@ -20,8 +20,8 @@ const GOOD_MANIFEST: Manifest = {
   private: false,
   license: 'Apache-2.0',
   files: ['dist/', 'schemas/'],
-  bin: { treadle: 'dist/treadle.js' },
-  repository: { url: 'git+https://github.com/Abhijeet34/treadle.git' },
+  bin: { treadling: 'dist/treadling.js' },
+  repository: { url: 'git+https://github.com/Abhijeet34/treadling.git' },
 }
 
 function run(overrides: {
@@ -76,14 +76,14 @@ describe('the release preflight', () => {
   })
 
   it('refuses a release with no bundle built', () => {
-    assert.match(run({ bundleBytes: undefined }).join('\n'), /dist\/treadle\.js does not exist/)
+    assert.match(run({ bundleBytes: undefined }).join('\n'), /dist\/treadling\.js does not exist/)
   })
 
   it('refuses a bundle over the DR1 budget', () => {
     assert.match(run({ bundleBytes: 512001 }).join('\n'), /over DR1's 512000/)
   })
 
-  // Found by truncating dist/treadle.js to 200 bytes and touching it: every other clause
+  // Found by truncating dist/treadling.js to 200 bytes and touching it: every other clause
   // passed, because an mtime says when a file was written and not that a build wrote it.
   it('refuses a bundle far under the budget, which is a partial write and not a build', () => {
     assert.match(run({ bundleBytes: 200 }).join('\n'), /partial write rather than a build/)
@@ -122,7 +122,7 @@ describe('the release preflight', () => {
   })
 
   it('refuses to publish a bin that points anywhere but the bundle', () => {
-    const problems = run({ manifest: { bin: { treadle: 'bin/treadle.js' } }, publishing: true })
+    const problems = run({ manifest: { bin: { treadling: 'bin/treadling.js' } }, publishing: true })
     assert.match(problems.join('\n'), /must point into the bundle/)
   })
 

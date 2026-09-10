@@ -31,7 +31,7 @@ import { openWorkspace } from '../../src/adapters/store/index.ts'
 import { aDemoWorkspace, type Demo } from '../helpers/cli-fixtures.ts'
 import { runCli, type Run } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 type Rows = { readonly shown: number; readonly total: number; readonly rows: readonly Record<string, unknown>[] }
 
@@ -50,7 +50,7 @@ describe('history --txn lists every event one command wrote', () => {
   const cli = (argv: readonly string[]): Promise<Run> => runCli(argv, { cwd: root, env: ENV })
 
   before(async () => {
-    root = await mkdtemp(path.join(tmpdir(), 'treadle-txn-'))
+    root = await mkdtemp(path.join(tmpdir(), 'treadling-txn-'))
     const must = async (argv: readonly string[]): Promise<Run> => {
       const run = await cli(argv)
       assert.equal(run.code, 0, `${argv.join(' ')}: ${run.err}`)
@@ -121,8 +121,8 @@ describe('history --txn lists every event one command wrote', () => {
     const run = await cli(['history', 'auth-refresh', '--txn', commit])
     assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
     assert.match(run.err, /ask different questions/, run.err)
-    assert.match(run.err, /^fix treadle history auth-refresh$/m, run.err)
-    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+    assert.match(run.err, /^fix treadling history auth-refresh$/m, run.err)
+    assert.match(run.err, new RegExp(`^fix treadling history --txn ${commit}$`, 'm'), run.err)
   })
 
   it('names both readings when the line names neither', async () => {
@@ -155,13 +155,13 @@ describe('history --txn lists every event one command wrote', () => {
     const run = await cli(['history', '--txn', eventId])
     assert.equal(run.code, EXIT_OF.NOT_FOUND, run.out + run.err)
     assert.match(run.err, /is an event here, not a transaction/, run.err)
-    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+    assert.match(run.err, new RegExp(`^fix treadling history --txn ${commit}$`, 'm'), run.err)
   })
 
   it('refuses an unknown cursor with a first page that keeps the transaction', async () => {
     const run = await cli(['history', '--txn', commit, '--cursor', 'nope'])
     assert.equal(run.code, EXIT_OF.VALIDATION, run.out + run.err)
-    assert.match(run.err, new RegExp(`^fix treadle history --txn ${commit}$`, 'm'), run.err)
+    assert.match(run.err, new RegExp(`^fix treadling history --txn ${commit}$`, 'm'), run.err)
   })
 
   it('carries the transaction through all three renderings', async () => {
@@ -244,7 +244,7 @@ describe('a transaction larger than one page', () => {
     assert.equal(events.total, SIZE)
     assert.equal(first.data['more'], SIZE - PAGE)
     const page = first.data['page'] as string
-    assert.match(page, new RegExp(`^treadle history --txn ${TXN} --limit ${PAGE} --cursor e\\S+$`), page)
+    assert.match(page, new RegExp(`^treadling history --txn ${TXN} --limit ${PAGE} --cursor e\\S+$`), page)
 
     // Walk it to the end by its own cursor lines: every row of the transaction, once.
     const seen: string[] = []

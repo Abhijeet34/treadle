@@ -21,7 +21,7 @@ import { checkRuntime } from '../../src/cli/runtime.ts'
 import { workflowOf, type Job } from '../helpers/workflow.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const BUNDLE = 'dist/treadle.js'
+const BUNDLE = 'dist/treadling.js'
 // Read from the directory, never listed. The list this replaced named five of the seven
 // workflows, so codeql.yml had never been read by the SHA-pinning assertion below and a new
 // workflow escaped both of them by existing.
@@ -120,7 +120,7 @@ describe('F13 control two: the lockfile is committed and is what CI installs', (
 
 describe('the published package is the bundle and nothing else', () => {
   it('bin points at the bundle', () => {
-    assert.deepEqual(manifest.bin, { treadle: BUNDLE })
+    assert.deepEqual(manifest.bin, { treadling: BUNDLE })
   })
 
   it('files ships the bundle and carries no source', () => {

@@ -188,7 +188,7 @@ describe('an evidence ref of a kind with a knowable shape', () => {
 
   it('accepts every form each kind actually takes, scheme case included', () => {
     for (const ref of [
-      '42', '#42', 'acme/treadle#42', 'https://example.test/pr/42', 'http://example.test/pr/42',
+      '42', '#42', 'acme/treadling#42', 'https://example.test/pr/42', 'http://example.test/pr/42',
       // RFC 3986 defines the scheme case-insensitively, so this is a URL and not a typo.
       'HTTPS://EXAMPLE.TEST/pr/42',
     ]) {
@@ -200,7 +200,7 @@ describe('an evidence ref of a kind with a knowable shape', () => {
 
   // No forge issues #0, so a zero is a placeholder or an off-by-one rather than a pointer.
   it('refuses a pr number that no forge issues', () => {
-    for (const ref of ['0', '#0', '042', 'acme/treadle#0']) {
+    for (const ref of ['0', '#0', '042', 'acme/treadling#0']) {
       assert.equal(withEvidence('pr', ref).ok, false, ref)
     }
   })

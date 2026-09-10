@@ -9,7 +9,7 @@
 // calls. The redirect is scoped to that one importer, so every other user of `atomic.ts` -
 // `writeFileAtomic` included - keeps the real one.
 //
-// TREADLE_EPERM says which situation to model:
+// TREADLING_EPERM says which situation to model:
 //   pending:<n>  the lock path answers EPERM for the next <n> creates, the directory
 //                accepts every other name. Windows, a lock file being released.
 //   refusing     every create in the directory answers EPERM. A read-only mount, a denied
@@ -35,7 +35,7 @@ export function resolve(
   return next(specifier, context)
 }
 
-const [situation, budget] = (process.env['TREADLE_EPERM'] ?? '').split(':')
+const [situation, budget] = (process.env['TREADLING_EPERM'] ?? '').split(':')
 let remaining = Number(budget ?? 0)
 
 /** The errno and message Node raises on Windows, verbatim from the transcript. */

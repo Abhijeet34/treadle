@@ -43,7 +43,7 @@ An item write is refused with `S10` when it INTRODUCES a `parent_id` the store d
 That closes C without teaching `set` and `file` a read set they do not have, and it covers the hand-built and `migrate` paths that a service-layer read set would leave open.
 
 "Introduces" is the whole rule, and the first draft did not have it.
-Watching the reference rather than the write that creates one refused every write to a record whose parent had already gone: `treadle set child-task assignee=kim` answered `CONFLICT rule S10` with `fix treadle show parent-story` over a record that is not there, and the remedy `H30` prints is itself a write to that record.
+Watching the reference rather than the write that creates one refused every write to a record whose parent had already gone: `treadling set child-task assignee=kim` answered `CONFLICT rule S10` with `fix treadling show parent-story` over a record that is not there, and the remedy `H30` prints is itself a write to that record.
 So a write whose `parent_id` is what the store already holds for that record passes, exactly as a record carrying an `H24` edge is still writable, and only a new or changed parent is checked.
 The one exception is a transaction that removes the parent itself: an unchanged `parent_id` is refused there, because that transaction is what creates the dangle.
 
@@ -69,7 +69,7 @@ It exists for a column that changes meaning, which would leave rows an older bui
 
 The store now refuses to write one, so this reports what reaches the files by the routes decision D1 permits: a hand edit, a git merge, a build older than this rule, a crash between two writes.
 It runs against the same held-or-served set `H24` and `H26` use, so a child of a quarantined record raises nothing - the record exists, it is simply not served.
-Its detail names the line that clears it, as `H24`'s does: `treadle set <child> parent_id= drops it`.
+Its detail names the line that clears it, as `H24`'s does: `treadling set <child> parent_id= drops it`.
 
 ## Alternatives considered
 

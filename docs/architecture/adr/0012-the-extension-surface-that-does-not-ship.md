@@ -2,7 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-09-05
-**Implements:** section 6 of the `treadle-board-outcomes-retention-b3` audit, and threat-model findings F1, F7 and F11
+**Implements:** section 6 of the `treadling-board-outcomes-retention-b3` audit, and threat-model findings F1, F7 and F11
 **Refuses:** DR6's hook contract, and A.8 rule 3's generated adapter, for v1
 **Overtaken in part by:** [ADR-0029](0029-the-record-is-the-product-and-the-agile-surface-is-not.md) removes `--no-input`, which the consent gate below would have read; the refusal and its argument are unchanged
 **Overtaken in part by:** [ADR-0035](0035-a-verdict-that-records-nothing-and-a-rendering-for-a-person-go.md) cuts the Markdown export, so F4 no longer waits on a layer and closes by absence beside F1, F7 and F11; the consequence below that counts twelve closed findings and names F4 as the one that remains was true on this record's date and is not now
@@ -57,7 +57,7 @@ The backlog story `hooks` is cancelled with the resolution `wont_do`, naming thi
 
 ### No artefact is generated, and F11's contract is kept against the day one is
 
-treadle generates no adapter, no shell completion and no man page, so F11 has no surface and closes on the evidence rather than on a fix.
+treadling generates no adapter, no shell completion and no man page, so F11 has no surface and closes on the evidence rather than on a fix.
 `test/security/f11-adapter-write-safety.test.ts` is the tripwire: it holds the filesystem-writer allowlist and the absence of a generator command, and its failure message carries the contract, so whoever trips it is told the five rules rather than sent looking for them.
 
 When a generator does land, it prints the diff against the current target, takes a moderate confirmation, writes a timestamped backup of anything it replaces, is a no-op with the `already` marker on a re-run against an up-to-date target, and prints the exact command that reverts it.
@@ -93,7 +93,7 @@ Twelve of the thirteen threat-model findings now name a regression test rather t
 F4 is the one that remains, and it waits on export, which is not built.
 
 A future hooks feature is additive under [../../STABILITY.md](../../STABILITY.md): it would produce an exit code nothing produces today and read a configuration key nothing reads today, so no caller's contract moves.
-The gate that would make it safe is specified in section 6 of the `treadle-board-outcomes-retention-b3` audit rather than left to be redesigned.
+The gate that would make it safe is specified in section 6 of the `treadling-board-outcomes-retention-b3` audit rather than left to be redesigned.
 
 ## Departures from the design record
 

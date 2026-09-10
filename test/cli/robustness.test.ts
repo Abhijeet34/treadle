@@ -37,7 +37,7 @@ function assertRefusal(run: { code: number; out: string; err: string }, rule: st
 
 describe('a filesystem that refuses is a refusal, not a stack trace', () => {
   it('init into a path already occupied by a file', async () => {
-    const at = await mkdtemp(path.join(tmpdir(), 'treadle-occupied-'))
+    const at = await mkdtemp(path.join(tmpdir(), 'treadling-occupied-'))
     try {
       await writeFile(path.join(at, '.work'), 'not a directory\n')
       const run = await runCli(['init', '--name', 'acme'], { cwd: at })
@@ -49,7 +49,7 @@ describe('a filesystem that refuses is a refusal, not a stack trace', () => {
   })
 
   it('file into a shard directory whose write bit is off', { skip: POSIX_MODES }, async () => {
-    const at = await mkdtemp(path.join(tmpdir(), 'treadle-readonly-'))
+    const at = await mkdtemp(path.join(tmpdir(), 'treadling-readonly-'))
     const items = path.join(at, '.work', 'items')
     try {
       const created = await runCli(['init', '--name', 'readonly'], { cwd: at })
@@ -67,7 +67,7 @@ describe('a filesystem that refuses is a refusal, not a stack trace', () => {
   })
 
   it('leaves the store readable after the refusal', { skip: POSIX_MODES }, async () => {
-    const at = await mkdtemp(path.join(tmpdir(), 'treadle-after-'))
+    const at = await mkdtemp(path.join(tmpdir(), 'treadling-after-'))
     const items = path.join(at, '.work', 'items')
     try {
       await runCli(['init', '--name', 'after'], { cwd: at })

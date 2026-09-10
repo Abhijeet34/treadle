@@ -168,9 +168,9 @@ describe('the guards and the ranking that read blockers', () => {
     assert.equal(line(refused, 'guard'), 'guard G2')
     assert.match(refused.err, /avatar-crop is blocked by webhook-retry/)
     assert.deepEqual(lines(refused).filter((entry) => entry.startsWith('fix ')), [
-      'fix treadle transition webhook-retry in_progress',
-      'fix treadle transition avatar-crop in_progress --override G2 --reason "<why>"',
-      'fix treadle explain avatar-crop',
+      'fix treadling transition webhook-retry in_progress',
+      'fix treadling transition avatar-crop in_progress --override G2 --reason "<why>"',
+      'fix treadling explain avatar-crop',
     ])
     const dry = await cli(['transition', 'avatar-crop', 'in_progress', '--override', 'G2', '--reason', 'the blocker is cosmetic', '--dry-run'])
     assert.equal(dry.code, 0, dry.err)
@@ -230,9 +230,9 @@ describe('a copy is not separate work, which is DOR10 on the ready gate', () => 
     assert.equal(refused.code, 3)
     assert.equal(line(refused, 'guard'), 'guard G1')
     assert.equal(line(refused, '"cause'), '"cause the ready gate fails: DOR10')
-    assert.match(refused.err, /^fix treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
+    assert.match(refused.err, /^fix treadling transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
     const why = await cli(['explain', 'metrics-p95'])
-    assert.match(why.out, /^ready DOR10 fail treadle transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
+    assert.match(why.out, /^ready DOR10 fail treadling transition metrics-p95 cancelled --resolution duplicate --reason "<why>"$/m)
   })
 
   it('leaves the original alone, and lets the copy through once the edge is dropped', async () => {
@@ -269,7 +269,7 @@ describe('what a hand edit can leave, which no write path records', () => {
     const audit = await cli(['doctor'])
     assert.equal(audit.code, 7)
     assert.match(audit.out, /^H24 queue-drain relations blocks ghost-item names an item the store does not hold/m)
-    assert.match(audit.out, /treadle relation remove queue-drain blocks ghost-item/)
+    assert.match(audit.out, /treadling relation remove queue-drain blocks ghost-item/)
     assert.match((await cli(['explain', 'queue-drain'])).out, /^H24 /m)
     assert.equal(line(await cli(['explain', 'queue-drain']), 'blocks'), 'blocks theme-dark')
     const dropped = await cli(['relation', 'remove', 'queue-drain', 'blocks', 'ghost-item'])

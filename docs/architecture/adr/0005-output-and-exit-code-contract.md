@@ -45,7 +45,7 @@ One source therefore backs the schema a consumer validates against, the order th
 A guard refusal is distinguishable from a validation error, which is the question DR5's U3 asked.
 The table itself is declared in `src/application/result.ts` beside the codes it is keyed by, because `--contract` prints it and a renderer may not reach the command layer; `src/cli/exit.ts` is where the command layer reads it from, and there is still exactly one table.
 
-**`treadle --contract` prints that table, because this document is not on the machine.**
+**`treadling --contract` prints that table, because this document is not on the machine.**
 The statuses lived only here, and an agent handed the binary reads `--contract` and nothing else.
 The `~exits` block it prints is generated from the same constant `exitFor` returns, so the contract a caller is handed and the status the process returns cannot disagree; `130` is in it under `INTERRUPTED`, so an interrupt is not read as an unknown failure.
 
@@ -57,7 +57,7 @@ Making that a refusal would have put the report on stderr under an `err` envelop
 The same code is a refusal everywhere else: a read over a store that holds a record it cannot serve exits `INTEGRITY` with the error object, because its answer would have been computed over a set with a hole.
 [ADR-0003](0003-record-format-and-migration.md) owns why that is a refusal rather than a partial answer with a count.
 The two hook codes DR5 names are not in the set: no hook exists to produce one, and a code nothing can produce is a contract with no implementation behind it.
-One status is not a function of any result object: `130`, `EXIT_INTERRUPTED`, when SIGINT arrives while a call is in flight. `bin/treadle.js` sets it and lets the call finish rather than killing it half applied, so a transaction either commits or is abandoned whole; the entry point keeps that status rather than overwriting it with the command's own exit code.
+One status is not a function of any result object: `130`, `EXIT_INTERRUPTED`, when SIGINT arrives while a call is in flight. `bin/treadling.js` sets it and lets the call finish rather than killing it half applied, so a transaction either commits or is abandoned whole; the entry point keeps that status rather than overwriting it with the command's own exit code.
 
 **`--out human|agent|json` selects the rendering; absent, `human` if and only if stdout is a terminal, else `agent`.**
 That is the whole rule (R10).
@@ -83,7 +83,7 @@ The field goes last, after the mutate form's own two, so no position a caller al
 | header | tool | `#<field> <field> ...`, in force until the next one; a `"<field>` column is data |
 | truncation | tool | `+<key> <bytes>B truncated-at <cells>` |
 
-`treadle --contract` prints that table, and `test/security/f12-data-boundary.test.ts` asserts the printed one is the one the renderer implements.
+`treadling --contract` prints that table, and `test/security/f12-data-boundary.test.ts` asserts the printed one is the one the renderer implements.
 
 **F2, and R7's scope corrected.**
 A description is a text field and may carry newlines by design, so DR5's "strings are emitted verbatim, which R7's validation makes safe" was not safe: R7 is defined for single-line fields, and one newline in a description ends its line and starts a record the tool never emitted.
@@ -159,7 +159,7 @@ A mode and a store passed separately can disagree, and a `dry-run` whose store i
 - **`--out` is supported on `version`.** The interface answers N there because its `version` emits no record. Ours does, so a caller that wants it as JSON gets it.
 - **A confirmation class is claimed only where one exists.** Interface B.5 gives `transition <id> cancelled` a severe class and `--yes` is S on `transition` in its matrix. Nothing in this build prompts, so `transition` carries no confirmation class here and `--yes` and `--no-input` are A on it. `init` carries the moderate class it actually implements: it refuses a non-empty directory without `--yes`. A flag advertised as supported that does nothing is worse than one honestly marked accepted-and-ignored, and B.5's severe class lands with `undo`, which is the case that motivates it.
 The help note gives that reason rather than the presentation reason it would otherwise share with `--color`: one verdict letter covers four different reasons for ignoring a flag, and a note that states the wrong one is read as the rule and predicts the next command wrong.
-- **`INTEGRITY` is a code DR5 did not name, and it moves three conditions.** A read over a store holding a record it cannot serve exited 0 with the record missing from the count, `doctor` exited 0 with findings in its table, and a domain `INTEGRITY` error (a hierarchy cycle met during a walk, a hold with no `held_from`) was reported as `STORE_UNAVAILABLE` with `treadle init` as its remedy. All three now exit 7, and the remedy is `treadle doctor`. Under `docs/STABILITY.md` the first two are new non-zero exits for cases that used to succeed; nothing is released, so it is a release note and not a bump.
+- **`INTEGRITY` is a code DR5 did not name, and it moves three conditions.** A read over a store holding a record it cannot serve exited 0 with the record missing from the count, `doctor` exited 0 with findings in its table, and a domain `INTEGRITY` error (a hierarchy cycle met during a walk, a hold with no `held_from`) was reported as `STORE_UNAVAILABLE` with `treadling init` as its remedy. All three now exit 7, and the remedy is `treadling doctor`. Under `docs/STABILITY.md` the first two are new non-zero exits for cases that used to succeed; nothing is released, so it is a release note and not a bump.
 - **The hook codes are not in the closed set.** DR5 names `HOOK_REFUSED` and `HOOK_FAILED`; hooks are a later task and no code path can produce either today. [ADR-0012](0012-the-extension-surface-that-does-not-ship.md) later made that permanent for v1: the codes stay reserved and unreachable, so exit 3 means a guard refused and nothing else.
 
 ## What would reopen this

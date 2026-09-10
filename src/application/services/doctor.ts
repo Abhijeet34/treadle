@@ -274,7 +274,7 @@ export class WorkspaceAudit {
         rule: 'H18',
         id: item.id,
         where: 'hold_until',
-        detail: `the hold ran out at ${item.hold_until} and the item is still on_hold, which no write path would set; treadle transition ${item.id} resume`,
+        detail: `the hold ran out at ${item.hold_until} and the item is still on_hold, which no write path would set; treadling transition ${item.id} resume`,
       })
     }
     const after = item.state === 'done' && hasReviewStep(this.#context.config, item.type) && (item.evidence ?? []).length === 0
@@ -468,7 +468,7 @@ export class WorkspaceAudit {
       rule: 'H34',
       id: item.id,
       where: 'state',
-      detail: `${only} filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadle history ${item.id}`,
+      detail: `${only} filed, worked and accepted this item and no other actor appears in its log, so this is single-actor completion and no second party saw the work; treadling history ${item.id}`,
     }]
   }
 
@@ -491,7 +491,7 @@ export class WorkspaceAudit {
         rule: 'H32',
         id: entry.item.id,
         where: 'relations',
-        detail: `the record stores ${relation.kind} ${relation.target} and no event in the log recorded it, so it was written outside the tool, which refuses a cycle, a second original and an edge out of finished work; treadle relation remove ${entry.item.id} ${relation.kind} ${relation.target}`,
+        detail: `the record stores ${relation.kind} ${relation.target} and no event in the log recorded it, so it was written outside the tool, which refuses a cycle, a second original and an edge out of finished work; treadling relation remove ${entry.item.id} ${relation.kind} ${relation.target}`,
       }))
   }
 
@@ -519,7 +519,7 @@ export class WorkspaceAudit {
         rule: 'H33',
         id: cell(id),
         where: 'items',
-        detail: `the log filed ${id} at ${filed} and recorded no removal of it, and no record here carries that id, so the record left the store outside the tool: a truncated or deleted shard, a bad merge, or a hand edit; treadle history ${id}`,
+        detail: `the log filed ${id} at ${filed} and recorded no removal of it, and no record here carries that id, so the record left the store outside the tool: a truncated or deleted shard, a bad merge, or a hand edit; treadling history ${id}`,
       })
     }
     return findings
@@ -556,8 +556,8 @@ export class WorkspaceAudit {
           id: cell(holder),
           where: 'relations',
           detail: survives
-            ? `the log records ${key} held by ${holder} and no record here carries that id, so the edge went with a record deleted outside the tool and ${target} reads as though it never existed; treadle explain ${target}`
-            : `the log records ${key} held by ${holder} and no record here carries either id, so both records left the store outside the tool and the log is all that is left of the edge; treadle history ${target}`,
+            ? `the log records ${key} held by ${holder} and no record here carries that id, so the edge went with a record deleted outside the tool and ${target} reads as though it never existed; treadling explain ${target}`
+            : `the log records ${key} held by ${holder} and no record here carries either id, so both records left the store outside the tool and the log is all that is left of the edge; treadling history ${target}`,
         })
       }
     }
@@ -581,9 +581,9 @@ export class WorkspaceAudit {
       id: entry.item.id,
       where: 'state',
       // One command line, last, with nothing after it: `test/cli/runnable-lines.test.ts`
-      // reads a detail's trailing `; treadle ...` as a line to run, and a verb phrase after
+      // reads a detail's trailing `; treadling ...` as a line to run, and a verb phrase after
       // the command would be run as its arguments.
-      detail: `the item has been in_progress for ${age} days, over this workspace's aging_days of ${days}, and explain names what it is waiting on; treadle explain ${entry.item.id}`,
+      detail: `the item has been in_progress for ${age} days, over this workspace's aging_days of ${days}, and explain names what it is waiting on; treadling explain ${entry.item.id}`,
     }]
   }
 
@@ -635,7 +635,7 @@ export class WorkspaceAudit {
         rule: 'H04',
         id: '-',
         where: state as WorkItemState,
-        detail: `the ${state} column of this workspace holds ${used} items against a wip_limits of ${limit}, which G3 refuses to add to and an override or a lowered limit produces; treadle backlog --state ${state}`,
+        detail: `the ${state} column of this workspace holds ${used} items against a wip_limits of ${limit}, which G3 refuses to add to and an override or a lowered limit produces; treadling backlog --state ${state}`,
       })
     }
     return findings
@@ -673,7 +673,7 @@ export function auditParentOf(
     rule: 'H30',
     id: item.id,
     where: 'parent_id',
-    detail: `parent_id names ${parent} and no record here carries that id; treadle set ${item.id} parent_id= drops it`,
+    detail: `parent_id names ${parent} and no record here carries that id; treadling set ${item.id} parent_id= drops it`,
   }]
 }
 
@@ -690,7 +690,7 @@ export function auditRelationsOf(known: ReadonlySet<ItemId>, item: Pick<WorkItem
       rule: 'H24',
       id: item.id,
       where: 'relations',
-      detail: `${relation.kind} ${relation.target} names an item the store does not hold, so the edge counts for nothing; treadle relation remove ${item.id} ${relation.kind} ${relation.target} drops it`,
+      detail: `${relation.kind} ${relation.target} names an item the store does not hold, so the edge counts for nothing; treadling relation remove ${item.id} ${relation.kind} ${relation.target} drops it`,
     }))
 }
 
@@ -716,7 +716,7 @@ export function auditImpediment(item: Pick<WorkItem, 'id' | 'type' | 'state' | '
     rule: 'H27',
     id: item.id,
     where: 'relations',
-    detail: `the impediment is ${item.state} and blocks nothing, so it is raised against no work; treadle relation add ${item.id} blocks <id> names what it holds up`,
+    detail: `the impediment is ${item.state} and blocks nothing, so it is raised against no work; treadling relation add ${item.id} blocks <id> names what it holds up`,
   }]
 }
 

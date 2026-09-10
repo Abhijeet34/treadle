@@ -71,7 +71,7 @@ describe('a guard that read a neighbour is refused when that neighbour moved bef
   }
 
   before(async () => {
-    parent = await mkdtemp(path.join(tmpdir(), 'treadle-guard-race-'))
+    parent = await mkdtemp(path.join(tmpdir(), 'treadling-guard-race-'))
     root = path.join(parent, '.work')
     const created = await createWorkspace(root, { id: 'race', name: 'race', at: NOW })
     assert.equal(created.ok, true)

@@ -72,7 +72,7 @@ function unsettable(field: string, item: WorkItem): { readonly cause: string; re
   // Whether the type has the field is decided before which command writes it: `severity`
   // on a task used to be answered with the `mark --severity` line, which a task refuses too.
   if (isKnownField(field) && !fieldsOf(item.type).includes(field)) {
-    return { cause: `${field} is not a field of ${withArticle(item.type)}`, fix: [`treadle show ${item.id}`] }
+    return { cause: `${field} is not a field of ${withArticle(item.type)}`, fix: [`treadling show ${item.id}`] }
   }
   const writer = writerOf(field)
   if (writer.kind === 'command') {
@@ -80,7 +80,7 @@ function unsettable(field: string, item: WorkItem): { readonly cause: string; re
     return { cause: `${field} is not set here; ${usage}`, fix: [usage] }
   }
   if (writer.kind === 'none') {
-    return { cause: `${field} is not set here; ${writer.why}`, fix: [`treadle show ${item.id}`] }
+    return { cause: `${field} is not set here; ${writer.why}`, fix: [`treadling show ${item.id}`] }
   }
   // The cause names the fields this item's type takes, because the first three of the whole
   // dictionary alphabetically began with one a task has not got.
@@ -88,7 +88,7 @@ function unsettable(field: string, item: WorkItem): { readonly cause: string; re
     const takes = fieldsOf(item.type).filter((name) => writerOf(name).kind === 'set')
     return {
       cause: `${field} is not a field of any work item; set writes ${takes.join(', ')} on ${withArticle(item.type)}`,
-      fix: [`treadle set ${item.id} <field>=<value>`],
+      fix: [`treadling set ${item.id} <field>=<value>`],
     }
   }
   return undefined
@@ -109,7 +109,7 @@ export async function setFields(
   if (request.assignments.length === 0) {
     return refusal(workspace, 'C1', item.id,
       'set writes one or more field=value assignments, and none was given',
-      [`treadle set ${item.id} <field>=<value>`])
+      [`treadling set ${item.id} <field>=<value>`])
   }
 
   const wanted = new Map<string, string>()
@@ -118,7 +118,7 @@ export async function setFields(
     if (at <= 0) {
       return refusal(workspace, 'C1', item.id,
         `${assignment} is not a field=value assignment`,
-        [`treadle set ${item.id} <field>=<value>`])
+        [`treadling set ${item.id} <field>=<value>`])
     }
     // Through `canonicalField`, so the spelling `show` printed is a spelling `set` takes.
     const field = canonicalField(assignment.slice(0, at))
@@ -130,7 +130,7 @@ export async function setFields(
     if (value === '' && (field === 'title' || requiredAtCreation(item.type).includes(field))) {
       return refusal(workspace, 'V4', item.id,
         `${field} cannot be cleared; ${withArticle(item.type)} needs it`,
-        [`treadle set ${item.id} ${field}=${placeholderOf(field)}`])
+        [`treadling set ${item.id} ${field}=${placeholderOf(field)}`])
     }
     wanted.set(field, value)
   }
@@ -153,7 +153,7 @@ export async function setFields(
   const now = clock.now()
   const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
-    return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadle show ${item.id}`])
+    return refusal(workspace, valid.error.rule ?? 'V4', item.id, valid.error.message, [`treadling show ${item.id}`])
   }
   if (wanted.has('parent_id') && after.parent_id !== undefined) {
     const refused = parentRefusal('set', workspace, view.value, item, after.parent_id)

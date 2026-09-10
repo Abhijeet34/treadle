@@ -36,7 +36,7 @@ const READS = ['status', 'next', 'backlog', 'show', 'explain'] as const
 type Session = { readonly root: string; dispose(): Promise<void> }
 
 async function aSession(): Promise<Session> {
-  const parent = await mkdtemp(path.join(tmpdir(), 'treadle-seq-'))
+  const parent = await mkdtemp(path.join(tmpdir(), 'treadling-seq-'))
   const created = await runCli(['init', '--name', 'sequence'], { cwd: parent })
   assert.equal(created.code, 0, created.err)
   return {

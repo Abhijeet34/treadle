@@ -13,7 +13,7 @@ Each failure was one test out of 2160, always the same errno at the same point, 
 ✖ failing tests:
 test at test\store\lock.test.ts:85:3
 ✖ refuses none of them, because there is no acquisition budget (3866.8023ms)
-  stdout: `{"ok":false,"code":"STORE_UNAVAILABLE","message":"the lock C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\treadle-store-KhWkn5\\.lock could not be created: EPERM: operation not permitted, open 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\treadle-store-KhWkn5\\.lock'"}`
+  stdout: `{"ok":false,"code":"STORE_UNAVAILABLE","message":"the lock C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\treadling-store-KhWkn5\\.lock could not be created: EPERM: operation not permitted, open 'C:\\Users\\RUNNER~1\\AppData\\Local\\Temp\\treadling-store-KhWkn5\\.lock'"}`
 ```
 
 | Run | Job | Commit | Test | Contenders |
@@ -74,7 +74,7 @@ The occurrence is Windows-only and the behaviour is not.
 
 Two situations, two tests, both running on all three platforms.
 
-| `TREADLE_EPERM` | What it models | Asserted |
+| `TREADLING_EPERM` | What it models | Asserted |
 |---|---|---|
 | `pending:12` | the lock path answers `EPERM` for twelve creates, every other name is accepted | acquired, and after at least 60 ms, so the retries happened |
 | `refusing` | every create in the directory answers `EPERM` | `STORE_UNAVAILABLE` `S11`, inside the caller's bound rather than at it |

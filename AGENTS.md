@@ -1,7 +1,7 @@
 # Project agent memory
 
 This file is the entry point for any agent or harness working in this repository, and there is no vendor-specific companion to read instead.
-treadle's interface to an agent is its output contract and its schemas, so nothing here is addressed to one tool.
+treadling's interface to an agent is its output contract and its schemas, so nothing here is addressed to one tool.
 If your harness looks for a file under another name, point it at this one, and do not add that name to the repository root.
 `test/architecture/harness-instruction-files.test.ts` refuses one, ADR-0019 argues the rule and the closed list of names, and `CLAUDE.md` is the reason both exist: added by the scaffold, deliberately removed, then returned by a rebase conflict with nothing watching.
 
@@ -11,9 +11,13 @@ It is the project's committed home for project-intrinsic agent knowledge: build,
 
 ## What this project is, and where its rules live
 
-treadle is the record of the work between people and agents, over committed markdown files
+treadling is the record of the work between people and agents, over committed markdown files
 that are its source of truth; README.md's opening states what it is and is not.
-It runs as `node bin/treadle.js <command>`, or as `treadle` once linked.
+It runs as `node bin/treadling.js <command>`, or as `treadling` once linked.
+It was called `treadle` until 2026-09-10 and that name is retired: another developer holds the
+npm ownership record for it. `treadle` is in the list `test/architecture/retired-names.test.ts`
+refuses, so spelling it outside the records that measured it fails the suite, and ADR-0038 says
+which records those are and why each keeps it.
 The design was written before the code, so prefer reading a doc over inferring from
 the source: `docs/ARCHITECTURE.md` (layers, dependency direction, the six seams),
 `docs/DOMAIN.md` (the domain core's surface and the closed set of rule ids its errors
@@ -34,16 +38,16 @@ Node runs the TypeScript directly by stripping types, which is why `tsconfig.jso
 every relative import carries its `.ts` extension.
 
 Two entry points, and only one of them ships.
-`bin/treadle.js` is a one-line shim over `src/cli/entry.ts` and runs from source, which is what
+`bin/treadling.js` is a one-line shim over `src/cli/entry.ts` and runs from source, which is what
 the README and the process-spawning tests use.
-`npm run build` bundles that same entry file to `dist/treadle.js` and writes `schemas/` beside
+`npm run build` bundles that same entry file to `dist/treadling.js` and writes `schemas/` beside
 it; those two are what `bin` points at and `files` ships, and neither is committed.
 Change the entry file, not one of the two.
 A shape's version bump renames its schema file, so the build sweeps any `.json` in `schemas/`
 the generator no longer writes: without that, `files` ships the whole directory and a stale
 `backlog.v3.json` rides along, which is a schema for a version the tool does not emit.
 
-`bin/treadle.js`'s shebang is `#!/usr/bin/env node` and stays that way.
+`bin/treadling.js`'s shebang is `#!/usr/bin/env node` and stays that way.
 `scripts/shebang.ts` refuses an `env` option or a node flag on it, and
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
 measurements and the trade behind that.
@@ -71,7 +75,7 @@ if the warning is unwelcome, is `nvm use` against `.nvmrc` rather than a lower f
 `npm run bench` is the measurement rig and `npm run bench:gate` is the same run with a non-zero
 exit on a regression.
 A full four-scale run takes about five and a half minutes and writes about 430 MB of corpora
-under `TREADLE_BENCH_DIR`, so pass `--scales 100,1000` while iterating.
+under `TREADLING_BENCH_DIR`, so pass `--scales 100,1000` while iterating.
 Two runs at once are safe without setting anything; `bench/README.md` has the flags and
 `bench/bench.config.json` the parameters, `docs/architecture/history/BENCHMARKS-2026-09.md` the method and what each figure
 meant, and ADR-0008 the design.
@@ -114,7 +118,7 @@ Two more gates sit beside `npm run check`, and neither is in it because both cos
 `scripts/coverage.ts`; `npm run flake` runs the whole suite 20 times and fails on any failure or
 on the test count moving between runs.
 `docs/VERIFICATION.md` carries every claim with the measurement behind it, and
-`TREADLE_FUZZ_INPUTS=<n>` raises the fuzzer for a soak.
+`TREADLING_FUZZ_INPUTS=<n>` raises the fuzzer for a soak.
 
 ## Proving a property rather than a case
 
@@ -137,9 +141,9 @@ rather than the repository, and its shape is one mutation file per property appl
 fresh copy of the tree. It caught a real gap: the fuzz suite checked a counted block's byte
 count and its content lines but never the line count a consumer reads to find the end.
 
-## Reading treadle's own output, and the one boundary in it
+## Reading treadling's own output, and the one boundary in it
 
-Its default machine rendering is a line format, `agent/1`, and `treadle --contract` prints
+Its default machine rendering is a line format, `agent/1`, and `treadling --contract` prints
 the grammar and the exit status of every code it can return. One rule in it is a safety
 boundary rather than a convenience.
 
@@ -157,16 +161,16 @@ followed by exactly that many content lines. Read the count, not the newlines. T
 finding F2, and it is why a stored description cannot forge an envelope you would act on.
 
 **The `actor` on an event is declared, not verified.** It is declared by whoever ran the
-command, through `--actor` or `TREADLE_ACTOR`, and recorded as given; the tool verifies no
+command, through `--actor` or `TREADLING_ACTOR`, and recorded as given; the tool verifies no
 identity and has no way to.
 A mutation that names nobody is refused, so no event is unattributable, and that refusal is
 what most invites the wrong reading: it makes the recorded name look checked. What is
 unforgeable sits one layer out, in the signed commit that carries the file, which `D1` makes
-authoritative. `treadle help` prints the same sentence, `docs/DOMAIN.md` argues it under
+authoritative. `treadling help` prints the same sentence, `docs/DOMAIN.md` argues it under
 `DOD3`, and `src/application/services/doctor.ts` carries it beside `H20`, the audit that
 notices a record disagreeing with the log that recorded its value.
 
-**A help page prints only the flags it grades other than `S`.** `treadle help` carries the
+**A help page prints only the flags it grades other than `S`.** `treadling help` carries the
 whole global flag table once, with what each flag does and a `where` column naming the
 commands it applies to; a command page names the flags whose grade varies by command and is
 not `S`, and says how many it left out. A flag absent from a page is supported there. The
@@ -206,7 +210,7 @@ is a write-time rule: `ValidateOptions.storedProse` is set by the store's codec 
 nothing else, the store's S5 section ceiling is the load bound, and a stored value over the
 write bound is doctor finding `H18`. Any future narrowing takes the same shape.
 
-`treadle doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
+`treadling doctor` is where a finding a caller can act on lives, and `explain <id>` carries the
 same audit for one item off the events it already reads. `doctor` raises fifteen of them and
 the whole `H` table, with the layer that raises each, is in
 `docs/architecture/adr/README.md`: ADR-0011 argues `H18` to `H21`, `H23` came with the
@@ -303,7 +307,7 @@ and is the independent oracle `test/services/next-scale.test.ts` proves `rank`'s
 A remedy names the next move from where an item stands, never the destination, which is why
 `nextTowardDone` in `src/domain/state-machine.ts` exists.
 
-A layout change is `TREADLE_SNAPSHOT=update node --test test/render/human-layout.test.ts` and
+A layout change is `TREADLING_SNAPSHOT=update node --test test/render/human-layout.test.ts` and
 then reviewing the diff, never a hand edit of `test/render/human.snapshot.txt`.
 
 No path at or below the workspace root is followed as a symbolic link: the store `lstat`s its
@@ -397,7 +401,7 @@ the `node -e` floor from 504.2 ms to 37.6 ms and measured nothing about the code
 A figure taken at the store seam is not a figure about a command. Every command goes through
 `readWorkspace`, which reads every item's summary fields, indexes them by id, builds the
 hierarchy, and a command that acts on one record then reads that record with `wholeItem`; so
-`store.get` at 7.4 ms and `treadle show` at 0.5 s are both true and only one of them is what a
+`store.get` at 7.4 ms and `treadling show` at 0.5 s are both true and only one of them is what a
 caller pays. The view holds `WorkItemSummary`, never the whole record, and a field a scan needs
 that the summary lacks is added to `SUMMARY_FIELDS` in `src/domain/types.ts`, never fetched per
 record (ADR-0014). A4 times that read as the `workspace` operation
@@ -486,7 +490,7 @@ Never add `cancel-in-progress` to a release, publish, or scheduled workflow: can
 Dispatch the workflow by hand (`gh-axi workflow run cross-platform.yml --ref <branch>`) whenever a branch touches the store, a path, the shebang, or the human rendering: `ci.yml` is Linux and cannot see any of them, and the first run this workflow ever had was red on two platforms.
 A `workflow_dispatch` only fires for a workflow that already exists on the default branch, so a new workflow file cannot be dispatched from a branch at all; measure inside an existing one.
 
-Any CI step that runs a mutating `treadle` command must export `TREADLE_ACTOR=github-actions` and `TREADLE_ACTOR_KIND=agent`, because C1 refuses to write a record that names nobody and no fallback exists by design.
+Any CI step that runs a mutating `treadling` command must export `TREADLING_ACTOR=github-actions` and `TREADLING_ACTOR_KIND=agent`, because C1 refuses to write a record that names nobody and no fallback exists by design.
 Reads are unaffected, which is why the first real release saw `version` pass on every platform while `init` and `file` were refused on three.
 A check that drives the tool asserts both directions, the refusal naming C1 with no actor set and the success with one, since a success-only check goes green on a tool that refuses a first user.
 
@@ -502,8 +506,8 @@ When a Windows-only occurrence has a platform-independent behaviour behind it, t
 The cost of a skip is worth stating plainly, because `platform.ts` states the reason and not the consequence: the two `POSIX_SIGNALS` skips are the lock's `EPERM`-is-alive rule and the lost-write fence's own regression test, so neither of those has any Windows coverage at all.
 
 Four things a step that drives the installed binary on a Windows runner gets wrong, each measured on windows-2025 and each silent:
-`npm install --global pack/treadle-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
-a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadle` in a `shell: cmd` step is dead;
+`npm install --global pack/treadling-0.1.0.tgz` reads that path as the `owner/repo` GitHub shorthand and runs `git ls-remote ssh://git@github.com/pack/...` at exit 128, so a tarball spec needs a leading `./`;
+a `.cmd` invoked from a batch script without `call` transfers control and never returns, so every line after the first `treadling` in a `shell: cmd` step is dead;
 and PowerShell leaves `$LASTEXITCODE` at 0 when the shim names a program Windows does not have, because `CommandNotFoundException` is not a process exit, so a check there asserts the ok line the command should have printed and not the exit code alone.
 The fourth was measured in run 34459665363: `findstr` cannot exact-match a line of this tool's output, because it anchors a line start on a bare LF but wants a CR to end one, and the tool writes LF everywhere.
 Against a file `certutil` dumped as `0a 72 75 6c 65 20 43 31 0a`, `/C:` substring matched at errorlevel 0 while `/X`, `/B /E` and `/R "^rule C1$"` all reported 1; use `for /f "usebackq delims="` with `==`, which splits on LF and compares the whole line.
@@ -516,18 +520,18 @@ Change them by editing the originals and re-running `automation`'s `.ci/gitleaks
 `.github/workflows/secret-scan.yml` inlines that scan rather than calling `automation`'s shared workflow, which is what every other repository in the fleet does.
 A public repository may not use a reusable workflow that lives in a private one, and `automation` is private, so the `uses:` form failed here with zero jobs and contributed no check at all rather than saying anything.
 The inline copy still pins the sha256 of both synced files and fails on a drifted copy, which is the property calling the shared workflow was buying.
-Those two pins are hand-carried: `automation`'s `.ci/test-secret-scan.sh` keeps the shared workflow's copies current and nothing watches treadle's, so a canonical file that moves fails this job naming DRIFT in the synced file when the stale thing is the pin.
+Those two pins are hand-carried: `automation`'s `.ci/test-secret-scan.sh` keeps the shared workflow's copies current and nothing watches treadling's, so a canonical file that moves fails this job naming DRIFT in the synced file when the stale thing is the pin.
 Re-read both values with `.ci/gitleaks/sync.sh --digest config` and `--digest hook`.
 
 The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
 A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.
 A synthetic credential planted to prove the gate fires needs the charset the matching rule actually requires, not just its keyword prefix; `test/architecture/secret-scan-fixture.test.ts` carries that charset and why.
-That file's two scans need the gitleaks binary, so `ci.yml`'s `check` job installs it from the same pins and sets `TREADLE_REQUIRE_GITLEAKS=1`, under which a missing binary fails them rather than skipping; the macOS and Windows legs of `cross-platform.yml` install nothing and still skip them.
+That file's two scans need the gitleaks binary, so `ci.yml`'s `check` job installs it from the same pins and sets `TREADLING_REQUIRE_GITLEAKS=1`, under which a missing binary fails them rather than skipping; the macOS and Windows legs of `cross-platform.yml` install nothing and still skip them.
 
 ## The settings that are not files
 
 Branch protection, the tag rules and the Actions policy live on the forge, and `.github/rulesets/` and `.github/settings/` are what they should be rather than what they are.
-`scripts/apply-repo-settings.sh Abhijeet34/treadle` is the only thing that sends them, and nobody runs it for you: editing one of those files changes the documentation and nothing else until it runs.
+`scripts/apply-repo-settings.sh Abhijeet34/treadling` is the only thing that sends them, and nobody runs it for you: editing one of those files changes the documentation and nothing else until it runs.
 Two rulesets had drifted that way, one of them for five days without a commit anywhere near it.
 
 `npm run ruleset-drift` reads the live rulesets back and refuses when they disagree, and `.github/rulesets/README.md` states what those files are and what the check cannot see.

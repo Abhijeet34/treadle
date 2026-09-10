@@ -23,7 +23,7 @@ import { dataOf, openSurface, resultOf, type Invocation } from './surface.ts'
 import type { AxisResult } from './axis.ts'
 
 /** Variables a caller might reasonably expect to redirect the store. None is read. */
-const OVERRIDE_VARS = ['TREADLE_WORKSPACE', 'TREADLE_HOME', 'TREADLE_STORE', 'TREADLE_DIR', 'WORKSPACE'] as const
+const OVERRIDE_VARS = ['TREADLING_WORKSPACE', 'TREADLING_HOME', 'TREADLING_STORE', 'TREADLING_DIR', 'WORKSPACE'] as const
 
 export type ScenarioRow = {
   readonly scenario: string
@@ -69,7 +69,7 @@ export async function runA6(corpus: Corpus): Promise<{
     // A config file naming the decoy, in the directory above the one the command runs in.
     // Nothing reads it; the row exists so the claim is measured rather than assumed.
     const config = JSON.stringify({ workspace: path.join(decoy, '.work'), store: path.join(decoy, '.work') })
-    for (const name of ['treadle.config.json', '.treadlerc']) {
+    for (const name of ['treadling.config.json', '.treadlingrc']) {
       await writeFile(path.join(intended, name), `${config}\n`)
     }
 
@@ -80,7 +80,7 @@ export async function runA6(corpus: Corpus): Promise<{
       const argv = ['file', 'task', `A6 ${scenario}`, '--id', id, ...(options.extra ?? []), '--out', 'json']
       const call = await surface.run(argv, {
         cwd: options.cwd,
-        ...(options.env === undefined ? {} : { env: { TREADLE_ACTOR: 'dana', ...options.env } }),
+        ...(options.env === undefined ? {} : { env: { TREADLING_ACTOR: 'dana', ...options.env } }),
       })
       const created = (await readdir(options.cwd)).includes('.work')
         && options.cwd !== intended && options.cwd !== decoy
@@ -188,7 +188,7 @@ async function holds(
 }
 
 async function seamRows(corpus: Corpus): Promise<readonly SeamRow[]> {
-  const unrelated = await mkdtemp(path.join(tmpdir(), 'treadle-a6-seam-'))
+  const unrelated = await mkdtemp(path.join(tmpdir(), 'treadling-a6-seam-'))
   const scenarios = [
     { name: 'from the workspace root', from: corpus.root, expect: corpus.root },
     { name: 'from a subdirectory of the workspace', from: path.join(corpus.root, 'items'), expect: corpus.root },

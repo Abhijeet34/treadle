@@ -164,7 +164,7 @@ describe('the default done gate', () => {
     }), { reviewStep: true })
     assert.deepEqual(failed(evaluateGate(DEFAULT_DONE_GATE, bare)), ['DOD7'])
     assert.ok(evaluateGate(DEFAULT_DONE_GATE, bare).rules
-      .find((r) => r.rule === 'DOD7')?.remedy?.startsWith('treadle evidence add'))
+      .find((r) => r.rule === 'DOD7')?.remedy?.startsWith('treadling evidence add'))
 
     const pointed = gateContext(item('story', {
       state: 'in_review', reviewer: 'kim', assignee: 'dana',
@@ -184,7 +184,7 @@ describe('the default done gate', () => {
     assert.deepEqual(failed(verdict), ['DOD2'])
     const rule = verdict.rules.find((r) => r.rule === 'DOD2')
     assert.equal(rule?.reason, 'cert-expired, vendor-hold are still open against the item')
-    assert.equal(rule?.remedy, 'treadle transition cert-expired ready', 'the remedy is the next move toward resolving the impediment from where it stands, not the destination')
+    assert.equal(rule?.remedy, 'treadling transition cert-expired ready', 'the remedy is the next move toward resolving the impediment from where it stands, not the destination')
   })
 
   it('requires a reviewer only when the type has a review step, and never the assignee', () => {

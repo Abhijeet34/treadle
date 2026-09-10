@@ -54,7 +54,7 @@ export const EXIT_MEANING: Readonly<Record<ResultCode | 'INTERRUPTED', string>> 
   CONFLICT: 'the record moved under you; read it again and retry',
   NOT_FOUND: 'the entity named does not exist in this workspace',
   STORE_UNAVAILABLE: 'the store could not be opened, locked or written',
-  INTEGRITY: 'the stored files carry something no write path would have accepted; run treadle doctor',
+  INTEGRITY: 'the stored files carry something no write path would have accepted; run treadling doctor',
   INTERRUPTED: 'SIGINT arrived while a call was in flight; the transaction committed whole or not at all',
 }
 
@@ -238,8 +238,8 @@ export const MAX_CAUSE = 500
  * A cause is one sentence, and `cause` and `entity` are the refusal fields a caller's own text
  * reaches:
  * every splice site names an id, a title, a flag value or a field the caller wrote,
- * and none of them is bounded at the point it is spliced. `treadle help <1,000,000
- * characters>` printed a one megabyte cause and `treadle show <the same>` a one megabyte
+ * and none of them is bounded at the point it is spliced. `treadling help <1,000,000
+ * characters>` printed a one megabyte cause and `treadling show <the same>` a one megabyte
  * entity, each on a refusal whose whole job is to be read. The `fix` list already carries this rule (A.6) and
  * carries it per site; one bound here is the same rule with no site left to forget it.
  */

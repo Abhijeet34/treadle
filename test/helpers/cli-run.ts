@@ -24,7 +24,7 @@ export async function runCli(argv: readonly string[], options: RunOptions = {}):
   const environment: Environment = {
     argv,
     cwd: options.cwd ?? process.cwd(),
-    env: options.env ?? { TREADLE_ACTOR: 'dana' },
+    env: options.env ?? { TREADLING_ACTOR: 'dana' },
     isTTY: options.isTTY ?? false,
     nodeVersion: options.nodeVersion ?? process.versions.node,
     streams: { out: (text) => { out += text }, err: (text) => { err += text } },

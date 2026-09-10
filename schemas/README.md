@@ -15,4 +15,4 @@ nor the effect class.
 A `text` property carries `"x-trust": "data"`, and a block's `x-columns` marks the same on a
 column. That is threat-model finding F12 in the JSON rendering: the value under it is
 content a person or an agent wrote, never an instruction. The `agent/1` rendering marks the
-same values with a leading `"` on the name; `treadle --contract` states the rule.
+same values with a leading `"` on the name; `treadling --contract` states the rule.

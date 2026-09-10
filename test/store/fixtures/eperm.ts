@@ -2,7 +2,7 @@
 // A separate process, because the substitution in `eperm-open.ts` has to be registered before
 // `lock.ts` is loaded and the test runner has already loaded it.
 //
-// Usage: TREADLE_EPERM=pending:<n>|refusing node eperm.ts <lock path>
+// Usage: TREADLING_EPERM=pending:<n>|refusing node eperm.ts <lock path>
 
 import { register } from 'node:module'
 

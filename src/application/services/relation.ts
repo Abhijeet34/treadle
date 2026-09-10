@@ -98,7 +98,7 @@ export async function relate(
     return errorResult({
       code: 'VALIDATION', command: 'relation', workspace, effect: 'mutate', rule: 'C1', entity: source.id,
       cause: `${request.kind} is not a relation kind; the kinds are ${RELATION_KINDS.join(', ')}`,
-      fix: ['treadle help relation'],
+      fix: ['treadling help relation'],
     })
   }
   // The other end is looked up before the graph decides anything, so an edge to nothing is
@@ -124,7 +124,7 @@ export async function relate(
       return errorResult({
         code: added.error.code === 'VALIDATION' ? 'VALIDATION' : 'GUARD_REFUSED',
         command: 'relation', workspace, effect: 'mutate', rule: added.error.rule ?? 'R2', entity: source.id,
-        cause: added.error.message, fix: [`treadle show ${source.id}`, `treadle explain ${request.other}`],
+        cause: added.error.message, fix: [`treadling show ${source.id}`, `treadling explain ${request.other}`],
       })
     }
     if (!added.value.added) {
@@ -166,7 +166,7 @@ export async function relate(
   if (!valid.ok) {
     return errorResult({
       code: 'VALIDATION', command: 'relation', workspace, effect: 'mutate',
-      rule: valid.error.rule ?? 'V4', entity: written.id, cause: valid.error.message, fix: [`treadle show ${written.id}`],
+      rule: valid.error.rule ?? 'V4', entity: written.id, cause: valid.error.message, fix: [`treadling show ${written.id}`],
     })
   }
 

@@ -23,7 +23,7 @@ import { after, before, describe, it } from 'node:test'
 import { defaultConfig } from '../../src/domain/index.ts'
 import { runCli, type Run } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' }
+const ENV = { TREADLING_ACTOR: 'dana' }
 
 type Data = Record<string, unknown>
 type Block = { readonly rows: readonly Record<string, unknown>[] }
@@ -47,7 +47,7 @@ describe('an epic keeps its record and loses its ceremony', () => {
   }
 
   before(async () => {
-    dir = await mkdtemp(path.join(tmpdir(), 'treadle-epic-'))
+    dir = await mkdtemp(path.join(tmpdir(), 'treadling-epic-'))
     await must(['init', '--name', 'efforts'])
     await must(['file', 'epic', 'Ship the record', '--id', 'ship-it', '--set', 'outcome=the record ships'])
     await must(['file', 'story', 'Write the shard', '--id', 'write-shard', '--parent', 'ship-it',
@@ -84,7 +84,7 @@ describe('an epic keeps its record and loses its ceremony', () => {
     const data = dataOf(refused)
     assert.equal(data['guard'], 'G5')
     assert.equal(data['cause'], 'an epic has no review step, so in_progress exits through done')
-    assert.deepEqual(data['fix'], ['treadle transition ship-it done', 'treadle explain ship-it'])
+    assert.deepEqual(data['fix'], ['treadling transition ship-it done', 'treadling explain ship-it'])
   })
 
   it('still refuses the epic done while a child is open, which is G8 and stays', async () => {

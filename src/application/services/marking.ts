@@ -116,7 +116,7 @@ export async function markItem(
   if (request.severity !== undefined && !(BUG_SEVERITIES as readonly string[]).includes(request.severity)) {
     return refusal('mark', workspace, 'C1', item.id,
       `${request.severity} is not a severity; the severities are ${BUG_SEVERITIES.join(', ')}`,
-      ['treadle help mark'])
+      ['treadling help mark'])
   }
 
   const draft: Record<string, unknown> = { ...item }
@@ -139,18 +139,18 @@ export async function markItem(
   if (request.reason === undefined || request.reason.trim() === '') {
     return refusal('mark', workspace, 'C1', item.id,
       `a change to ${changes.map((change) => change.field).join(' and ')} records a reason, and none was given`,
-      [`treadle mark ${item.id} ${changes.map((c) => `--${c.field === 'severity' ? 'severity' : 'priority'} ${c.after}`).join(' ')} --reason "<why>"`])
+      [`treadling mark ${item.id} ${changes.map((c) => `--${c.field === 'severity' ? 'severity' : 'priority'} ${c.after}`).join(' ')} --reason "<why>"`])
   }
   if (request.reason.length > MAX_REASON) {
     return refusal('mark', workspace, 'T7', item.id, overLength('a reason', MAX_REASON, request.reason.length),
-      ['treadle help mark'])
+      ['treadling help mark'])
   }
 
   const now = clock.now()
   const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal('mark', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
-      [`treadle show ${item.id}`])
+      [`treadling show ${item.id}`])
   }
 
   const set = changes.map((change) => `${change.field} ${echoed(change.before)} -> ${echoed(change.after)}`)
@@ -202,21 +202,21 @@ export async function addEvidence(
   if (!(EVIDENCE_KINDS as readonly string[]).includes(request.kind)) {
     return refusal('evidence', workspace, 'C1', item.id,
       `${request.kind} is not an evidence kind; the kinds are ${EVIDENCE_KINDS.join(', ')}`,
-      ['treadle help evidence'])
+      ['treadling help evidence'])
   }
 
   const existing = item.evidence ?? []
   if (existing.length >= MAX_EVIDENCE_ENTRIES) {
     return refusal('evidence', workspace, 'V4', item.id,
       `${item.id} already carries ${existing.length} evidence entries and the limit is ${MAX_EVIDENCE_ENTRIES}`,
-      [`treadle show ${item.id}`])
+      [`treadling show ${item.id}`])
   }
   // Appended and never edited, so the same pointer twice is noise the list cannot shed.
   const duplicate = existing.find((entry) => entry.kind === request.kind && entry.ref === request.ref)
   if (duplicate !== undefined) {
     return refusal('evidence', workspace, 'V4', item.id,
       `${item.id} already points at ${request.kind} ${request.ref}`,
-      [`treadle show ${item.id}`])
+      [`treadling show ${item.id}`])
   }
 
   const pointer: EvidencePointer = request.label === undefined
@@ -228,7 +228,7 @@ export async function addEvidence(
   const valid = validateWorkItem(after, { now })
   if (!valid.ok) {
     return refusal('evidence', workspace, valid.error.rule ?? 'V4', item.id, valid.error.message,
-      ['treadle help evidence'])
+      ['treadling help evidence'])
   }
 
   const data: Record<string, Value> = {

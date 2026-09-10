@@ -29,7 +29,7 @@ import { TRANSITIONS, WORK_ITEM_STATES } from '../../src/domain/index.ts'
 import { runCli } from '../helpers/cli-run.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Run = { code: number; out: string; err: string }
 type Cli = (argv: readonly string[]) => Promise<Run>
@@ -40,7 +40,7 @@ function must(run: Run, what: string): Run {
 }
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-line-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-line-'))
   const cli = (argv: readonly string[]) => runCli(argv, { cwd: root, env: ENV })
   must(await cli(['init', '--name', 'truthful']), 'init')
   must(await cli(['file', 'task', 'A record to name', '--id', 'a-record']), 'file')
@@ -119,7 +119,7 @@ describe('an operand past the last one a command publishes is refused', () => {
         new RegExp(`^"cause ${name} takes (no|one|two|three|four|five) operands? and this line writes ${operands.length + 1}, so operand ${operands.length + 1} would be read by nothing$`, 'm'),
         run.err,
       )
-      assert.match(run.err, new RegExp(`^fix treadle help ${name}$`, 'm'), run.err)
+      assert.match(run.err, new RegExp(`^fix treadling help ${name}$`, 'm'), run.err)
       // The operand is a caller's own word and no slot of the usage holds it, so nothing has
       // held it to a line: the count is the whole of the answer and the word never reaches
       // the stream. This is `operandRefusal`'s rule at one more position.
@@ -314,7 +314,7 @@ describe('a value this line cannot mean is refused wherever the line writes it',
 
 /**
  * `transition` takes eight words as a target and the page published seven of them. The eighth
- * is `resume`, which every gate remedy for a held blocker prints: `treadle transition <id>
+ * is `resume`, which every gate remedy for a held blocker prints: `treadling transition <id>
  * resume` is what `nextTowardDone` returns off `on_hold`, `runnable-lines` runs it and it
  * exits 0. The page said "the target is a state, not the move name" over the seven states,
  * so the one word the tool prints was the one word the contract denied. Of the thirteen move
@@ -367,7 +367,7 @@ describe('the first sentence the tool says about itself', () => {
     const about = topLevelHelp('-').data['about']
     const readme = (await readFile(path.join(ROOT, 'README.md'), 'utf8')).split('\n')
     assert.equal(about, readme[2],
-      'treadle help and README.md say different things about what this tool is')
+      'treadling help and README.md say different things about what this tool is')
     assert.match(readme[8] ?? '', /It is not a Rally and not a Kanban board/,
       'the README line this pins against has moved; re-read both before changing either')
   })

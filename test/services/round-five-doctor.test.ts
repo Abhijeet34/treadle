@@ -17,12 +17,12 @@ import { describe, it, before, after } from 'node:test'
 
 import { runCli } from '../helpers/cli-run.ts'
 
-const ENV = { TREADLE_ACTOR: 'dana' } as const
+const ENV = { TREADLING_ACTOR: 'dana' } as const
 
 type Cli = (argv: readonly string[]) => Promise<{ code: number; out: string; err: string }>
 
 async function aWorkspace(): Promise<{ root: string; cli: Cli }> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-r5d-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-r5d-'))
   const cli: Cli = (argv) => runCli(argv, { cwd: root, env: ENV })
   assert.equal((await cli(['init'])).code, 0)
   return { root, cli }
@@ -115,6 +115,6 @@ describe('status says which set its findings line counts', () => {
     const orient = await cli(['status'])
     assert.equal(orient.code, 0, orient.err)
     assert.match(orient.out, /^findings 0$/m)
-    assert.match(orient.out, /^audit not run here; treadle doctor reads every record against the event log$/m)
+    assert.match(orient.out, /^audit not run here; treadling doctor reads every record against the event log$/m)
   })
 })

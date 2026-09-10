@@ -47,7 +47,7 @@ describe('no path at or below the workspace root is followed as a symbolic link'
   for (const relative of LINKED) {
     it(`refuses ${relative} as a link, on read and on write, and writes nothing through it`, async () => {
       const workspace = await aWorkspace()
-      const outside = await mkdtemp(path.join(tmpdir(), 'treadle-outside-'))
+      const outside = await mkdtemp(path.join(tmpdir(), 'treadling-outside-'))
       try {
         await workspace.store.apply({ txn: 't0', writes: [{ item: anItem() }], events: [update('e0').events[0] as never] })
         await workspace.store.close()
@@ -83,7 +83,7 @@ describe('no path at or below the workspace root is followed as a symbolic link'
 
   it('refuses the root itself as a link, naming the directory and its target', async () => {
     const workspace = await aWorkspace()
-    const outside = await mkdtemp(path.join(tmpdir(), 'treadle-outside-'))
+    const outside = await mkdtemp(path.join(tmpdir(), 'treadling-outside-'))
     const link = path.join(outside, '.work')
     try {
       await workspace.store.close()

@@ -7,7 +7,7 @@
 
 ## Context
 
-`AGENTS.md` opens by saying that treadle's interface to an agent is its output contract and its schemas, that nothing in the file is addressed to one tool, and that a harness looking for another name should be pointed at this one.
+`AGENTS.md` opens by saying that treadling's interface to an agent is its output contract and its schemas, that nothing in the file is addressed to one tool, and that a harness looking for another name should be pointed at this one.
 The repository root then carried `CLAUDE.md`, ninety bytes of pointer at `AGENTS.md`, and no equivalent for any other harness.
 
 That is a claim a reader can check and it did not hold.

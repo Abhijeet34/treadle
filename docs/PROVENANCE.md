@@ -1,16 +1,16 @@
 # Provenance
 
-This file records how treadle was built, so that anyone auditing the licence position can check it rather than take it on trust.
+This file records how treadling was built, so that anyone auditing the licence position can check it rather than take it on trust.
 
 ## The short version
 
-treadle is an independent implementation.
+treadling is an independent implementation.
 It contains no code from any other project.
 No third-party notice attaches to it, and `NOTICE` says so.
 
 ## Prior art we studied
 
-treadle is a successor in capability to `tasks-axi`, a task-backlog command-line tool that edits a single markdown file in place and prints compact structured output for agents.
+treadling is a successor in capability to `tasks-axi`, a task-backlog command-line tool that edits a single markdown file in place and prints compact structured output for agents.
 It is one author's own earlier tool.
 We studied it, and we carried none of it.
 

@@ -141,17 +141,17 @@ const BY_SET: FieldWriter = { kind: 'set' }
  * the whole point of a remedy is that running it satisfies the rule. One table, both paths.
  */
 const WRITTEN_BY: Readonly<Record<string, FieldWriter>> = {
-  id: { kind: 'command', usage: 'treadle file <type> "<title>" --id <value>' },
-  type: { kind: 'command', usage: 'treadle file <type> "<title>"' },
-  state: { kind: 'command', usage: 'treadle transition <id> <state>' },
-  severity: { kind: 'command', usage: 'treadle mark <id> --severity <S1-S4> --reason "<why>"' },
-  priority: { kind: 'command', usage: 'treadle mark <id> --priority <1-5> --reason "<why>"' },
-  evidence: { kind: 'command', usage: 'treadle evidence add <id> <kind> <ref> [label]' },
-  relations: { kind: 'command', usage: `treadle relation add <id> <${RELATION_KINDS.join('|')}> <other>` },
-  resolution: { kind: 'command', usage: 'treadle transition <id> cancelled --resolution <r> --reason "<why>"' },
-  hold_reason: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
-  hold_until: { kind: 'command', usage: 'treadle transition <id> on_hold --until <instant> --reason "<why>"' },
-  held_from: { kind: 'command', usage: 'treadle transition <id> on_hold --reason "<why>"' },
+  id: { kind: 'command', usage: 'treadling file <type> "<title>" --id <value>' },
+  type: { kind: 'command', usage: 'treadling file <type> "<title>"' },
+  state: { kind: 'command', usage: 'treadling transition <id> <state>' },
+  severity: { kind: 'command', usage: 'treadling mark <id> --severity <S1-S4> --reason "<why>"' },
+  priority: { kind: 'command', usage: 'treadling mark <id> --priority <1-5> --reason "<why>"' },
+  evidence: { kind: 'command', usage: 'treadling evidence add <id> <kind> <ref> [label]' },
+  relations: { kind: 'command', usage: `treadling relation add <id> <${RELATION_KINDS.join('|')}> <other>` },
+  resolution: { kind: 'command', usage: 'treadling transition <id> cancelled --resolution <r> --reason "<why>"' },
+  hold_reason: { kind: 'command', usage: 'treadling transition <id> on_hold --reason "<why>"' },
+  hold_until: { kind: 'command', usage: 'treadling transition <id> on_hold --until <instant> --reason "<why>"' },
+  held_from: { kind: 'command', usage: 'treadling transition <id> on_hold --reason "<why>"' },
   filed_at: { kind: 'none', why: 'the instant the item was filed is a record of what happened, not a field' },
   version: { kind: 'none', why: 'the store sets a version on every write, which is how a stale write is caught' },
   extra: { kind: 'none', why: 'a key this build has no meaning for belongs to the record file, which D1 makes authoritative' },
@@ -171,7 +171,7 @@ export function writeCommand(field: string, id: string, value: string): string |
   const writer = writerOf(name)
   if (writer.kind === 'none') return undefined
   return writer.kind === 'set'
-    ? `treadle set ${id} ${name}=${value}`
+    ? `treadling set ${id} ${name}=${value}`
     : writer.usage.replaceAll('<id>', id).replaceAll('<value>', value)
 }
 

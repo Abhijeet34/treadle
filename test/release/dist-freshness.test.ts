@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // The release-integrity gate F6 asked for, exercised from both sides.
 //
-// `package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores
+// `package.json` lists `dist/` in `files`, points `bin` at `dist/treadling.js` and gitignores
 // the directory, and nothing built it before a pack. A tree carrying a bundle two days older
 // than its source reported fourteen commands where the inventory has nineteen, and a publish
 // from it would have shipped that tool with this README.
@@ -27,14 +27,14 @@ const CHECKER = path.join(ROOT, 'scripts', 'check-dist-fresh.ts')
 
 /** A throwaway tree with one source file and one bundle, each with the time it is given. */
 async function aTree(sourceAt: Date, bundleAt: Date | undefined): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), 'treadle-dist-'))
+  const root = await mkdtemp(path.join(tmpdir(), 'treadling-dist-'))
   await mkdir(path.join(root, 'src', 'cli'), { recursive: true })
   const source = path.join(root, 'src', 'cli', 'main.ts')
   await writeFile(source, 'export const VERSION = "0.1.0"\n')
   await utimes(source, sourceAt, sourceAt)
   if (bundleAt !== undefined) {
     await mkdir(path.join(root, 'dist'), { recursive: true })
-    const bundle = path.join(root, 'dist', 'treadle.js')
+    const bundle = path.join(root, 'dist', 'treadling.js')
     await writeFile(bundle, '#!/usr/bin/env -S node --stack-size=2000\n')
     await chmod(bundle, 0o755)
     await utimes(bundle, bundleAt, bundleAt)
@@ -56,12 +56,12 @@ describe('a bundle older than its source is not packed', () => {
     } finally { await rm(root, { recursive: true, force: true }) }
   })
 
-  // Found by rebuilding and then running ./dist/treadle.js: esbuild writes 0644, so the
+  // Found by rebuilding and then running ./dist/treadling.js: esbuild writes 0644, so the
   // shebang that chooses the runtime's stack size was never read from a checkout.
   it('refuses a bundle the kernel would not read the shebang of', { skip: POSIX_MODES }, async () => {
     const root = await aTree(OLD, NEW)
     try {
-      await chmod(path.join(root, 'dist', 'treadle.js'), 0o644)
+      await chmod(path.join(root, 'dist', 'treadling.js'), 0o644)
       assert.match(distProblems(root)[0] as string, /not executable/)
     } finally { await rm(root, { recursive: true, force: true }) }
   })
@@ -130,13 +130,13 @@ describe('the release path runs that gate, and it is not prepack', () => {
     try {
       const stale = staleAgainst(root)
       // Repository-relative with `/` on every platform, so the sentence the preflight prints
-      // reads the same everywhere: it already names `dist/treadle.js` that way.
+      // reads the same everywhere: it already names `dist/treadling.js` that way.
       assert.equal(stale, 'src/cli/main.ts', 'the checker did not find the newer source file')
       const problems = preflight({
         tag: 'v0.1.0',
         facts: { commit: 'abc', onReleaseBranch: true },
         releasedCommit: 'abc',
-        manifest: { version: '0.1.0', license: 'Apache-2.0', files: ['dist/'], bin: { treadle: 'dist/treadle.js' }, repository: 'https://github.com/Abhijeet34/treadle' },
+        manifest: { version: '0.1.0', license: 'Apache-2.0', files: ['dist/'], bin: { treadling: 'dist/treadling.js' }, repository: 'https://github.com/Abhijeet34/treadling' },
         bundleBytes: 362429,
         bundleLimit: 512000,
         staleAgainst: stale,

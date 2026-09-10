@@ -180,7 +180,7 @@ export async function transition(
     return errorResult({
       code: 'VALIDATION', command: 'transition', workspace, effect: 'mutate',
       rule: live.error.rule ?? 'V4', entity: `item ${item.id}`, cause: live.error.message,
-      fix: [`treadle help transition`, `treadle show ${item.id}`],
+      fix: [`treadling help transition`, `treadling show ${item.id}`],
     })
   }
 
@@ -243,7 +243,7 @@ function completedLine(item: WorkItem, request: TransitionRequestInput, rule: st
   if (release) flags.push(`--outcome ${request.outcome ?? `<${ATTEMPT_OUTCOMES.join('|')}>`}`)
   for (const guard of request.overrides ?? []) flags.push(`--override ${guard}`)
   flags.push('--reason "<why>"')
-  return [`treadle transition ${item.id} ${to} ${flags.join(' ')}`]
+  return [`treadling transition ${item.id} ${to} ${flags.join(' ')}`]
 }
 
 /**
@@ -264,7 +264,7 @@ function fixesFor(
   // the blocker is where a caller wants that read back; the field is the one line `show`
   // cuts at 64 cells, so the fix asks for it whole.
   if (failed?.guard === 'G2') {
-    fixes.push(...impediments.map((id) => `treadle show ${id} --field proposed_resolution`))
+    fixes.push(...impediments.map((id) => `treadling show ${id} --field proposed_resolution`))
   }
   // A gate guard's own reason names rule ids, and the rules' remedies are command lines
   // (test/domain/gate-remedies.test.ts holds that), so a refusal on G1 or G6 hands all of
@@ -281,7 +281,7 @@ function fixesFor(
   if (failed !== undefined && OVERRIDABLE_GUARDS.includes(failed.guard) && target !== undefined) {
     fixes.push(overrideCommand(item.id, target, failed.guard, request.resolution))
   }
-  fixes.push(`treadle explain ${item.id}`)
-  if (target !== undefined && isTerminal(target)) fixes.push(`treadle show ${item.id}`)
+  fixes.push(`treadling explain ${item.id}`)
+  if (target !== undefined && isTerminal(target)) fixes.push(`treadling show ${item.id}`)
   return [...new Set(fixes)]
 }

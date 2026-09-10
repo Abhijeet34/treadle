@@ -42,7 +42,7 @@ describe('a record removed and filed again under its own id', () => {
   const ids = sequentialIds()
 
   before(async () => {
-    parent = await mkdtemp(path.join(tmpdir(), 'treadle-refile-'))
+    parent = await mkdtemp(path.join(tmpdir(), 'treadling-refile-'))
     const root = path.join(parent, 'platform', '.work')
     await initWorkspace(fixedClock(FILED), ids, { at: root, name: 'platform', actor: ACTOR })
     const opened = await openWorkspace(root)
@@ -109,7 +109,7 @@ describe('a forged event filed under an earlier month than the removal', () => {
   const ids = sequentialIds()
 
   before(async () => {
-    parent = await mkdtemp(path.join(tmpdir(), 'treadle-cross-month-'))
+    parent = await mkdtemp(path.join(tmpdir(), 'treadling-cross-month-'))
     root = path.join(parent, 'platform', '.work')
     await initWorkspace(fixedClock(FILED), ids, { at: root, name: 'platform', actor: ACTOR })
     const opened = await openWorkspace(root)
@@ -160,7 +160,7 @@ describe('a record no removal ever touched', () => {
   const ids = sequentialIds()
 
   before(async () => {
-    parent = await mkdtemp(path.join(tmpdir(), 'treadle-refile-plain-'))
+    parent = await mkdtemp(path.join(tmpdir(), 'treadling-refile-plain-'))
     const root = path.join(parent, 'platform', '.work')
     await initWorkspace(fixedClock(REFILED), ids, { at: root, name: 'platform', actor: ACTOR })
     const opened = await openWorkspace(root)

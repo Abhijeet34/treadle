@@ -82,7 +82,7 @@ function figure(hit: number, total: number): string {
   return `${percent(hit, total).toFixed(2).padStart(6)} (${hit}/${total})`
 }
 
-const work = mkdtempSync(path.join(tmpdir(), 'treadle-coverage-'))
+const work = mkdtempSync(path.join(tmpdir(), 'treadling-coverage-'))
 const report = path.join(work, 'lcov.info')
 
 const run = spawnSync(process.execPath, [

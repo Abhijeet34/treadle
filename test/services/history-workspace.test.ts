@@ -35,7 +35,7 @@ describe('history over the workspace record', () => {
   let txn: string
 
   before(async () => {
-    parent = await mkdtemp(path.join(tmpdir(), 'treadle-ws-history-'))
+    parent = await mkdtemp(path.join(tmpdir(), 'treadling-ws-history-'))
     const root = path.join(parent, 'platform', '.work')
     const ids = sequentialIds()
     const clock = fixedClock(NOW)

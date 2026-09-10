@@ -125,7 +125,7 @@ export async function setConfig(
   if (!isConfigKey(request.key)) {
     return refusal(workspace, 'VALIDATION', 'C1', request.key,
       `${request.key} is not a configuration key; they are ${CONFIG_KEYS.join(', ')}`,
-      ['treadle config'])
+      ['treadling config'])
   }
   const key: ConfigKey = request.key
 
@@ -135,7 +135,7 @@ export async function setConfig(
   const parsed = parseConfigValue(key, request.value)
   if (!parsed.ok) {
     return refusal(workspace, 'VALIDATION', parsed.error.rule ?? 'V8', key, parsed.error.message,
-      [`treadle config`, `treadle help config`])
+      [`treadling config`, `treadling help config`])
   }
 
   const after = withConfigKey(before, key, parsed.value)

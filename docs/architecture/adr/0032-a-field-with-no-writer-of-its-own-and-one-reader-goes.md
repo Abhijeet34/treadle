@@ -9,17 +9,17 @@
 
 `reporter` was a common field of every work-item type, meaning "who asked for this".
 Nothing in the tool ever filled it.
-`file` has no `--reporter` flag and never set it from the actor, so the only way a record acquired one was `treadle set <id> reporter=<name>`, the generic editor that writes any field the dictionary does not reserve.
+`file` has no `--reporter` flag and never set it from the actor, so the only way a record acquired one was `treadling set <id> reporter=<name>`, the generic editor that writes any field the dictionary does not reserve.
 Nothing read it either, beyond printing it back: `show` carried it as one column, and that was the whole of its life.
 It reached no gate, no guard, no ranking clause, no `doctor` finding and no filter.
-treadle's own workspace, fifteen items at the time of the audit, has never carried one.
+treadling's own workspace, fifteen items at the time of the audit, has never carried one.
 
 The fact `reporter` would have recorded is already recorded.
 Every `item.file` event names the actor who filed the record, `history` prints that actor, and `explain` reads the same log.
 So the field was not a second source for who asked; it was an empty slot beside an answer the log already gives.
 
 That is the defect class this repository keeps finding in its own surface: a promise on the record that nothing keeps.
-A reader who sees `reporter` in the type-to-fields dictionary that `treadle help show` prints reasonably concludes the tool tracks who requested the work, and it does not.
+A reader who sees `reporter` in the type-to-fields dictionary that `treadling help show` prints reasonably concludes the tool tracks who requested the work, and it does not.
 
 ## Decision
 

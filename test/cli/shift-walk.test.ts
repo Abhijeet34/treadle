@@ -34,7 +34,7 @@ import { describe, it, before, after } from 'node:test'
 
 import { runCli } from '../helpers/cli-run.ts'
 
-const WORKER = { TREADLE_ACTOR: 'worker', TREADLE_ACTOR_KIND: 'agent' }
+const WORKER = { TREADLING_ACTOR: 'worker', TREADLING_ACTOR_KIND: 'agent' }
 
 type Answer = {
   readonly code: number
@@ -135,13 +135,13 @@ describe('one agent shift, walked in order', () => {
     tally.assertions += 1
   }
 
-  before(async () => { cwd = await mkdtemp(path.join(tmpdir(), 'treadle-shift-')) })
+  before(async () => { cwd = await mkdtemp(path.join(tmpdir(), 'treadling-shift-')) })
   after(async () => { await rm(cwd, { recursive: true, force: true }) })
 
   it('refuses every command before the workspace exists, and names the one that creates it', async () => {
     const answer = await step('status with no workspace', ['status'], 6)
     assert.equal(answer.scalars.get('rule'), 'S1')
-    assert.ok(answer.fixes.includes('treadle init'), `S1 did not name init: ${answer.fixes.join(' | ')}`)
+    assert.ok(answer.fixes.includes('treadling init'), `S1 did not name init: ${answer.fixes.join(' | ')}`)
     tally.assertions += 2
     await step('the fix line S1 printed', ['init'], 0)
   })
@@ -182,7 +182,7 @@ describe('one agent shift, walked in order', () => {
       assert.match(refused.scalars.get('cause') ?? '', /DOR3/)
       tally.refusals += 1
       tally.assertions += 3
-      const next = refused.fixes.find((line) => line.startsWith('treadle transition cert '))
+      const next = refused.fixes.find((line) => line.startsWith('treadling transition cert '))
       assert.ok(next !== undefined, `hop ${hop}: no fix line moves the blocker\n${refused.out}`)
       assert.ok(!walked.includes(next), `hop ${hop}: the remedy repeated itself: ${next}`)
       walked.push(next)
@@ -192,9 +192,9 @@ describe('one agent shift, walked in order', () => {
       tally.assertions += 1
     }
     assert.deepEqual(walked, [
-      'treadle transition cert ready',
-      'treadle transition cert in_progress',
-      'treadle transition cert done',
+      'treadling transition cert ready',
+      'treadling transition cert in_progress',
+      'treadling transition cert done',
     ])
     tally.assertions += 1
     await holds('the blocker is resolved by reaching done', 'cert', 'done')

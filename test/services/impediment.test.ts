@@ -76,7 +76,7 @@ describe('raising an impediment', () => {
     assert.equal((await cli(['relation', 'remove', 'vault-down', 'blocks', 'audit-log'])).code, 0)
     const audit = await cli(['doctor'])
     assert.equal(audit.code, 7)
-    assert.match(audit.out, /^H27 vault-down relations the impediment is ready and blocks nothing, so it is raised against no work; treadle relation add vault-down blocks <id> names what it holds up$/m)
+    assert.match(audit.out, /^H27 vault-down relations the impediment is ready and blocks nothing, so it is raised against no work; treadling relation add vault-down blocks <id> names what it holds up$/m)
     assert.match((await cli(['explain', 'vault-down'])).out, /^H27 the impediment is ready and blocks nothing/m)
     assert.equal((await cli(['transition', 'vault-down', 'cancelled', '--resolution', 'rejected', '--reason', 'raised in error'])).code, 0)
   })
@@ -86,7 +86,7 @@ describe('raising an impediment', () => {
     assert.equal(refused.code, 3)
     assert.equal(line(refused, 'guard'), 'guard G1')
     assert.match(refused.err, /the ready gate fails: DOR9/)
-    assert.match(refused.err, /^fix treadle relation add cert-expired blocks <id>$/m)
+    assert.match(refused.err, /^fix treadling relation add cert-expired blocks <id>$/m)
   })
 
   it('stops being H27 once it blocks something, and a resolved one blocking nothing is not a finding', async () => {
@@ -138,14 +138,14 @@ describe('an impediment raised against a draft story', () => {
     assert.match(refused.err, /the ready gate fails: DOR3/)
     // The impediment is in draft, so the move that resolves it from here is `ready`, not
     // `done`: the fix line used to name `done`, which T1 refuses from draft.
-    assert.equal(line(refused, 'fix'), 'fix treadle transition cert-expired ready')
+    assert.equal(line(refused, 'fix'), 'fix treadling transition cert-expired ready')
     const why = await cli(['explain', 'saml-login'])
     assert.equal(line(why, 'blocked'), 'blocked yes cert-expired')
-    assert.match(why.out, /^ready DOR3 fail treadle transition cert-expired ready$/m)
-    assert.match(why.out, /^done DOD2 fail treadle transition cert-expired ready$/m)
+    assert.match(why.out, /^ready DOR3 fail treadling transition cert-expired ready$/m)
+    assert.match(why.out, /^done DOD2 fail treadling transition cert-expired ready$/m)
     const ran = await cli(['transition', 'cert-expired', 'ready'])
     assert.equal(ran.code, 0, `the fix line was refused as printed: ${ran.err}`)
-    assert.match((await cli(['explain', 'saml-login'])).out, /^ready DOR3 fail treadle transition cert-expired in_progress$/m, 'the remedy follows the impediment from state to state')
+    assert.match((await cli(['explain', 'saml-login'])).out, /^ready DOR3 fail treadling transition cert-expired in_progress$/m, 'the remedy follows the impediment from state to state')
   })
 
   it('frees the story once the impediment is done, with nothing unlinked: the edge stays as history', async () => {
@@ -163,7 +163,7 @@ describe('an impediment raised against a draft story', () => {
   it('re-blocks the story if the impediment is reopened, because the edge was never dropped', async () => {
     assert.equal((await cli(['transition', 'cert-expired', 'in_progress', '--reason', 'the renewed certificate is wrong'])).code, 0)
     assert.equal(line(await cli(['explain', 'saml-login']), 'blocked'), 'blocked yes cert-expired')
-    assert.match((await cli(['explain', 'saml-login'])).out, /^done DOD2 fail treadle transition cert-expired done$/m)
+    assert.match((await cli(['explain', 'saml-login'])).out, /^done DOD2 fail treadling transition cert-expired done$/m)
   })
 })
 
@@ -190,10 +190,10 @@ describe('an impediment raised against ready work', () => {
     // The same blocked item is remedied the same way at `ready` and at `in_progress`: the
     // blocker's next move, and on this edge the override as the second answer.
     assert.deepEqual(lines(refused).filter((entry) => entry.startsWith('fix ')), [
-      'fix treadle show vendor-hold --field proposed_resolution',
-      'fix treadle transition vendor-hold in_progress',
-      'fix treadle transition avatar-crop in_progress --override G2 --reason "<why>"',
-      'fix treadle explain avatar-crop',
+      'fix treadling show vendor-hold --field proposed_resolution',
+      'fix treadling transition vendor-hold in_progress',
+      'fix treadling transition avatar-crop in_progress --override G2 --reason "<why>"',
+      'fix treadling explain avatar-crop',
     ])
   })
 
@@ -230,8 +230,8 @@ describe('an impediment raised against work in progress', () => {
     assert.equal(refused.code, 3)
     assert.equal(line(refused, 'guard'), 'guard G6')
     assert.match(refused.err, /the done gate fails: DOD2/)
-    assert.equal(line(refused, 'fix'), 'fix treadle transition sec-review ready')
-    assert.match((await cli(['explain', 'log-redact'])).out, /^done DOD2 fail treadle transition sec-review ready$/m)
+    assert.equal(line(refused, 'fix'), 'fix treadling transition sec-review ready')
+    assert.match((await cli(['explain', 'log-redact'])).out, /^done DOD2 fail treadling transition sec-review ready$/m)
     for (const target of ['ready', 'in_progress', 'done']) {
       assert.equal((await cli(['transition', 'sec-review', target])).code, 0)
     }
