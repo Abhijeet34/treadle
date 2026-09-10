@@ -115,12 +115,13 @@ export async function appendAndSync(
 /**
  * DR4: the next lock holder removes the temp files a previous one left behind.
  *
- * Every one of them, whatever its age. Only a lock holder writes a temp file under the
- * store, so one standing when the lock changes hands belongs to a holder that never
- * committed: a writer that crashed, or one descheduled inside `writeFileAtomic` still
- * carrying a rename that would commit over the reclaimer's work. Age cannot tell those two
- * apart, and the hour this used to spare a fresh temp file for is what left that rename able
- * to land.
+ * Every one of them, whatever its age. Two things write a temp file under the store: a lock
+ * holder, and a waiter asking whether the directory will take a file at all (`lock.ts`, on
+ * `EPERM`), which removes its own in a `finally`. So one standing when the lock changes hands
+ * belongs to a holder that never committed: a writer that crashed, or one descheduled inside
+ * `writeFileAtomic` still carrying a rename that would commit over the reclaimer's work. Age
+ * cannot tell those two apart, and the hour this used to spare a fresh temp file for is what
+ * left that rename able to land.
  */
 export async function sweepTempFiles(dir: string): Promise<number> {
   let removed = 0

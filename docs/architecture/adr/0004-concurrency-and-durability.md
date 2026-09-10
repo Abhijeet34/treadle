@@ -5,6 +5,7 @@
 **Implements:** DR4 of the system design record, under decision D2
 **Overtaken in part by:** [ADR-0003](0003-record-format-and-migration.md) rule 7, which put the finding check in the one read every command performs, so the narrow refusal this record chose is no longer what a caller meets
 **Overtaken in part by:** [ADR-0030](0030-the-index-goes-and-a-read-parses-the-files.md), which removes the contention this record's busy-timeout ordering was written against, so "The index is the third thing processes contend on" is a closed account, and with it the mechanism under "A duplicated id refuses the write": no `items` table keys on the id now, and the `S3` finding a write reads before it acts is raised by the shard read itself; the lock, the atomic write, compare-and-set, the journal and the refusal that finding produces stand, and the journal's home is `.txn/`
+**Overtaken in part by:** [ADR-0036](0036-eperm-from-an-exclusive-create-is-contention-when-the-directory-takes-a-file.md), under which "on `EEXIST` read the token" is no longer the whole of what a waiter treats as contention: Windows answers a delete-pending lock file with `EPERM`, and that errno is waited on when the directory still takes a file and refused when it does not; everything else about the loop stands
 
 ## Context
 

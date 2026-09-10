@@ -19,6 +19,10 @@ import type { FileHandle } from 'node:fs/promises'
 
 import { openExclusive as real } from '../../../src/adapters/store/atomic.ts'
 
+// The redirect replaces `atomic.ts` whole for `lock.ts`, so everything else it imports from
+// there has to come back out of here unchanged.
+export { tempNameFor } from '../../../src/adapters/store/atomic.ts'
+
 type Resolved = { url: string; shortCircuit?: boolean; format?: string }
 type Next = (specifier: string, context: { parentURL?: string }) => Resolved | Promise<Resolved>
 
