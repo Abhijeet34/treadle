@@ -82,15 +82,39 @@ GitHub keeps a redirect from the old path, so the links already published in `CH
 
 ### The records that spelled the old name keep it
 
-Four things are left spelling `treadle`, each because rewriting it would falsify a record rather than update one:
+Seven kinds of passage are left spelling `treadle`, each because rewriting it would falsify a record rather than update one, or because the passage names the retirement itself:
 
-- `CHANGELOG.md`, which release-please generates and whose entries are release history.
-- `docs/architecture/adr/0009-release-and-supply-chain.md`, the identity-gate record, marked overtaken in part by this one.
-- `docs/architecture/history/BENCHMARKS-2026-09.md`, whose figures are facts about runs taken under the old name.
-- `.work/`, this repository's own workspace: the append-only event log, the month shard and the workspace record, none of which is hand-edited.
+- Generated release history. `CHANGELOG.md` is written by release-please, and its entries and links are release history.
+- Measured figures. `docs/architecture/history/BENCHMARKS-2026-09.md`'s numbers are facts about runs taken under the old name.
+- This repository's own workspace, none of it hand-edited: the append-only event log, the month shard and the workspace record, whose header names the workspace by the id `init` gave it.
+- Every decision record, including this one, ADR-0037 and the ADR index, because a decision record is never rewritten; a later record marks one overtaken instead of rewriting it. `test/architecture/retired-names.test.ts` allowlists the whole `docs/architecture/adr/` directory rather than naming each file inside it.
+- The retired-names test itself, which allowlists itself and names `treadle` once as the retired name and once in a historical comment, by design.
+- Four measured quotes of the release-please branch name as the run answered it, `release-please--branches--main--components--treadle`, each beside a sentence saying why: two in `docs/RELEASING.md`, one in `docs/VERIFICATION.md` and one in ADR-0037.
+- Prose in a live document that spells `treadle` in order to say the name is retired: one sentence each in `AGENTS.md`, `README.md` and `docs/RELEASING.md`. Each sentence's subject is the retirement itself, and `test/architecture/retired-names.test.ts` admits it through its `SAYS_IT_WENT` context window rather than through the file allowlist, so it is gated on wording rather than exempted by path.
 
-Two measured quotes in `docs/RELEASING.md` and one in ADR-0037 keep the release pull request's branch name as the run answered it, `release-please--branches--main--components--treadle`, with a sentence beside each saying why.
-`test/architecture/retired-names.test.ts` gains `treadle` as a retired name, so the sweep that already refuses a stale `sprint_id` now refuses a stale `treadle` anywhere outside those records.
+`test/architecture/retired-names.test.ts` gains `treadle` as a retired name, so the sweep that already refuses a stale `sprint_id` now refuses a stale `treadle` anywhere outside the passages named above.
+
+Measured at this record's own final revision with `git grep -oIni 'treadle' -- . | wc -l` for the total and the same command piped to `cut -d: -f1 | sort | uniq -c` for the per-file count, since `treadling` does not contain `treadle` and a plain substring count is exact:
+
+| File | Occurrences |
+|---|---|
+| `CHANGELOG.md` | 170 |
+| `docs/architecture/history/BENCHMARKS-2026-09.md` | 43 |
+| `docs/architecture/adr/0009-release-and-supply-chain.md` | 15 |
+| `docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md` (this record) | 33 |
+| `docs/RELEASING.md` | 3 |
+| `test/architecture/retired-names.test.ts` | 3 |
+| `.work/workspace.md` | 2 |
+| `AGENTS.md` | 2 |
+| `docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md` | 1 |
+| `docs/architecture/adr/README.md` | 1 |
+| `docs/VERIFICATION.md` | 1 |
+| `README.md` | 1 |
+| `.work/items/2026-09.md` | 1 |
+| `.work/events/2026-09.jsonl` | 1 |
+| **Total** | **277** |
+
+This table is exhaustive as of this revision: it is every row `git grep -oIni 'treadle' -- .` reports, and its occurrence column sums to the total `git grep -oIni 'treadle' -- . | wc -l` gives. A later change that adds or removes a surviving occurrence makes this table stale until both commands are re-run and the table is rewritten to match.
 
 ## Alternatives measured
 
