@@ -28,6 +28,7 @@ There is no tag trigger: a hand-pushed tag would fire it, and `release_created` 
 any squash-merge to main
   |- release-pr -------- opens or updates "chore(main): release x.y.z", tags nothing
   |- release-pr-checks - releases that pull request's parked runs, so it is checked
+  |- ruleset-drift ----- the forge's rulesets, read back against .github/rulesets/
   `- cross-platform ---- macOS, Windows and Linux on this exact tree
        `- release-tag -- nothing above it has tagged; this is the only job that can
             |- artifacts --- preflight, npm run build, npm pack, SBOM, checksums,
@@ -387,6 +388,53 @@ A settings script that half-applies is worse than one that refuses, because the 
 
 The `npm-publish` environment and its required reviewer are not in that script.
 An environment that gates publication should be created deliberately by the person who owns the account, at the moment they decide to open the gate.
+
+`.github/rulesets/README.md` states, beside the two files, that they are applied by that command and by nothing else.
+The next section is how a repository that stopped matching them says so.
+
+## Keeping the rulesets and the files in step
+
+Nothing runs that script for you, so a ruleset file and the ruleset GitHub enforces part company silently.
+
+`.github/rulesets/tags.json` dropped `required_signatures` in #97.
+Live ruleset `22316869` was created and last modified in the same second on 2026-09-05 and was not touched again, so it still required a signature that no file asked for.
+`release-tag` created an unsigned tag as the automation, GitHub refused it, and the refusal read `Resource not accessible by integration`, which looks like a missing permission and is not one.
+
+Reading the rulesets back found a second drift nobody was looking for.
+`.github/rulesets/main.json` has required the `tests kept` context since #32, and live ruleset `22314350` requires `secret scan` in its place.
+The guard ADR-0013 argues for has never been a required context on `main`, and only a read of the forge could have said so.
+
+```sh
+npm run ruleset-drift
+```
+
+`scripts/check-ruleset-drift.ts` reads every live ruleset, joins it to a file by name, and exits 1 naming each difference with both values.
+Both directions count: a file naming a ruleset the forge does not have has never been applied, and a live ruleset no file describes is a rule this tree cannot account for.
+Arrays are compared as sets, because the rules, the required contexts, the merge methods and the ref patterns all mean the same thing in any order.
+
+It needs no credential.
+Both ruleset endpoints answer an unauthenticated request on a public repository, measured at HTTP 200, so the check runs under the read-only default workflow token rather than under a stored administrative one.
+That matters more than the convenience: the release design has no long-lived credentials in it, and a secret introduced to check a configuration file would be a worse thing to own than the drift it caught.
+
+Two things it reports and does not fail on, both named in the output rather than passed over.
+
+| What | Why it is not drift |
+|---|---|
+| `bypass_actors` was not compared | The field is served only to a read by a repository administrator. Measured against `cli/cli`, where this account is not one, the response carries `conditions`, `rules` and `enforcement` and no `bypass_actors` at all. Run the command locally as an administrator to have it compared |
+| A parameter only the forge reports | GitHub fills defaults into a ruleset it accepts and serves keys its own published API description does not carry: `require_extra_approval_for_unattributed_changes` is in the live `pull_request` parameters and is absent from `repository-rule-pull-request` in `github/rest-api-description`. A file that mirrored the response could be refused by the endpoint that applies it |
+
+`.github/workflows/ruleset-drift.yml` runs the check weekly, on a pull request that touches the ruleset files, on dispatch, and on the release path.
+The weekly run is the one that matters most: the main ruleset was changed on the forge on 2026-09-08 and no push since could have noticed, because drift needs no commit.
+
+On the release path `release-tag` needs it, so the check stands in front of the tag rather than behind it.
+A `v*` tag can be neither updated nor deleted, so a tag cut against a tag ruleset nobody had read costs a version number permanently.
+It is not a required context on `main`: its pull request trigger is filtered by path, and a required context that does not report blocks every merge.
+
+The four files under `.github/settings/` are not read back, and that is a gap rather than a decision that they cannot drift.
+Their endpoints answer `401 Requires authentication` to an unauthenticated request and need an administrative read, so checking them automatically would mean storing a token with rights this release path deliberately does not own.
+Confirm those by hand, with the three commands `scripts/apply-repo-settings.sh` prints when it finishes.
+
+A file nobody reads back is documentation, whatever it is called.
 
 ## Why Actions may create pull requests
 
