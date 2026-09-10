@@ -71,10 +71,11 @@ F1, F7 and F11 closed by removing their surface rather than by guarding it, whic
 The first three name tests proving that nothing under `src/` starts a process, evaluates a string, reads a hook setting or writes a file outside the five modules `WRITERS` in `test/security/f11-adapter-write-safety.test.ts` names: the store's four writers and the workspace resolver.
 F4 names `test/render/conformance.test.ts`, which holds the shipped rendering set to the three `RENDERINGS` declares, none of them a format a spreadsheet opens.
 None of the four proves that the removed surface would be safe if it were built: a guarded export and a gated hook contract are both open questions this tree answers by not having either.
-They are also not evidence about a release that has never fired: F13's third control, provenance at publish, is asserted over the workflow and the preflight script rather than over a publish that happened.
+They are also not evidence about a publish that has never happened: F13's third control, provenance at publish, is asserted over the workflow and the preflight script rather than over a publish that happened.
 
-**The tag half of the release pipeline, exercised locally rather than fired.**
-`cross-platform`, `artifacts`, `publish` and `smoke` fire only on a `v*` tag, and no release has ever fired, so none of them has ever run.
+**The tag half of the release pipeline, exercised locally rather than proven by a release.**
+`cross-platform`, `artifacts`, `publish`, `publication` and `smoke` fire only on a `v*` tag, and one tag has fired them: on `v0.1.0`, run `34453354302`, `cross-platform` ran and its three container jobs failed for want of `TREADLE_ACTOR`, and `artifacts`, `publish`, `publication` and `smoke` all skipped behind them.
+So the tag has been pushed and nothing downstream of `cross-platform` has ever run.
 Every step of `artifacts` that can run without a tag was run in a worktree on 2026-09-10, in the workflow's own order and with its own commands, on Node 24.20.0 and npm 11.19.0 rather than the 24.15.0 `.nvmrc` pins: `npm ci`, `npm run build` at 386,054 bytes against DR8's 768,000, `npm pack --json --ignore-scripts` producing `treadle-0.1.0.tgz` at 116,490 bytes, the dependency-graph SBOM export at 107,021 bytes of SPDX-2.3 over 134 packages, and `sha256sum` over both into a `SHA256SUMS` that verifies against both files.
 `node scripts/release-preflight.ts --tag v0.1.0 --branch origin/main` refused at exit 1 with `v0.1.0 is not a tag in this repository`, which is the right answer where no tag exists and is why its accept path was exercised through `scripts/rollback-drill.sh` instead, 8 of 8 including the notes it writes.
 `notesFor` was run against release pull request 69's own changelog and returned the 104-line 0.1.0 section with no leak into a second heading.

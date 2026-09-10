@@ -47,8 +47,8 @@ the generator no longer writes: without that, `files` ships the whole directory 
 `scripts/shebang.ts` refuses an `env` option or a node flag on it, and
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
 measurements and the trade behind that.
-Nothing is published: `docs/RELEASING.md` carries the three interlocks, the signed-tag rule and
-how a release happens, and `scripts/apply-repo-settings.sh` is the only thing that applies the
+No package is on the registry, and `v0.1.0` is released with no assets: `docs/RELEASING.md`
+carries the interlocks that still hold, the signed-tag rule and how a release happens, and `scripts/apply-repo-settings.sh` is the only thing that applies the
 checked-in rulesets under `.github/`.
 Do not tag, release or publish without the captain saying so.
 `scripts/rollback-drill.sh` is how the tag path is exercised without firing one: it signs real

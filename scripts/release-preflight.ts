@@ -115,9 +115,9 @@ export function preflight(input: {
   }
 
   if (publishing) {
-    // The name-clearance screen has not run. Until it does, `private: true` is the interlock
-    // that makes publication impossible rather than merely unintended, and this names it so a
-    // failed publish reads as the gate holding rather than as a broken workflow.
+    // `private: true` was the first publication interlock and the manifest no longer carries it.
+    // The clause stays: a manifest that carries the field again is refused before anything is
+    // packed, and the refusal reads as the gate holding rather than as a broken workflow.
     if (manifest.private === true) {
       problems.push(
         'package.json is "private": true, which is treadle\'s publication interlock: the name ' +

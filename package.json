@@ -7,7 +7,6 @@
     "treadle": "dist/treadle.js"
   },
   "author": "Abhijeet Halder",
-  "private": true,
   "type": "module",
   "engines": {
     "node": ">=24.15.0"
