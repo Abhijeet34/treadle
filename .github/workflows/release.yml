@@ -355,12 +355,12 @@ jobs:
           set -euo pipefail
           version="${TAG#v}"
           for attempt in 1 2 3 4 5 6; do
-            if npm install --global --ignore-scripts "treadling@${version}"; then
-              echo "installed treadling@${version} on attempt ${attempt}"
+            if npm install --global --ignore-scripts "@abhijeet34/treadling@${version}"; then
+              echo "installed @abhijeet34/treadling@${version} on attempt ${attempt}"
               break
             fi
             if [ "$attempt" = 6 ]; then
-              echo "::error::treadling@${version} was published but is not installable" >&2
+              echo "::error::@abhijeet34/treadling@${version} was published but is not installable" >&2
               exit 1
             fi
             sleep 60

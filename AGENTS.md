@@ -51,6 +51,10 @@ the generator no longer writes: without that, `files` ships the whole directory 
 `scripts/shebang.ts` refuses an `env` option or a node flag on it, and
 `docs/STABILITY.md`, "The supported userlands, and the macOS argument-block limit", carries the
 measurements and the trade behind that.
+The package publishes as `@abhijeet34/treadling` while the typed command, the `TREADLING_*`
+variables and the repository stay the bare word, so an install line carries the scope, a usage
+example never does, and `npm pack` writes `abhijeet34-treadling-<version>.tgz`
+(`docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md`).
 No package is on the registry, and `v0.1.0`, `v0.1.1` and `v0.1.2` are released with no assets:
 `docs/RELEASING.md` carries the interlocks that still hold and how a release happens, and
 `scripts/apply-repo-settings.sh` is the only thing that applies the checked-in rulesets under

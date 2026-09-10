@@ -154,8 +154,8 @@ jobs:
           set -euo pipefail
           docker run --rm -v "$PWD/pack:/pack:ro" "${{ matrix.image }}" sh -c '
             set -eu
-            npm install --global --ignore-scripts /pack/treadling-*.tgz >/dev/null 2>&1
-            echo "shebang: $(head -1 /usr/local/lib/node_modules/treadling/dist/treadling.js)"
+            npm install --global --ignore-scripts /pack/abhijeet34-treadling-*.tgz >/dev/null 2>&1
+            echo "shebang: $(head -1 /usr/local/lib/node_modules/@abhijeet34/treadling/dist/treadling.js)"
             treadling version
             mkdir -p /tmp/ws && cd /tmp/ws
 
@@ -213,12 +213,12 @@ jobs:
           node scripts/check-dist-fresh.ts
           mkdir -p pack
           npm pack --ignore-scripts --pack-destination pack
-          # `./` is load-bearing: npm reads `pack/treadling-0.1.0.tgz` as the `owner/repo`
+          # `./` is load-bearing: npm reads `pack/abhijeet34-treadling-0.2.0.tgz` as the `owner/repo`
           # GitHub shorthand and tries `git ls-remote ssh://git@github.com/pack/...`, which
           # failed this job at exit 128 in run 34151979303.
-          npm install --global --ignore-scripts "./$(ls pack/treadling-*.tgz)"
+          npm install --global --ignore-scripts "./$(ls pack/abhijeet34-treadling-*.tgz)"
           prefix=$(npm prefix -g)
-          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/treadling/dist/treadling.js")"
+          echo "first line of the installed bundle: $(head -1 "$prefix/node_modules/@abhijeet34/treadling/dist/treadling.js")"
           echo "the program npm's shim will run:"
           grep -E '^\s+SET "_prog=' "$prefix/treadling.cmd"
 

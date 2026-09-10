@@ -30,6 +30,8 @@ The package has zero runtime dependencies, and that is a budget rather than a co
 No package is on the registry, and none of the three releases cut so far carries any assets.
 Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered.
 The name clearance ran on 2026-09-10 and cleared `treadling` on every source it could reach; [ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) carries what it read, what it could not, and why `treadle` is no longer this package's name.
+The package will publish as `@abhijeet34/treadling`, because npm refused the unscoped `treadling` as too similar to `readline` and named that scope in the refusal ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
+The typed command stays `treadling`, so every example below is unchanged, and `npx treadling` will never resolve here: the scope is part of the name and an install line without it fetches nothing of this project's.
 [docs/RELEASING.md](docs/RELEASING.md) says why each release came up empty, what opens the publish gate, and what a release says when it published nothing.
 Clone the repository to work on it.
 
@@ -128,7 +130,7 @@ See [Status](#status) for what is shipped, and what was declined or is blocked.
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
 | Release: version and changelog through release-please, the cross-platform matrix gates the tag rather than a signature, SBOM, checksums, build provenance | Shipped: [ADR-0037](docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md); a failing check spends no version number, because the automation cuts the tag itself, behind the matrix; fired three times, on `v0.1.0` through `v0.1.2`, none of which carries assets ([docs/RELEASING.md](docs/RELEASING.md)) |
-| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered; the name cleared on 2026-09-10 ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)) |
+| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered; the name cleared on 2026-09-10 ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)) and publishes scoped as `@abhijeet34/treadling` ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)) |
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.

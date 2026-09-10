@@ -4,6 +4,7 @@
 **Date:** 2026-09-10
 **Decided by:** the captain, on 2026-09-10
 **Overtakes in part:** [ADR-0009](0009-release-and-supply-chain.md)'s identity gate, whose verdict was that the name stands for the repository, the code and the documentation and does not stand for publication until a sixteen-source clearance screen has run. The screen has now run, on a different word. Everything else ADR-0009 decided stands, and its own spelling of the old name is left where it is.
+**Overtaken in part by:** [ADR-0039](0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md), which moves the package name alone to `@abhijeet34/treadling` after npm refused the unscoped name as too similar to `readline`; the command, the `TREADLING_*` environment variables, the repository and the word itself stand
 
 ## Context
 
