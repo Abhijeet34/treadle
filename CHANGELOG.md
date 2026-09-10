@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.3](https://github.com/Abhijeet34/treadle/compare/v0.1.2...v0.1.3) (2026-09-10)
+
+
+### Bug Fixes
+
+* **release:** stop the artifacts job creating a second GitHub release ([#100](https://github.com/Abhijeet34/treadle/issues/100)) ([ed7172b](https://github.com/Abhijeet34/treadle/commit/ed7172b5ca94b8ec10b3058b214742ecd0de571d))
+
 ## [0.1.2](https://github.com/Abhijeet34/treadle/compare/v0.1.1...v0.1.2) (2026-09-10)
 
 
