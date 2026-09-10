@@ -48,6 +48,15 @@ jobs:
     # A backstop, never the mechanism. A job that outlives this reports `cancelled`, which
     # carries no verdict; the steps below bound themselves first.
     timeout-minutes: 15
+    env:
+      # The same pins secret-scan.yml carries, asserted equal to that job's by
+      # test/architecture/secret-scan-fixture.test.ts so the two copies cannot drift apart.
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+      # With this set, the two scans in that file fail on a missing binary instead of skipping,
+      # so deleting the install step below reddens this job rather than quietly returning them
+      # to running in no job on any platform, which is what they had always done.
+      TREADLE_REQUIRE_GITLEAKS: "1"
     strategy:
       fail-fast: false
       matrix:
@@ -71,6 +80,22 @@ jobs:
 
       - name: Typecheck
         run: npm run typecheck
+
+      # test/architecture/secret-scan-fixture.test.ts proves the planted AWS credential is a
+      # shape gitleaks' aws-access-token rule actually matches, and a fixture that stops
+      # matching turns the secret-scanning gate into a check that always passes. Those two
+      # scans need the binary, and no job that ran `npm test` had ever installed it: they
+      # skipped on all three platforms of every run. Downloaded and checksummed for the reason
+      # the actionlint job states, from the same pins as secret-scan.yml.
+      - name: Install gitleaks, which the secret-scan fixture tests need to run at all
+        run: |
+          set -euo pipefail
+          url="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL "$url" -o gitleaks.tar.gz
+          echo "${GITLEAKS_SHA256}  gitleaks.tar.gz" | sha256sum --check --strict
+          tar -xzf gitleaks.tar.gz gitleaks
+          sudo install -m 0755 gitleaks /usr/local/bin/gitleaks
+          rm -f gitleaks gitleaks.tar.gz
 
       # The suite spawns 37 processes for the store's advisory lock and more for the index
       # contention case, so it is the slowest thing here at about 20 seconds locally.

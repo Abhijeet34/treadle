@@ -19,6 +19,8 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
 
+import { workflowOf, type Job } from '../helpers/workflow.ts'
+
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 // The tail gitleaks' aws-access-token rule requires: [A-Z2-7]{16}, never the full
@@ -34,9 +36,8 @@ function syntheticAwsAccessKeyId(): string {
 }
 
 /**
- * gitleaks is not a runtime dependency of treadle: the `check` job that runs `npm test` does
- * not install it, only the shared secret-scan workflow's own job does. A machine without the
- * binary skips the tests below with this named reason rather than failing the build.
+ * gitleaks is not a runtime dependency of treadle, so a developer's machine without the binary
+ * skips the two scans below with this named reason rather than failing the build.
  */
 const GITLEAKS_MISSING: string | false = (() => {
   try {
@@ -47,7 +48,23 @@ const GITLEAKS_MISSING: string | false = (() => {
   }
 })()
 
+/**
+ * That skip was true on every leg: secret-scan.yml installed gitleaks and never ran `npm test`,
+ * ci.yml and cross-platform.yml ran `npm test` and installed nothing, so the two tests proving
+ * the planted fixture is a shape the rule matches had never executed in any job. ci.yml's
+ * `check` job now installs the binary and sets this, and with it set an absent binary fails
+ * these tests instead of skipping them - so deleting that install step reddens the job rather
+ * than returning them to running nowhere.
+ */
+const REQUIRED = process.env['TREADLE_REQUIRE_GITLEAKS'] === '1'
+
+const SKIP: string | false = REQUIRED ? false : GITLEAKS_MISSING
+
 async function scan(line: string): Promise<Array<{ RuleID: string }>> {
+  assert.equal(
+    GITLEAKS_MISSING, false,
+    'TREADLE_REQUIRE_GITLEAKS is set, so this job undertook to install gitleaks and did not',
+  )
   const dir = await mkdtemp(path.join(tmpdir(), 'treadle-secret-scan-fixture-'))
   try {
     await writeFile(path.join(dir, 'deploy.env'), `${line}\n`)
@@ -79,7 +96,7 @@ describe('the synthetic AWS credential fixture this repository plants to prove t
 
   it(
     'gitleaks flags the generated fixture as aws-access-token, the rule the gate is proven against',
-    { skip: GITLEAKS_MISSING },
+    { skip: SKIP },
     async () => {
       const key = syntheticAwsAccessKeyId()
       const findings = await scan(`AWS_ACCESS_KEY_ID=${key}`)
@@ -92,7 +109,7 @@ describe('the synthetic AWS credential fixture this repository plants to prove t
 
   it(
     'a tail outside that charset is not a fixture the gate can be proven against: it scans clean',
-    { skip: GITLEAKS_MISSING },
+    { skip: SKIP },
     async () => {
       // A tail with its first character forced to '8' - inside the full uppercase-alphanumeric
       // set a naive generator would draw from, outside the base32-style set the rule requires.
@@ -104,4 +121,36 @@ describe('the synthetic AWS credential fixture this repository plants to prove t
       )
     },
   )
+})
+
+// The two scans above are worth exactly what runs them, and until 2026-09-10 nothing did:
+// `grep -rn gitleaks .github/` named secret-scan.yml alone, and that workflow runs the scanner
+// over the repository without ever running `npm test`. This holds the wiring that changed.
+function jobOf(file: string, name: string): Job {
+  const job = workflowOf(ROOT, file)[name]
+  assert.ok(job !== undefined, `${file} declares no ${name} job`)
+  return job
+}
+
+describe('the job that runs the suite carries the scanner the two scans above need', () => {
+  const check = jobOf('ci.yml', 'check')
+  const secrets = jobOf('secret-scan.yml', 'secrets')
+
+  it('installs gitleaks in the same job that runs npm test, and refuses to skip without it', () => {
+    const installs = check.steps.filter((step) => step.run?.includes('gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz'))
+    const suite = check.steps.filter((step) => step.run?.includes('npm test'))
+    assert.equal(installs.length, 1, 'the check job does not install gitleaks, so the scans above skip in CI')
+    assert.equal(suite.length, 1, 'the check job no longer runs npm test, so nothing here runs the scans above')
+    assert.equal(
+      check.env['TREADLE_REQUIRE_GITLEAKS'], '"1"',
+      'without this a failed or deleted install is a silent skip again, which is the finding',
+    )
+  })
+
+  it('pins the version and digest secret-scan.yml pins, so the two copies cannot drift apart', () => {
+    for (const key of ['GITLEAKS_VERSION', 'GITLEAKS_SHA256']) {
+      assert.equal(check.env[key], secrets.env[key], `${key} differs between ci.yml and secret-scan.yml`)
+      assert.ok((check.env[key] ?? '').length > 2, `${key} is unset in ci.yml`)
+    }
+  })
 })
