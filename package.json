@@ -1,6 +1,6 @@
 {
   "name": "treadle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The record of the work between people and agents, over files you commit to git.",
   "license": "Apache-2.0",
   "bin": {
