@@ -271,7 +271,7 @@ GitHub documents that value as requiring approval for a contributor opening thei
 The bot holds no write access and has never had a pull request merged here, so it is that contributor on every release pull request, forever.
 
 A parked run is not a slow run.
-The branch name in the two measurements below ends in the package's old name, which ADR-0038 retired; release-please derives that branch from the package name, so a run taken now would read `release-please--branches--main--components--treadling`.
+The branch name in the two measurements below ends in the package's old name, which ADR-0038 retired; release-please derives that branch from the package name, but what it derives under the scoped `@abhijeet34/treadling` name is unread rather than predicted, and will be taken from the first real release-please run under that name: this document's convention, and ADR-0038 and ADR-0039, state only what a run showed, and a scope's `@` and `/` cannot survive unchanged in a git branch component, so any derived value here would be a guess dressed as a measurement.
 Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
 Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
 `.github/rulesets/main.json` requires the `checks`, `tests kept` and `secret scan` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
