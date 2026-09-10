@@ -20,7 +20,10 @@ cleanup() {
 trap cleanup EXIT
 
 CLONE="$WORK/treadle"
-git clone --quiet --no-hardlinks "$SOURCE" "$CLONE"
+# --no-tags because the drill creates `v<the tree's version>` and the source now carries a real
+# release tag of that name: without it the first scenario died at `tag 'v0.1.0' already exists`,
+# which is a drill that stops working the moment the thing it rehearses happens once.
+git clone --quiet --no-hardlinks --no-tags "$SOURCE" "$CLONE"
 cd "$CLONE"
 # The preflight asks whether the tagged commit is on the released branch, and names that
 # branch `origin/main`. In the clone that ref points at the source's main, which is not the
@@ -66,43 +69,90 @@ check() {
   fail=$((fail + 1))
 }
 
+# tag.gpgsign is on for this user, so a bare `git tag` produces a signed annotated one. Every
+# tag here is built against that default with `-c tag.gpgsign=false`, because the tag the
+# release path now sees is the lightweight, unsigned one release-please creates (ADR-0037).
 echo "== the tag the release path accepts"
-git tag -s -m "release $VERSION" "v$VERSION"
-check "a signed annotated tag at the tree's version, on main" ok \
-  --tag "v$VERSION" --branch origin/main --notes-out "$WORK/notes.md"
+git -c tag.gpgsign=false tag "v$VERSION"
+RELEASED=$(git rev-parse "v$VERSION^{}")
+check "the lightweight tag release-please creates, at the tree's version, on main" ok \
+  --tag "v$VERSION" --commit "$RELEASED" --branch origin/main --notes-out "$WORK/notes.md"
 if [ -s "$WORK/notes.md" ]; then echo "      notes: $(head -1 "$WORK/notes.md")"; fi
 
 echo
 echo "== the tags it refuses"
-# tag.gpgsign is on for this user, so a bare `git tag` would produce a signed annotated one.
-# Both of these have to be built deliberately against that default.
-git -c tag.gpgsign=false tag "v$VERSION-light"
-git -c tag.gpgsign=false tag -a -m "unsigned" unsigned-tag
-
-check "a lightweight tag, which is what a GitHub Release creates" lightweight \
-  --tag "v$VERSION-light" --branch origin/main
-check "an annotated tag nothing signed" "no signature" \
-  --tag unsigned-tag --branch origin/main
-
-git tag -s -m "wrong version" v9.9.9
+git -c tag.gpgsign=false tag v9.9.9
 check "a tag naming a version the tree does not declare" "does not name" \
-  --tag v9.9.9 --branch origin/main
+  --tag v9.9.9 --commit "$(git rev-parse v9.9.9)" --branch origin/main
+
+# The clause that replaced the signature: the name was already on the forge, pointing at a
+# tree this run never released, and after the fact nothing else tells the two apart.
+check "a tag that existed before this run, pointing at a tree it did not release" \
+  "must be deleted rather than reused" \
+  --tag "v$VERSION" --commit "$(git rev-parse HEAD~1)" --branch origin/main
 
 git checkout --quiet -b sideline
 git commit --quiet -s --allow-empty -m "chore: a commit that never reached main"
-git tag -s -m "off main" v8.8.8
+git -c tag.gpgsign=false tag v8.8.8
+SIDELINE=$(git rev-parse v8.8.8)
 git checkout --quiet drill-main
 check "a tag on a commit that never reached the released branch" "not on the released branch" \
-  --tag v8.8.8 --branch origin/main
+  --tag v8.8.8 --commit "$SIDELINE" --branch origin/main
 
 mv dist/treadle.js "$WORK/treadle.js"
-check "a release with no bundle built" "does not exist" --tag "v$VERSION" --branch origin/main
+check "a release with no bundle built" "does not exist" \
+  --tag "v$VERSION" --commit "$RELEASED" --branch origin/main
 mv "$WORK/treadle.js" dist/treadle.js
 
 echo
-echo "== the publication interlock"
-check "publishing while the name has not been cleared" "publication interlock" \
-  --tag "v$VERSION" --branch origin/main --publishing
+echo "== the publish refusals, each on a manifest broken to make it fire"
+# The tree satisfies every publishing clause today, so each one here is a regression guard and
+# not a first setup, and the only way to watch a guard hold is to break what it guards. Each
+# scenario edits the clone's manifest, runs the gate, and puts the field back.
+#
+# `repository` is the expensive one. Trusted publishing generates provenance by default and
+# npm's prerequisites require a public repository field, so without it the publish fails at the
+# registry with the tag already cut - and .github/rulesets/tags.json forbids deleting or moving
+# a `v*` tag, so that costs a version number permanently. Two have been spent that way already.
+manifest() {
+  node -e '
+    const fs = require("fs");
+    const m = JSON.parse(fs.readFileSync("package.json", "utf8"));
+    (new Function("m", process.argv[1]))(m);
+    fs.writeFileSync("package.json", JSON.stringify(m, null, 2) + "\n");
+  ' "$1"
+}
+publishes() {
+  what="$1"
+  want="$2"
+  edit="$3"
+  cp package.json "$WORK/package.json.kept"
+  manifest "$edit"
+  check "$what" "$want" --tag "v$VERSION" --commit "$RELEASED" --branch origin/main --publishing
+  cp "$WORK/package.json.kept" package.json
+}
+
+# `private: true` left the manifest when the first release was cut, so the tree as it stands
+# trips nothing here and this scenario had been failing at exit 0 against a preflight that was
+# right. What the clause still does is refuse the field coming back.
+publishes "publishing a manifest that carries private again" "publication interlock" \
+  'm.private = true'
+publishes "publishing with no licence npm would accept" "which npm will not publish" \
+  'm.license = "UNLICENSED"'
+publishes "publishing with the licence field gone" "which npm will not publish" \
+  'delete m.license'
+publishes "publishing with no files allowlist, which would ship the whole tree" "files allowlist" \
+  'delete m.files'
+publishes "publishing with no repository, which npm rejects after the tag is cut" "provenance" \
+  'delete m.repository'
+publishes "publishing a bin that points outside the bundle" "must point into the bundle" \
+  'm.bin = { treadle: "bin/treadle.js" }'
+
+# The other half of the same truth, and the reason the release says so on its own page: nothing
+# in this gate stops publication any more. NPM_PUBLISH_ENABLED and the npm-publish environment
+# are what hold it, and neither is a file this script can read.
+check "publishing the manifest as it stands, which this gate no longer refuses" ok \
+  --tag "v$VERSION" --commit "$RELEASED" --branch origin/main --publishing
 
 echo
 echo "== the hotfix path"
@@ -121,9 +171,9 @@ git commit --quiet -s -a -m "fix: the hotfix this drill rehearses"
 git checkout --quiet drill-main
 git merge --quiet --no-ff -m "chore: land the hotfix" "hotfix/v$VERSION"
 git update-ref refs/remotes/origin/main HEAD
-git tag -s -m "release $patch" "v$patch"
+git -c tag.gpgsign=false tag "v$patch"
 check "a hotfix branched from the released tag, landed, and tagged" ok \
-  --tag "v$patch" --branch origin/main
+  --tag "v$patch" --commit "$(git rev-parse "v$patch^{}")" --branch origin/main
 
 echo
 echo "drill: $pass passed, $fail failed"

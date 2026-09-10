@@ -26,7 +26,7 @@ on:
   schedule:
     - cron: "17 5 * * 1"
   workflow_dispatch:
-  # Called by release.yml on the signed tag, so no artifact is attached and nothing is
+  # Called by release.yml on main's head, before any tag exists, so no artifact is attached
   # published on evidence from one platform.
   workflow_call:
 

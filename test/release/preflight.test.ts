@@ -8,10 +8,10 @@ import { describe, it } from 'node:test'
 
 import { notesFor, preflight, type Manifest, type TagFacts } from '../../scripts/release-preflight.ts'
 
+const RELEASED_COMMIT = '0f2b1a6d9c4e7f80a1b2c3d4e5f60718293a4b5c'
+
 const GOOD_TAG: TagFacts = {
-  objectType: 'tag',
-  commit: '0f2b1a6d9c4e7f80a1b2c3d4e5f60718293a4b5c',
-  signed: true,
+  commit: RELEASED_COMMIT,
   onReleaseBranch: true,
 }
 
@@ -27,6 +27,7 @@ const GOOD_MANIFEST: Manifest = {
 function run(overrides: {
   tag?: string
   facts?: Partial<TagFacts>
+  releasedCommit?: string
   manifest?: Partial<Manifest>
   bundleBytes?: number | undefined
   staleAgainst?: string | undefined
@@ -35,6 +36,7 @@ function run(overrides: {
   return preflight({
     tag: overrides.tag ?? 'v0.2.0',
     facts: { ...GOOD_TAG, ...overrides.facts },
+    releasedCommit: overrides.releasedCommit ?? RELEASED_COMMIT,
     manifest: { ...GOOD_MANIFEST, ...overrides.manifest },
     bundleBytes: 'bundleBytes' in overrides ? overrides.bundleBytes : 173891,
     bundleLimit: 512000,
@@ -44,7 +46,7 @@ function run(overrides: {
 }
 
 describe('the release preflight', () => {
-  it('passes a signed annotated tag on the released branch', () => {
+  it('passes the tag this run created, on the released branch', () => {
     assert.deepEqual(run({}), [])
   })
 
@@ -60,14 +62,13 @@ describe('the release preflight', () => {
     assert.match(run({ tag: 'v0.3.0' })[0] ?? '', /does not name package.json's version 0\.2\.0/)
   })
 
-  // The measured case: release-please's tags are lightweight, so a release cut the way
-  // pointback cuts one would fail here rather than pass quietly.
-  it('refuses a lightweight tag', () => {
-    assert.match(run({ facts: { objectType: 'commit' } }).join('\n'), /lightweight/)
-  })
-
-  it('refuses an annotated tag nothing signed', () => {
-    assert.match(run({ facts: { signed: false } }).join('\n'), /no signature git could verify/)
+  // What replaced the signature clause when ADR-0037 reversed the signed-tag decision. The
+  // tag release-please creates is lightweight and unsigned, so the only question left about
+  // it is whether this run is the run that made it.
+  it('refuses a tag that points anywhere but the commit this run released', () => {
+    const problems = run({ facts: { commit: 'deadbeef' } }).join('\n')
+    assert.match(problems, /not at the released commit 0f2b1a6/)
+    assert.match(problems, /must be deleted rather than reused/)
   })
 
   it('refuses a tag on a commit that never reached the released branch', () => {
@@ -106,6 +107,20 @@ describe('the release preflight', () => {
     assert.deepEqual(run({ manifest: { private: true } }), [])
   })
 
+  // Regression guards rather than a first setup: the manifest satisfies all four today, and
+  // each is what stops a field going missing later. `repository` is the expensive one - npm
+  // rejects the publish at the registry with the tag already cut, and a `v*` tag here can be
+  // neither moved nor deleted, so that costs a version number permanently.
+  it('refuses to publish without a licence npm would accept', () => {
+    assert.match(run({ manifest: { license: 'UNLICENSED' }, publishing: true }).join('\n'), /npm will not publish/)
+    assert.match(run({ manifest: { license: undefined }, publishing: true }).join('\n'), /license is absent/)
+  })
+
+  it('refuses to publish without a files allowlist, which would ship the whole tree', () => {
+    assert.match(run({ manifest: { files: [] }, publishing: true }).join('\n'), /no files allowlist/)
+    assert.match(run({ manifest: { files: undefined }, publishing: true }).join('\n'), /no files allowlist/)
+  })
+
   it('refuses to publish a bin that points anywhere but the bundle', () => {
     const problems = run({ manifest: { bin: { treadle: 'bin/treadle.js' } }, publishing: true })
     assert.match(problems.join('\n'), /must point into the bundle/)
@@ -118,10 +133,10 @@ describe('the release preflight', () => {
   it('collects every problem rather than stopping at the first', () => {
     const problems = run({
       tag: 'v9.9.9',
-      facts: { objectType: 'commit', signed: false, onReleaseBranch: false },
+      facts: { commit: 'deadbeef', onReleaseBranch: false },
       bundleBytes: undefined,
     })
-    assert.equal(problems.length, 5, problems.join('\n'))
+    assert.equal(problems.length, 4, problems.join('\n'))
   })
 })
 

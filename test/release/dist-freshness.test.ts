@@ -134,7 +134,8 @@ describe('the release path runs that gate, and it is not prepack', () => {
       assert.equal(stale, 'src/cli/main.ts', 'the checker did not find the newer source file')
       const problems = preflight({
         tag: 'v0.1.0',
-        facts: { objectType: 'tag', commit: 'abc', signed: true, onReleaseBranch: true },
+        facts: { commit: 'abc', onReleaseBranch: true },
+        releasedCommit: 'abc',
         manifest: { version: '0.1.0', license: 'Apache-2.0', files: ['dist/'], bin: { treadle: 'dist/treadle.js' }, repository: 'https://github.com/Abhijeet34/treadle' },
         bundleBytes: 362429,
         bundleLimit: 512000,

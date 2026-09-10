@@ -1,21 +1,18 @@
 # SPDX-License-Identifier: Apache-2.0
-# Two triggers, two halves, and the line between them is a person.
+# One trigger, and a person's only act is merging the release pull request.
 #
-# On a push to main, release-please keeps the release pull request up to date: the version,
-# the changelog and nothing else. It never tags and never creates a release, which is the one
-# place this workflow departs from the sibling repository it is modelled on.
+# A `push: tags` trigger was removed rather than kept beside this one: a hand-pushed tag would
+# fire it, and release-please's own `release_created` output is the only signal that means
+# "this tag was created for this tree, just now". Everything downstream keys on that output.
 #
-# The other half runs on a tag. treadle's release tags are annotated and signed
-# (.github/rulesets/tags.json requires both), and release-please cannot produce one: it
-# creates a GitHub Release and lets GitHub create the tag for it, which is lightweight and
-# unsigned. Measured on the sibling repository, whose four release tags all report
-# `"type": "commit"` from `git/refs/tags`. So the tag is created by a person at a terminal
-# where signing is configured, and pushing it is the act that authorises the release.
+# The tag used to be created by a person with `git tag -s`, and that signature was the release
+# authorisation. ADR-0037 reverses that decision and says what it cost and what it gives up:
+# no release carries a human signature any more. `.github/rulesets/tags.json` still refuses to
+# update or delete a `v*` tag, which is the half of the tag policy that stands.
 #
-# What that buys, beyond the signature: nothing here can release anything by itself. The
-# publication gate the identity screen holds is not a flag someone might forget to unset, it
-# is the absence of a signed tag. docs/RELEASING.md carries the procedure, the three
-# interlocks in front of npm, and what to do when a release was wrong.
+# The three-platform matrix sits in front of the tag rather than behind it, and that ordering
+# is the whole of what stops another empty release. `v0.1.0` was tagged, `cross-platform`
+# failed, `artifacts` skipped, and the tag can never be moved or deleted.
 #
 # No `concurrency` block. Cancelling a publish mid-flight causes real damage, and GitHub keeps
 # only one pending run per group even when nothing is cancelled in flight, so a third push can
@@ -26,7 +23,6 @@ name: Release
 on:
   push:
     branches: [main]
-    tags: ["v*"]
   workflow_dispatch:
 
 permissions:
@@ -35,10 +31,13 @@ permissions:
 jobs:
   # Opening and updating the release pull request happens on every push to main,
   # unconditionally: a gate in front of it would stop the pull request from ever appearing,
-  # which is a worse failure than any it could prevent. `skip-github-release` is what keeps it
-  # from tagging, and there is no second job that lifts it.
+  # which is a worse failure than any it could prevent. `skip-github-release` is what keeps
+  # this half from tagging; `release-tag` below is the other half, behind the matrix.
   release-pr:
     name: release-pr
+    # A dispatch names a ref and the workflow that runs is the one on that ref, so this says
+    # out loud what `on: push` already restricts. Every job below reaches this guard through
+    # `needs:`, which is why it is written once.
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -54,121 +53,88 @@ jobs:
           # of this input, at the SHA pinned above.
           skip-github-release: true
 
-  # release-please opening the pull request is not the same as the pull request being able to
-  # merge, and nothing said which of those had happened. Every run on that branch is parked by
-  # the `first_time_contributors` approval policy, and a parked run attaches no check to the
-  # pull request at all: `gh pr checks 69` reported "no CI checks configured" while forty-six
-  # runs sat at `action_required`, so the only surface carrying the state was the Actions list
-  # nobody was reading. Four release pull requests waited four days that way.
+  # The release pull request's checks do not start on their own. release-please opens it as
+  # `github-actions[bot]`, this repository's `first_time_contributors` approval policy parks
+  # every run on that branch, and a parked run attaches no check to the pull request at all,
+  # so the required `checks` context can never appear. Forty-six runs concluded
+  # `action_required` before anything said so.
   #
-  # This job says so on the pull request itself rather than in this run's conclusion. Parking
-  # is ADR-0009's design and not a fault, so it is true on every push: as a gate on main it
-  # failed every Release run from the one that introduced it - 34277320540, 34281238907 and
-  # 34288199967 - and a red that never clears makes every other red on main unreadable. A
-  # commit status on the pull request's head fills the surface `gh pr checks` found empty,
-  # carries the same state green when the runs have been approved, and is required by no
-  # ruleset, so it reports without gating anything.
+  # This job releases them with the run's own token, which is what makes a release unattended
+  # without storing a credential to make it so. scripts/approve-release-checks.ts carries the
+  # narrowing and test/release/approve-release-checks.test.ts drives it.
   #
-  # It approves nothing and stores nothing: the run's own token, no stored credential, and the
-  # click stays a person's, exactly as docs/RELEASING.md and ADR-0009 decided.
-  parked-checks:
-    name: parked-checks
-    # After release-please, not beside it. Measured on run 34288199967: this job read the pull
-    # request one second in and answered about the head commit release-please replaced two
-    # minutes later, so a status would have landed on a commit the pull request had left.
+  # After release-please, not beside it: measured on run 34288199967, a job that read the pull
+  # request one second in answered about the head commit release-please replaced two minutes
+  # later.
+  release-pr-checks:
+    name: release-pr-checks
     needs: release-pr
-    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     permissions:
-      actions: read
+      contents: read
       pull-requests: read
-      # Writing the state onto the release pull request's head commit. A commit status is not
-      # an approval and cannot become one; nothing here can execute a parked run.
-      statuses: write
+      # For POST /actions/runs/{id}/approve alone. Nothing else here needs it, which is why it
+      # is not on the job holding contents: write.
+      actions: write
     env:
-      GH_TOKEN: ${{ github.token }}
-      CONTEXT: release checks approved
-      SUMMARY_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      GITHUB_TOKEN: ${{ github.token }}
     steps:
-      - name: Report the release pull request's parked checks on the pull request
-        run: |
-          set -euo pipefail
-          # Keyed on the head sha, not the branch. A run parked on a commit the pull request
-          # has since moved past stays `action_required` for the life of the repository, so a
-          # branch-wide query would report parked once and never come back; only runs on the
-          # commit the pull request currently points at can hold up its required contexts.
-          gh api "repos/${GITHUB_REPOSITORY}/pulls?state=open&per_page=100" \
-            --jq '.[] | select(.head.ref | startswith("release-please--")) | [.number, .head.sha] | @tsv' \
-            > pulls.tsv
-          # `|| [ -n "${number}" ]` because a final line with no newline leaves `read` at exit
-          # 1 with the fields already set, and dropping it would report a parked pull request
-          # as clear - the one answer this must not give.
-          while IFS="$(printf '\t')" read -r number sha || [ -n "${number}" ]; do
-            [ -n "${number}" ] || continue
-            # GitHub creates the runs for release-please's push asynchronously: measured on
-            # 34288199967, two seconds after the job that pushed it finished. A head still at
-            # zero after the wait is unknown, not clear, so it reports pending rather than
-            # success: only a head with runs and none parked earns success.
-            for _ in 1 2 3 4 5; do
-              total=$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&per_page=1" --jq '.total_count')
-              if [ "${total}" != "0" ]; then break; fi
-              sleep 2
-            done
-            if [ "${total}" = "0" ]; then
-              gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
-                -f state=pending \
-                -f context="${CONTEXT}" \
-                -f target_url="${SUMMARY_URL}" \
-                -f description="No runs observed on this head yet." > /dev/null
-              echo "release pull request #${number} has no observed runs yet"
-              continue
-            fi
-            runs=$(gh api \
-              "repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${sha}&status=action_required&per_page=100" \
-              --jq '.workflow_runs[] | [.id, .name] | @tsv')
-            if [ -z "${runs}" ]; then
-              gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
-                -f state=success \
-                -f context="${CONTEXT}" \
-                -f target_url="${SUMMARY_URL}" \
-                -f description="No run on this commit is waiting for a person." > /dev/null
-              echo "release pull request #${number} has no parked checks"
-              continue
-            fi
-            gh api -X POST "repos/${GITHUB_REPOSITORY}/statuses/${sha}" \
-              -f state=failure \
-              -f context="${CONTEXT}" \
-              -f target_url="${SUMMARY_URL}" \
-              -f description="Parked until a person approves them. The Release run summary has the command." > /dev/null
-            echo "::notice::release pull request #${number} has parked checks, and now says so on the pull request"
-            {
-              echo "### Release pull request #${number} is waiting for a person"
-              echo
-              echo "Its checks are parked, so the required \`checks\` context can never report and the pull request cannot merge."
-              echo
-              while IFS="$(printf '\t')" read -r id name || [ -n "${id}" ]; do
-                echo "- \`${name}\`: \`gh api -X POST repos/${GITHUB_REPOSITORY}/actions/runs/${id}/approve\`"
-              done <<< "${runs}"
-              echo
-              echo 'Approving a run executes that branch'"'"'s workflow files, so read the diff first.'
-              echo 'docs/RELEASING.md, "What stands between the release pull request and a merge", carries the rest.'
-            } >> "$GITHUB_STEP_SUMMARY"
-          done < pulls.tsv
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-  # Three platforms on the tagged tree, before anything is attached to a release and long
-  # before anything is published. The release pull request already ran this matrix through
-  # ci.yml, on the tree that became main's head; this run is on the tag itself, which is the
-  # tree the tarball is packed from.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Approve the release pull request's parked checks
+        run: node scripts/approve-release-checks.ts
+
+  # Conditioned on nothing, and that is the point. This matrix used to run on the tag, which
+  # put it after the thing it was meant to gate: on `v0.1.0` the tag existed, the three
+  # container legs failed for want of TREADLE_ACTOR, `artifacts` skipped, and the tag cannot
+  # be moved or deleted.
+  #
+  # Asking "is this push a release?" before running it is what would put that back. That
+  # answer is release-please's to give, and a second opinion saying no when the truth is yes
+  # skips the matrix, skips `release-tag` with it, and drops the release in silence. So every
+  # push to main pays for macOS and Windows, and main gets three-platform coverage on every
+  # commit rather than only on the days a release is cut.
+  #
+  # The tree it runs on is main's head, which is the tree `release-tag` tags and the tree
+  # `artifacts` packs. The preflight there proves that rather than assuming it.
   cross-platform:
     name: cross-platform
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release-pr
     uses: ./.github/workflows/cross-platform.yml
+
+  # The other half of release-please, and the only job in this repository that can create a
+  # tag. `skip-github-pull-request` keeps it from opening a second pull request behind
+  # `release-pr`'s back. On an ordinary push there is no merged release pull request to
+  # release, so it does nothing and says so through `created`.
+  release-tag:
+    name: release-tag
+    needs: [release-pr, cross-platform]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      tag: ${{ steps.release.outputs.tag_name }}
+      sha: ${{ steps.release.outputs.sha }}
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+          skip-github-pull-request: true
 
   artifacts:
     name: artifacts
-    needs: cross-platform
-    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release-tag
+    if: needs.release-tag.outputs.created == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:
@@ -179,13 +145,24 @@ jobs:
       attestations: write
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ needs.release-tag.outputs.tag }}
+      RELEASE_SHA: ${{ needs.release-tag.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          # The preflight resolves the tag object, verifies its signature and asks whether the
-          # commit is on main. A ref-only fetch brings none of those.
+          # The tagged tree, which is the tree the tarball is packed from.
+          ref: ${{ needs.release-tag.outputs.tag }}
+          # The preflight resolves the tag object and asks whether the commit is on main. A
+          # ref-only fetch brings neither.
           fetch-depth: 0
+
+      # actions/checkout given an explicit `ref` fetches that ref, so `origin/main` need not be
+      # in the clone it leaves behind. The preflight's released-branch clause reads it, and a
+      # missing ref there would refuse every release rather than the wrong ones. Not shallow:
+      # main can be several commits ahead of the tag by the time this runs, and a truncated
+      # main has no ancestry for `git merge-base --is-ancestor` to walk.
+      - name: Bring the released branch into the clone
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -197,12 +174,12 @@ jobs:
       - name: Build the bundle
         run: npm run build
 
-      # Refuses a tag that is lightweight, unsigned, misnamed, off main, or naming a version
-      # the tree does not declare, and writes the release notes for the version it accepted.
-      # scripts/release-preflight.ts carries the clauses and test/release/preflight.test.ts
-      # demonstrates each one refusing.
+      # Refuses a tag that is misnamed, that points anywhere but the commit this run released,
+      # that names a version the tree does not declare, or that is off main, and writes the
+      # release notes for the version it accepted. scripts/release-preflight.ts carries the
+      # clauses and test/release/preflight.test.ts demonstrates each one refusing.
       - name: Release preflight
-        run: node scripts/release-preflight.ts --tag "$TAG" --branch origin/main --notes-out "$RUNNER_TEMP/notes.md"
+        run: node scripts/release-preflight.ts --tag "$TAG" --commit "$RELEASE_SHA" --branch origin/main --notes-out "$RUNNER_TEMP/notes.md"
 
       - name: Pack the tarball
         id: pack
@@ -236,8 +213,8 @@ jobs:
         with:
           subject-path: ${{ steps.pack.outputs.tarball }}
 
-      # The release is created here rather than by release-please, because the tag already
-      # exists and carries the signature that authorised all of this.
+      # release-please created the tag and left the release to this job, which is what puts
+      # the three assets and the changelog notes on it in one act rather than two.
       - name: Create the release and attach everything
         env:
           TARBALL: ${{ steps.pack.outputs.tarball }}
@@ -264,13 +241,16 @@ jobs:
   #   3. The `npm-publish` environment, which is configured to require a reviewer. The job
   #      stops and waits for a person before it can reach the registry.
   #
+  # The unattended release stops here. Nothing above this job asks a person anything any more,
+  # and this job still does.
+  #
   # It holds no repository write token, and no npm token at all. The OIDC identity that mints
   # the npm credential lives here alone, and everything it publishes was produced, checksummed
   # and attested by the job above.
   publish:
     name: publish
-    needs: artifacts
-    if: startsWith(github.ref, 'refs/tags/v') && vars.NPM_PUBLISH_ENABLED == 'true'
+    needs: [release-tag, artifacts]
+    if: needs.release-tag.outputs.created == 'true' && vars.NPM_PUBLISH_ENABLED == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     environment: npm-publish
@@ -279,11 +259,16 @@ jobs:
       id-token: write
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ needs.release-tag.outputs.tag }}
+      RELEASE_SHA: ${{ needs.release-tag.outputs.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          ref: ${{ needs.release-tag.outputs.tag }}
           fetch-depth: 0
+
+      - name: Bring the released branch into the clone
+        run: git fetch --no-tags origin +refs/heads/main:refs/remotes/origin/main
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -310,7 +295,7 @@ jobs:
         run: |
           npm ci
           npm run build
-          node scripts/release-preflight.ts --tag "$TAG" --branch origin/main --publishing
+          node scripts/release-preflight.ts --tag "$TAG" --commit "$RELEASE_SHA" --branch origin/main --publishing
 
       # Downloading the release asset rather than rebuilding: what npm receives is then
       # byte-for-byte the artifact that was attested and checksummed above.
@@ -332,16 +317,16 @@ jobs:
   # and a `treadle` on PATH from it would answer instead of the published one.
   smoke:
     name: smoke
-    needs: publish
+    needs: [release-tag, publish]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     container: node:24.15.0-trixie
+    env:
+      TAG: ${{ needs.release-tag.outputs.tag }}
     steps:
       # The registry serves a new version from a CDN, so the publish returning is not the
       # package being installable yet. Six tries a minute apart rather than one and a guess.
       - name: Install the published package from the registry
-        env:
-          TAG: ${{ github.ref_name }}
         run: |
           set -euo pipefail
           version="${TAG#v}"
@@ -388,23 +373,22 @@ jobs:
   # rather than once: a reader who set the variable to lift the first block still got nothing,
   # because `private: true` stopped the publish a step later and nothing said so up front.
   #
-  # So this job says what happened, on every tag, whatever `publish` did. It names every block
-  # that applies rather than the one that happened to stop it first, and it writes that onto the
-  # release itself, because "did this version reach npm?" is asked at the release and not in a
-  # job list where a skipped job looks like a job that had nothing to do.
+  # So this job says what happened, on every release, whatever `publish` did. It names every
+  # block that applies rather than the one that happened to stop it first, and it writes that
+  # onto the release itself, because "did this version reach npm?" is asked at the release and
+  # not in a job list where a skipped job looks like a job that had nothing to do.
   #
-  # It reports and does not gate, for the reason `parked-checks` above does not gate: with
-  # publication closed by design the condition is true on every release this repository will cut
-  # until the name clears, and a red that never clears is a red nobody reads. The run carries a
-  # warning annotation and a summary, the release carries the sentence, and neither turns the
-  # release red.
+  # It reports and does not gate: with publication closed by design the condition is true on
+  # every release this repository will cut until the name clears, and a red that never clears
+  # is a red nobody reads. The run carries a warning annotation and a summary, the release
+  # carries the sentence, and neither turns the release red.
   publication:
     name: publication
-    needs: [artifacts, publish]
+    needs: [release-tag, artifacts, publish]
     # `always()` because the whole point is to report a `publish` that was skipped, and a
     # skipped dependency skips its dependents by default. Guarded on `artifacts` succeeding
     # because there is no release to write onto when it did not.
-    if: always() && startsWith(github.ref, 'refs/tags/v') && needs.artifacts.result == 'success'
+    if: always() && needs.release-tag.outputs.created == 'true' && needs.artifacts.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -413,7 +397,7 @@ jobs:
       contents: write
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.ref_name }}
+      TAG: ${{ needs.release-tag.outputs.tag }}
       # `skipped`, `success`, `failure` or `cancelled`. This is the only place in the run where
       # that word is turned into a sentence.
       PUBLISH_RESULT: ${{ needs.publish.result }}
@@ -423,6 +407,8 @@ jobs:
       # For one field. `private` is read out of the tree the tag names rather than asserted from
       # this file, so the report cannot claim an interlock the released tree does not carry.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.release-tag.outputs.tag }}
 
       - name: Say whether this release published, and name every block that stopped it
         run: |

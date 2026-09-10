@@ -105,9 +105,10 @@ describe('.github/settings/actions-fork-pr-approval.json', () => {
   // has never had a pull request merged here, so `first_time_contributors` parks every check on
   // it at `action_required`: fourteen consecutive runs on the release branch were created,
   // started and updated at the same instant with zero jobs (2026-09-07 to 2026-09-08).
-  // The remedy is the person who signs the tag approving them, per ADR-0009, and the wrong
-  // remedy is loosening this value, so the value is asserted rather than merely applied.
-  it('records the strict policy, which is what makes the parked checks a human step', async () => {
+  // The remedy is the `release-pr-checks` job releasing them with the run's own token, per
+  // ADR-0037, and the wrong remedy is loosening this value, which would drop the control on
+  // every fork pull request as well, so the value is asserted rather than merely applied.
+  it("records the strict policy, which is why the release pull request's checks park", async () => {
     const policy = JSON.parse(
       await readFile(path.join(ROOT, '.github/settings/actions-fork-pr-approval.json'), 'utf8'),
     ) as { approval_policy: string }
@@ -125,6 +126,10 @@ describe('.github/rulesets/tags.json', () => {
     }
     const types = ruleset.rules.map((rule) => rule.type)
     assert.ok(!types.includes('tag_name_pattern'), `tag naming is enforced in the release workflow, not here: ${types.join(', ')}`)
-    assert.deepEqual(types, ['update', 'deletion', 'required_signatures'])
+    // `required_signatures` went with ADR-0037: release-please creates the tag and nothing
+    // signs it, so requiring a signature at the forge would refuse every release. `update` and
+    // `deletion` stand, and `v0.1.0` is why - an immutable tag with no assets is a record of
+    // what happened, and moving it would make the history lie.
+    assert.deepEqual(types, ['update', 'deletion'])
   })
 })

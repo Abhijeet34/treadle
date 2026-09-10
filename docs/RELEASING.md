@@ -1,51 +1,107 @@
 # Releasing, and rolling back
 
-One release has been cut, and it published nothing.
-`v0.1.0` is on the forge carrying no assets, and its notes say why: the cross-platform install checks set no `TREADLE_ACTOR`, `treadle init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
+Two releases have been cut and neither produced anything.
+`v0.1.0` and `v0.1.1` are on the forge carrying no assets, both immutable under the tag ruleset, and each failed on a different piece of code that had never run.
+On `v0.1.0` the cross-platform install checks set no `TREADLE_ACTOR`, `treadle init` refused under rule C1 on all three container platforms, and the `artifacts` job that depends on them skipped, so the bundle, the SBOM and the checksums were never built.
+On `v0.1.1` all six of those jobs passed and `artifacts` then failed in the release preflight, on a tag-signature check that had never been able to pass on a runner: see "Why the tag is no longer signed".
 Nothing has reached npm, and no package of this name exists on the registry.
 This file is the procedure the machinery is fired with, and the procedure for undoing a release that was wrong.
 
+[ADR-0037](architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md) reversed the posture this file used to describe, on 2026-09-10.
+The tag was created by a person signing it, and it is now created by the automation; the release pull request's parked checks were approved by a person, and they now approve themselves.
+Merging the release pull request is the only human act left on this path, and no release carries a human signature.
+
 ## How a release happens
 
-Five steps, and a person is the third one.
+Three steps, and a person is the second one.
 
 1. Work merges to `main` through a pull request, as always.
-2. `release-please` opens or updates a release pull request on every push to `main`. It carries the version bump and the changelog entry and nothing else.
-3. Someone reviews that pull request, approves its parked checks, and merges it. Merging is what makes `main`'s head releasable.
-   The approval is not a review approval and not an oversight: see "What stands between the release pull request and a merge".
-4. Someone tags `main`'s head with a signed annotated tag and pushes it:
+2. Someone reviews the release pull request `release-please` keeps up to date, and merges it.
+   That is the only thing a person does on this path.
+3. The merge is itself a push to `main`, so the workflow runs again on the release commit.
+   This time `release-tag` finds a merged release pull request, creates `vX.Y.Z` and reports it through `release_created`, and everything downstream keys on that output.
 
-   ```sh
-   git checkout main && git pull
-   git tag -s -m "release v0.2.0" v0.2.0
-   git push origin v0.2.0
-   ```
+`.github/workflows/release.yml` triggers on `push: branches: [main]` and `workflow_dispatch`, and on nothing else.
+There is no tag trigger: a hand-pushed tag would fire it, and `release_created` is the only signal that means "this tag was created for this tree, just now".
 
-5. The tag fires `.github/workflows/release.yml`, which runs three platforms on the tagged tree, builds the bundle, packs it, exports an SBOM, checksums both, attests the tarball, and creates the GitHub release with the changelog section as its notes.
-   It then writes onto that release whether it published to npm, and when it did not, every condition that stopped it.
+```text
+any squash-merge to main
+  |- release-pr -------- opens or updates "chore(main): release x.y.z", tags nothing
+  |- release-pr-checks - releases that pull request's parked runs, so it is checked
+  `- cross-platform ---- macOS, Windows and Linux on this exact tree
+       `- release-tag -- nothing above it has tagged; this is the only job that can
+            |- artifacts --- preflight, npm run build, npm pack, SBOM, checksums,
+            |                attestation, and the GitHub release the three hang off
+            |- publish ----- only if NPM_PUBLISH_ENABLED is "true", and then only
+            |    `- smoke    after the npm-publish environment's reviewer says so
+            `- publication - says whether this release reached npm, on every release
 
-Publishing to npm is a sixth step that only runs when three separate interlocks are open.
+on an ordinary merge, release-tag finds no merged release pull request and reports
+created=false, so artifacts, publish, smoke and publication all skip. On the merge of
+the release pull request it writes CHANGELOG.md and package.json, tags vX.Y.Z, and the
+rest of the run builds the release around that tag.
+```
+
+The matrix is in front of the tag rather than behind it, and that ordering is what stops another `v0.1.0`.
+A `v*` tag can be neither updated nor deleted, so a check that runs after the tag is a check that spends a version number it cannot get back: that is how `0.1.0` and `0.1.1` were both lost.
+With the matrix in front, three container jobs failing for want of `TREADLE_ACTOR` fails a push to `main`, no tag is created, the release pull request stays open, and the next push after the fix cuts the release.
+A red build costs a red build.
+
+It is conditioned on nothing, so every push to `main` pays for macOS and Windows.
+Asking "is this push a release?" before running it is what would put the defect back: that answer is release-please's to give, and a second opinion answering no when the truth is yes skips the matrix, skips `release-tag` with it, and drops the release in silence.
+
+What is left behind the tag is `artifacts`, and its preflight refusal would still cost a version number.
+That is the rule every clause on that side is written to: a check behind the tag must be decidable from the repository and the run alone, never from how the machine happens to be configured.
+The signature clause was the one that was not, which is why "Why the tag is no longer signed" ends where it does.
+
+A gate that runs after the thing it was meant to prevent is decoration.
+
+Publishing to npm is a fourth step that only runs when three separate interlocks are open.
 One of them, `"private": true` in `package.json`, has been removed; the other two are closed.
 The release says which ones held rather than leaving a green run to imply a publish: see "What a release says when it published nothing".
 
-## Why the tag is signed, and why release-please does not create it
+## Why the tag is no longer signed
 
-Every commit in this repository is signed, and a tag that releases them should be too.
-release-please cannot produce one.
-It creates a GitHub Release and lets GitHub create the tag for it, and that tag is lightweight and unsigned.
-This is measured rather than assumed: the sibling repository this pipeline is modelled on has four release tags, and `GET /repos/{owner}/{repo}/git/refs/tags` reports `"type": "commit"` for every one of them, which is what a lightweight tag looks like.
+It was, and the check could never pass where it ran.
 
-So release-please runs with `skip-github-release: true` and never tags.
-The tag is created by a person at a terminal where signing is configured, and pushing it is the act that authorises the release.
+`v0.1.1` is signed correctly.
+It carries a real `-----BEGIN SSH SIGNATURE-----`, GitHub accepted it against a ruleset that required signed tags, and on the machine that made it `git verify-tag v0.1.1` answers `Good "git" signature for 27002551+Abhijeet34@users.noreply.github.com with ED25519 key SHA256:4RHEgfnr...`.
+On run `34475691252` all six `cross-platform` jobs passed and the `artifacts` job then failed:
 
-That buys a second thing beyond the signature.
-Nothing in CI can release treadle by itself.
-The gate that holds publication is not a flag someone might forget to unset, it is the absence of a signed tag.
+```text
+##[error]tag v0.1.1 carries no signature git could verify; every commit in this
+repository is signed and the tag that releases them must be too
+release preflight: 1 problem(s)
+```
 
-`scripts/release-preflight.ts` is where that becomes enforcement rather than habit.
-It refuses a tag that is lightweight, that carries no signature `git verify-tag` accepts, that is not `v<semver>`, that names a version the tree does not declare, or that points at a commit which never reached `main`.
-`.github/rulesets/tags.json` requires the signature at the forge as well, and refuses to let a `v*` tag be updated or deleted once it exists.
+Verifying an SSH signature needs an allowed-signers file naming the trusted keys, and a fresh runner has none.
+Reproduced in a clone of `v0.1.1` with `gpg.ssh.allowedSignersFile` pointed at `/dev/null`, which is what an unconfigured runner amounts to:
+
+```text
+$ git verify-tag v0.1.1
+Good "git" signature with ED25519 key SHA256:4RHEgfnr...
+No principal matched.
+(exit 1)
+```
+
+The signature is read, and there is nobody to match it against.
+That clause had never been able to pass on a runner, and nothing could find that out until a tag reached one, because the release path runs for real once.
+
+So the signature is gone rather than repaired.
+Giving the runner an allowed-signers file would make the refusal satisfiable and keep the human step, which is the cost ADR-0037 removes; a signing key in CI is a long-lived credential whose leak forges a release.
+release-please creates the tag now, that tag is lightweight and unsigned, and **no release carries a human signature.**
+What stands behind a released tree instead is the merge of the release pull request, `.github/rulesets/main.json`'s `required_signatures` on commits to `main`, and the build provenance `actions/attest-build-provenance` signs through GitHub's OIDC identity.
+
+`scripts/release-preflight.ts` is what checks the tag now, and every clause it keeps is decidable from the repository and the run.
+It refuses a tag that is not `v<semver>`, that names a version the tree does not declare, that points at a commit which never reached `main`, or that resolves to anything but the commit release-please reported releasing in this run.
+That last one is `--commit`, it is required rather than optional, and it is the only comparison that can tell a tag this run made from a tag that already carried the name.
+`.github/rulesets/tags.json` no longer requires a signature and still refuses to let a `v*` tag be updated or deleted once it exists.
 It does not check the tag's name; the next section says why.
+
+Six more clauses stand in front of the registry, and `scripts/rollback-drill.sh` fires each one on a manifest broken to make it fire rather than asserting it: `"private": true`, an absent or `UNLICENSED` licence, a missing `files` allowlist, a `bin` pointing outside the bundle, and a `repository` field npm's provenance prerequisites reject.
+The last is the expensive one.
+Trusted publishing generates provenance by default and npm's prerequisites require a public `repository`, so without it the publish fails at the registry with the tag already cut, and a `v*` tag here can be neither moved nor deleted.
+That costs a version number permanently. Two have been spent that way already.
 
 It also refuses a `dist/` older than any file under `src/`.
 `package.json` lists `dist/` in `files`, points `bin` at `dist/treadle.js` and gitignores the directory, so a tarball built from a tree whose bundle predates its source ships a different tool from the one the README describes: a checkout carrying a bundle two days older than its source reported fourteen commands where the inventory then had nineteen (2026-09-07).
@@ -54,11 +110,11 @@ The obvious remedy is a `prepack`, and this repository cannot have one.
 So the clause sits in `scripts/release-preflight.ts`, which the workflow runs one step after `npm run build` and one step before it packs.
 `node scripts/check-dist-fresh.ts` is the same check, runnable on its own against a checkout.
 
-A signed tag is the authorisation, not a label on one.
+A check nobody can watch hold is a check nobody knows is broken.
 
 ## Why the tag ruleset does not check the tag name
 
-`.github/rulesets/tags.json` carries `update`, `deletion` and `required_signatures`, and deliberately carries no `tag_name_pattern` rule.
+`.github/rulesets/tags.json` carries `update` and `deletion`, and deliberately carries no `tag_name_pattern` rule.
 GitHub's ruleset documentation lists that rule for a tag target, and GitHub refuses it on this repository with HTTP 422.
 
 Measured on 2026-09-05 by posting each rule alone against a disabled probe ruleset and deleting it afterwards:
@@ -72,13 +128,14 @@ Measured on 2026-09-05 by posting each rule alone against a disabled probe rules
 
 So the rule type is refused in every shape and operator tried, rather than one parameter block being malformed.
 The sibling repository's working tag ruleset carries only `update` and `deletion`, which is consistent with the same limit rather than with an oversight there.
+`required_signatures` was accepted and is no longer in the file: ADR-0037 removed it, because release-please creates the tag and nothing signs it.
 
 Do not add the rule back from the documentation.
 While it was in the file every run of `scripts/apply-repo-settings.sh` failed on it.
 
 Tag naming is enforced where the tag is created instead.
-`.github/workflows/release.yml` fires only on `refs/tags/v*`, and `scripts/release-preflight.ts` refuses a tag that is not `v<semver>` before anything is built, attached or published.
-A tag that reached the forge with the wrong name releases nothing.
+release-please composes the name from the manifest version, and `scripts/release-preflight.ts` refuses a tag that is not `v<semver>` before anything is built, attached or published.
+The workflow no longer fires on a tag ref at all, so a tag that reached the forge by any other route starts nothing.
 
 ## What a release produces
 
@@ -160,7 +217,7 @@ The third interlock is read rather than claimed.
 `GET /repos/{owner}/{repo}/environments/npm-publish` answers 404 for an environment nobody has created, and GitHub creates an environment on first use carrying no protection rules, so "could not be read" and "requires a reviewer" are opposite answers about whether anything would hold the job.
 The report prints whichever one is true and never rounds the first up to the second.
 
-It reports and does not gate, for the same reason `parked-checks` does not.
+It reports and does not gate.
 Publication is closed by design until the name clears, so the condition is true on every release this repository cuts until then, and a red that never clears is a red nobody reads.
 `test/release/publication-decision.test.ts` drives the job's own shell over each outcome `publish` can have: skipped, failed, succeeded, and a result the job does not recognise.
 
@@ -169,10 +226,10 @@ A release that publishes nothing must not read as a plain success.
 ## What stands between the release pull request and a merge
 
 Two things, and neither was named anywhere in this tree until 2026-09-08.
-The first parks the checks so they never run.
-The second reddens them once they do.
+The first parks the checks so they never run, and the run now releases them itself.
+The second reddens them once they do, and is fixed in the release-please configuration.
 
-### The checks wait for a person
+### The checks are parked, and the run releases them
 
 The release pull request is opened by `github-actions[bot]`, and every workflow run on it is created and then parked rather than executed.
 
@@ -187,50 +244,41 @@ The bot holds no write access and has never had a pull request merged here, so i
 A parked run is not a slow run.
 Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
 Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
-`.github/rulesets/main.json` requires the `checks` and `tests kept` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 3 above stops there.
+`.github/rulesets/main.json` requires the `checks` and `tests kept` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
 
-Releasing them is one call, and the person who signs the tag is already at the terminal:
+A parked run also attaches no check to the pull request, so the pull request page reported nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
+Forty-six runs had concluded `action_required` by then, and four release pull requests had waited four days.
 
-```sh
-gh-axi run list -R Abhijeet34/treadle --branch release-please--branches--main--components--treadle
-gh-axi api -X POST "repos/Abhijeet34/treadle/actions/runs/<run-id>/approve"
-```
+`.github/workflows/release.yml`'s `release-pr-checks` job releases them now.
+It runs `scripts/approve-release-checks.ts` after `release-pr` on every push to `main`, reads which runs on the pull request's current head commit are at `action_required`, and calls `POST /repos/{owner}/{repo}/actions/runs/{run_id}/approve` on each one.
+It uses the run's own `GITHUB_TOKEN` with `permissions: actions: write`, which is what makes a release unattended without storing a credential to make it so.
 
-Measured against that same run on 2026-09-08: `completed` with conclusion `action_required` and zero jobs before the call, `in_progress` with eight jobs after it.
-Approving a run executes that branch's workflow files, so read the diff before approving, exactly as you would before merging.
+The one pull request it can reach is one whose author is `github-actions[bot]`, whose head branch starts `release-please--` and is in this repository rather than a fork, and whose base is the default branch.
+`test/release/approve-release-checks.test.ts` puts one impostor against each of those four clauses, and drives the script through its own request function rather than through a stub binary on `PATH`.
 
-Knowing to make that call is the part that was missing until 2026-09-09.
-A parked run attaches no check to the pull request, so the pull request page reports nothing rather than reporting a wait: `gh pr checks 69` answered `no checks reported on the 'release-please--branches--main--components--treadle' branch` while two runs sat at `action_required` on its head commit, and the Release run on `main`'s own head reported success at the same moment.
-Forty-six runs had concluded `action_required` by then.
-
-`.github/workflows/release.yml`'s `parked-checks` job is what says so now, on the pull request rather than on the trunk.
-It runs after `release-pr` on the same push to `main`, asks the API which runs on the pull request's current head commit are at `action_required`, and posts a `release checks approved` commit status on that head: red while they are parked, green once they are confirmed clear, and yellow (pending) while no runs have been observed on the head at all.
-`gh pr checks 69` reads commit statuses, so the surface that answered nothing now answers.
-The approve command for each parked run goes into the Release run's step summary, and the status links there.
-The job reports and never approves: `statuses: write` over two reads, the run's own token, no stored credential, and the click stays where ADR-0009 put it.
-
-It does not fail the Release run, and that is the point.
-Parking is this design rather than a fault, so the condition is true on every push to `main`, and as a gate it failed runs `34277320540`, `34281238907` and `34288199967` - every Release run from the one that introduced it.
-A red that never clears is a red nobody reads, and it makes every other red on `main` look like this one.
-`release checks approved` is required by no rule in `.github/rulesets/main.json`, so it carries the state without gating on it.
+It fails the job rather than passing quietly in two cases, because the thing being replaced is a release that stalls in silence.
+A parked run it could not approve fails, naming the `actions: write` it needs.
+A head that still carries no `pull_request` run at all after 120 seconds fails too: unknown and clear are different claims, and a pull request whose runs never appeared reads exactly like one whose runs have not finished.
 
 Keying it on the head commit rather than the branch is what keeps it honest, because a run parked on a commit the pull request has moved past stays `action_required` for the life of the repository.
-`needs: release-pr` is there because the job read the pull request one second into run `34288199967` and answered about the head commit release-please replaced two minutes later.
-GitHub then created the runs on that new head two seconds after `release-pr` finished, so a head sha carrying no runs at all is read again rather than called clear.
-A head that still carries no runs once that budget expires stays pending rather than falling through to success, because unknown and clear are different claims, and an absent signal reading as a pass is the exact defect class this repository has been removing.
+`needs: release-pr` is there because the `parked-checks` job this replaces read the pull request one second into run `34288199967` and answered about the head commit release-please replaced two minutes later.
+GitHub created the runs on that new head two seconds after `release-pr` finished, so a head carrying no runs at all is read again rather than acted on.
 
-One thing the status cannot do is refresh itself.
-It describes the head commit as of the last push to `main`, so between approving the runs and the next push it is behind, and merging the pull request is what ends that window.
+Approving is a request and a 201 is not the outcome.
+The outcome is the run leaving the parked state, which is what the required `checks` context waits on, so the script watches for that rather than for its own call returning.
 
-A gate nobody can see holding is indistinguishable from a gate that failed.
+`parked-checks` is gone with the wait it reported.
+It posted a `release checks approved` commit status on the pull request's head, red while the runs were parked, and it never approved anything: the click stayed where ADR-0009 put it.
+Once the run makes the click itself that status is green on every push, and a status that is always green is a status nobody reads.
 
-Three other ways to unpark them, and none of them is taken here.
-Loosening `approval_policy` buys an unattended release by removing a control on every fork pull request this public repository will ever receive, which is why `.github/settings/actions-fork-pr-approval.json` records the strict value in the tree and `test/release/repo-settings.test.ts` asserts it.
+Two other ways to unpark them, and neither is taken here.
+Loosening `approval_policy` buys the same thing by removing a control on every fork pull request this public repository will ever receive, which is why `.github/settings/actions-fork-pr-approval.json` records the strict value in the tree and `test/release/repo-settings.test.ts` asserts it.
 A stored token with wider rights would raise the pull request under an identity whose runs execute, and "Why Actions may create pull requests" below rules that out for the whole release design.
-A script that approves the parked runs was weighed in ADR-0009 and rejected: 165 lines plus a test, to make an unattended release unattended, on a path that is human-initiated by design.
 
-The gate that already holds this release is a person.
-Do not spend a credential to route around one.
+Approving a run executes that branch's workflow files.
+That is why the narrowing above is four clauses rather than one, and why the branch it may reach is one only release-please writes to.
+
+The run spends its own token on its own branch, or nothing here is safe to automate.
 
 ### The release commit signs itself off
 
@@ -247,6 +295,7 @@ A sign-off is a Developer Certificate of Origin attestation, not authorship.
 It writes no `Co-authored-by` trailer and leaves the commit's author line unchanged, so it adds nobody to this repository's contributors.
 
 Each of these was hidden behind the one in front of it, and both were hidden behind a Release workflow that had stopped starting at all.
+The signature clause was hidden behind all three.
 A release path is only as fixed as its last link.
 
 ## Rolling back
@@ -273,7 +322,7 @@ git checkout -b hotfix/v0.2.1 v0.2.0
 
 Cutting from the tag is what keeps the fix minimal.
 Cutting from `main` ships whatever else merged since, which is how a rollback becomes a second incident.
-The patch then follows the ordinary release path above, including its own signed tag.
+The patch then follows the ordinary release path above: land it, merge the release pull request, and the automation cuts `v0.2.1` from it.
 
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
@@ -292,14 +341,22 @@ Mark the GitHub release as a pre-release or edit its notes to say it is withdraw
 
 `scripts/rollback-drill.sh` is the rehearsal, and it has been run.
 
-It clones this repository into a temporary directory, signs real tags in the clone, and drives the release preflight against each one.
+It clones this repository into a temporary directory, creates real tags in the clone, and drives the release preflight against each one.
 It pushes nothing and never touches the real repository, which is why it is a script anyone can run rather than a workflow.
+The clone is taken with `--no-tags`, because the drill creates `v<the tree's version>` and the source now carries a real release tag of that name: without it the first scenario died at `tag 'v0.1.0' already exists`, which is a drill that stops working the moment the thing it rehearses happens once.
 
-Eight scenarios, all passing on 2026-09-07 and first on 2026-09-05: the signed annotated tag the release path accepts, five it refuses (lightweight, unsigned, wrong version, off the released branch, no bundle built), the publication interlock refusing a publish, and the hotfix path branched from the released tag, landed and tagged again.
-Re-run on 2026-09-07 because the preflight had gained its bundle-freshness clause since the first run, and a drill that predates the gate it rehearses proves nothing about it.
+Thirteen scenarios, all passing on 2026-09-10.
+The lightweight tag release-please creates, which the path now accepts.
+Four it refuses: a version the tree does not declare, a tag that existed before this run, a commit that never reached the released branch, and no bundle built.
+Six publish refusals, each on a manifest broken to make it fire: `private` back in the manifest, `UNLICENSED`, no licence field at all, no `files` allowlist, no `repository`, and a `bin` pointing outside the bundle.
+The manifest as it stands passing that same publishing gate, which is what says the gate no longer holds publication.
+And the hotfix path branched from the released tag, landed and tagged again.
+
+Re-run whenever the gate changes, because a drill that predates the gate it rehearses proves nothing about it.
+The 2026-09-07 run was eight scenarios against the signed-tag gate; ADR-0037 replaced that gate, and the publication-interlock scenario had already started passing at exit 0 against a preflight that was right, because `"private": true` left the manifest when the first release was cut.
 
 ```text
-drill: 8 passed, 0 failed
+drill: 13 passed, 0 failed
 ```
 
 A rollback policy nobody has run is a document, not a policy.
@@ -322,7 +379,7 @@ A settings script that half-applies is worse than one that refuses, because the 
 | File | What it sets |
 |---|---|
 | `.github/rulesets/main.json` | Signed commits, squash-only merges, no force push, no deletion, and the required `checks` and `tests kept` contexts |
-| `.github/rulesets/tags.json` | Signed tags on `refs/tags/v*` that cannot be updated or deleted. The name itself is checked by the release preflight, not here: see "Why the tag ruleset does not check the tag name" |
+| `.github/rulesets/tags.json` | A `refs/tags/v*` tag that cannot be updated or deleted. No signature is required: see "Why the tag is no longer signed". The name itself is checked by the release preflight, not here |
 | `.github/settings/repository.json` | Squash-only, keeping the commit messages so a `Release-As:` footer survives, and deleting a branch once its pull request merges |
 | `.github/settings/actions-permissions.json` | `sha_pinning_required`, so an unpinned action cannot come back |
 | `.github/settings/actions-workflow-permissions.json` | A read-only default token, and permission for Actions to open a pull request. See "Why Actions may create pull requests" |
