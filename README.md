@@ -27,13 +27,23 @@ The package has zero runtime dependencies, and that is a budget rather than a co
 
 ## Install
 
-No package is on the registry, and none of the three releases cut so far carries any assets.
-Publication is a separate gate and it is closed, on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered.
-The name clearance ran on 2026-09-10 and cleared `treadling` on every source it could reach; [ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) carries what it read, what it could not, and why `treadle` is no longer this package's name.
-The package will publish as `@abhijeet34/treadling`, because npm refused the unscoped `treadling` as too similar to `readline` and named that scope in the refusal ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
-The typed command stays `treadling`, so every example below is unchanged, and `npx treadling` will never resolve here: the scope is part of the name and an install line without it fetches nothing of this project's.
-[docs/RELEASING.md](docs/RELEASING.md) says why each release came up empty, what opens the publish gate, and what a release says when it published nothing.
-Clone the repository to work on it.
+`@abhijeet34/treadling` is on the registry, and `0.2.1` is what `latest` points at.
+
+```bash
+npm install -g @abhijeet34/treadling
+treadling version
+```
+
+The install line carries the scope and the command does not.
+`npm install -g @abhijeet34/treadling` and `npx @abhijeet34/treadling` fetch this package; `npm install -g treadling` and `npx treadling` fetch nothing, because npm refused the unscoped `treadling` as too similar to `readline` and no such package exists to resolve ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
+`treadle` is not this package either: another developer holds that npm record, which is why the name moved ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)).
+
+`0.2.1` was published by hand.
+The release workflow carries a `publish` job and it has never run: it is gated on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, the `npm-publish` environment does not exist either, and no trusted publisher is registered against this repository.
+Every release since `v0.1.3` says so on its own page under `## Publication`.
+[docs/RELEASING.md](docs/RELEASING.md), "The interlocks in front of npm", names what is left to arm it.
+
+Clone the repository to work on it instead.
 
 ```bash
 git clone https://github.com/Abhijeet34/treadling.git
@@ -45,17 +55,18 @@ npm ci
 
 ```bash
 export TREADLING_ACTOR=your-name   # and TREADLING_ACTOR_KIND=agent when an agent runs it
-node bin/treadling.js init
-node bin/treadling.js file story "Field edits"
-node bin/treadling.js show field-edits
-node bin/treadling.js backlog
-node bin/treadling.js status
+treadling init
+treadling file story "Field edits"
+treadling show field-edits
+treadling backlog
+treadling status
 ```
 
 `file` prints the id it minted on its `item` line, and that id is the title as a slug, which is why `show field-edits` reads the record back.
 `backlog` lists what is open and names the filter it used; `status` counts the workspace rather than printing a record.
 `status` also says when no write can pass, on a `writes` line with the remedy that clears it, because a store that refuses every write is the most important fact about a workspace and the count above it would otherwise read as health.
 `treadling help <command>` is the contract for one command, and `treadling help` on its own is the whole inventory.
+From a clone rather than an install, `node bin/treadling.js` replaces `treadling` in every line above and takes the same arguments.
 
 `TREADLING_ACTOR` is who the event log records for every change you make, and `--actor <name>` overrides it for one command.
 A command that would write an event refuses instead of recording one when neither names anyone, so no workspace ever holds an event nobody is attributable for.
@@ -129,8 +140,9 @@ See [Status](#status) for what is shipped, and what was declined or is blocked.
 | `doctor`: fifteen findings over records, the event log, the relation graph, the parent hierarchy, impediments and the workspace's configured thresholds | Shipped |
 | Benchmarks: corpora, cold-process timing, byte and token accounting, the DR8 gate | Shipped: ten of the twelve comparison axes measured, two not; A11 Declined [ADR-0012](docs/architecture/adr/0012-the-extension-surface-that-does-not-ship.md) |
 | Build: one esbuild bundle, weighed against DR8's 768,000 bytes | Shipped: [ADR-0027](docs/architecture/adr/0027-the-bundle-budget-moves-once-with-the-measurement-that-moved-it.md) |
-| Release: version and changelog through release-please, the cross-platform matrix gates the tag rather than a signature, SBOM, checksums, build provenance | Shipped: [ADR-0037](docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md); a failing check spends no version number, because the automation cuts the tag itself, behind the matrix; fired three times, on `v0.1.0` through `v0.1.2`, none of which carries assets ([docs/RELEASING.md](docs/RELEASING.md)) |
-| Published package | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, and on a trusted publisher that has not been registered; the name cleared on 2026-09-10 ([ADR-0038](docs/architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md)) and publishes scoped as `@abhijeet34/treadling` ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)) |
+| Release: version and changelog through release-please, the cross-platform matrix gates the tag rather than a signature, SBOM, checksums, build provenance | Shipped: [ADR-0037](docs/architecture/adr/0037-the-automation-cuts-the-tag-and-no-release-carries-a-human-signature.md); a failing check spends no version number, because the automation cuts the tag itself, behind the matrix; fired six times, on `v0.1.0` through `v0.2.1`, and the last three carry all three assets ([docs/RELEASING.md](docs/RELEASING.md)) |
+| Published package | Shipped: `@abhijeet34/treadling@0.2.1` on the npm registry since 2026-09-10, scoped because npm refused the unscoped name ([ADR-0039](docs/architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)); published by hand, not by the release run |
+| Publishing from the release run | Blocked on the `NPM_PUBLISH_ENABLED` repository variable, which does not exist, on the `npm-publish` environment, which does not exist, and on a trusted publisher that has not been registered; the `publish` job has never run ([docs/RELEASING.md](docs/RELEASING.md)) |
 
 Every row's State is one of four words, and each carries a pointer this repository holds it to.
 **Shipped** names the record or the commit, **Queued** names an item in `.work` that is `ready` or `draft`, **Declined** names the record that refused it with one sentence of reason, and **Blocked** names what has to happen elsewhere before the row can move at all.
