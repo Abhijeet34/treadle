@@ -522,6 +522,15 @@ A reviewed finding in an already-published commit belongs in a per-repository `.
 A synthetic credential planted to prove the gate fires needs the charset the matching rule actually requires, not just its keyword prefix; `test/architecture/secret-scan-fixture.test.ts` carries that charset and why.
 That file's two scans need the gitleaks binary, so `ci.yml`'s `check` job installs it from the same pins and sets `TREADLE_REQUIRE_GITLEAKS=1`, under which a missing binary fails them rather than skipping; the macOS and Windows legs of `cross-platform.yml` install nothing and still skip them.
 
+## The settings that are not files
+
+Branch protection, the tag rules and the Actions policy live on the forge, and `.github/rulesets/` and `.github/settings/` are what they should be rather than what they are.
+`scripts/apply-repo-settings.sh Abhijeet34/treadle` is the only thing that sends them, and nobody runs it for you: editing one of those files changes the documentation and nothing else until it runs.
+Two rulesets had drifted that way, one of them for five days without a commit anywhere near it.
+
+`npm run ruleset-drift` reads the live rulesets back and refuses when they disagree, and `.github/rulesets/README.md` states what those files are and what the check cannot see.
+Run it after editing a ruleset file, and expect it to be the thing that tells you the edit has not landed yet.
+
 ## Maintaining this file
 
 Keep this file for knowledge useful to almost every future agent session in this project.

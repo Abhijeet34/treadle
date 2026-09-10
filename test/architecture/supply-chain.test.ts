@@ -13,7 +13,7 @@
 
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, it } from 'node:test'
@@ -22,7 +22,12 @@ import { workflowOf, type Job } from '../helpers/workflow.ts'
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const BUNDLE = 'dist/treadle.js'
-const WORKFLOWS = ['ci.yml', 'cross-platform.yml', 'release.yml', 'bench.yml', 'secret-scan.yml']
+// Read from the directory, never listed. The list this replaced named five of the seven
+// workflows, so codeql.yml had never been read by the SHA-pinning assertion below and a new
+// workflow escaped both of them by existing.
+const WORKFLOWS = readdirSync(path.join(ROOT, '.github', 'workflows'))
+  .filter((entry) => entry.endsWith('.yml'))
+  .sort()
 
 const manifest = JSON.parse(readFileSync(path.join(ROOT, 'package.json'), 'utf8')) as {
   bin?: Record<string, string>

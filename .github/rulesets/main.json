@@ -29,7 +29,11 @@
       "parameters": {
         "strict_required_status_checks_policy": true,
         "do_not_enforce_on_create": false,
-        "required_status_checks": [{ "context": "checks" }, { "context": "tests kept" }]
+        "required_status_checks": [
+          { "context": "checks" },
+          { "context": "tests kept" },
+          { "context": "secret scan" }
+        ]
       }
     }
   ]

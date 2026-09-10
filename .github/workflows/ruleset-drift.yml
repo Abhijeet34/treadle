@@ -1,0 +1,62 @@
+# SPDX-License-Identifier: Apache-2.0
+# Reads the rulesets GitHub actually enforces and refuses a repository whose rulesets disagree
+# with .github/rulesets/. Those files were a record nothing read back: tags.json dropped
+# `required_signatures` in #97, the live tag ruleset kept it, and `release-tag` was refused
+# `Resource not accessible by integration` creating an unsigned tag. scripts/check-ruleset-drift.ts
+# carries the incident and what the check can and cannot see.
+#
+# It runs on four events and each answers a different way the two can part:
+#   - `schedule`, because drift needs no commit. The main ruleset's required context was
+#     changed on the forge on 2026-09-08 and no push since then could have noticed.
+#   - `pull_request` on the files themselves, so a branch editing a ruleset file is told at
+#     once whether it changed the forge or only the documentation.
+#   - `workflow_call`, taken by release.yml in front of `release-tag`. A `v*` tag can be
+#     neither updated nor deleted, so a tag cut against a tag ruleset nobody had read costs a
+#     version number permanently, and two have been spent that way already.
+#   - `workflow_dispatch`, to answer the question on demand without waiting for Monday.
+#
+# It is not a required context on main. `pull_request` here is filtered by path, so most pull
+# requests never start this job, and a required context that does not report blocks every merge.
+#
+# No `concurrency` block: cancelling a scheduled or release run discards the only record of its
+# own result, and AGENTS.md forbids cancel-in-progress on either.
+
+name: ruleset drift
+
+on:
+  schedule:
+    - cron: "37 6 * * 1"
+  workflow_dispatch:
+  workflow_call:
+  pull_request:
+    paths:
+      - .github/rulesets/**
+      - scripts/check-ruleset-drift.ts
+      - test/release/ruleset-drift.test.ts
+      - .github/workflows/ruleset-drift.yml
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    name: ruleset drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      # No `npm ci`: the script calls fetch and the standard library and nothing else.
+      #
+      # The ruleset endpoints answer an unauthenticated request on a public repository, so the
+      # token buys no field here - `bypass_actors` is served only to a repository administrator
+      # and the report says when it could not read it. It is passed for the rate limit:
+      # unauthenticated requests are counted per IP and the runners share theirs.
+      - name: The forge must enforce what .github/rulesets/ says it enforces
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-ruleset-drift.ts

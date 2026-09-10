@@ -107,13 +107,30 @@ jobs:
     needs: release-pr
     uses: ./.github/workflows/cross-platform.yml
 
+  # The rulesets the forge enforces, read back against .github/rulesets/, in front of the tag
+  # rather than behind it. A `v*` tag can be neither updated nor deleted, so a tag cut against a
+  # tag ruleset nobody had read costs a version number permanently: that is how `release-tag`
+  # met `Resource not accessible by integration` on a tag ruleset that still required a
+  # signature the file had dropped. A red build costs a red build.
+  #
+  # This exits 1 against the live repository today: .github/rulesets/main.json names `checks`,
+  # `tests kept` and `secret scan`, live ruleset 22314350 enforces only `checks` and
+  # `secret scan`, so release-tag below stays blocked until scripts/apply-repo-settings.sh
+  # applies `tests kept` to the live rule. That is containment, not a defect; do not drop this
+  # from release-tag's `needs:` to turn it green, docs/RELEASING.md, "Keeping the rulesets and
+  # the files in step".
+  ruleset-drift:
+    name: ruleset-drift
+    needs: release-pr
+    uses: ./.github/workflows/ruleset-drift.yml
+
   # The other half of release-please, and the only job in this repository that can create a
   # tag. `skip-github-pull-request` keeps it from opening a second pull request behind
   # `release-pr`'s back. On an ordinary push there is no merged release pull request to
   # release, so it does nothing and says so through `created`.
   release-tag:
     name: release-tag
-    needs: [release-pr, cross-platform]
+    needs: [release-pr, cross-platform, ruleset-drift]
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
