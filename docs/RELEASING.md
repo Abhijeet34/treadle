@@ -408,6 +408,11 @@ A red drift check says the two sides disagree, not which one is right, and the f
 This was the first drift the check ever found where getting that wrong would have made things worse: `secret scan` was already required on the forge, so applying `main.json` as it then stood would have dropped `secret scan` as a merge gate to match it, and the drift check would then have reported success over a repository with one fewer guard on it.
 The fix adds `secret scan` to `main.json` beside `tests kept`, keeping the stronger side rather than matching the weaker one; deciding which side that is stays a person's job, every time this check goes red.
 
+That is why the release path is blocked today, and it is containment rather than a defect.
+`main.json` names `checks`, `tests kept` and `secret scan`; live ruleset `22314350` enforces only `checks` and `secret scan`; so `npm run ruleset-drift` exits 1, and `release-tag`'s `needs: ruleset-drift` in `.github/workflows/release.yml` stops the release path there rather than cutting a tag against rules the tree only believes it has.
+That is the check doing its job on the first drift it ever found, not something to route around: dropping `ruleset-drift` from `release-tag`'s `needs:` would delete the enforcement in the same change that added it.
+What unblocks it is running `scripts/apply-repo-settings.sh` to apply `tests kept` to the live rule, which adds a protection rather than removing one.
+
 ```sh
 npm run ruleset-drift
 ```

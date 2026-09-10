@@ -36,6 +36,7 @@ It needs no credential: both ruleset endpoints answer an unauthenticated request
 
 The `ruleset drift` workflow runs it weekly, on a pull request that touches these files, and in front of the tag on the release path.
 A `v*` tag can be neither updated nor deleted, so a tag cut against a tag ruleset nobody had read costs a version number permanently.
+That is why it exits 1 in front of `release-tag` today: `main.json` names `checks`, `tests kept` and `secret scan`, live ruleset `22314350` enforces only `checks` and `secret scan`, so the release path stays blocked until `scripts/apply-repo-settings.sh` applies `tests kept` to the live rule, a protection being added rather than one being removed.
 
 One field it cannot check: `bypass_actors` is served only to a read by a repository administrator, so an unprivileged run reports that it could not compare it rather than counting it as matching.
 Run the command locally, signed in as an administrator, to have that field compared too.
