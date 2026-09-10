@@ -117,7 +117,31 @@ describe('a branch that drops a test main has is refused', () => {
     const skipped: Tree = { ...TWO, 'test/b.test.ts': (TWO['test/b.test.ts'] ?? '').replace('  it(', '  it.skip(') }
     const verdict = await check(TWO, skipped)
     assert.equal(verdict.code, 1)
-    assert.match(verdict.out, /declares it \.skip, which runs nothing and asserts nothing/)
+    assert.match(verdict.out, /declares it skipped, which runs nothing and asserts nothing/)
+  })
+
+  // The form above is the one this gate was written for, and the one nothing here uses. All 21
+  // skips in this repository are Node's option object, which the gate read as a running test:
+  // it exited 0 on every skip that existed and would have exited 0 on a new one.
+  it('counts the same skip written as `{ skip: reason }`, which is the form every skip here uses', async () => {
+    const skipped: Tree = {
+      ...TWO,
+      'test/b.test.ts': (TWO['test/b.test.ts'] ?? '')
+        .replace("name=value', () =>", "name=value', { skip: 'windows has no mode bits' }, () =>"),
+    }
+    const verdict = await check(TWO, skipped)
+    assert.equal(verdict.code, 1)
+    assert.match(verdict.out, /FAIL {2}writes every part as name=value/)
+    assert.match(verdict.out, /declares it skipped, which runs nothing and asserts nothing/)
+  })
+
+  it('reads that option object only where the argument after the title is, so a title naming one is not one', async () => {
+    const named: Tree = {
+      'test/a.test.ts': ["it('refuses a { skip: reason } it cannot parse', () => {})", ''].join('\n'),
+    }
+    const verdict = await check(named, named)
+    assert.equal(verdict.code, 0, verdict.out)
+    assert.match(verdict.out, /1 tests at/)
   })
 
   it('compares a title built from a template by its skeleton, so an interpolated name counts', async () => {

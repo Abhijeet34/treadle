@@ -511,6 +511,7 @@ Re-read both values with `.ci/gitleaks/sync.sh --digest config` and `--digest ho
 The hook is the gate and CI is the backstop: the hook refuses a push before anything reaches the remote, and it is inert in a fresh clone until that clone runs `git config core.hooksPath .githooks`, because that is repository configuration and no commit carries it.
 A reviewed finding in an already-published commit belongs in a per-repository `.gitleaksignore` pinned to commits that exist, never in `.gitleaks.toml`, which the whole fleet shares.
 A synthetic credential planted to prove the gate fires needs the charset the matching rule actually requires, not just its keyword prefix; `test/architecture/secret-scan-fixture.test.ts` carries that charset and why.
+That file's two scans need the gitleaks binary, so `ci.yml`'s `check` job installs it from the same pins and sets `TREADLE_REQUIRE_GITLEAKS=1`, under which a missing binary fails them rather than skipping; the macOS and Windows legs of `cross-platform.yml` install nothing and still skip them.
 
 ## Maintaining this file
 

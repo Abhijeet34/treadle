@@ -32,6 +32,14 @@ const ANYWHERE = /(?<![.\w$])(?:describe|it|test)(?:\.[A-Za-z0-9_$]+)?[ \t]*\(/g
 /** Node runs everything else, `.only` included. */
 const INACTIVE = new Set(['skip', 'todo'])
 
+/** The same modifier written as Node's option object, `it('t', { skip: 'why' }, fn)`. All 21
+ *  skips in this repository are written that way, so a reader that knows only `it.skip(` sees
+ *  none of them: the gate passed at exit 0 on every skip that existed. Read from the end of the
+ *  title rather than from anywhere on the line, so a title that merely contains the words is
+ *  not one. `{ skip: false }` runs and is read here as inactive; that asks for a test back,
+ *  where missing a real skip loses one silently. */
+const OPTIONS = /^[ \t]*,[ \t]*\{[^}]*(?<![.\w$])(?:skip|todo)[ \t]*:/
+
 const TRAILER = 'Removes-test'
 
 type Inventory = {
@@ -102,13 +110,14 @@ function decode(raw: string): string {
   })
 }
 
-/** The title of a declaration, or undefined when it is not a string literal on this line: an
- *  identifier, or a string that does not close before the newline.
+/** The title of a declaration and the offset just past it, or undefined when it is not a
+ *  string literal on this line: an identifier, or a string that does not close before the
+ *  newline. The offset is what lets the argument after the title be read for an option object.
  *
  *  A template's interpolations are collapsed to a bare `${}`, because what identifies the
  *  declaration is the skeleton around them. 58 of this repository's 773 declarations name
  *  their subject that way and would otherwise be invisible to the comparison. */
-function titleAt(line: string, from: number): string | undefined {
+function titleAt(line: string, from: number): { title: string; end: number } | undefined {
   let at = from
   while (line[at] === ' ' || line[at] === '\t') at += 1
   const quote = line[at]
@@ -134,7 +143,7 @@ function titleAt(line: string, from: number): string | undefined {
       i = end - 1
       continue
     }
-    if (ch === quote) return decode(raw)
+    if (ch === quote) return { title: decode(raw), end: i + 1 }
     raw += ch
   }
   return undefined
@@ -164,12 +173,13 @@ function inventoryOf(ref: string): Inventory {
       const match = DECLARATION.exec(line)
       if (match === null) continue
       declared += 1
-      const title = titleAt(line, match[0].length)
-      if (title === undefined) {
+      const declaration = titleAt(line, match[0].length)
+      if (declaration === undefined) {
         dynamic += 1
         continue
       }
-      record(INACTIVE.has(match[2] ?? '') ? inactive : active, title, file)
+      const off = INACTIVE.has(match[2] ?? '') || OPTIONS.test(line.slice(declaration.end))
+      record(off ? inactive : active, declaration.title, file)
     }
     // A declaration this reader did not see is a hole in the comparison rather than a pass,
     // so it is named here and fails the run.
@@ -263,7 +273,7 @@ function main(): void {
       `FAIL  ${gone.title}\n` +
       `      ${where} declares it at ${base.slice(0, 8)} and this branch does not\n` +
       (gone.skipped
-        ? '      this branch declares it .skip, which runs nothing and asserts nothing\n'
+        ? '      this branch declares it skipped, which runs nothing and asserts nothing\n'
         : '') +
       '      restore the test, or record the removal in a commit message trailer:\n' +
       `        ${TRAILER}: ${gone.title}`,
