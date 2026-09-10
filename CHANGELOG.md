@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/Abhijeet34/treadle/compare/v0.1.1...v0.1.2) (2026-09-10)
+
+
+### Build and release
+
+* **release:** cut the tag from the run and approve its parked checks ([#97](https://github.com/Abhijeet34/treadle/issues/97)) ([b55ce5c](https://github.com/Abhijeet34/treadle/commit/b55ce5c550e1b23651ba38e80598ef8cac6d8047))
+
 ## [0.1.1](https://github.com/Abhijeet34/treadle/compare/v0.1.0...v0.1.1) (2026-09-10)
 
 
