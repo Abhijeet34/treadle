@@ -154,7 +154,7 @@ Three assets on the GitHub release, plus one attestation that is not a file.
 
 | Asset | What it is |
 |---|---|
-| `treadling-<version>.tgz` | The tarball `npm pack` produced, which is what npm would publish |
+| `abhijeet34-treadling-<version>.tgz` | The tarball `npm pack` produced, which is what npm would publish. The scope becomes a filename prefix, measured rather than composed ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)) |
 | `sbom.spdx.json` | GitHub's dependency-graph export for this repository |
 | `SHA256SUMS` | `sha256sum` over the other two |
 
@@ -200,11 +200,13 @@ When the name clears, what is left of opening the gate is: register treadling's 
 The name clearance ran on 2026-09-10 and `treadling` cleared every source it could reach: free at the npm ownership record, zero exact marks on the US register, free on crates.io and PyPI, and a dictionary word.
 The EU, UK and Indian registers were not read, and npm's similarity gate runs only on a real publish, so neither is cleared and [ADR-0038](architecture/adr/0038-the-name-is-treadling-and-the-old-npm-record-belongs-to-another-developer.md) says so rather than rounding them up.
 That record also carries why `treadle` is no longer this package's name: another developer holds the npm ownership record for it, for a real unrelated library, and npm transfers no name on demand.
+The similarity gate then refused the unscoped `treadling` on 2026-09-11 as too similar to `readline`, which is two edits away where the screen tested one, so the trusted publisher registers against `@abhijeet34/treadling` and the scope is what publishes ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
 
 That list assumed a release and a package would arrive on the same day. They did not.
 `v0.1.0` was cut while three of those four sentences still said nothing had been released, so they were corrected on the day the release existed rather than the day a package does, and this is what is left of the list.
 Two sentences and one code block stop being true when a package first reaches the registry:
-`README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which becomes `npm install -g treadling` and `treadling init` where today it is `node bin/treadling.js init` against a clone.
+`README.md`'s "No package is on the registry" opening to its Install section, `README.md`'s "Published package" status row, and the quick start, which becomes `npm install -g @abhijeet34/treadling` and `treadling init` where today it is `node bin/treadling.js init` against a clone.
+The scope is part of the install line and not of the command: `npm install -g treadling` and `npx treadling` resolve to something that is not this package, or to nothing ([ADR-0039](architecture/adr/0039-the-published-name-is-scoped-and-the-similarity-gate-is-only-observable-on-a-publish.md)).
 Do not write any of them early. A quick start that names a package nobody can install is the defect this repository spent a week removing.
 
 One more setting belongs in that list, and it closes a hole nothing in this tree can: set the package's npm publishing access to disallow token publishes, so the workflow's OIDC identity is the only thing that can publish.
@@ -269,7 +271,7 @@ GitHub documents that value as requiring approval for a contributor opening thei
 The bot holds no write access and has never had a pull request merged here, so it is that contributor on every release pull request, forever.
 
 A parked run is not a slow run.
-The branch name in the two measurements below ends in the package's old name, which ADR-0038 retired; release-please derives that branch from the package name, so a run taken now would read `release-please--branches--main--components--treadling`.
+The branch name in the two measurements below ends in the package's old name, which ADR-0038 retired; release-please derives that branch from the package name, but what it derives under the scoped `@abhijeet34/treadling` name is unread rather than predicted, and will be taken from the first real release-please run under that name: this document's convention, and ADR-0038 and ADR-0039, state only what a run showed, and a scope's `@` and `/` cannot survive unchanged in a git branch component, so any derived value here would be a guess dressed as a measurement.
 Measured on 2026-09-08, run `34176306546` on `release-please--branches--main--components--treadle` reported `created_at`, `run_started_at` and `updated_at` all at `2026-09-08T01:20:18Z`, and `0` jobs.
 Fourteen consecutive runs on that branch concluded `action_required` the same way, over 2026-09-07 and 2026-09-08.
 `.github/rulesets/main.json` requires the `checks`, `tests kept` and `secret scan` contexts on `main`, so a release pull request whose checks never ran can never merge, and step 2 above stops there.
@@ -336,7 +338,7 @@ So the order of preference is fixed.
 **First, deprecate.** This is the answer in almost every case.
 
 ```sh
-npm deprecate treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
+npm deprecate @abhijeet34/treadling@0.2.0 "0.2.0 quarantines a valid record on a hand-edited shard; use 0.2.1"
 ```
 
 The version stays installable, every existing lockfile keeps working, and anyone installing it sees the sentence.
@@ -356,7 +358,7 @@ The patch then follows the ordinary release path above: land it, merge the relea
 **Unpublish only when the artifact must not exist.** A leaked credential in the tarball, or code that should never have shipped at all.
 
 ```sh
-npm unpublish treadling@0.2.0
+npm unpublish @abhijeet34/treadling@0.2.0
 ```
 
 Within 72 hours, and only when nothing depends on that version.
